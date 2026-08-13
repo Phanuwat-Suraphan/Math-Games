@@ -254,6 +254,8 @@
       ช่องที่ยังไม่ใส่รูปจะใช้ภาพสัญลักษณ์เดิม
     </div>
 
+    <div class="note ok" id="bakedInfo" style="display:none"></div>
+
     <div class="note bad" id="shareWarn">
       <b>⚠️ รูปเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น</b>
       ถ้าส่งลิงก์ให้เด็กเปิดในเครื่องอื่น เขาจะยังไม่เห็นรูปที่คุณใส่
@@ -364,9 +366,18 @@
     const QUALITY = 0.72;
     let map = {};
 
+    /**
+     * รูปที่ฝังมากับไฟล์เกมตั้งแต่ต้น (ถ้ามี)
+     * รูปชุดนี้ติดไปกับลิงก์ทุกเครื่อง ไม่ต้องอัปใหม่
+     * ส่วนรูปที่ผู้ใช้อัปเองจะทับชุดนี้เฉพาะบนเครื่องนั้น
+     */
+    const BAKED = (typeof window !== 'undefined' && window.__BAKED_IMAGES) || {};
+
     try { map = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { map = {}; }
 
-    const get = key => map[key] || null;
+    const get = key => map[key] || BAKED[key] || null;
+    const isBaked = key => !map[key] && !!BAKED[key];
+    const bakedCount = () => Object.keys(BAKED).length;
     const bytes = () => new Blob([JSON.stringify(map)]).size;
 
     function save(){
@@ -424,7 +435,7 @@
     }
     function count(){ return Object.keys(map).length; }
 
-    return { get, set, remove, clear, exportPack, importPack, bytes, count };
+    return { get, set, remove, clear, exportPack, importPack, bytes, count, isBaked, bakedCount };
   })();
 
   /** ใส่รูปพื้นหลังให้ element ถ้ามีรูปของ key นั้น */
@@ -500,10 +511,11 @@
       const box = $(boxId); box.innerHTML = '';
       items.forEach(it => {
         const src = IMG.get(it.key);
+        const baked = IMG.isBaked(it.key);
         const d = document.createElement('div');
         d.className = 'slot' + (src ? ' filled' : '');
         d.innerHTML = `<div class="thumb">${src ? '' : it.fallback}</div>
-                       <div class="lb">${it.label}</div>
+                       <div class="lb">${it.label}${baked ? '<br><span style="color:var(--blue)">ฝังมากับเกม</span>' : ''}</div>
                        <input type="file" accept="image/*">`;
         if (src) d.querySelector('.thumb').style.backgroundImage = `url(${src})`;
 
@@ -519,7 +531,7 @@
           renderGallery();
         };
 
-        if (src) {
+        if (src && !baked) {
           const rm = document.createElement('button');
           rm.className = 'rm'; rm.textContent = '✕';
           rm.title = 'ลบรูปนี้';
@@ -536,7 +548,17 @@
     $('usage').textContent = kb.toFixed(0);
     $('usagePct').textContent = `(ใส่รูปแล้ว ${IMG.count()} ช่อง · ราว ${pct.toFixed(0)}% ของพื้นที่)`;
     $('usageBar').style.width = pct + '%';
+    // เตือนเฉพาะรูปที่ผู้ใช้อัปเอง รูปที่ฝังมากับไฟล์ติดไปกับลิงก์อยู่แล้ว
     $('shareWarn').style.display = IMG.count() > 0 ? '' : 'none';
+    const bakedInfo = $('bakedInfo');
+    if (IMG.bakedCount() > 0) {
+      bakedInfo.style.display = '';
+      bakedInfo.innerHTML = `<b>✅ เกมนี้มีรูปฝังมาแล้ว ${IMG.bakedCount()} ใบ</b>`
+        + 'รูปชุดนี้ติดไปกับลิงก์ ทุกคนที่เปิดจะเห็นเหมือนกันหมด ไม่ต้องอัปเอง'
+        + ' ถ้าอัปรูปทับ จะเห็นเฉพาะบนเครื่องนี้';
+    } else {
+      bakedInfo.style.display = 'none';
+    }
   }
 
   $('openGallery').onclick = () => {
