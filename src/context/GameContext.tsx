@@ -8,7 +8,6 @@ import {
   type ReactNode,
 } from 'react'
 import type { GameSettings, Player } from '../types/player'
-import type { Level, LevelResult } from '../types/level'
 import {
   DEFAULT_SETTINGS,
   clearPlayer,
@@ -17,28 +16,24 @@ import {
   loadSettings,
   savePlayer,
   saveSettings,
+  updatePlayer as persistPlayerChanges,
   type StorageStatus,
 } from '../services/storage'
 import {
-  COINS_PER_CORRECT_ANSWER,
-  EXP_PER_CORRECT_ANSWER,
-  applyExpGain,
-} from '../utils/levelSystem'
-import { playSfx, setSfxEnabled } from '../utils/sfx'
-
-export interface AnswerRewardOutcome {
-  gainedExp: number
-  gainedCoins: number
-  levelsGained: number
-}
-
-/** ยอดที่ผู้เล่นได้รับจริงระหว่างเล่นด่าน ส่งมาจากหน้า MathChallenge */
-export interface LevelAttemptStats {
-  correctAnswers: number
-  totalQuestions: number
-  expFromAnswers: number
-  coinsFromAnswers: number
-}
+  completeQuest,
+  isReplayOf,
+  recordAnswer,
+  type AnswerInput,
+  type AnswerOutcome,
+  type QuestInput,
+  type QuestOutcome,
+} from '../services/rewardService'
+import { emit } from '../services/eventBus'
+import {
+  playSfx,
+  setMusicEnabled,
+  setSoundEnabled,
+} from '../services/audioService'
 
 export interface GameContextValue {
   player: Player | null
@@ -47,9 +42,13 @@ export interface GameContextValue {
   storageStatus: StorageStatus
   storageWarning: string | null
   pendingLevelUp: number | null
+
   startNewGame: (name: string, avatar: string) => Player
-  rewardCorrectAnswer: () => AnswerRewardOutcome
-  completeLevel: (level: Level, stats: LevelAttemptStats) => LevelResult
+  answerQuestion: (input: AnswerInput) => AnswerOutcome | null
+  finishQuest: (input: QuestInput) => QuestOutcome | null
+  patchPlayer: (changes: Partial<Player>) => void
+  isLevelReplay: (levelId: string) => boolean
+
   acknowledgeLevelUp: () => void
   updateSettings: (partial: Partial<GameSettings>) => void
   resetProgress: () => void
@@ -60,6 +59,7 @@ export const GameContext = createContext<GameContextValue | null>(null)
 
 const STORAGE_WARNINGS: Partial<Record<StorageStatus, string>> = {
   corrupted: 'ข้อมูลเดิมเสียหาย จึงต้องเริ่มการผจญภัยใหม่ ขออภัยด้วยนะ',
+  repaired: 'อัปเดตรูปแบบข้อมูลให้ทันสมัยแล้ว ความคืบหน้าเดิมยังอยู่ครบ',
   unavailable:
     'เบราว์เซอร์นี้บันทึกข้อมูลไม่ได้ ความคืบหน้าจะหายเมื่อปิดหน้าเว็บ',
 }
@@ -74,6 +74,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   // เก็บค่าล่าสุดไว้ใน ref เพื่อให้คำนวณรางวัลได้ทันทีแบบ synchronous
   const playerRef = useRef<Player | null>(null)
+  const settingsRef = useRef<GameSettings>(DEFAULT_SETTINGS)
 
   useEffect(() => {
     const result = loadPlayer()
@@ -83,19 +84,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
     setStorageWarning(STORAGE_WARNINGS[result.status] ?? null)
 
     const loadedSettings = loadSettings()
+    settingsRef.current = loadedSettings
     setSettings(loadedSettings)
-    setSfxEnabled(loadedSettings.soundEnabled)
+    setSoundEnabled(loadedSettings.soundEnabled)
+    setMusicEnabled(loadedSettings.musicEnabled)
     setIsLoading(false)
   }, [])
 
-  // ให้ "ลดการเคลื่อนไหว" มีผลจริงกับทั้งแอปผ่าน data attribute
+  // ให้การตั้งค่าอนิเมชันมีผลจริงกับทั้งแอปผ่าน data attribute
   useEffect(() => {
     if (typeof document === 'undefined') return
-    document.documentElement.dataset.reduceMotion = settings.reduceMotion
-      ? 'true'
-      : 'false'
-  }, [settings.reduceMotion])
+    document.documentElement.dataset.animations = settings.animationsEnabled
+      ? 'on'
+      : 'off'
+  }, [settings.animationsEnabled])
 
+  /** บันทึกผู้เล่นลง state และ localStorage — เรียกเฉพาะตอนข้อมูลสำคัญเปลี่ยนจริง */
   const commitPlayer = useCallback((next: Player) => {
     playerRef.current = next
     setPlayer(next)
@@ -113,91 +117,154 @@ export function GameProvider({ children }: { children: ReactNode }) {
       setStorageWarning(null)
       setPendingLevelUp(null)
       commitPlayer(next)
+
+      emit('PLAYER_CREATED', {
+        playerId: next.id,
+        name: next.name,
+        avatar: next.avatar,
+      })
+
       return next
     },
     [commitPlayer],
   )
 
-  const rewardCorrectAnswer = useCallback((): AnswerRewardOutcome => {
+  const isLevelReplay = useCallback((levelId: string): boolean => {
     const current = playerRef.current
-    if (!current) {
-      return { gainedExp: 0, gainedCoins: 0, levelsGained: 0 }
-    }
+    return current ? isReplayOf(current, levelId) : false
+  }, [])
 
-    const gain = applyExpGain(
-      current.level,
-      current.exp,
-      EXP_PER_CORRECT_ANSWER,
-    )
-
-    commitPlayer({
-      ...current,
-      level: gain.level,
-      exp: gain.exp,
-      coins: current.coins + COINS_PER_CORRECT_ANSWER,
-    })
-
-    if (gain.levelsGained > 0) {
-      setPendingLevelUp(gain.level)
-    }
-
-    return {
-      gainedExp: EXP_PER_CORRECT_ANSWER,
-      gainedCoins: COINS_PER_CORRECT_ANSWER,
-      levelsGained: gain.levelsGained,
-    }
-  }, [commitPlayer])
-
-  const completeLevel = useCallback(
-    (level: Level, stats: LevelAttemptStats): LevelResult => {
+  const answerQuestion = useCallback(
+    (input: AnswerInput): AnswerOutcome | null => {
       const current = playerRef.current
+      if (!current) return null
 
-      const result: LevelResult = {
-        worldId: level.worldId,
-        levelId: level.id,
-        totalQuestions: stats.totalQuestions,
-        correctAnswers: stats.correctAnswers,
-        expFromAnswers: stats.expFromAnswers,
-        coinsFromAnswers: stats.coinsFromAnswers,
-        bonusExp: level.reward.exp,
-        bonusCoins: level.reward.coins,
-        isFirstClear: current ? !current.completedLevels.includes(level.id) : true,
-      }
+      const outcome = recordAnswer(current, input)
+      commitPlayer(outcome.player)
 
-      if (!current) return result
-
-      const gain = applyExpGain(current.level, current.exp, level.reward.exp)
-
-      commitPlayer({
-        ...current,
-        level: gain.level,
-        exp: gain.exp,
-        coins: current.coins + level.reward.coins,
-        completedLevels: current.completedLevels.includes(level.id)
-          ? current.completedLevels
-          : [...current.completedLevels, level.id],
+      emit('QUESTION_ANSWERED', {
+        questionId: input.questionId,
+        skill: input.skill,
+        isCorrect: input.isCorrect,
+        timeMs: input.timeMs,
       })
 
-      if (gain.levelsGained > 0) {
-        setPendingLevelUp(gain.level)
+      if (input.isCorrect) {
+        emit('QUESTION_CORRECT', {
+          questionId: input.questionId,
+          skill: input.skill,
+          streak: outcome.currentStreak,
+        })
+        if (outcome.gainedExp > 0) {
+          emit('EXP_GAINED', { amount: outcome.gainedExp, source: 'answer' })
+        }
+        if (outcome.gainedCoins > 0) {
+          emit('COIN_GAINED', {
+            amount: outcome.gainedCoins,
+            source: outcome.streakBonus ? 'streak' : 'answer',
+          })
+        }
+      } else {
+        emit('QUESTION_WRONG', {
+          questionId: input.questionId,
+          skill: input.skill,
+        })
+        if (outcome.hpDelta !== 0) {
+          emit('HP_CHANGED', {
+            hp: outcome.player.hp,
+            maxHp: outcome.player.maxHp,
+            delta: outcome.hpDelta,
+          })
+        }
       }
 
-      return result
+      emit('STREAK_CHANGED', {
+        currentStreak: outcome.currentStreak,
+        bestStreak: outcome.bestStreak,
+        isBest: outcome.isNewBestStreak,
+      })
+
+      if (outcome.levelsGained > 0) {
+        emit('LEVEL_UP', {
+          level: outcome.newLevel,
+          levelsGained: outcome.levelsGained,
+        })
+        setPendingLevelUp(outcome.newLevel)
+      }
+
+      return outcome
     },
     [commitPlayer],
   )
+
+  const finishQuest = useCallback(
+    (input: QuestInput): QuestOutcome | null => {
+      const current = playerRef.current
+      if (!current) return null
+
+      const outcome = completeQuest(current, input)
+      commitPlayer(outcome.player)
+
+      emit('QUEST_COMPLETED', {
+        levelId: input.level.id,
+        worldId: input.level.worldId,
+        correctAnswers: input.correctAnswers,
+        totalQuestions: input.totalQuestions,
+        isFirstClear: outcome.result.isFirstClear,
+      })
+
+      if (outcome.result.bonusExp > 0) {
+        emit('EXP_GAINED', { amount: outcome.result.bonusExp, source: 'quest' })
+      }
+      if (outcome.result.bonusCoins > 0) {
+        emit('COIN_GAINED', {
+          amount: outcome.result.bonusCoins,
+          source: 'quest',
+        })
+      }
+      if (outcome.healedHp !== 0) {
+        emit('HP_CHANGED', {
+          hp: outcome.player.hp,
+          maxHp: outcome.player.maxHp,
+          delta: outcome.healedHp,
+        })
+      }
+
+      if (outcome.levelsGained > 0) {
+        emit('LEVEL_UP', {
+          level: outcome.newLevel,
+          levelsGained: outcome.levelsGained,
+        })
+        setPendingLevelUp(outcome.newLevel)
+      }
+
+      return outcome
+    },
+    [commitPlayer],
+  )
+
+  const patchPlayer = useCallback((changes: Partial<Player>) => {
+    const current = playerRef.current
+    if (!current) return
+
+    const next = persistPlayerChanges(current, changes)
+    playerRef.current = next
+    setPlayer(next)
+  }, [])
 
   const acknowledgeLevelUp = useCallback(() => {
     setPendingLevelUp(null)
   }, [])
 
+  /** ปรับการตั้งค่าแบบ synchronous เพื่อให้เสียงและอนิเมชันมีผลทันทีในคลิกเดียวกัน */
   const updateSettings = useCallback((partial: Partial<GameSettings>) => {
-    setSettings((current) => {
-      const next: GameSettings = { ...current, ...partial }
-      setSfxEnabled(next.soundEnabled)
-      saveSettings(next)
-      return next
-    })
+    const next: GameSettings = { ...settingsRef.current, ...partial }
+    settingsRef.current = next
+
+    setSoundEnabled(next.soundEnabled)
+    setMusicEnabled(next.musicEnabled)
+    saveSettings(next)
+    setSettings(next)
   }, [])
 
   const resetProgress = useCallback(() => {
@@ -228,8 +295,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       storageWarning,
       pendingLevelUp,
       startNewGame,
-      rewardCorrectAnswer,
-      completeLevel,
+      answerQuestion,
+      finishQuest,
+      patchPlayer,
+      isLevelReplay,
       acknowledgeLevelUp,
       updateSettings,
       resetProgress,
@@ -243,8 +312,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
       storageWarning,
       pendingLevelUp,
       startNewGame,
-      rewardCorrectAnswer,
-      completeLevel,
+      answerQuestion,
+      finishQuest,
+      patchPlayer,
+      isLevelReplay,
       acknowledgeLevelUp,
       updateSettings,
       resetProgress,

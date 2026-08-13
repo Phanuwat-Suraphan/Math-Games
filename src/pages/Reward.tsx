@@ -7,7 +7,7 @@ import { getLevel, getLevelsByWorld } from '../data/levels'
 import { getWorld } from '../data/worlds'
 import type { LevelResult } from '../types/level'
 import type { Player } from '../types/player'
-import { playSfx } from '../utils/sfx'
+import { playSfx } from '../services/audioService'
 import { NotFoundNotice } from './NotFoundNotice'
 
 /** ตรวจสอบข้อมูลที่ส่งมากับ navigation state เพราะผู้เล่นอาจกดรีเฟรชหน้าได้ */
@@ -57,10 +57,7 @@ export function Reward({ player }: { player: Player }) {
   const world = getWorld(result.worldId)
   const totalExp = result.expFromAnswers + result.bonusExp
   const totalCoins = result.coinsFromAnswers + result.bonusCoins
-  const accuracy =
-    result.totalQuestions === 0
-      ? 0
-      : Math.round((result.correctAnswers / result.totalQuestions) * 100)
+  const accuracy = result.accuracy
 
   const nextLevel = level
     ? getLevelsByWorld(level.worldId).find((item) => item.order === level.order + 1)
@@ -112,7 +109,11 @@ export function Reward({ player }: { player: Player }) {
           <p className="mt-3 inline-flex rounded-full bg-leaf-600/25 px-3 py-1 text-sm font-bold text-leaf-400">
             ✨ ผ่านด่านนี้ครั้งแรก!
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-3 inline-flex rounded-full bg-sky-600/25 px-3 py-1 text-sm font-bold text-sky-400">
+            🔁 ฝึกซ้ำ — รางวัลน้อยกว่าครั้งแรก แต่สถิติเก่งขึ้นแน่นอน
+          </p>
+        )}
 
         <dl className="mt-6 grid grid-cols-2 gap-3">
           <RewardStat
@@ -145,7 +146,33 @@ export function Reward({ player }: { player: Player }) {
           />
         </dl>
 
-        <div className="mt-6 rounded-2xl bg-night-900/60 p-4">
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-night-900/50 p-3 text-center">
+            <p className="text-xs text-slate-400">
+              <span aria-hidden="true">❤️</span> พลังชีวิตที่ฟื้น
+            </p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-ember-400">
+              +{result.hpHealed}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              ตอนนี้ {player.hp} / {player.maxHp}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-night-900/50 p-3 text-center">
+            <p className="text-xs text-slate-400">
+              <span aria-hidden="true">🔥</span> ตอบถูกติดต่อกัน
+            </p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-gold-300">
+              {player.currentStreak}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              สถิติดีที่สุด {player.bestStreak}
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-2xl bg-night-900/60 p-4">
           <p className="text-sm text-slate-300">ตอนนี้หนูอยู่ที่</p>
           <p className="mt-1 text-xl font-bold text-white">
             เลเวล {player.level} · 🪙 {player.coins.toLocaleString('th-TH')} เหรียญ
@@ -185,6 +212,16 @@ export function Reward({ player }: { player: Player }) {
             onClick={() => navigate('/map', { replace: true })}
           >
             กลับแผนที่
+          </Button>
+
+          <Button
+            size="lg"
+            variant="ghost"
+            fullWidth
+            icon="👤"
+            onClick={() => navigate('/character', { replace: true })}
+          >
+            ดูโปรไฟล์ของฉัน
           </Button>
         </div>
       </motion.section>

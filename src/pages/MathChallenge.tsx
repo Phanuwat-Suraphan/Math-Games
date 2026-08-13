@@ -6,13 +6,14 @@ import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { getLevel } from '../data/levels'
 import { getWorld } from '../data/worlds'
+import { getQuestionSkill } from '../data/skills'
 import { useGame } from '../context/useGame'
 import type { Player } from '../types/player'
 import type { Level, LevelResult } from '../types/level'
 import type { World } from '../types/world'
 import { getQuestionsForLevel } from '../utils/questionGenerator'
 import { isLevelUnlocked } from '../utils/progression'
-import { playSfx } from '../utils/sfx'
+import { playSfx } from '../services/audioService'
 import { NotFoundNotice } from './NotFoundNotice'
 
 /**
@@ -61,19 +62,27 @@ interface ChallengeSessionProps {
 
 function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
   const navigate = useNavigate()
-  const { rewardCorrectAnswer, completeLevel } = useGame()
+  const { answerQuestion, finishQuest, isLevelReplay } = useGame()
 
   // สร้างชุดโจทย์ครั้งเดียวตอน mount ชุดโจทย์จึงไม่สลับระหว่างเล่น
   const [questions] = useState(() => getQuestionsForLevel(level))
+  // ตัดสินสถานะเล่นซ้ำตอนเริ่มด่าน เพื่อให้อัตรารางวัลคงที่ตลอดทั้งด่าน
+  const [isReplay] = useState(() => isLevelReplay(level.id))
 
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
   const [wrongChoices, setWrongChoices] = useState<number[]>([])
   const [correctCount, setCorrectCount] = useState(0)
   const [attemptedWrong, setAttemptedWrong] = useState(false)
+  const [streakMessage, setStreakMessage] = useState<string | null>(null)
+  const [lastGain, setLastGain] = useState<{ exp: number; coins: number } | null>(
+    null,
+  )
 
-  // เก็บยอดที่ได้รับจริงระหว่างเล่น เพื่อให้หน้ารางวัลแสดงตัวเลขตรงกับที่ผู้เล่นได้จริง
+  // ยอดที่ได้รับจริงระหว่างเล่น เพื่อให้หน้ารางวัลแสดงตัวเลขตรงกับที่ผู้เล่นได้จริง
   const earnedRef = useRef({ exp: 0, coins: 0 })
+  // เวลาเริ่มตอบของข้อปัจจุบัน ใช้บันทึกเวลาที่ใช้ต่อข้อ
+  const questionStartedAtRef = useRef(Date.now())
 
   const currentQuestion = questions[questionIndex]
 
@@ -81,7 +90,17 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
     (choice: number) => {
       if (!currentQuestion || answerState === 'correct') return
 
-      if (choice === currentQuestion.answer) {
+      const isCorrect = choice === currentQuestion.answer
+      const outcome = answerQuestion({
+        questionId: currentQuestion.id,
+        levelId: level.id,
+        skill: getQuestionSkill(currentQuestion),
+        isCorrect,
+        timeMs: Date.now() - questionStartedAtRef.current,
+        isReplay,
+      })
+
+      if (isCorrect) {
         playSfx('correct')
         setAnswerState('correct')
 
@@ -89,11 +108,15 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
           setCorrectCount((count) => count + 1)
         }
 
-        const outcome = rewardCorrectAnswer()
-        earnedRef.current = {
-          exp: earnedRef.current.exp + outcome.gainedExp,
-          coins: earnedRef.current.coins + outcome.gainedCoins,
+        if (outcome) {
+          earnedRef.current = {
+            exp: earnedRef.current.exp + outcome.gainedExp,
+            coins: earnedRef.current.coins + outcome.gainedCoins,
+          }
+          setLastGain({ exp: outcome.gainedExp, coins: outcome.gainedCoins })
+          setStreakMessage(outcome.streakBonus?.message ?? null)
         }
+
         playSfx('coin')
         return
       }
@@ -101,11 +124,19 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       playSfx('wrong')
       setAnswerState('wrong')
       setAttemptedWrong(true)
+      setStreakMessage(null)
       setWrongChoices((current) =>
         current.includes(choice) ? current : [...current, choice],
       )
     },
-    [answerState, attemptedWrong, currentQuestion, rewardCorrectAnswer],
+    [
+      answerQuestion,
+      answerState,
+      attemptedWrong,
+      currentQuestion,
+      isReplay,
+      level.id,
+    ],
   )
 
   const handleNext = useCallback(() => {
@@ -114,19 +145,30 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       setAnswerState('idle')
       setWrongChoices([])
       setAttemptedWrong(false)
+      setStreakMessage(null)
+      setLastGain(null)
+      questionStartedAtRef.current = Date.now()
       return
     }
 
-    const result: LevelResult = completeLevel(level, {
+    const outcome = finishQuest({
+      level,
       correctAnswers: correctCount,
       totalQuestions: questions.length,
       expFromAnswers: earnedRef.current.exp,
       coinsFromAnswers: earnedRef.current.coins,
     })
+
+    if (!outcome) {
+      navigate('/map', { replace: true })
+      return
+    }
+
+    const result: LevelResult = outcome.result
     navigate('/reward', { replace: true, state: result })
   }, [
-    completeLevel,
     correctCount,
+    finishQuest,
     level,
     navigate,
     questionIndex,
@@ -154,9 +196,16 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
         title={`${level.emoji} ${level.name}`}
         backTo={`/world/${world.id}`}
         backLabel="ออกจากด่าน"
+        showStreak
       />
 
       <ScreenLayout width="normal">
+        {isReplay ? (
+          <p className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-600/15 px-4 py-2.5 text-center text-sm font-semibold text-sky-400">
+            🔁 กำลังฝึกซ้ำด่านนี้ — รางวัลจะน้อยกว่าครั้งแรก แต่สถิติยังนับให้ครบ
+          </p>
+        ) : null}
+
         <div
           className="mb-5 h-2 w-full overflow-hidden rounded-full bg-night-800"
           role="progressbar"
@@ -182,13 +231,27 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
 
         {answerState === 'correct' ? (
           <div className="mt-5">
+            {streakMessage ? (
+              <p
+                role="status"
+                className="mb-3 rounded-2xl border border-ember-400/40 bg-ember-600/20 px-4 py-2 text-center text-sm font-bold text-ember-400"
+              >
+                🔥 {streakMessage}
+              </p>
+            ) : null}
+
             <p
               className="mb-3 text-center text-sm font-semibold text-slate-300"
               aria-live="polite"
             >
-              ได้รับ <span className="text-arcane-400">+10 EXP</span> และ{' '}
-              <span className="text-gold-300">+5 เหรียญ</span>
+              ได้รับ{' '}
+              <span className="text-arcane-400">+{lastGain?.exp ?? 0} EXP</span>{' '}
+              และ{' '}
+              <span className="text-gold-300">
+                +{lastGain?.coins ?? 0} เหรียญ
+              </span>
             </p>
+
             <Button
               size="lg"
               variant="success"
@@ -203,7 +266,8 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
         ) : null}
 
         <p className="mt-6 text-center text-sm text-slate-400">
-          ตอบถูกครั้งแรกแล้ว {correctCount} ข้อ · ตอบผิดได้ ไม่เสียพลังชีวิตนะ
+          ตอบถูกครั้งแรกแล้ว {correctCount} ข้อ · ตอบผิดเสียพลังชีวิตนิดเดียว
+          แล้วได้คืนตอนจบด่าน
         </p>
       </ScreenLayout>
     </>

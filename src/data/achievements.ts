@@ -1,4 +1,5 @@
 import type { Player } from '../types/player'
+import { calculateAccuracy } from '../utils/statistics'
 
 export interface Achievement {
   id: string
@@ -67,5 +68,46 @@ export const ACHIEVEMENTS: Achievement[] = [
       player.completedLevels.includes('world-1-level-5')
         ? 'ชนะแล้ว'
         : 'ยังไม่ได้เอาชนะ',
+  },
+  {
+    id: 'streak-5',
+    name: 'ไฟกำลังลุก',
+    description: 'ตอบถูกติดต่อกัน 5 ข้อ',
+    emoji: '🔥',
+    isUnlocked: (player) => player.bestStreak >= 5,
+    getProgressText: (player) => `${Math.min(player.bestStreak, 5)} / 5 ข้อ`,
+  },
+  {
+    id: 'streak-10',
+    name: 'สายฟ้าคณิตศาสตร์',
+    description: 'ตอบถูกติดต่อกัน 10 ข้อ',
+    emoji: '⚡',
+    isUnlocked: (player) => player.bestStreak >= 10,
+    getProgressText: (player) => `${Math.min(player.bestStreak, 10)} / 10 ข้อ`,
+  },
+  {
+    id: 'questions-50',
+    name: 'นักฝึกฝนตัวยง',
+    description: 'ทำโจทย์ครบ 50 ข้อ',
+    emoji: '📝',
+    isUnlocked: (player) => player.totalQuestions >= 50,
+    getProgressText: (player) =>
+      `${Math.min(player.totalQuestions, 50)} / 50 ข้อ`,
+  },
+  {
+    id: 'sharp-shooter',
+    name: 'แม่นยำเป็นเลิศ',
+    description: 'ความแม่นยำ 80% ขึ้นไป หลังทำครบ 20 ข้อ',
+    emoji: '🎯',
+    isUnlocked: (player) =>
+      player.totalQuestions >= 20 &&
+      calculateAccuracy(player.correctAnswers, player.totalQuestions) >= 80,
+    getProgressText: (player) =>
+      player.totalQuestions < 20
+        ? `ทำโจทย์อีก ${20 - player.totalQuestions} ข้อ`
+        : `ความแม่นยำตอนนี้ ${calculateAccuracy(
+            player.correctAnswers,
+            player.totalQuestions,
+          )}%`,
   },
 ]

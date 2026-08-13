@@ -3,6 +3,7 @@ import { GameProvider } from './context/GameContext'
 import { useGame } from './context/useGame'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LevelUpModal } from './components/LevelUpModal'
+import { RewardToastLayer } from './components/RewardToastLayer'
 import { RequirePlayer } from './routes/RequirePlayer'
 import { Achievements } from './pages/Achievements'
 import { Character } from './pages/Character'
@@ -94,6 +95,7 @@ function GameRoutes() {
         <Route path="*" element={<Navigate to="/404" replace />} />
       </Routes>
 
+      <RewardToastLayer />
       <LevelUpModal level={pendingLevelUp} onClose={acknowledgeLevelUp} />
     </>
   )

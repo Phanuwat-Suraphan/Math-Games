@@ -33,4 +33,8 @@ export interface LevelResult {
   bonusExp: number
   bonusCoins: number
   isFirstClear: boolean
+  /** ร้อยละความแม่นยำของการเล่นครั้งนี้ */
+  accuracy: number
+  /** พลังชีวิตที่ฟื้นได้จริงเมื่อจบด่าน */
+  hpHealed: number
 }

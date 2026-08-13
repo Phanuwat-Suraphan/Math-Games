@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { PlayerCard } from '../components/PlayerCard'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { useGame } from '../context/useGame'
-import { getOverallProgress } from '../utils/progression'
+import { useProgression } from '../hooks/useProgression'
+import { getOverallAccuracy } from '../utils/statistics'
 import type { Player } from '../types/player'
 
 interface MenuItem {
@@ -55,7 +56,8 @@ const MENU_ITEMS: MenuItem[] = [
 export function MainMenu({ player }: { player: Player }) {
   const navigate = useNavigate()
   const { storageWarning, dismissStorageWarning } = useGame()
-  const progress = getOverallProgress(player)
+  const progress = useProgression(player)
+  const accuracy = getOverallAccuracy(player.totalQuestions, player.correctAnswers)
 
   return (
     <ScreenLayout width="normal">
@@ -87,6 +89,9 @@ export function MainMenu({ player }: { player: Player }) {
         ความคืบหน้ารวม: ผ่านแล้ว {progress.completedLevels} จาก{' '}
         {progress.totalLevels} ด่าน · เปิดโลกแล้ว {progress.unlockedWorlds} จาก{' '}
         {progress.totalWorlds} โลก
+        {accuracy.hasData
+          ? ` · ความแม่นยำ ${accuracy.accuracy}% จาก ${accuracy.totalQuestions} ข้อ`
+          : ''}
       </p>
 
       <nav aria-label="เมนูหลัก" className="mt-6">

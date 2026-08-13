@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { useGame } from '../context/useGame'
-import { playSfx } from '../utils/sfx'
+import { useGameSettings } from '../hooks/useGameSettings'
+import { playSfx } from '../services/audioService'
 
 export function Settings() {
   const navigate = useNavigate()
-  const { player, settings, updateSettings, resetProgress } = useGame()
+  const { player, resetProgress } = useGame()
+  const { settings, toggleSound, toggleMusic, toggleAnimations } =
+    useGameSettings()
   const [confirmingReset, setConfirmingReset] = useState(false)
 
   function handleReset() {
@@ -38,18 +41,27 @@ export function Settings() {
           emoji="🔊"
           checked={settings.soundEnabled}
           onChange={(checked) => {
-            updateSettings({ soundEnabled: checked })
+            toggleSound()
             if (checked) playSfx('correct')
           }}
         />
 
         <ToggleRow
-          id="setting-motion"
-          label="ลดการเคลื่อนไหว"
-          description="ปิดอนิเมชันต่าง ๆ ถ้ารู้สึกว่าเคลื่อนไหวมากเกินไป"
-          emoji="🎬"
-          checked={settings.reduceMotion}
-          onChange={(checked) => updateSettings({ reduceMotion: checked })}
+          id="setting-music"
+          label="ดนตรีประกอบ"
+          description="เพลงพื้นหลังระหว่างผจญภัย (จะเพิ่มเพลงในตอนต่อไป)"
+          emoji="🎵"
+          checked={settings.musicEnabled}
+          onChange={toggleMusic}
+        />
+
+        <ToggleRow
+          id="setting-animations"
+          label="เอฟเฟกต์การเคลื่อนไหว"
+          description="ปิดได้ถ้ารู้สึกว่าภาพเคลื่อนไหวมากเกินไป"
+          emoji="✨"
+          checked={settings.animationsEnabled}
+          onChange={toggleAnimations}
         />
       </div>
 

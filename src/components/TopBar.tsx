@@ -4,12 +4,15 @@ import type { Player } from '../types/player'
 import { AvatarBadge } from './AvatarBadge'
 import { CoinDisplay } from './CoinDisplay'
 import { ExpBar } from './ExpBar'
+import { StreakBadge } from './StreakBadge'
 
 interface TopBarProps {
   player: Player
   title: string
   backTo?: string
   backLabel?: string
+  /** แสดงจำนวนข้อที่ตอบถูกติดต่อกัน ใช้ระหว่างเล่นด่าน */
+  showStreak?: boolean
 }
 
 /** แถบสถานะด้านบนที่ใช้ร่วมกันทุกหน้า เพื่อไม่ให้เด็กหลงทาง */
@@ -18,6 +21,7 @@ export function TopBar({
   title,
   backTo,
   backLabel = 'ย้อนกลับ',
+  showStreak = false,
 }: TopBarProps) {
   const navigate = useNavigate()
   const avatar = getAvatar(player.avatar)
@@ -48,6 +52,14 @@ export function TopBar({
             </p>
           </div>
         </div>
+
+        {showStreak ? (
+          <StreakBadge
+            currentStreak={player.currentStreak}
+            bestStreak={player.bestStreak}
+            compact
+          />
+        ) : null}
 
         <CoinDisplay coins={player.coins} />
       </div>

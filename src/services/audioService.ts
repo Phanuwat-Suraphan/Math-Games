@@ -3,10 +3,11 @@
  * ไม่ต้องโหลดไฟล์เสียงจากภายนอก และถ้าเบราว์เซอร์ไม่รองรับก็จะเงียบไปเฉย ๆ ไม่ทำให้เกมพัง
  */
 
-type SfxName = 'correct' | 'wrong' | 'coin' | 'levelUp' | 'click'
+export type SfxName = 'correct' | 'wrong' | 'coin' | 'levelUp' | 'click'
 
 let audioContext: AudioContext | null = null
-let enabled = true
+let soundEnabled = true
+let musicEnabled = true
 
 interface ToneStep {
   frequency: number
@@ -60,12 +61,28 @@ function getContext(): AudioContext | null {
   return audioContext
 }
 
-export function setSfxEnabled(value: boolean): void {
-  enabled = value
+export function setSoundEnabled(value: boolean): void {
+  soundEnabled = value
+}
+
+export function isSoundEnabled(): boolean {
+  return soundEnabled
+}
+
+/**
+ * เปิด/ปิดดนตรีประกอบ
+ * Part 2 ยังไม่มีไฟล์เพลง จึงเก็บสถานะไว้ก่อนเพื่อให้ Part ถัดไปต่อยอดได้ทันที
+ */
+export function setMusicEnabled(value: boolean): void {
+  musicEnabled = value
+}
+
+export function isMusicEnabled(): boolean {
+  return musicEnabled
 }
 
 export function playSfx(name: SfxName): void {
-  if (!enabled) return
+  if (!soundEnabled) return
 
   const context = getContext()
   if (!context) return

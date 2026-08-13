@@ -4,6 +4,7 @@ import { AvatarBadge } from './AvatarBadge'
 import { CoinDisplay } from './CoinDisplay'
 import { ExpBar } from './ExpBar'
 import { HpDisplay } from './HpDisplay'
+import { StreakBadge } from './StreakBadge'
 
 interface PlayerCardProps {
   player: Player
@@ -44,6 +45,11 @@ export function PlayerCard({ player, className = '' }: PlayerCardProps) {
           <span aria-hidden="true">🏅</span>
           <span>ผ่านแล้ว {player.completedLevels.length} ด่าน</span>
         </span>
+        <StreakBadge
+          currentStreak={player.currentStreak}
+          bestStreak={player.bestStreak}
+          compact
+        />
       </div>
     </section>
   )

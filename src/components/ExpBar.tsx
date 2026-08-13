@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { getExpProgress } from '../utils/levelSystem'
+import { getExpProgress } from '../utils/experience'
 
 interface ExpBarProps {
   level: number
@@ -14,10 +14,10 @@ export function ExpBar({
   showLabel = true,
   size = 'md',
 }: ExpBarProps) {
-  const progress = getExpProgress(level, exp)
+  const progress = getExpProgress({ level, exp })
   const label = progress.isMaxLevel
     ? 'เลเวลสูงสุดแล้ว'
-    : `${progress.exp} / ${progress.required} EXP`
+    : `${progress.exp.toLocaleString('th-TH')} / ${progress.required.toLocaleString('th-TH')} EXP`
 
   return (
     <div className="w-full">

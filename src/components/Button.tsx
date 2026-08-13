@@ -1,5 +1,5 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { playSfx } from '../utils/sfx'
+import { playSfx } from '../services/audioService'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'success' | 'danger'
 export type ButtonSize = 'md' | 'lg'

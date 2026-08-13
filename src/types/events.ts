@@ -1,0 +1,35 @@
+import type { SkillId } from './stats'
+
+/**
+ * รายการเหตุการณ์กลางของเกม
+ * ส่วนอื่น ๆ (เช่น ระบบความสำเร็จ หรือ Part ถัดไป) สามารถ subscribe ได้โดยไม่ต้องแก้โค้ดต้นทาง
+ */
+export interface GameEventMap {
+  PLAYER_CREATED: { playerId: string; name: string; avatar: string }
+  QUESTION_ANSWERED: {
+    questionId: string
+    skill: SkillId
+    isCorrect: boolean
+    timeMs: number
+  }
+  QUESTION_CORRECT: { questionId: string; skill: SkillId; streak: number }
+  QUESTION_WRONG: { questionId: string; skill: SkillId }
+  QUEST_COMPLETED: {
+    levelId: string
+    worldId: string
+    correctAnswers: number
+    totalQuestions: number
+    isFirstClear: boolean
+  }
+  EXP_GAINED: { amount: number; source: 'answer' | 'quest' }
+  COIN_GAINED: { amount: number; source: 'answer' | 'quest' | 'streak' }
+  LEVEL_UP: { level: number; levelsGained: number }
+  HP_CHANGED: { hp: number; maxHp: number; delta: number }
+  STREAK_CHANGED: { currentStreak: number; bestStreak: number; isBest: boolean }
+}
+
+export type GameEventName = keyof GameEventMap
+
+export type GameEventHandler<K extends GameEventName> = (
+  payload: GameEventMap[K],
+) => void
