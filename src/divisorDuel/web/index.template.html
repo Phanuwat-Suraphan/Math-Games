@@ -1,0 +1,586 @@
+<title>Divisor Duel</title>
+<style>
+  :root{
+    --bg:#14082b; --bg2:#1d0f3d; --panel:#251550; --panel2:#2f1a63;
+    --line:rgba(255,255,255,.14);
+    --gold:#fbbf24; --gold-l:#fcd34d;
+    --violet:#a78bfa; --violet-d:#7c3aed;
+    --green:#4ade80; --green-d:#16a34a;
+    --red:#fb7185; --red-d:#e11d48;
+    --blue:#38bdf8;
+    --txt:#f4f1ff; --dim:#b9aee0; --dim2:#8a7db8;
+    --font:"Noto Sans Thai","Sarabun","Leelawadee UI",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--txt); font-family:var(--font);
+    background-image:
+      radial-gradient(ellipse at 20% 0%, rgba(124,58,237,.35), transparent 55%),
+      radial-gradient(ellipse at 80% 100%, rgba(225,29,72,.18), transparent 55%);
+    background-attachment:fixed; line-height:1.5; overflow-x:hidden;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:14px 12px 40px}
+  h1,h2,h3{margin:0}
+  button{font-family:inherit;cursor:pointer}
+  .hide{display:none !important}
+
+  /* ── ตั้งค่าก่อนเริ่ม ── */
+  .title{text-align:center;padding:18px 0 6px}
+  .title h1{
+    font-size:clamp(30px,7vw,50px);font-weight:800;letter-spacing:.5px;
+    background:linear-gradient(100deg,var(--gold-l),var(--violet),var(--blue));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .title p{color:var(--dim);margin-top:6px;font-size:15px}
+  .sect{margin-top:22px}
+  .sect>h3{font-size:15px;color:var(--gold-l);margin-bottom:10px;letter-spacing:.5px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .pick{
+    border:2px solid var(--line);border-radius:16px;background:var(--panel);
+    padding:14px;text-align:left;color:var(--txt);transition:.15s;
+  }
+  .pick:hover{border-color:var(--violet)}
+  .pick.on{border-color:var(--gold);background:var(--panel2);box-shadow:0 0 22px -6px var(--violet)}
+  .pick b{display:block;font-size:16px;margin-bottom:2px}
+  .pick span{display:block;font-size:12.5px;color:var(--dim);line-height:1.45}
+  .pick .em{font-size:26px;margin-bottom:4px}
+
+  .btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    min-height:54px;padding:12px 18px;border:none;border-bottom:4px solid;
+    border-radius:14px;font-size:17px;font-weight:700;color:#fff;
+  }
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn.primary{background:linear-gradient(180deg,var(--violet),var(--violet-d));border-bottom-color:#5b21b6}
+  .btn.go{background:linear-gradient(180deg,var(--green),var(--green-d));border-bottom-color:#15803d;color:#08210f}
+  .btn.warn{background:linear-gradient(180deg,var(--red),var(--red-d));border-bottom-color:#9f1239}
+  .btn.ghost{background:transparent;border:1px solid var(--line);border-bottom:4px solid var(--line);color:var(--dim)}
+  .btn.sm{min-height:42px;font-size:14px;padding:8px 12px;border-radius:11px}
+
+  /* ── สนามรบ ── */
+  .bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:rgba(20,8,43,.85);border:1px solid var(--line);border-radius:14px;
+    padding:9px 12px;margin-bottom:12px;position:sticky;top:6px;z-index:20;backdrop-filter:blur(8px);
+  }
+  .bar .turn{font-weight:800;color:var(--gold-l);font-size:15px}
+  .bar .who{color:var(--dim);font-size:13px}
+  .chip{
+    display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);
+    border-radius:999px;padding:3px 11px;font-size:13px;font-weight:700;
+    background:rgba(47,26,99,.6);font-variant-numeric:tabular-nums;
+  }
+  .side{border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:12px;background:rgba(37,21,80,.55)}
+  .side.enemy{border-color:rgba(251,113,133,.35)}
+  .side.mine{border-color:rgba(74,222,128,.3)}
+  .side h3{font-size:13px;color:var(--dim);margin-bottom:9px;letter-spacing:.6px;text-transform:uppercase}
+
+  .units{display:flex;gap:8px;flex-wrap:wrap}
+  .unit{
+    flex:1 1 130px;min-width:120px;border:2px solid var(--line);border-radius:13px;
+    background:var(--panel);padding:9px;text-align:center;transition:.15s;position:relative;
+  }
+  .unit.tgt{cursor:pointer}
+  .unit.tgt:hover{border-color:var(--gold)}
+  .unit.sel{border-color:var(--gold);background:var(--panel2);box-shadow:0 0 18px -6px var(--gold)}
+  .unit.dead{opacity:.35;filter:grayscale(1)}
+  .unit .em{font-size:26px;line-height:1.1}
+  .unit .nm{font-size:12px;font-weight:700;margin-top:2px;line-height:1.25}
+  .unit .dv{
+    display:inline-block;margin-top:4px;font-size:11.5px;font-weight:800;
+    color:var(--gold-l);background:rgba(251,191,36,.16);border-radius:999px;padding:1px 8px;
+  }
+  .hpbar{height:7px;border-radius:99px;background:rgba(0,0,0,.45);overflow:hidden;margin-top:5px}
+  .hpbar i{display:block;height:100%;border-radius:99px;transition:width .4s}
+  .hp-e{background:linear-gradient(90deg,var(--red-d),var(--red))}
+  .hp-m{background:linear-gradient(90deg,var(--green-d),var(--green))}
+  .unit .hpn{font-size:11px;color:var(--dim);margin-top:3px;font-variant-numeric:tabular-nums}
+  .lock{font-size:10.5px;color:var(--dim2);margin-top:3px}
+
+  /* ── สมการ ── */
+  .eqbox{border:1px solid var(--line);border-radius:16px;background:rgba(29,15,61,.8);padding:14px;margin-bottom:12px}
+  .eq{
+    min-height:62px;display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:6px;
+    font-size:clamp(24px,6vw,34px);font-weight:800;font-variant-numeric:tabular-nums;
+    background:rgba(0,0,0,.28);border-radius:12px;padding:10px;letter-spacing:1px;
+  }
+  .eq .ph{font-size:15px;color:var(--dim2);font-weight:500;letter-spacing:0}
+  .pw{text-align:center;margin-top:10px;font-size:15px;color:var(--dim)}
+  .pw b{color:var(--gold-l);font-size:24px;font-variant-numeric:tabular-nums}
+
+  .preview{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+  .prow{
+    display:flex;align-items:center;gap:8px;font-size:13px;
+    background:rgba(0,0,0,.25);border-radius:10px;padding:6px 10px;
+  }
+  .prow .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .prow .calc{color:var(--dim);font-variant-numeric:tabular-nums;font-size:12px}
+  .prow .dm{font-weight:800;font-variant-numeric:tabular-nums;min-width:56px;text-align:right}
+  .crit{color:var(--green)} .blk{color:var(--dim2)}
+
+  /* ── มือ ── */
+  .hand{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
+  .card{
+    width:62px;height:84px;border-radius:11px;border:2px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    font-size:24px;font-weight:800;color:#fff;transition:.13s;padding:0;
+    font-variant-numeric:tabular-nums;
+  }
+  .card small{font-size:9px;font-weight:600;opacity:.75;margin-top:2px}
+  .card.num{background:linear-gradient(165deg,#166534,#052e16);border-color:#22c55e}
+  .card.num.big{background:linear-gradient(165deg,#a16207,#422006);border-color:var(--gold)}
+  .card.num.huge{background:linear-gradient(165deg,#6d28d9,#2e1065);border-color:var(--violet)}
+  .card.op{background:linear-gradient(165deg,#9f1239,#4c0519);border-color:var(--red)}
+  .card.br{background:linear-gradient(165deg,#0369a1,#082f49);border-color:var(--blue);font-size:19px}
+  .card:disabled{opacity:.28;cursor:not-allowed}
+  .card.used{opacity:.28}
+  .card:not(:disabled):hover{transform:translateY(-4px)}
+
+  .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .row>*{flex:1 1 120px}
+
+  .note{
+    border-radius:12px;padding:10px 12px;font-size:13.5px;margin-top:10px;
+    border:1px solid rgba(251,191,36,.35);background:rgba(251,191,36,.1);color:var(--gold-l);
+  }
+  .note.bad{border-color:rgba(251,113,133,.4);background:rgba(225,29,72,.14);color:var(--red)}
+  .note.ok{border-color:rgba(74,222,128,.4);background:rgba(22,163,74,.15);color:var(--green)}
+  .note b{display:block;margin-bottom:3px}
+
+  .log{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.25);padding:10px;max-height:150px;overflow-y:auto}
+  .log div{font-size:12.5px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--dim)}
+  .log div:last-child{border:0}
+  .log .c{color:var(--green)} .log .b{color:var(--red)} .log .s{color:var(--violet)}
+
+  .modal{position:fixed;inset:0;background:rgba(10,4,22,.9);display:flex;align-items:center;justify-content:center;padding:18px;z-index:60;backdrop-filter:blur(5px)}
+  .modal .in{max-width:400px;width:100%;background:linear-gradient(180deg,var(--panel2),var(--panel));border:2px solid var(--gold);border-radius:20px;padding:26px;text-align:center;box-shadow:0 0 50px -10px var(--violet)}
+  .modal .in h2{font-size:26px;color:var(--gold-l);margin-bottom:8px}
+  .modal .in p{color:var(--dim);margin-bottom:18px}
+  .big{font-size:52px}
+
+  @media(max-width:420px){ .card{width:54px;height:75px;font-size:21px} .grid2{grid-template-columns:1fr} }
+</style>
+
+<div class="wrap">
+
+  <!-- ══════ หน้าตั้งค่า ══════ -->
+  <div id="setup">
+    <div class="title">
+      <h1>Divisor Duel</h1>
+      <p>ศึกผ่าสมการในตำนาน · สร้างสมการให้หารเกราะศัตรูลงตัว</p>
+    </div>
+
+    <div class="sect">
+      <h3>โหมดการเล่น</h3>
+      <div class="grid2">
+        <button class="pick on" data-mode="ai">
+          <div class="em">🤖</div><b>เล่นกับคอมพิวเตอร์</b>
+          <span>ฝึกซ้อมคนเดียว คอมจะคิดสมการเอง</span>
+        </button>
+        <button class="pick" data-mode="human">
+          <div class="em">👥</div><b>2 ผู้เล่น</b>
+          <span>สลับกันเล่นบนเครื่องเดียวกัน</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h3>ฮีโร่ของผู้เล่น 1</h3>
+      <div class="grid2" id="h1"></div>
+    </div>
+    <div class="sect">
+      <h3 id="h2label">ฮีโร่ของคอมพิวเตอร์</h3>
+      <div class="grid2" id="h2"></div>
+    </div>
+
+    <div class="sect">
+      <button class="btn primary" id="start">⚔️ เริ่มการดวล</button>
+    </div>
+
+    <div class="note" style="margin-top:18px">
+      <b>วิธีเล่นสั้น ๆ</b>
+      แตะการ์ดตัวเลขและเครื่องหมายเพื่อสร้างสมการ → ผลลัพธ์คือพลังโจมตี →
+      ถ้าพลังโจมตีหารเกราะของเป้าหมายลงตัว จะเป็น Critical Hit ทำดาเมจเต็ม
+      แต่ถ้าเหลือเศษ ดาเมจจะถูกหักออกเศษละ 10 แต้ม
+    </div>
+  </div>
+
+  <!-- ══════ หน้าเล่น ══════ -->
+  <div id="game" class="hide">
+    <div class="bar">
+      <span class="turn" id="turnLbl"></span>
+      <span class="who" id="whoLbl"></span>
+      <span style="flex:1"></span>
+      <span class="chip" id="comboChip" style="color:var(--red)"></span>
+      <button class="btn ghost sm" style="flex:0 0 auto;min-height:34px" id="quit">ออก</button>
+    </div>
+
+    <div class="side enemy">
+      <h3 id="enemyTitle">ฝ่ายตรงข้าม — แตะเพื่อเลือกเป้าหมาย</h3>
+      <div class="units" id="enemyUnits"></div>
+    </div>
+
+    <div class="eqbox">
+      <div class="eq" id="eq"><span class="ph">แตะการ์ดด้านล่างเพื่อสร้างสมการ</span></div>
+      <div class="pw" id="pw"></div>
+      <div class="preview" id="preview"></div>
+      <div id="deadNote"></div>
+      <div class="row">
+        <button class="btn ghost sm" id="undo">↩︎ ถอยหลัง 1 ใบ</button>
+        <button class="btn ghost sm" id="clear">✕ ล้างสมการ</button>
+        <button class="btn ghost sm" id="brk">( ) ใส่วงเล็บ</button>
+        <button class="btn ghost sm" id="redraw">♻️ จั่วใหม่</button>
+      </div>
+      <div class="row">
+        <button class="btn go" id="atk">⚔️ โจมตี!</button>
+      </div>
+    </div>
+
+    <div class="side mine">
+      <h3 id="handTitle">การ์ดในมือ</h3>
+      <div class="hand" id="hand"></div>
+      <div style="margin-top:10px">
+        <div class="units" id="myUnits"></div>
+      </div>
+    </div>
+
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<!-- ══════ กล่องผลลัพธ์ ══════ -->
+<div class="modal hide" id="resultModal">
+  <div class="in">
+    <div class="big" id="rEmoji">🎉</div>
+    <h2 id="rTitle"></h2>
+    <p id="rBody" style="white-space:pre-line;color:var(--txt)"></p>
+    <button class="btn primary" id="rNext"></button>
+  </div>
+</div>
+
+<div class="modal hide" id="winModal">
+  <div class="in">
+    <div class="big">🏆</div>
+    <h2 id="wTitle"></h2>
+    <p id="wBody"></p>
+    <button class="btn go" id="wAgain">เล่นอีกครั้ง</button>
+  </div>
+</div>
+
+<script>
+/*__ENGINE_BUNDLE__*/
+</script>
+
+<script>
+(function(){
+  const G = __M['engine/game'], AI = __M['engine/ai'], EQ = __M['engine/equation'];
+  const DMG = __M['engine/damage'], DH = __M['engine/deadHand'], C = __M['cards'], R = __M['rules'];
+
+  const $ = id => document.getElementById(id);
+  let mode = 'ai', h1 = C.HEROES[2].id, h2 = C.HEROES[0].id;
+  let st = null, target = null, aiBusy = false;
+
+  const HERO_EMOJI = {
+    'high-priestess-elara':'🙏','grand-wizard-arcanus':'🧙',
+    'knight-commander-valerius':'⚔️','lich-queen-morwenna':'💀'
+  };
+
+  // ── หน้าตั้งค่า ──
+  function heroBtns(box, sel, onPick){
+    box.innerHTML = '';
+    C.HEROES.forEach(h => {
+      const b = document.createElement('button');
+      b.className = 'pick' + (h.id === sel ? ' on' : '');
+      b.innerHTML = `<div class="em">${HERO_EMOJI[h.id]}</div><b>${h.name}</b>
+        <span><b style="color:var(--gold-l);display:inline">${h.ability.nameTh}</b> — ${h.ability.description}</span>`;
+      b.onclick = () => { onPick(h.id); };
+      box.appendChild(b);
+    });
+  }
+  function renderSetup(){
+    heroBtns($('h1'), h1, id => { h1 = id; renderSetup(); });
+    heroBtns($('h2'), h2, id => { h2 = id; renderSetup(); });
+    $('h2label').textContent = mode === 'ai' ? 'ฮีโร่ของคอมพิวเตอร์' : 'ฮีโร่ของผู้เล่น 2';
+  }
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    b.onclick = () => {
+      mode = b.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b));
+      renderSetup();
+    };
+  });
+  renderSetup();
+
+  $('start').onclick = () => {
+    st = G.createGame({ p1HeroId:h1, p2HeroId:h2, p2Control:mode });
+    target = null;
+    $('setup').classList.add('hide');
+    $('game').classList.remove('hide');
+    render();
+  };
+  $('quit').onclick = () => {
+    $('game').classList.add('hide'); $('setup').classList.remove('hide');
+  };
+  $('wAgain').onclick = () => {
+    $('winModal').classList.add('hide');
+    $('game').classList.add('hide'); $('setup').classList.remove('hide');
+  };
+
+  // ── ตัวช่วย ──
+  const me = () => st.players[st.turn];
+  const isMyTurn = () => me().control === 'human';
+
+  function unitEl(u, clickable, isEnemy){
+    const d = document.createElement('div');
+    const dead = u.hp <= 0;
+    const selected = target && target.kind === u.kind && target.index === u.index;
+    d.className = 'unit' + (dead ? ' dead' : '') + (clickable && !dead && u.isAttackable ? ' tgt' : '') + (selected ? ' sel' : '');
+    d.innerHTML = `<div class="em">${u.emoji}</div>
+      <div class="nm">${u.name}</div>
+      <div class="dv">เกราะ ÷${u.divisor}</div>
+      <div class="hpbar"><i class="${isEnemy?'hp-e':'hp-m'}" style="width:${Math.max(0,u.hp/u.maxHp*100)}%"></i></div>
+      <div class="hpn">${u.hp} / ${u.maxHp}</div>
+      ${!u.isAttackable && !dead ? '<div class="lock">🔒 ล้มองครักษ์ก่อน</div>' : ''}`;
+    if (clickable && !dead && u.isAttackable) {
+      d.onclick = () => { target = { kind:u.kind, index:u.index }; render(); };
+    }
+    return d;
+  }
+
+  function myUnits(){
+    const p = me();
+    const list = p.guards.map((g,i)=>({kind:'guard',index:i,name:g.name,emoji:g.emoji,
+      hp:g.hp,maxHp:g.maxHp,divisor:g.divisor+g.divisorBonus,isAttackable:false}));
+    list.push({kind:'hero',index:-1,name:p.heroName,emoji:'👑',hp:p.heroHp,maxHp:p.heroMaxHp,
+      divisor:p.heroDivisor,isAttackable:false});
+    return list;
+  }
+
+  // ── วาดหน้าจอ ──
+  function render(){
+    if (!st) return;
+    const p = me();
+
+    $('turnLbl').textContent = `เทิร์น ${st.turnNumber}`;
+    $('whoLbl').textContent = `${p.name} · ${p.heroName}`;
+    const tier = R.getComboTier(p.comboStreak);
+    $('comboChip').textContent = p.comboStreak > 1 && tier ? `${tier.emoji} ${tier.label} x${p.comboStreak}` : '';
+    $('comboChip').style.display = p.comboStreak > 1 ? '' : 'none';
+
+    // ฝ่ายตรงข้าม
+    const eb = $('enemyUnits'); eb.innerHTML = '';
+    G.getTargets(st).forEach(t => eb.appendChild(unitEl(t, isMyTurn(), true)));
+
+    // ฝ่ายเรา
+    const mb = $('myUnits'); mb.innerHTML = '';
+    myUnits().forEach(u => mb.appendChild(unitEl(u, false, false)));
+    $('handTitle').textContent = `การ์ดในมือของ ${p.name}`;
+
+    // สมการ
+    const txt = EQ.toDisplayString(st.equation);
+    $('eq').innerHTML = txt ? txt : '<span class="ph">แตะการ์ดด้านล่างเพื่อสร้างสมการ</span>';
+    const power = EQ.evaluate(st.equation);
+    if (power !== null) {
+      $('pw').innerHTML = `พลังโจมตี <b>${power}</b>`;
+    } else if (st.equation.slots.length > 0) {
+      // อธิบายว่าทำไมยังโจมตีไม่ได้ ไม่ปล่อยให้เด็กงงว่าปุ่มกดไม่ได้เพราะอะไร
+      $('pw').innerHTML = `<span style="color:var(--gold-l)">${EQ.validate(st.equation).message}</span>`;
+    } else {
+      $('pw').innerHTML = '';
+    }
+
+    // ตารางดูผลก่อนตี — จุดสอนสำคัญ ให้เด็กเห็นว่าหารแล้วเหลือเศษเท่าไร
+    const pv = $('preview'); pv.innerHTML = '';
+    if (power !== null && power > 0) {
+      G.getTargets(st).filter(t => t.isAttackable).forEach(t => {
+        const r = DMG.calculateDamage({ power, divisor:t.divisor, comboStreak:p.comboStreak,
+          passive: p.heroId==='knight-commander-valerius'?'precisionStrike':
+                   p.heroId==='lich-queen-morwenna'?'soulSiphon':null });
+        const row = document.createElement('div');
+        row.className = 'prow';
+        row.innerHTML = `<span>${t.emoji}</span>
+          <span class="nm">${t.name}</span>
+          <span class="calc">${power} ÷ ${t.divisor} = ${r.quotient} เศษ ${r.remainder}</span>
+          <span class="dm ${r.isCritical?'crit':(r.damage>0?'':'blk')}">${r.isCritical?'⚡':''}${r.damage}</span>`;
+        pv.appendChild(row);
+      });
+    }
+
+    // การ์ดในมือ
+    const used = new Set([...st.equation.slots.map(s=>s.cardId), ...st.equation.brackets.map(b=>b.cardId)]);
+    const hb = $('hand'); hb.innerHTML = '';
+    const expect = st.equation.slots.length % 2 === 0 ? 'number' : 'operator';
+    p.hand.forEach(c => {
+      const b = document.createElement('button');
+      const isUsed = used.has(c.uid);
+      let cls = 'card ';
+      if (c.kind === 'number') cls += 'num' + (c.value >= 50 ? ' huge' : c.value >= 10 ? ' big' : '');
+      else if (c.kind === 'operator') cls += 'op'; else cls += 'br';
+      b.className = cls + (isUsed ? ' used' : '');
+      b.innerHTML = c.kind === 'number'
+        ? `${c.value}<small>ตัวเลข</small>`
+        : c.kind === 'bracket' ? `( )<small>ถุงมือ</small>` : `${c.label}<small>เครื่องหมาย</small>`;
+      b.disabled = !isMyTurn() || isUsed || c.kind === 'bracket' || c.kind !== expect;
+      b.onclick = () => { st = G.placeCard(st, c.uid); render(); };
+      hb.appendChild(b);
+    });
+
+    // กติกามือตาย
+    renderDeadHand();
+
+    // ปุ่ม
+    const canAtk = isMyTurn() && st.phase === 'build' && target &&
+                   (power !== null || st.deadHand !== 'none');
+    $('atk').disabled = !canAtk;
+    $('atk').textContent =
+      st.deadHand !== 'none' ? '⚔️ โจมตี (กติกามือตาย)'
+      : power === null ? '✏️ สร้างสมการให้จบด้วยตัวเลข'
+      : !target ? '👆 เลือกเป้าหมายก่อน'
+      : '⚔️ โจมตี!';
+    $('undo').disabled = !isMyTurn() || st.equation.slots.length === 0;
+    $('clear').disabled = !isMyTurn() || st.equation.slots.length === 0;
+    const terms = EQ.getTerms(st.equation).length;
+    const hasG = p.hand.some(c => c.kind==='bracket' && !used.has(c.uid));
+    $('brk').disabled = !isMyTurn() || !hasG || terms < 3 || st.equation.brackets.length > 0;
+    $('redraw').disabled = !isMyTurn() || p.redrawsUsedThisTurn >= 1 || p.heroHp <= G.getRedrawCost();
+    $('redraw').textContent = `♻️ จั่วใหม่ (−${G.getRedrawCost()} HP)`;
+
+    // บันทึก
+    const lg = $('log'); lg.innerHTML = '';
+    st.log.slice(-14).reverse().forEach(l => {
+      const d = document.createElement('div');
+      d.className = l.tone==='critical'?'c':l.tone==='blocked'?'b':l.tone==='system'?'s':'';
+      d.textContent = l.text; lg.appendChild(d);
+    });
+
+    if (!isMyTurn() && !st.winner && !aiBusy) runAi();
+  }
+
+  function renderDeadHand(){
+    const box = $('deadNote'); box.innerHTML = '';
+    if (st.deadHand === 'none' || !isMyTurn()) return;
+    const info = DH.getDeadHandInfo(st.deadHand);
+    const d = document.createElement('div');
+    d.className = 'note' + (st.deadHand === 'tacticalReset' ? ' bad' : '');
+    d.innerHTML = `<b>${info.emoji} ${info.title}</b>${info.condition} — ${info.steps[info.steps.length-1]}`;
+    box.appendChild(d);
+
+    const btn = document.createElement('button');
+    btn.className = 'btn warn sm';
+    btn.style.marginTop = '8px';
+    btn.textContent = info.emoji + ' ใช้ ' + info.title;
+    btn.onclick = () => useDeadHand();
+    box.appendChild(btn);
+  }
+
+  function useDeadHand(){
+    const p = me();
+    if (st.deadHand === 'tacticalReset') {
+      st = G.tacticalReset(st);
+      showResult('♻️','Tactical Reset','ทิ้งการ์ดทั้งหมดแล้วจั่วใหม่\nเทิร์นนี้ข้ามการโจมตี', () => { nextTurn(); });
+      return;
+    }
+    if (!target) { alert('เลือกเป้าหมายก่อนนะ'); return; }
+    const nums = p.hand.filter(c => c.kind === 'number');
+    let power, used;
+    if (st.deadHand === 'rawMagicGathering') {
+      const two = nums.slice().sort((a,b)=>b.value-a.value).slice(0,2);
+      power = DH.rawMagicPower(two[0].value, two[1] ? two[1].value : 0);
+      used = two.map(c=>c.uid);
+    } else {
+      power = DH.desperateStrikePower(nums[0].value);
+      used = [nums[0].uid];
+    }
+    const out = G.deadHandAttack(st, { target, power, usedCardIds: used });
+    st = out.state;
+    afterAttack(out.result, power);
+  }
+
+  // ── ปุ่ม ──
+  $('undo').onclick = () => { st = G.undoLastCard(st); render(); };
+  $('clear').onclick = () => { st = G.clearEquation(st); render(); };
+  $('brk').onclick = () => {
+    const n = EQ.getTerms(st.equation).length;
+    const which = confirm('กด "ตกลง" = ใส่วงเล็บคร่อม 2 ตัวแรก\nกด "ยกเลิก" = คร่อม 2 ตัวหลัง');
+    const res = which ? G.addBracket(st, 0, 1) : G.addBracket(st, n-2, n-1);
+    if (res.ok) st = res.state; else alert(res.message);
+    render();
+  };
+  $('redraw').onclick = () => {
+    const res = G.redrawHand(st);
+    if (!res.ok) { alert(res.message); return; }
+    st = res.state; target = null; render();
+  };
+  $('atk').onclick = () => {
+    if (st.deadHand !== 'none') { useDeadHand(); return; }
+    const power = EQ.evaluate(st.equation);
+    if (power === null) { alert(EQ.validate(st.equation).message || 'สมการยังไม่สมบูรณ์'); return; }
+    const out = G.attack(st, { target });
+    if (!out.result) { alert(out.message); return; }
+    st = out.state;
+    afterAttack(out.result, power);
+  };
+
+  function afterAttack(r, power){
+    const t = st.lastResult;
+    const divisor = r.quotient > 0 ? Math.round((power - r.remainder) / r.quotient) : '?';
+
+    // แสดงการคำนวณทีละขั้น ให้เด็กเห็นว่าตัวเลขมาจากไหน
+    const detail = r.isCritical
+      ? `${power} ÷ ${divisor} = ${r.quotient} เศษ 0\nหารลงตัว! ดาเมจเต็ม ${power}`
+        + (r.passiveBonus ? `\nคมดาบไร้ที่ติ +${r.passiveBonus}` : '')
+        + `\n\nใส่ ${t.targetName} ไป ${r.damage} แต้ม`
+      : `${power} ÷ ${divisor} = ${r.quotient} เศษ ${r.remainder}\n`
+        + (r.remainderPenalty
+            ? `เหลือเศษ จึงถูกหัก ${r.remainder} × 10 = ${r.remainderPenalty}\n${power} − ${r.remainderPenalty} = ${r.baseDamage}`
+            : `ดูดกลืนเศษวิญญาณ! ได้เศษ ${r.remainder} เป็นดาเมจเพิ่มแทน`)
+        + `\n\nใส่ ${t.targetName} ไป ${r.damage} แต้ม`;
+
+    showResult(r.isCritical ? '⚡' : '🛡️',
+      r.isCritical ? 'Critical Hit!' : (r.damage > 0 ? 'โดนบางส่วน' : 'Blocked — ดาเมจ 0'),
+      detail + (r.comboTier ? `\n${r.comboTier.emoji} ${r.comboTier.label} +${r.comboTier.bonusPercent}%` : ''),
+      () => { if (st.winner) showWin(); else nextTurn(); });
+  }
+
+  function showResult(emoji, title, body, onNext){
+    $('rEmoji').textContent = emoji;
+    $('rTitle').textContent = title;
+    $('rBody').textContent = body;
+    $('rNext').textContent = st.winner ? 'ดูผลการดวล' : 'จบเทิร์น →';
+    $('resultModal').classList.remove('hide');
+    $('rNext').onclick = () => { $('resultModal').classList.add('hide'); onNext(); };
+  }
+  function nextTurn(){ st = G.endTurn(st); target = null; render(); }
+  function showWin(){
+    const w = st.players[st.winner];
+    $('wTitle').textContent = `${w.name} ชนะ!`;
+    $('wBody').textContent = `${w.heroName} เอาชนะการดวลได้ใน ${st.turnNumber} เทิร์น`;
+    $('winModal').classList.remove('hide');
+  }
+
+  // ── เทิร์นคอมพิวเตอร์ ──
+  function runAi(){
+    aiBusy = true;
+    setTimeout(() => {
+      const plan = AI.planTurn(st, 'normal');
+      const p = me();
+      if (plan.fallback === 'tacticalReset') {
+        st = G.tacticalReset(st);
+      } else if (plan.fallback !== 'none') {
+        const nums = p.hand.filter(c => c.kind === 'number');
+        const used = plan.rawMagicCards ? [...plan.rawMagicCards] : (nums[0] ? [nums[0].uid] : []);
+        st = G.deadHandAttack(st, { target: plan.target, power: plan.power, usedCardIds: used }).state;
+      } else {
+        st = { ...st, equation: { slots: plan.slots, brackets: plan.bracket ? [plan.bracket] : [] } };
+        const pw = EQ.evaluate(st.equation) || 0;
+        st = G.attack(st, { target: plan.target, overridePower: pw }).state;
+      }
+      render();
+      setTimeout(() => {
+        aiBusy = false;
+        if (st.winner) showWin(); else { st = G.endTurn(st); target = null; render(); }
+      }, 1400);
+    }, 700);
+  }
+})();
+</script>
