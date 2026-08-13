@@ -111,15 +111,25 @@ function main() {
   }
 
   let html = fs.readFileSync(htmlFile, 'utf8')
-  const payload = `<script>window.__BAKED_IMAGES=${JSON.stringify(images)};</script>`
 
-  // แทนที่ของเดิมถ้าเคยฝังไว้แล้ว เพื่อให้รันซ้ำได้โดยไฟล์ไม่บวม
-  const existing = /<script>window\.__BAKED_IMAGES=.*?<\/script>/s
-  html = existing.test(html)
-    ? html.replace(existing, payload)
-    : html.replace('<title>', payload + '\n<title>')
+  // ล้างของเดิมออกก่อน เพื่อให้รันซ้ำได้โดยไฟล์ไม่บวมและไม่มี meta ซ้อน
+  html = html
+    .replace(/<script>window\.__BAKED_IMAGES=.*?<\/script>\s*/s, '')
+    .replace(/<meta\s+charset=["']?[\w-]+["']?\s*\/?>\s*/i, '')
+    .replace(/^\s+/, '')
 
-  fs.writeFileSync(htmlFile, html)
+  /*
+   * meta charset ต้องอยู่ต้นไฟล์เสมอ
+   *
+   * เบราว์เซอร์อ่านแค่ ~1 KB แรกเพื่อหาว่าไฟล์ใช้รหัสอักขระอะไร
+   * รูปที่ฝังเป็น base64 ยาวเป็นล้านตัวอักษร ถ้าไปแทรกไว้ก่อน meta
+   * เบราว์เซอร์จะหาไม่เจอแล้วเดาเป็น windows-1252 ทำให้ภาษาไทยกลายเป็น à¸ à¹ˆ
+   */
+  const payload =
+    '<meta charset="utf-8">\n' +
+    `<script>window.__BAKED_IMAGES=${JSON.stringify(images)};</script>\n`
+
+  fs.writeFileSync(htmlFile, payload + html)
 
   const mb = fs.statSync(htmlFile).size / 1024 / 1024
   console.log(`\nฝังรูปลง ${htmlFile} แล้ว — ขนาดไฟล์ ${mb.toFixed(2)} MB`)
