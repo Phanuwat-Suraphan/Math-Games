@@ -103,9 +103,10 @@ export function Character({ player }: { player: Player }) {
             )}
 
             <p className="mt-4 text-sm text-slate-400">
-              ผ่านด่านแล้ว {progression.completedLevels} จาก{' '}
-              {progression.totalLevels} ด่าน · เปิดโลกแล้ว{' '}
-              {progression.unlockedWorlds} จาก {progression.totalWorlds} โลก
+              ผ่านด่านแล้ว {progression.overall.completedStages} จาก{' '}
+              {progression.overall.totalStages} ด่าน · ⭐ {progression.overall.stars} /{' '}
+              {progression.overall.maxStars} · เปิดโลกแล้ว{' '}
+              {progression.overall.unlockedWorlds} จาก {progression.overall.totalWorlds} โลก
             </p>
           </section>
 
@@ -149,14 +150,14 @@ export function Character({ player }: { player: Player }) {
         </section>
 
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-          {progression.nextLevel ? (
+          {progression.nextStage ? (
             <Button
               size="lg"
               fullWidth
               icon="⚔️"
               onClick={() =>
                 navigate(
-                  `/play/${progression.nextLevel?.worldId}/${progression.nextLevel?.id}`,
+                  `/quest/${progression.nextStage?.worldId}/${progression.nextStage?.id}`,
                 )
               }
             >

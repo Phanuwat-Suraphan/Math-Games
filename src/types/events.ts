@@ -14,13 +14,19 @@ export interface GameEventMap {
   }
   QUESTION_CORRECT: { questionId: string; skill: SkillId; streak: number }
   QUESTION_WRONG: { questionId: string; skill: SkillId }
-  QUEST_COMPLETED: {
-    levelId: string
+  STAGE_COMPLETED: {
+    stageId: string
     worldId: string
     correctAnswers: number
     totalQuestions: number
+    stars: number
     isFirstClear: boolean
+    isPassed: boolean
   }
+  STAGE_UNLOCKED: { stageId: string }
+  WORLD_UNLOCKED: { worldId: string }
+  QUEST_READY_TO_CLAIM: { questId: string; title: string }
+  QUEST_CLAIMED: { questId: string; exp: number; coins: number }
   EXP_GAINED: { amount: number; source: 'answer' | 'quest' }
   COIN_GAINED: { amount: number; source: 'answer' | 'quest' | 'streak' }
   LEVEL_UP: { level: number; levelsGained: number }

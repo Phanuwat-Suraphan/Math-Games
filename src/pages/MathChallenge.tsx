@@ -4,30 +4,30 @@ import { Button } from '../components/Button'
 import { MathQuestion, type AnswerState } from '../components/MathQuestion'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
-import { getLevel } from '../data/levels'
+import { getStage } from '../data/stages'
 import { getWorld } from '../data/worlds'
 import { getQuestionSkill } from '../data/skills'
 import { useGame } from '../context/useGame'
 import type { Player } from '../types/player'
-import type { Level, LevelResult } from '../types/level'
+import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
-import { getQuestionsForLevel } from '../utils/questionGenerator'
-import { isLevelUnlocked } from '../utils/progression'
+import { getQuestionsForStage } from '../utils/questionGenerator'
+import { getRequiredCorrectAnswers, isStageUnlocked } from '../utils/stageSystem'
 import { playSfx } from '../services/audioService'
 import { NotFoundNotice } from './NotFoundNotice'
 
 /**
  * ตัวห่อสำหรับตรวจสอบ URL และการปลดล็อก
  * สำคัญ: ใส่ key เป็นรหัสด่าน เพื่อบังคับให้ React สร้าง component ใหม่ทุกครั้งที่เปลี่ยนด่าน
- * มิฉะนั้นการกด "ไปต่อ" จากหน้ารางวัลจะทำให้คะแนนและข้อที่ค้างอยู่ของด่านก่อนหน้าติดมาด้วย
+ * มิฉะนั้นการกด "ไปต่อ" จากหน้าผลลัพธ์จะทำให้คะแนนของด่านก่อนหน้าติดมาด้วย
  */
 export function MathChallenge({ player }: { player: Player }) {
-  const { worldId, levelId } = useParams<{ worldId: string; levelId: string }>()
+  const { worldId, stageId } = useParams<{ worldId: string; stageId: string }>()
 
-  const level = levelId ? getLevel(levelId) : undefined
+  const stage = stageId ? getStage(stageId) : undefined
   const world = worldId ? getWorld(worldId) : undefined
 
-  if (!level || !world || level.worldId !== world.id) {
+  if (!stage || !world || stage.worldId !== world.id) {
     return (
       <NotFoundNotice
         title="ไม่พบด่านนี้"
@@ -38,36 +38,37 @@ export function MathChallenge({ player }: { player: Player }) {
     )
   }
 
-  if (!isLevelUnlocked(level.id, player.completedLevels)) {
+  if (!isStageUnlocked(player, stage)) {
     return (
       <NotFoundNotice
         title="ด่านนี้ยังไม่เปิด"
-        message={`🔒 ต้องผ่านด่านที่ ${level.order - 1} ของ ${world.name} ก่อนนะ`}
+        message="ผ่านด่านก่อนหน้าเพื่อปลดล็อกด่านนี้ก่อนนะ"
         actionLabel={`กลับไป ${world.name}`}
         actionTo={`/world/${world.id}`}
+        emoji="🔒"
       />
     )
   }
 
   return (
-    <ChallengeSession key={level.id} player={player} level={level} world={world} />
+    <ChallengeSession key={stage.id} player={player} stage={stage} world={world} />
   )
 }
 
 interface ChallengeSessionProps {
   player: Player
-  level: Level
+  stage: Stage
   world: World
 }
 
-function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
+function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
   const navigate = useNavigate()
-  const { answerQuestion, finishQuest, isLevelReplay } = useGame()
+  const { answerQuestion, finishStage, isStageReplay } = useGame()
 
   // สร้างชุดโจทย์ครั้งเดียวตอน mount ชุดโจทย์จึงไม่สลับระหว่างเล่น
-  const [questions] = useState(() => getQuestionsForLevel(level))
+  const [questions] = useState(() => getQuestionsForStage(stage))
   // ตัดสินสถานะเล่นซ้ำตอนเริ่มด่าน เพื่อให้อัตรารางวัลคงที่ตลอดทั้งด่าน
-  const [isReplay] = useState(() => isLevelReplay(level.id))
+  const [isReplay] = useState(() => isStageReplay(stage.id))
 
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
@@ -79,7 +80,7 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
     null,
   )
 
-  // ยอดที่ได้รับจริงระหว่างเล่น เพื่อให้หน้ารางวัลแสดงตัวเลขตรงกับที่ผู้เล่นได้จริง
+  // ยอดที่ได้รับจริงระหว่างเล่น เพื่อให้หน้าผลลัพธ์แสดงตัวเลขตรงกับที่ผู้เล่นได้จริง
   const earnedRef = useRef({ exp: 0, coins: 0 })
   // เวลาเริ่มตอบของข้อปัจจุบัน ใช้บันทึกเวลาที่ใช้ต่อข้อ
   const questionStartedAtRef = useRef(Date.now())
@@ -93,7 +94,7 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       const isCorrect = choice === currentQuestion.answer
       const outcome = answerQuestion({
         questionId: currentQuestion.id,
-        levelId: level.id,
+        stageId: stage.id,
         skill: getQuestionSkill(currentQuestion),
         isCorrect,
         timeMs: Date.now() - questionStartedAtRef.current,
@@ -135,7 +136,7 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       attemptedWrong,
       currentQuestion,
       isReplay,
-      level.id,
+      stage.id,
     ],
   )
 
@@ -151,8 +152,8 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       return
     }
 
-    const outcome = finishQuest({
-      level,
+    const outcome = finishStage({
+      stage,
       correctAnswers: correctCount,
       totalQuestions: questions.length,
       expFromAnswers: earnedRef.current.exp,
@@ -164,15 +165,15 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       return
     }
 
-    const result: LevelResult = outcome.result
-    navigate('/reward', { replace: true, state: result })
+    const result: StageResult = outcome.result
+    navigate('/result', { replace: true, state: result })
   }, [
     correctCount,
-    finishQuest,
-    level,
+    finishStage,
     navigate,
     questionIndex,
     questions.length,
+    stage,
   ])
 
   if (!currentQuestion) {
@@ -188,12 +189,13 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
 
   const isLastQuestion = questionIndex >= questions.length - 1
   const progressPercent = Math.round((questionIndex / questions.length) * 100)
+  const requiredCorrect = getRequiredCorrectAnswers(stage)
 
   return (
     <>
       <TopBar
         player={player}
-        title={`${level.emoji} ${level.name}`}
+        title={`${stage.emoji} ${stage.name}`}
         backTo={`/world/${world.id}`}
         backLabel="ออกจากด่าน"
         showStreak
@@ -202,7 +204,7 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
       <ScreenLayout width="normal">
         {isReplay ? (
           <p className="mb-4 rounded-2xl border border-sky-400/30 bg-sky-600/15 px-4 py-2.5 text-center text-sm font-semibold text-sky-400">
-            🔁 กำลังฝึกซ้ำด่านนี้ — รางวัลจะน้อยกว่าครั้งแรก แต่สถิติยังนับให้ครบ
+            🔁 กำลังฝึกซ้ำด่านนี้ — เก็บดาวเพิ่มได้ แต่รางวัลจะน้อยกว่าครั้งแรก
           </p>
         ) : null}
 
@@ -260,14 +262,14 @@ function ChallengeSession({ player, level, world }: ChallengeSessionProps) {
               onClick={handleNext}
               autoFocus
             >
-              {isLastQuestion ? 'จบด่าน รับรางวัล!' : 'ข้อถัดไป'}
+              {isLastQuestion ? 'จบด่าน ดูผลลัพธ์!' : 'ข้อถัดไป'}
             </Button>
           </div>
         ) : null}
 
         <p className="mt-6 text-center text-sm text-slate-400">
-          ตอบถูกครั้งแรกแล้ว {correctCount} ข้อ · ตอบผิดเสียพลังชีวิตนิดเดียว
-          แล้วได้คืนตอนจบด่าน
+          ตอบถูกครั้งแรกแล้ว {correctCount} ข้อ · ผ่านด่านนี้ต้องได้{' '}
+          {requiredCorrect} ข้อ
         </p>
       </ScreenLayout>
     </>

@@ -3,6 +3,7 @@ import { GameProvider } from './context/GameContext'
 import { useGame } from './context/useGame'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LevelUpModal } from './components/LevelUpModal'
+import { QuestToastLayer } from './components/QuestToastLayer'
 import { RewardToastLayer } from './components/RewardToastLayer'
 import { RequirePlayer } from './routes/RequirePlayer'
 import { Achievements } from './pages/Achievements'
@@ -12,9 +13,10 @@ import { Home } from './pages/Home'
 import { MainMenu } from './pages/MainMenu'
 import { MathChallenge } from './pages/MathChallenge'
 import { NotFoundNotice } from './pages/NotFoundNotice'
+import { QuestIntro } from './pages/QuestIntro'
 import { Quests } from './pages/Quests'
-import { Reward } from './pages/Reward'
 import { Settings } from './pages/Settings'
+import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
 
@@ -47,7 +49,13 @@ function GameRoutes() {
           }
         />
         <Route
-          path="/play/:worldId/:levelId"
+          path="/quest/:worldId/:stageId"
+          element={
+            <RequirePlayer render={(player) => <QuestIntro player={player} />} />
+          }
+        />
+        <Route
+          path="/play/:worldId/:stageId"
           element={
             <RequirePlayer
               render={(player) => <MathChallenge player={player} />}
@@ -55,9 +63,11 @@ function GameRoutes() {
           }
         />
         <Route
-          path="/reward"
+          path="/result"
           element={
-            <RequirePlayer render={(player) => <Reward player={player} />} />
+            <RequirePlayer
+              render={(player) => <StageResult player={player} />}
+            />
           }
         />
         <Route
@@ -96,6 +106,7 @@ function GameRoutes() {
       </Routes>
 
       <RewardToastLayer />
+      <QuestToastLayer />
       <LevelUpModal level={pendingLevelUp} onClose={acknowledgeLevelUp} />
     </>
   )

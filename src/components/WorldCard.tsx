@@ -1,65 +1,55 @@
 import { motion } from 'framer-motion'
-import type { World } from '../types/world'
-import type { WorldProgress } from '../utils/progression'
+import type { WorldSummary } from '../hooks/useProgression'
 
 interface WorldCardProps {
-  world: World
-  isUnlocked: boolean
-  lockReason: string | null
-  progress: WorldProgress
-  onSelect: (world: World) => void
+  summary: WorldSummary
+  onSelect: (worldId: string) => void
 }
 
-export function WorldCard({
-  world,
-  isUnlocked,
-  lockReason,
-  progress,
-  onSelect,
-}: WorldCardProps) {
-  const isPlayable = isUnlocked && progress.hasContent
+export function WorldCard({ summary, onSelect }: WorldCardProps) {
+  const { world, lock, progress } = summary
+  const isPlayable = lock.isUnlocked && progress.hasContent
 
-  const statusLabel = !isUnlocked
-    ? `🔒 ${lockReason ?? 'ยังเข้าไม่ได้'}`
+  const statusLabel = !lock.isUnlocked
+    ? `🔒 ${lock.reason ?? 'ยังเข้าไม่ได้'}`
     : !progress.hasContent
       ? '🚧 กำลังสร้าง เร็ว ๆ นี้'
       : progress.isComplete
-        ? '✅ ผ่านครบทุกด่านแล้ว'
-        : `⚔️ ผ่านแล้ว ${progress.completedLevels} / ${progress.totalLevels} ด่าน`
+        ? '🏆 พิชิตครบทุกด่านแล้ว'
+        : `⚔️ ผ่านแล้ว ${progress.completedStages} / ${progress.totalStages} ด่าน`
 
   return (
     <motion.button
       type="button"
       whileHover={isPlayable ? { y: -4 } : undefined}
       whileTap={isPlayable ? { scale: 0.98 } : undefined}
-      onClick={() => onSelect(world)}
+      onClick={() => onSelect(world.id)}
       disabled={!isPlayable}
-      aria-label={`โลกที่ ${world.order} ${world.name} หัวข้อ ${world.topic} — ${statusLabel}`}
+      aria-label={`โลกที่ ${world.order} ${world.name} เรื่อง ${world.subtitle} — ${statusLabel}`}
       className={[
         'group relative w-full overflow-hidden rounded-xl2 border p-5 text-left transition-colors',
-        'focus-visible:ring-4 focus-visible:ring-gold-300',
         isPlayable
-          ? 'border-white/15 bg-night-800/80 hover:border-white/30 shadow-card cursor-pointer'
-          : 'border-white/5 bg-night-800/40 cursor-not-allowed',
+          ? 'cursor-pointer border-white/15 bg-night-800/80 shadow-card hover:border-white/30'
+          : 'cursor-not-allowed border-white/5 bg-night-800/40',
       ].join(' ')}
     >
       <div
         aria-hidden="true"
-        className={`absolute inset-0 bg-gradient-to-br ${world.theme.gradient} ${
-          isPlayable ? 'opacity-20 group-hover:opacity-30' : 'opacity-[0.07]'
+        className={`absolute inset-0 bg-gradient-to-br ${world.theme.background} ${
+          isPlayable ? 'opacity-70 group-hover:opacity-90' : 'opacity-20'
         } transition-opacity`}
       />
 
       <div className="relative flex items-start gap-4">
         <span
           aria-hidden="true"
-          className={`text-4xl sm:text-5xl ${isPlayable ? '' : 'grayscale opacity-60'}`}
+          className={`text-4xl sm:text-5xl ${isPlayable ? '' : 'opacity-60 grayscale'}`}
         >
-          {isUnlocked ? world.emoji : '🔒'}
+          {lock.isUnlocked ? world.emoji : '🔒'}
         </span>
 
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-300">
             โลกที่ {world.order}
           </p>
           <h3
@@ -69,33 +59,39 @@ export function WorldCard({
           >
             {world.name}
           </h3>
-          <p className="mt-1 text-sm text-slate-300">{world.topic}</p>
+          <p className="mt-1 text-sm text-slate-200">{world.subtitle}</p>
 
           {isPlayable ? (
-            <p className="mt-2 line-clamp-2 text-sm text-slate-400">
+            <p className="mt-2 line-clamp-2 text-sm text-slate-300">
               {world.description}
             </p>
           ) : null}
 
           <p
             className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-              !isUnlocked || !progress.hasContent
-                ? 'bg-night-900/70 text-slate-300'
+              !lock.isUnlocked || !progress.hasContent
+                ? 'bg-night-900/70 text-slate-200'
                 : progress.isComplete
-                  ? 'bg-leaf-600/25 text-leaf-400'
-                  : 'bg-arcane-600/25 text-arcane-400'
+                  ? 'bg-gold-500/25 text-gold-300'
+                  : 'bg-night-900/70 text-white'
             }`}
           >
             {statusLabel}
           </p>
 
-          {isPlayable && progress.totalLevels > 0 ? (
-            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-night-900/70">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-leaf-400 to-leaf-600 transition-all duration-500"
-                style={{ width: `${progress.percent}%` }}
-              />
-            </div>
+          {isPlayable ? (
+            <>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-night-900/70">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-leaf-400 to-leaf-600 transition-all duration-500"
+                  style={{ width: `${progress.percent}%` }}
+                />
+              </div>
+              <p className="mt-2 text-sm font-semibold text-gold-300">
+                <span aria-hidden="true">⭐</span> {progress.stars} /{' '}
+                {progress.maxStars} ดาว
+              </p>
+            </>
           ) : null}
         </div>
       </div>

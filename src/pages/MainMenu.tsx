@@ -86,9 +86,10 @@ export function MainMenu({ player }: { player: Player }) {
       <PlayerCard player={player} />
 
       <p className="mt-4 text-center text-sm text-slate-400">
-        ความคืบหน้ารวม: ผ่านแล้ว {progress.completedLevels} จาก{' '}
-        {progress.totalLevels} ด่าน · เปิดโลกแล้ว {progress.unlockedWorlds} จาก{' '}
-        {progress.totalWorlds} โลก
+        ความคืบหน้ารวม: ผ่านแล้ว {progress.overall.completedStages} จาก{' '}
+        {progress.overall.totalStages} ด่าน · ⭐ {progress.overall.stars} /{' '}
+        {progress.overall.maxStars} · เปิดโลกแล้ว {progress.overall.unlockedWorlds}{' '}
+        จาก {progress.overall.totalWorlds} โลก
         {accuracy.hasData
           ? ` · ความแม่นยำ ${accuracy.accuracy}% จาก ${accuracy.totalQuestions} ข้อ`
           : ''}

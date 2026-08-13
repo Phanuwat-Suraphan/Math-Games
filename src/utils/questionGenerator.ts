@@ -1,13 +1,34 @@
 import { QUESTIONS } from '../data/questions'
-import type { Difficulty, Level } from '../types/level'
+import { getOperationForSkill } from '../data/skills'
+import type { Stage, StageDifficulty } from '../types/stage'
 import type { MathOperation, Question } from '../types/question'
+import type { Difficulty } from '../types/question'
 
+/**
+ * ระยะห่างของความยากที่ใช้จัดลำดับโจทย์
+ * คลังโจทย์ยังใช้ระดับเดิม (easy/normal/hard/boss) ส่วนด่านใช้ easy/medium/hard/boss
+ * จึงเทียบ medium กับ normal เป็นระดับเดียวกัน
+ */
 const DIFFICULTY_RANK: Record<Difficulty, number> = {
   easy: 0,
   normal: 1,
   hard: 2,
   boss: 3,
 }
+
+const STAGE_DIFFICULTY_RANK: Record<StageDifficulty, number> = {
+  easy: 0,
+  medium: 1,
+  hard: 2,
+  boss: 3,
+}
+
+const RANK_TO_QUESTION_DIFFICULTY: Difficulty[] = [
+  'easy',
+  'normal',
+  'hard',
+  'boss',
+]
 
 export function shuffle<T>(items: readonly T[]): T[] {
   const result = items.slice()
@@ -120,10 +141,15 @@ export function generateQuestion(
  * 2. เรียงโดยให้ระดับความยากใกล้เคียงด่านมาก่อน แล้วสุ่มลำดับภายในกลุ่ม
  * 3. ถ้ายังไม่ครบจำนวน ให้สร้างโจทย์เพิ่มแบบสุ่ม เกมจึงไม่มีทางโจทย์หมด
  */
-export function getQuestionsForLevel(level: Level): Question[] {
+export function getQuestionsForStage(stage: Stage): Question[] {
   const operations: MathOperation[] =
-    level.operations.length > 0 ? level.operations : ['add']
-  const targetRank = DIFFICULTY_RANK[level.difficulty]
+    stage.questionTypes.length > 0
+      ? stage.questionTypes.map(getOperationForSkill)
+      : ['add']
+
+  const targetRank = STAGE_DIFFICULTY_RANK[stage.difficulty]
+  const fallbackDifficulty =
+    RANK_TO_QUESTION_DIFFICULTY[targetRank] ?? 'normal'
 
   const pool = QUESTIONS.filter((question) =>
     operations.includes(question.operation),
@@ -144,22 +170,22 @@ export function getQuestionsForLevel(level: Level): Question[] {
   const selected: Question[] = []
 
   for (const distance of sortedDistances) {
-    if (selected.length >= level.questionCount) break
+    if (selected.length >= stage.questionCount) break
     const bucket = grouped.get(distance) ?? []
     for (const question of shuffle(bucket)) {
-      if (selected.length >= level.questionCount) break
+      if (selected.length >= stage.questionCount) break
       selected.push(question)
     }
   }
 
   let fallbackIndex = 0
-  while (selected.length < level.questionCount) {
+  while (selected.length < stage.questionCount) {
     const operation = operations[fallbackIndex % operations.length] ?? 'add'
     selected.push(
       generateQuestion(
         operation,
-        level.difficulty,
-        level.maxOperand,
+        fallbackDifficulty,
+        stage.numberRange.max,
         fallbackIndex,
       ),
     )

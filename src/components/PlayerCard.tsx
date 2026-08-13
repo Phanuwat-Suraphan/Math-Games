@@ -43,7 +43,7 @@ export function PlayerCard({ player, className = '' }: PlayerCardProps) {
         <CoinDisplay coins={player.coins} />
         <span className="stat-chip text-leaf-400">
           <span aria-hidden="true">🏅</span>
-          <span>ผ่านแล้ว {player.completedLevels.length} ด่าน</span>
+          <span>ผ่านแล้ว {player.completedStages.length} ด่าน</span>
         </span>
         <StreakBadge
           currentStreak={player.currentStreak}

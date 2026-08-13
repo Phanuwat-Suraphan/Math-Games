@@ -6,11 +6,19 @@ import {
   getStreakReward,
   type StreakReward,
 } from '../data/rewards'
-import type { Level, LevelResult } from '../types/level'
+import { getNextStage, getStagesByWorld } from '../data/stages'
+import { getWorld } from '../data/worlds'
 import type { Player } from '../types/player'
+import type { Stage, StageProgress, StageResult } from '../types/stage'
 import type { QuestionAttempt, SkillId } from '../types/stats'
 import { addExp } from '../utils/experience'
-import { calculateAccuracy, recordSkillAttempt } from '../utils/statistics'
+import {
+  createEmptyStageProgress,
+  getStageProgress,
+  resolveUnlockedWorlds,
+  summarizeAttempt,
+} from '../utils/stageSystem'
+import { recordSkillAttempt } from '../utils/statistics'
 
 /**
  * ฟังก์ชันทั้งหมดในไฟล์นี้เป็น pure function
@@ -73,7 +81,7 @@ function pushRecentAttempt(
 
 export interface AnswerInput {
   questionId: string
-  levelId: string
+  stageId: string
   skill: SkillId
   isCorrect: boolean
   timeMs: number
@@ -117,7 +125,7 @@ export function recordAnswer(player: Player, input: AnswerInput): AnswerOutcome 
     recentAttempts: pushRecentAttempt(player, {
       questionId: input.questionId,
       skill: input.skill,
-      levelId: input.levelId,
+      stageId: input.stageId,
       isCorrect: input.isCorrect,
       timeMs,
       answeredAt,
@@ -173,89 +181,136 @@ export function recordAnswer(player: Player, input: AnswerInput): AnswerOutcome 
   }
 }
 
-export interface QuestInput {
-  level: Level
+export interface StageInput {
+  stage: Stage
   correctAnswers: number
   totalQuestions: number
-  /** EXP และเหรียญที่ได้รับระหว่างตอบคำถาม ใช้แสดงในหน้ารางวัลให้ตรงกับที่ได้จริง */
+  /** EXP และเหรียญที่ได้รับระหว่างตอบคำถาม ใช้แสดงในหน้าผลลัพธ์ให้ตรงกับที่ได้จริง */
   expFromAnswers: number
   coinsFromAnswers: number
   completedAt?: string
 }
 
-export interface QuestOutcome {
+export interface StageOutcome {
   player: Player
-  result: LevelResult
+  result: StageResult
   levelsGained: number
   newLevel: number
   healedHp: number
 }
 
 /**
- * ปิดจบด่าน: ให้โบนัส ฟื้นพลังชีวิต บันทึกสถิติด่าน และตรวจการเลื่อนเลเวล
- * ด่านที่เคยผ่านแล้วจะได้รางวัลตามอัตราการเล่นซ้ำ ไม่ใช่รางวัลเต็ม
+ * ปิดจบด่าน
+ * ครอบคลุม: ตรวจเกณฑ์ผ่าน คำนวณดาว บันทึกสถิติที่ดีที่สุด ให้โบนัส ฟื้นพลังชีวิต
+ * ปลดล็อกด่านถัดไป และตรวจว่าพิชิตโลกครบจนปลดล็อกโลกใหม่หรือยัง
+ *
+ * ด่านที่เคยผ่านแล้วจะได้รางวัลตาม replayReward ไม่ใช่รางวัลเต็ม
  */
-export function completeQuest(
-  player: Player,
-  input: QuestInput,
-): QuestOutcome {
-  const { level } = input
+export function completeStage(player: Player, input: StageInput): StageOutcome {
+  const { stage } = input
   const completedAt = input.completedAt ?? new Date().toISOString()
-  const previousRecord = player.levelRecords[level.id]
-  const isFirstClear = !previousRecord || previousRecord.completions === 0
 
-  const bonusExp = applyReplayMultiplier(level.reward.exp, !isFirstClear)
-  const bonusCoins = applyReplayMultiplier(level.reward.coins, !isFirstClear)
-  const accuracy = calculateAccuracy(input.correctAnswers, input.totalQuestions)
+  const previous = getStageProgress(player, stage.id)
+  const wasCompleted = previous.completed
+  const isFirstClear = !wasCompleted
+
+  const attempt = summarizeAttempt(
+    stage,
+    input.correctAnswers,
+    input.totalQuestions,
+  )
+
+  // ให้รางวัลเต็มเฉพาะครั้งแรกที่ผ่านเกณฑ์ ครั้งต่อ ๆ ไปใช้รางวัลเล่นซ้ำ
+  const reward =
+    attempt.isPassed && isFirstClear ? stage.firstClearReward : stage.replayReward
+  // ถ้ายังไม่ผ่านเกณฑ์ ก็ยังได้รางวัลปลอบใจเล็กน้อย เด็กจะได้ไม่รู้สึกว่าเสียเวลาเปล่า
+  const bonusExp = attempt.isPassed ? reward.exp : Math.floor(reward.exp * 0.25)
+  const bonusCoins = attempt.isPassed
+    ? reward.coins
+    : Math.floor(reward.coins * 0.25)
 
   const hpBefore = player.hp
   let next = healPlayer(player, HP_CONFIG.questCompleteHeal)
   next = addCoins(next, bonusCoins)
 
-  next = {
-    ...next,
-    completedLevels: next.completedLevels.includes(level.id)
-      ? next.completedLevels
-      : [...next.completedLevels, level.id],
-    levelRecords: {
-      ...next.levelRecords,
-      [level.id]: {
-        completions: (previousRecord?.completions ?? 0) + 1,
-        bestCorrect: Math.max(
-          previousRecord?.bestCorrect ?? 0,
-          input.correctAnswers,
-        ),
-        bestAccuracy: Math.max(previousRecord?.bestAccuracy ?? 0, accuracy),
-        lastPlayedAt: completedAt,
-      },
-    },
+  const stars = Math.max(previous.stars, attempt.stars)
+  const bestScore = Math.max(previous.bestScore, input.correctAnswers)
+  const bestAccuracy = Math.max(previous.bestAccuracy, attempt.accuracy)
+  const isNewBest =
+    attempt.accuracy > previous.bestAccuracy || attempt.stars > previous.stars
+
+  const nextProgress: StageProgress = {
+    ...createEmptyStageProgress(stage.id),
+    attempts: previous.attempts + 1,
+    bestScore,
+    bestAccuracy,
+    stars,
+    completed: wasCompleted || attempt.isPassed,
+    mastered: stars >= 3,
+    firstCompletedAt:
+      previous.firstCompletedAt ?? (attempt.isPassed ? completedAt : undefined),
+    lastPlayedAt: completedAt,
   }
 
+  next = {
+    ...next,
+    completedStages:
+      nextProgress.completed && !next.completedStages.includes(stage.id)
+        ? [...next.completedStages, stage.id]
+        : next.completedStages,
+    stageProgress: { ...next.stageProgress, [stage.id]: nextProgress },
+  }
+
+  // ตรวจการปลดล็อกหลังบันทึกความคืบหน้าแล้ว
+  const nextStage = getNextStage(stage)
+  const unlockedStageId =
+    attempt.isPassed && isFirstClear && nextStage ? nextStage.id : undefined
+
+  const worldStages = getStagesByWorld(stage.worldId)
+  const isWorldComplete =
+    worldStages.length > 0 &&
+    worldStages.every((item) => getStageProgress(next, item.id).completed)
+
+  const unlockedWorlds = resolveUnlockedWorlds(next)
+  const newWorldId = unlockedWorlds.find(
+    (worldId) => !player.unlockedWorlds.includes(worldId),
+  )
+  next = { ...next, unlockedWorlds }
+
   const expResult = addExp(next, bonusExp)
+  const healedHp = expResult.player.hp - hpBefore
 
   return {
     player: expResult.player,
     result: {
-      worldId: level.worldId,
-      levelId: level.id,
+      worldId: stage.worldId,
+      stageId: stage.id,
       totalQuestions: input.totalQuestions,
       correctAnswers: input.correctAnswers,
+      accuracy: attempt.accuracy,
       expFromAnswers: input.expFromAnswers,
       coinsFromAnswers: input.coinsFromAnswers,
       bonusExp,
       bonusCoins,
-      isFirstClear,
-      accuracy,
-      hpHealed: expResult.player.hp - hpBefore,
+      isFirstClear: isFirstClear && attempt.isPassed,
+      isPassed: attempt.isPassed,
+      stars: attempt.stars,
+      previousStars: previous.stars,
+      isNewBest,
+      isMastered: nextProgress.mastered,
+      hpHealed: healedHp,
+      unlockedStageId,
+      unlockedWorldId: newWorldId && getWorld(newWorldId) ? newWorldId : undefined,
+      isWorldComplete,
+      completedQuestIds: [],
     },
     levelsGained: expResult.levelsGained,
     newLevel: expResult.newLevel,
-    healedHp: expResult.player.hp - hpBefore,
+    healedHp,
   }
 }
 
 /** ด่านนี้เคยผ่านแล้วหรือยัง ใช้ตัดสินอัตรารางวัลตั้งแต่ข้อแรก */
-export function isReplayOf(player: Player, levelId: string): boolean {
-  const record = player.levelRecords[levelId]
-  return Boolean(record && record.completions > 0)
+export function isReplayOf(player: Player, stageId: string): boolean {
+  return getStageProgress(player, stageId).completed
 }

@@ -1,7 +1,9 @@
-import type { Difficulty } from './level'
 import type { SkillId } from './stats'
 
 export type MathOperation = 'add' | 'subtract' | 'multiply' | 'divide'
+
+/** ระดับความยากของโจทย์ในคลัง แยกจากระดับความยากของด่าน */
+export type Difficulty = 'easy' | 'normal' | 'hard' | 'boss'
 
 export interface Question {
   id: string

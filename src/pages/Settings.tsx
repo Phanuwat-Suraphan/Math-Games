@@ -76,7 +76,7 @@ export function Settings() {
             <p className="mt-3 rounded-xl bg-night-900/60 px-4 py-3 text-sm text-slate-300">
               ตัวละครปัจจุบัน:{' '}
               <span className="font-bold text-white">{player.name}</span> · เลเวล{' '}
-              {player.level} · ผ่านแล้ว {player.completedLevels.length} ด่าน
+              {player.level} · ผ่านแล้ว {player.completedStages.length} ด่าน
             </p>
 
             {confirmingReset ? (
@@ -125,7 +125,7 @@ export function Settings() {
       </div>
 
       <p className="mt-6 text-center text-xs text-slate-500">
-        Math Adventure · Part 1 (ต้นแบบ)
+        Math Adventure · Part 3 (ต้นแบบ)
       </p>
     </ScreenLayout>
   )

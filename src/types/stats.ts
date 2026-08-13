@@ -24,17 +24,9 @@ export type PlayerStatistics = Record<SkillId, SkillStatistic>
 export interface QuestionAttempt {
   questionId: string
   skill: SkillId
-  levelId: string
+  stageId: string
   isCorrect: boolean
   /** เวลาที่ใช้ตอบ หน่วยมิลลิวินาที */
   timeMs: number
   answeredAt: string
-}
-
-/** สถิติของแต่ละด่าน ใช้ตัดสินว่าเป็นการเล่นครั้งแรกหรือเล่นซ้ำ */
-export interface LevelRecord {
-  completions: number
-  bestCorrect: number
-  bestAccuracy: number
-  lastPlayedAt: string
 }

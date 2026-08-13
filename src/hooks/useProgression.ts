@@ -1,11 +1,21 @@
 import { useMemo } from 'react'
-import { LEVELS } from '../data/levels'
 import { CORE_SKILL_IDS, SKILLS, getSkillMeta } from '../data/skills'
-import type { Level } from '../types/level'
+import { STAGES } from '../data/stages'
+import { WORLDS } from '../data/worlds'
 import type { Player } from '../types/player'
+import type { Stage } from '../types/stage'
+import type { World } from '../types/world'
 import type { SkillId, SkillStatistic } from '../types/stats'
 import { getStarRating, getSkillToPractice } from '../utils/statistics'
-import { getOverallProgress, isLevelUnlocked } from '../utils/progression'
+import {
+  getOverallProgress,
+  getWorldLockState,
+  getWorldProgress,
+  isStageUnlocked,
+  type OverallProgress,
+  type WorldLockState,
+  type WorldProgressSummary,
+} from '../utils/stageSystem'
 
 export interface SkillSummary {
   id: SkillId
@@ -17,6 +27,12 @@ export interface SkillSummary {
   stars: number | null
 }
 
+export interface WorldSummary {
+  world: World
+  lock: WorldLockState
+  progress: WorldProgressSummary
+}
+
 export interface UseProgressionResult {
   /** ทักษะหลักสี่อย่างของ World 1 ใช้แสดงในหน้าโปรไฟล์ */
   coreSkills: SkillSummary[]
@@ -24,11 +40,10 @@ export interface UseProgressionResult {
   allSkills: SkillSummary[]
   /** ทักษะที่ควรชวนไปฝึกต่อ */
   skillToPractice: SkillSummary | null
-  nextLevel: Level | undefined
-  completedLevels: number
-  totalLevels: number
-  unlockedWorlds: number
-  totalWorlds: number
+  worlds: WorldSummary[]
+  /** ด่านถัดไปที่ควรเล่น ข้ามโลกได้ถ้าโลกปัจจุบันจบแล้ว */
+  nextStage: Stage | undefined
+  overall: OverallProgress
 }
 
 function toSummary(player: Player, id: SkillId): SkillSummary {
@@ -49,27 +64,30 @@ function toSummary(player: Player, id: SkillId): SkillSummary {
   }
 }
 
-/** สรุปความก้าวหน้าของผู้เล่น ใช้ร่วมกันระหว่างหน้าโปรไฟล์ ภารกิจ และความสำเร็จ */
+/** สรุปความก้าวหน้าของผู้เล่น ใช้ร่วมกันระหว่างหน้าโปรไฟล์ แผนที่ และภารกิจ */
 export function useProgression(player: Player): UseProgressionResult {
   return useMemo(() => {
     const practiceId = getSkillToPractice(player.statistics)
-    const overall = getOverallProgress(player)
 
-    const nextLevel = LEVELS.filter(
-      (level) =>
-        isLevelUnlocked(level.id, player.completedLevels) &&
-        !player.completedLevels.includes(level.id),
+    const worlds: WorldSummary[] = WORLDS.map((world) => ({
+      world,
+      lock: getWorldLockState(player, world),
+      progress: getWorldProgress(player, world.id),
+    }))
+
+    const nextStage = STAGES.filter(
+      (stage) =>
+        isStageUnlocked(player, stage) &&
+        !player.completedStages.includes(stage.id),
     ).sort((a, b) => a.order - b.order)[0]
 
     return {
       coreSkills: CORE_SKILL_IDS.map((id) => toSummary(player, id)),
       allSkills: SKILLS.map((skill) => toSummary(player, skill.id)),
       skillToPractice: practiceId ? toSummary(player, practiceId) : null,
-      nextLevel,
-      completedLevels: overall.completedLevels,
-      totalLevels: overall.totalLevels,
-      unlockedWorlds: overall.unlockedWorlds,
-      totalWorlds: overall.totalWorlds,
+      worlds,
+      nextStage,
+      overall: getOverallProgress(player),
     }
   }, [player])
 }

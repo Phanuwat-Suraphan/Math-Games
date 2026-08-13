@@ -53,7 +53,7 @@ export function Home() {
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-bold text-white">{player.name}</p>
             <p className="text-sm text-slate-300">
-              เลเวล {player.level} · ผ่านแล้ว {player.completedLevels.length} ด่าน
+              เลเวล {player.level} · ผ่านแล้ว {player.completedStages.length} ด่าน
             </p>
           </div>
         </div>

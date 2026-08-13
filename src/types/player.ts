@@ -1,8 +1,6 @@
-import type {
-  LevelRecord,
-  PlayerStatistics,
-  QuestionAttempt,
-} from './stats'
+import type { DailyQuestState, QuestProgress } from './quest'
+import type { StageProgress } from './stage'
+import type { PlayerStatistics, QuestionAttempt } from './stats'
 
 export interface Player {
   id: string
@@ -23,9 +21,15 @@ export interface Player {
   currentStreak: number
   bestStreak: number
 
-  completedLevels: string[]
-  /** สถิติรายด่าน ใช้แยกการเล่นครั้งแรกออกจากการเล่นซ้ำ */
-  levelRecords: Record<string, LevelRecord>
+  /** รหัสด่านที่ผ่านเกณฑ์แล้ว */
+  completedStages: string[]
+  /** ความคืบหน้ารายด่าน รวมคะแนนดีที่สุดและดาว */
+  stageProgress: Record<string, StageProgress>
+  /** โลกที่เปิดให้เล่นแล้ว */
+  unlockedWorlds: string[]
+
+  questProgress: Record<string, QuestProgress>
+  dailyQuests: DailyQuestState
 
   statistics: PlayerStatistics
   /** ประวัติการตอบล่าสุด เก็บจำกัดจำนวนตาม MAX_RECENT_ATTEMPTS */

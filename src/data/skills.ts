@@ -99,3 +99,23 @@ export function getQuestionSkill(question: Question): SkillId {
 export function getSkillForOperation(operation: MathOperation): SkillId {
   return OPERATION_TO_SKILL[operation]
 }
+
+/**
+ * ทักษะที่ยังไม่มีคลังโจทย์ของตัวเอง (เศษส่วน ทศนิยม ฯลฯ) จะใช้โจทย์การบวกไปก่อน
+ * Part 4 จะแทนที่ด้วย Question Engine ที่สร้างโจทย์ของแต่ละทักษะได้จริง
+ */
+const SKILL_TO_OPERATION: Record<SkillId, MathOperation> = {
+  addition: 'add',
+  subtraction: 'subtract',
+  multiplication: 'multiply',
+  division: 'divide',
+  fractions: 'divide',
+  decimals: 'add',
+  percentages: 'multiply',
+  geometry: 'multiply',
+  wordProblems: 'add',
+}
+
+export function getOperationForSkill(skill: SkillId): MathOperation {
+  return SKILL_TO_OPERATION[skill]
+}

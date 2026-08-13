@@ -1,4 +1,5 @@
 import type { Player } from '../types/player'
+import { getTotalStars } from '../utils/stageSystem'
 import { calculateAccuracy } from '../utils/statistics'
 
 export interface Achievement {
@@ -17,9 +18,9 @@ export const ACHIEVEMENTS: Achievement[] = [
     name: 'ก้าวแรกของนักผจญภัย',
     description: 'ผ่านด่านแรกได้สำเร็จ',
     emoji: '👣',
-    isUnlocked: (player) => player.completedLevels.length >= 1,
+    isUnlocked: (player) => player.completedStages.length >= 1,
     getProgressText: (player) =>
-      `${Math.min(player.completedLevels.length, 1)} / 1 ด่าน`,
+      `${Math.min(player.completedStages.length, 1)} / 1 ด่าน`,
   },
   {
     id: 'level-3',
@@ -48,26 +49,48 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'world-1-clear',
     name: 'ผู้พิชิตป่าจำนวน',
-    description: 'ผ่านครบทั้ง 5 ด่านของ World 1',
+    description: 'ผ่านครบทั้ง 10 ด่านของ World 1',
     emoji: '🌳',
     isUnlocked: (player) =>
-      player.completedLevels.filter((id) => id.startsWith('world-1-')).length >= 5,
+      player.completedStages.filter((id) => id.startsWith('world-1-')).length >= 10,
     getProgressText: (player) =>
       `${Math.min(
-        player.completedLevels.filter((id) => id.startsWith('world-1-')).length,
-        5,
-      )} / 5 ด่าน`,
+        player.completedStages.filter((id) => id.startsWith('world-1-')).length,
+        10,
+      )} / 10 ด่าน`,
   },
   {
     id: 'boss-slayer',
     name: 'นักล่ามินิบอส',
-    description: 'เอาชนะยักษ์เฝ้าป่าได้สำเร็จ',
+    description: 'เอาชนะผู้พิทักษ์จำนวนได้สำเร็จ',
     emoji: '👹',
-    isUnlocked: (player) => player.completedLevels.includes('world-1-level-5'),
+    isUnlocked: (player) => player.completedStages.includes('world-1-stage-10'),
     getProgressText: (player) =>
-      player.completedLevels.includes('world-1-level-5')
+      player.completedStages.includes('world-1-stage-10')
         ? 'ชนะแล้ว'
         : 'ยังไม่ได้เอาชนะ',
+  },
+  {
+    id: 'star-collector',
+    name: 'นักสะสมดาว',
+    description: 'สะสมดาวจากด่านต่าง ๆ ให้ได้ 15 ดวง',
+    emoji: '⭐',
+    isUnlocked: (player) => getTotalStars(player) >= 15,
+    getProgressText: (player) => `${Math.min(getTotalStars(player), 15)} / 15 ดาว`,
+  },
+  {
+    id: 'first-mastered',
+    name: 'ความเชี่ยวชาญครั้งแรก',
+    description: 'ทำด่านใดก็ได้จนได้ครบ 3 ดาว',
+    emoji: '🏆',
+    isUnlocked: (player) =>
+      Object.values(player.stageProgress).some((progress) => progress.mastered),
+    getProgressText: (player) => {
+      const mastered = Object.values(player.stageProgress).filter(
+        (progress) => progress.mastered,
+      ).length
+      return mastered > 0 ? `เชี่ยวชาญแล้ว ${mastered} ด่าน` : 'ยังไม่มีด่านที่ได้ 3 ดาว'
+    },
   },
   {
     id: 'streak-5',

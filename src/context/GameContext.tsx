@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { GameSettings, Player } from '../types/player'
+import type { Quest } from '../types/quest'
 import {
   DEFAULT_SETTINGS,
   clearPlayer,
@@ -20,14 +21,21 @@ import {
   type StorageStatus,
 } from '../services/storage'
 import {
-  completeQuest,
+  completeStage,
   isReplayOf,
   recordAnswer,
   type AnswerInput,
   type AnswerOutcome,
-  type QuestInput,
-  type QuestOutcome,
+  type StageInput,
+  type StageOutcome,
 } from '../services/rewardService'
+import {
+  advanceQuestsOnAnswer,
+  claimQuestReward,
+  ensureDailyQuests,
+  refreshQuestCompletion,
+  type ClaimResult,
+} from '../services/questService'
 import { emit } from '../services/eventBus'
 import {
   playSfx,
@@ -42,14 +50,18 @@ export interface GameContextValue {
   storageStatus: StorageStatus
   storageWarning: string | null
   pendingLevelUp: number | null
+  /** ภารกิจที่เพิ่งทำสำเร็จ รอให้ผู้เล่นรับทราบ */
+  questToasts: Quest[]
 
   startNewGame: (name: string, avatar: string) => Player
   answerQuestion: (input: AnswerInput) => AnswerOutcome | null
-  finishQuest: (input: QuestInput) => QuestOutcome | null
+  finishStage: (input: StageInput) => StageOutcome | null
+  claimQuest: (questId: string) => ClaimResult | null
   patchPlayer: (changes: Partial<Player>) => void
-  isLevelReplay: (levelId: string) => boolean
+  isStageReplay: (stageId: string) => boolean
 
   acknowledgeLevelUp: () => void
+  dismissQuestToast: (questId: string) => void
   updateSettings: (partial: Partial<GameSettings>) => void
   resetProgress: () => void
   dismissStorageWarning: () => void
@@ -71,6 +83,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [storageStatus, setStorageStatus] = useState<StorageStatus>('empty')
   const [storageWarning, setStorageWarning] = useState<string | null>(null)
   const [pendingLevelUp, setPendingLevelUp] = useState<number | null>(null)
+  const [questToasts, setQuestToasts] = useState<Quest[]>([])
 
   // เก็บค่าล่าสุดไว้ใน ref เพื่อให้คำนวณรางวัลได้ทันทีแบบ synchronous
   const playerRef = useRef<Player | null>(null)
@@ -78,8 +91,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const result = loadPlayer()
-    playerRef.current = result.data
-    setPlayer(result.data)
+
+    // แจกภารกิจประจำวันชุดใหม่ทันทีถ้าขึ้นวันใหม่แล้ว
+    let loaded = result.data
+    if (loaded) {
+      const daily = ensureDailyQuests(loaded)
+      loaded = daily.player
+      if (daily.didReset) savePlayer(loaded)
+    }
+
+    playerRef.current = loaded
+    setPlayer(loaded)
     setStorageStatus(result.status)
     setStorageWarning(STORAGE_WARNINGS[result.status] ?? null)
 
@@ -110,28 +132,39 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const announceQuests = useCallback((quests: Quest[]) => {
+    if (quests.length === 0) return
+    setQuestToasts((current) => [...current, ...quests])
+    for (const quest of quests) {
+      emit('QUEST_READY_TO_CLAIM', { questId: quest.id, title: quest.title })
+    }
+  }, [])
+
   const startNewGame = useCallback(
     (name: string, avatar: string): Player => {
-      const next = createPlayer(name, avatar)
+      const fresh = createPlayer(name, avatar)
+      const withDaily = ensureDailyQuests(fresh).player
+
       setStorageStatus('ok')
       setStorageWarning(null)
       setPendingLevelUp(null)
-      commitPlayer(next)
+      setQuestToasts([])
+      commitPlayer(withDaily)
 
       emit('PLAYER_CREATED', {
-        playerId: next.id,
-        name: next.name,
-        avatar: next.avatar,
+        playerId: withDaily.id,
+        name: withDaily.name,
+        avatar: withDaily.avatar,
       })
 
-      return next
+      return withDaily
     },
     [commitPlayer],
   )
 
-  const isLevelReplay = useCallback((levelId: string): boolean => {
+  const isStageReplay = useCallback((stageId: string): boolean => {
     const current = playerRef.current
-    return current ? isReplayOf(current, levelId) : false
+    return current ? isReplayOf(current, stageId) : false
   }, [])
 
   const answerQuestion = useCallback(
@@ -140,7 +173,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!current) return null
 
       const outcome = recordAnswer(current, input)
-      commitPlayer(outcome.player)
+
+      // อัปเดตความคืบหน้าภารกิจจากผลการตอบข้อนี้
+      const questResult = advanceQuestsOnAnswer(outcome.player, {
+        skill: input.skill,
+        isCorrect: input.isCorrect,
+        currentStreak: outcome.currentStreak,
+      })
+
+      commitPlayer(questResult.player)
+      announceQuests(questResult.newlyCompleted)
 
       emit('QUESTION_ANSWERED', {
         questionId: input.questionId,
@@ -192,35 +234,43 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setPendingLevelUp(outcome.newLevel)
       }
 
-      return outcome
+      return { ...outcome, player: questResult.player }
     },
-    [commitPlayer],
+    [announceQuests, commitPlayer],
   )
 
-  const finishQuest = useCallback(
-    (input: QuestInput): QuestOutcome | null => {
+  const finishStage = useCallback(
+    (input: StageInput): StageOutcome | null => {
       const current = playerRef.current
       if (!current) return null
 
-      const outcome = completeQuest(current, input)
-      commitPlayer(outcome.player)
+      const outcome = completeStage(current, input)
 
-      emit('QUEST_COMPLETED', {
-        levelId: input.level.id,
-        worldId: input.level.worldId,
+      // ภารกิจแบบ "ผ่านด่าน X" จะสำเร็จได้ก็ต่อเมื่อความคืบหน้าด่านถูกบันทึกแล้ว
+      const questResult = refreshQuestCompletion(outcome.player)
+      commitPlayer(questResult.player)
+      announceQuests(questResult.newlyCompleted)
+
+      const result = {
+        ...outcome.result,
+        completedQuestIds: questResult.newlyCompleted.map((quest) => quest.id),
+      }
+
+      emit('STAGE_COMPLETED', {
+        stageId: input.stage.id,
+        worldId: input.stage.worldId,
         correctAnswers: input.correctAnswers,
         totalQuestions: input.totalQuestions,
+        stars: outcome.result.stars,
         isFirstClear: outcome.result.isFirstClear,
+        isPassed: outcome.result.isPassed,
       })
 
-      if (outcome.result.bonusExp > 0) {
-        emit('EXP_GAINED', { amount: outcome.result.bonusExp, source: 'quest' })
+      if (result.bonusExp > 0) {
+        emit('EXP_GAINED', { amount: result.bonusExp, source: 'quest' })
       }
-      if (outcome.result.bonusCoins > 0) {
-        emit('COIN_GAINED', {
-          amount: outcome.result.bonusCoins,
-          source: 'quest',
-        })
+      if (result.bonusCoins > 0) {
+        emit('COIN_GAINED', { amount: result.bonusCoins, source: 'quest' })
       }
       if (outcome.healedHp !== 0) {
         emit('HP_CHANGED', {
@@ -228,6 +278,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
           maxHp: outcome.player.maxHp,
           delta: outcome.healedHp,
         })
+      }
+      if (result.unlockedStageId) {
+        emit('STAGE_UNLOCKED', { stageId: result.unlockedStageId })
+      }
+      if (result.unlockedWorldId) {
+        emit('WORLD_UNLOCKED', { worldId: result.unlockedWorldId })
       }
 
       if (outcome.levelsGained > 0) {
@@ -238,7 +294,45 @@ export function GameProvider({ children }: { children: ReactNode }) {
         setPendingLevelUp(outcome.newLevel)
       }
 
-      return outcome
+      return { ...outcome, player: questResult.player, result }
+    },
+    [announceQuests, commitPlayer],
+  )
+
+  const claimQuest = useCallback(
+    (questId: string): ClaimResult | null => {
+      const current = playerRef.current
+      if (!current) return null
+
+      const result = claimQuestReward(current, questId)
+      if (!result.claimed) return result
+
+      commitPlayer(result.player)
+      setQuestToasts((toasts) =>
+        toasts.filter((quest) => quest.id !== questId),
+      )
+
+      emit('QUEST_CLAIMED', {
+        questId,
+        exp: result.exp,
+        coins: result.coins,
+      })
+      if (result.exp > 0) {
+        emit('EXP_GAINED', { amount: result.exp, source: 'quest' })
+      }
+      if (result.coins > 0) {
+        emit('COIN_GAINED', { amount: result.coins, source: 'quest' })
+      }
+      if (result.levelsGained > 0) {
+        emit('LEVEL_UP', {
+          level: result.newLevel,
+          levelsGained: result.levelsGained,
+        })
+        setPendingLevelUp(result.newLevel)
+      }
+
+      playSfx('coin')
+      return result
     },
     [commitPlayer],
   )
@@ -254,6 +348,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const acknowledgeLevelUp = useCallback(() => {
     setPendingLevelUp(null)
+  }, [])
+
+  const dismissQuestToast = useCallback((questId: string) => {
+    setQuestToasts((toasts) => toasts.filter((quest) => quest.id !== questId))
   }, [])
 
   /** ปรับการตั้งค่าแบบ synchronous เพื่อให้เสียงและอนิเมชันมีผลทันทีในคลิกเดียวกัน */
@@ -272,6 +370,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     playerRef.current = null
     setPlayer(null)
     setPendingLevelUp(null)
+    setQuestToasts([])
     setStorageStatus('empty')
     setStorageWarning(null)
   }, [])
@@ -294,12 +393,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       storageStatus,
       storageWarning,
       pendingLevelUp,
+      questToasts,
       startNewGame,
       answerQuestion,
-      finishQuest,
+      finishStage,
+      claimQuest,
       patchPlayer,
-      isLevelReplay,
+      isStageReplay,
       acknowledgeLevelUp,
+      dismissQuestToast,
       updateSettings,
       resetProgress,
       dismissStorageWarning,
@@ -311,12 +413,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       storageStatus,
       storageWarning,
       pendingLevelUp,
+      questToasts,
       startNewGame,
       answerQuestion,
-      finishQuest,
+      finishStage,
+      claimQuest,
       patchPlayer,
-      isLevelReplay,
+      isStageReplay,
       acknowledgeLevelUp,
+      dismissQuestToast,
       updateSettings,
       resetProgress,
       dismissStorageWarning,

@@ -1,14 +1,22 @@
 import { DEFAULT_AVATAR_ID, isValidAvatarId } from '../data/avatars'
 import { HP_CONFIG, MAX_RECENT_ATTEMPTS } from '../data/rewards'
 import { SKILL_IDS } from '../data/skills'
+import { ALL_QUESTS } from '../data/quests'
+import { STAGES, getStage } from '../data/stages'
 import type { GameSettings, Player } from '../types/player'
+import type { DailyQuestState, QuestProgress } from '../types/quest'
+import type { StageProgress } from '../types/stage'
 import type {
-  LevelRecord,
   PlayerStatistics,
   QuestionAttempt,
   SkillId,
 } from '../types/stats'
 import { MAX_LEVEL, applyExpGain, getRequiredExp } from '../utils/experience'
+import {
+  MAX_STAGE_STARS,
+  createEmptyStageProgress,
+  resolveUnlockedWorlds,
+} from '../utils/stageSystem'
 import {
   calculateAccuracy,
   createEmptySkillStatistic,
@@ -19,7 +27,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 2
+export const CURRENT_SAVE_VERSION = 3
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -27,16 +35,16 @@ export const DEFAULT_SETTINGS: GameSettings = {
   animationsEnabled: true,
 }
 
-export type StorageStatus = 'ok' | 'empty' | 'corrupted' | 'repaired' | 'unavailable'
+export type StorageStatus =
+  | 'ok'
+  | 'empty'
+  | 'corrupted'
+  | 'repaired'
+  | 'unavailable'
 
 export interface LoadResult<T> {
   status: StorageStatus
   data: T | null
-}
-
-interface SaveEnvelope {
-  version: number
-  player: unknown
 }
 
 function getStorage(): Storage | null {
@@ -67,18 +75,29 @@ function toSafeInt(
   return Math.min(max, Math.max(min, Math.floor(parsed)))
 }
 
+function toSafeNumber(
+  value: unknown,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.min(max, Math.max(min, parsed))
+}
+
 function toIsoString(value: unknown, fallback: string): string {
   if (typeof value !== 'string' || value.length === 0) return fallback
   return Number.isNaN(Date.parse(value)) ? fallback : value
 }
 
-function toLevelIdArray(value: unknown): string[] {
+function toIdArray(value: unknown, allowed?: Set<string>): string[] {
   if (!Array.isArray(value)) return []
   const unique = new Set<string>()
   for (const item of value) {
-    if (typeof item === 'string' && item.length > 0 && item.length <= 100) {
-      unique.add(item)
-    }
+    if (typeof item !== 'string' || item.length === 0 || item.length > 100) continue
+    if (allowed && !allowed.has(item)) continue
+    unique.add(item)
   }
   return Array.from(unique)
 }
@@ -98,6 +117,9 @@ function createId(): string {
   }
   return `player-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
 }
+
+const STAGE_IDS = new Set(STAGES.map((stage) => stage.id))
+const QUEST_IDS = new Set(ALL_QUESTS.map((quest) => quest.id))
 
 export function createPlayer(name: string, avatar: string): Player {
   const now = new Date().toISOString()
@@ -120,8 +142,13 @@ export function createPlayer(name: string, avatar: string): Player {
     currentStreak: 0,
     bestStreak: 0,
 
-    completedLevels: [],
-    levelRecords: {},
+    completedStages: [],
+    stageProgress: {},
+    // โลกแรกเปิดให้เล่นตั้งแต่เริ่มเกมเสมอ
+    unlockedWorlds: ['world-1'],
+
+    questProgress: {},
+    dailyQuests: { date: '', questIds: [] },
 
     statistics: createEmptyStatistics(),
     recentAttempts: [],
@@ -160,26 +187,79 @@ function parseStatistics(raw: unknown): PlayerStatistics {
   return statistics
 }
 
-function parseLevelRecords(raw: unknown): Record<string, LevelRecord> {
-  const records: Record<string, LevelRecord> = {}
+/** ตรวจความคืบหน้ารายด่าน ทิ้งด่านที่ไม่มีอยู่จริงและจำกัดค่าที่เกินขอบเขต */
+function parseStageProgress(raw: unknown): Record<string, StageProgress> {
+  const records: Record<string, StageProgress> = {}
   if (!isRecord(raw)) return records
 
-  for (const [levelId, entry] of Object.entries(raw)) {
-    if (levelId.length === 0 || levelId.length > 100) continue
-    if (!isRecord(entry)) continue
+  for (const [stageId, entry] of Object.entries(raw)) {
+    if (!STAGE_IDS.has(stageId) || !isRecord(entry)) continue
 
-    records[levelId] = {
-      completions: toSafeInt(entry.completions, 0, 0, 999_999),
-      bestCorrect: toSafeInt(entry.bestCorrect, 0, 0, 9_999),
-      bestAccuracy: Math.min(
-        100,
-        Math.max(0, Number(entry.bestAccuracy) || 0),
-      ),
-      lastPlayedAt: toIsoString(entry.lastPlayedAt, new Date().toISOString()),
+    const stage = getStage(stageId)
+    const maxScore = stage?.questionCount ?? 999
+
+    const stars = toSafeInt(entry.stars, 0, 0, MAX_STAGE_STARS)
+    const completed = entry.completed === true
+
+    records[stageId] = {
+      ...createEmptyStageProgress(stageId),
+      attempts: toSafeInt(entry.attempts, 0, 0, 999_999),
+      bestScore: toSafeInt(entry.bestScore, 0, 0, maxScore),
+      bestAccuracy: toSafeNumber(entry.bestAccuracy, 0, 0, 100),
+      stars,
+      completed,
+      // ต้องได้ดาวครบเท่านั้นจึงจะนับว่าเชี่ยวชาญ ไม่เชื่อธงที่บันทึกไว้
+      mastered: completed && stars >= MAX_STAGE_STARS,
+      firstCompletedAt:
+        typeof entry.firstCompletedAt === 'string'
+          ? entry.firstCompletedAt
+          : undefined,
+      lastPlayedAt:
+        typeof entry.lastPlayedAt === 'string' ? entry.lastPlayedAt : undefined,
     }
   }
 
   return records
+}
+
+function parseQuestProgress(raw: unknown): Record<string, QuestProgress> {
+  const records: Record<string, QuestProgress> = {}
+  if (!isRecord(raw)) return records
+
+  for (const [questId, entry] of Object.entries(raw)) {
+    if (!QUEST_IDS.has(questId) || !isRecord(entry)) continue
+
+    const counters = Array.isArray(entry.counters)
+      ? entry.counters.map((value) => toSafeInt(value, 0, 0, 9_999_999))
+      : []
+
+    const completed = entry.completed === true
+
+    records[questId] = {
+      questId,
+      counters,
+      completed,
+      // รับรางวัลได้เฉพาะภารกิจที่สำเร็จแล้วเท่านั้น
+      claimed: completed && entry.claimed === true,
+      completedAt:
+        typeof entry.completedAt === 'string' ? entry.completedAt : undefined,
+      claimedAt:
+        typeof entry.claimedAt === 'string' ? entry.claimedAt : undefined,
+    }
+  }
+
+  return records
+}
+
+function parseDailyQuests(raw: unknown): DailyQuestState {
+  if (!isRecord(raw)) return { date: '', questIds: [] }
+
+  const date =
+    typeof raw.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.date)
+      ? raw.date
+      : ''
+
+  return { date, questIds: toIdArray(raw.questIds, QUEST_IDS) }
 }
 
 function parseRecentAttempts(raw: unknown): QuestionAttempt[] {
@@ -196,7 +276,7 @@ function parseRecentAttempts(raw: unknown): QuestionAttempt[] {
     attempts.push({
       questionId: entry.questionId.slice(0, 100),
       skill: entry.skill as SkillId,
-      levelId: typeof entry.levelId === 'string' ? entry.levelId.slice(0, 100) : '',
+      stageId: typeof entry.stageId === 'string' ? entry.stageId.slice(0, 100) : '',
       isCorrect: entry.isCorrect === true,
       timeMs: toSafeInt(entry.timeMs, 0, 0, 3_600_000),
       answeredAt: toIsoString(entry.answeredAt, new Date().toISOString()),
@@ -234,9 +314,18 @@ function parsePlayer(raw: unknown): Player | null {
   )
 
   const bestStreak = toSafeInt(raw.bestStreak, 0, 0, 9_999_999)
+  const stageProgress = parseStageProgress(raw.stageProgress)
 
-  return {
-    id: typeof raw.id === 'string' && raw.id.length > 0 ? raw.id.slice(0, 100) : createId(),
+  // รายชื่อด่านที่ผ่านต้องสอดคล้องกับความคืบหน้ารายด่านเสมอ
+  const completedStages = Object.values(stageProgress)
+    .filter((progress) => progress.completed)
+    .map((progress) => progress.stageId)
+
+  const player: Player = {
+    id:
+      typeof raw.id === 'string' && raw.id.length > 0
+        ? raw.id.slice(0, 100)
+        : createId(),
     name,
     avatar:
       typeof raw.avatar === 'string' && isValidAvatarId(raw.avatar)
@@ -257,8 +346,12 @@ function parsePlayer(raw: unknown): Player | null {
     currentStreak: toSafeInt(raw.currentStreak, 0, 0, bestStreak),
     bestStreak,
 
-    completedLevels: toLevelIdArray(raw.completedLevels),
-    levelRecords: parseLevelRecords(raw.levelRecords),
+    completedStages,
+    stageProgress,
+    unlockedWorlds: [],
+
+    questProgress: parseQuestProgress(raw.questProgress),
+    dailyQuests: parseDailyQuests(raw.dailyQuests),
 
     statistics: parseStatistics(raw.statistics),
     recentAttempts: parseRecentAttempts(raw.recentAttempts),
@@ -266,20 +359,22 @@ function parsePlayer(raw: unknown): Player | null {
     createdAt,
     updatedAt: toIsoString(raw.updatedAt, createdAt),
   }
+
+  // คำนวณโลกที่เปิดจากความคืบหน้าจริง กันไม่ให้แก้ localStorage เพื่อข้ามด่าน
+  return { ...player, unlockedWorlds: resolveUnlockedWorlds(player) }
 }
 
 /**
- * ย้ายข้อมูลจากเวอร์ชัน 1 (Part 1) มาเป็นเวอร์ชัน 2
+ * เวอร์ชัน 1 (Part 1) → เวอร์ชัน 2
  * ข้อมูลเดิมไม่มีสถิติ streak หรือประวัติการเล่น จึงเติมค่าเริ่มต้นให้
- * และเติม levelRecords จาก completedLevels เพื่อให้ระบบเล่นซ้ำทำงานถูกต้องทันที
  */
-function migrateFromV1(raw: unknown): unknown {
+function migrateV1ToV2(raw: unknown): unknown {
   if (!isRecord(raw)) return raw
 
-  const completedLevels = toLevelIdArray(raw.completedLevels)
+  const completedLevels = toIdArray(raw.completedLevels)
   const migratedAt = toIsoString(raw.updatedAt, new Date().toISOString())
 
-  const levelRecords: Record<string, LevelRecord> = {}
+  const levelRecords: Record<string, unknown> = {}
   for (const levelId of completedLevels) {
     levelRecords[levelId] = {
       completions: 1,
@@ -302,22 +397,80 @@ function migrateFromV1(raw: unknown): unknown {
   }
 }
 
-/** อ่านซองข้อมูลและแปลงให้เป็นเวอร์ชันปัจจุบัน */
+/**
+ * เวอร์ชัน 2 (Part 2) → เวอร์ชัน 3
+ * Part 3 เปลี่ยนคำว่า level เป็น stage และเพิ่มระบบดาว ภารกิจ และการปลดล็อกโลก
+ * ด่านเดิม world-1-level-N ถูกย้ายไปเป็น world-1-stage-N ตามลำดับ ความคืบหน้าจึงไม่หาย
+ */
+function migrateV2ToV3(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+
+  const oldCompleted = toIdArray(raw.completedLevels)
+  const oldRecords = isRecord(raw.levelRecords) ? raw.levelRecords : {}
+  const migratedAt = toIsoString(raw.updatedAt, new Date().toISOString())
+
+  const stageProgress: Record<string, unknown> = {}
+
+  const toStageId = (levelId: string): string =>
+    levelId.replace(/-level-(\d+)$/, '-stage-$1')
+
+  for (const levelId of oldCompleted) {
+    const stageId = toStageId(levelId)
+    if (!STAGE_IDS.has(stageId)) continue
+
+    const oldRecord = oldRecords[levelId]
+    const bestAccuracy = isRecord(oldRecord)
+      ? toSafeNumber(oldRecord.bestAccuracy, 0, 0, 100)
+      : 0
+    const bestScore = isRecord(oldRecord)
+      ? toSafeInt(oldRecord.bestCorrect, 0, 0, 999)
+      : 0
+    const attempts = isRecord(oldRecord)
+      ? toSafeInt(oldRecord.completions, 1, 1, 999_999)
+      : 1
+
+    const stage = getStage(stageId)
+    // ข้อมูลเดิมไม่ได้เก็บความแม่นยำไว้ทุกกรณี จึงให้ดาวขั้นต่ำ 1 ดวงสำหรับด่านที่เคยผ่าน
+    const stars =
+      bestAccuracy >= 90 ? 3 : bestAccuracy >= 70 ? 2 : 1
+
+    stageProgress[stageId] = {
+      stageId,
+      attempts,
+      bestScore: Math.min(bestScore, stage?.questionCount ?? bestScore),
+      bestAccuracy,
+      stars,
+      completed: true,
+      mastered: stars >= MAX_STAGE_STARS,
+      firstCompletedAt: migratedAt,
+      lastPlayedAt: migratedAt,
+    }
+  }
+
+  return {
+    ...raw,
+    stageProgress,
+    questProgress: {},
+    dailyQuests: { date: '', questIds: [] },
+  }
+}
+
+/** อ่านซองข้อมูลและแปลงให้เป็นเวอร์ชันปัจจุบันทีละขั้น */
 function migrateToCurrent(parsed: unknown): unknown {
   // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateFromV1(parsed)
+    return migrateV2ToV3(migrateV1ToV2(parsed))
   }
 
   if (!isRecord(parsed)) return null
 
   const version = toSafeInt(parsed.version, 1, 1, 999)
-  const storedPlayer = parsed.player
+  let player = parsed.player
 
-  if (version >= CURRENT_SAVE_VERSION) return storedPlayer
-  if (version === 1) return migrateFromV1(storedPlayer)
+  if (version <= 1) player = migrateV1ToV2(player)
+  if (version <= 2) player = migrateV2ToV3(player)
 
-  return storedPlayer
+  return player
 }
 
 /** ปรับ EXP ที่ล้นเกณฑ์ให้กลายเป็นเลเวลที่ถูกต้อง (เกิดได้เมื่อเส้นโค้ง EXP เปลี่ยน) */
@@ -369,7 +522,7 @@ export function savePlayer(player: Player): boolean {
   if (!storage) return false
 
   try {
-    const envelope: SaveEnvelope = {
+    const envelope = {
       version: CURRENT_SAVE_VERSION,
       player: { ...player, updatedAt: new Date().toISOString() },
     }
@@ -381,10 +534,7 @@ export function savePlayer(player: Player): boolean {
 }
 
 /** แก้ไขข้อมูลผู้เล่นบางส่วนแล้วบันทึก คืนผู้เล่นชุดใหม่ */
-export function updatePlayer(
-  player: Player,
-  changes: Partial<Player>,
-): Player {
+export function updatePlayer(player: Player, changes: Partial<Player>): Player {
   const next: Player = { ...player, ...changes }
   savePlayer(next)
   return next
