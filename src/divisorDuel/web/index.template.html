@@ -158,6 +158,40 @@
   .modal .in p{color:var(--dim);margin-bottom:18px}
   .big{font-size:52px}
 
+  /* ── รูปการ์ดที่ครูอัปเองได้ ── */
+  .card.hasimg{background-size:cover;background-position:center;position:relative;overflow:hidden}
+  .card.hasimg small{display:none}
+  /* ป้ายตัวเลขมุมล่าง ต้องอ่านออกเสมอแม้รูปจะสีอะไรก็ตาม */
+  .card.hasimg .tag{
+    position:absolute;left:0;right:0;bottom:0;padding:2px 0;
+    background:rgba(0,0,0,.72);font-size:17px;line-height:1.2;font-weight:800;
+    text-shadow:0 1px 2px #000;
+  }
+  .unit .por{
+    width:100%;height:64px;border-radius:9px;background-size:cover;background-position:center;
+    margin-bottom:4px;border:1px solid rgba(255,255,255,.15);
+  }
+
+  .slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px}
+  .slot{
+    border:2px dashed var(--line);border-radius:12px;background:var(--panel);
+    padding:7px;text-align:center;color:var(--txt);position:relative;
+  }
+  .slot.filled{border-style:solid;border-color:var(--green)}
+  .slot .thumb{
+    width:100%;height:70px;border-radius:8px;background:rgba(0,0,0,.35);
+    background-size:cover;background-position:center;display:flex;
+    align-items:center;justify-content:center;font-size:26px;margin-bottom:5px;
+  }
+  .slot .lb{font-size:11px;line-height:1.3;color:var(--dim);word-break:break-word}
+  .slot input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .slot .rm{
+    position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:6px;
+    border:none;background:rgba(225,29,72,.9);color:#fff;font-size:12px;line-height:1;z-index:3;
+  }
+  .meter{height:8px;border-radius:99px;background:rgba(0,0,0,.4);overflow:hidden;margin-top:6px}
+  .meter i{display:block;height:100%;background:linear-gradient(90deg,var(--green),var(--gold))}
+
   @media(max-width:420px){ .card{width:54px;height:75px;font-size:21px} .grid2{grid-template-columns:1fr} }
 </style>
 
@@ -195,6 +229,7 @@
 
     <div class="sect">
       <button class="btn primary" id="start">⚔️ เริ่มการดวล</button>
+      <button class="btn ghost" id="openGallery" style="margin-top:9px">🖼️ ใส่รูปการ์ดของฉัน</button>
     </div>
 
     <div class="note" style="margin-top:18px">
@@ -203,6 +238,44 @@
       ถ้าพลังโจมตีหารเกราะของเป้าหมายลงตัว จะเป็น Critical Hit ทำดาเมจเต็ม
       แต่ถ้าเหลือเศษ ดาเมจจะถูกหักออกเศษละ 10 แต้ม
     </div>
+  </div>
+
+  <!-- ══════ หน้าใส่รูปการ์ด ══════ -->
+  <div id="gallery" class="hide">
+    <div class="bar">
+      <span class="turn">🖼️ รูปการ์ดของฉัน</span>
+      <span style="flex:1"></span>
+      <button class="btn ghost sm" style="flex:0 0 auto;min-height:34px" id="galBack">← กลับ</button>
+    </div>
+
+    <div class="note">
+      <b>วิธีใช้</b>
+      แตะช่องไหนก็ได้เพื่อเลือกรูปจากเครื่อง ระบบจะย่อรูปให้อัตโนมัติแล้วเก็บไว้ในเบราว์เซอร์นี้
+      ช่องที่ยังไม่ใส่รูปจะใช้ภาพสัญลักษณ์เดิม
+    </div>
+
+    <div class="note bad" id="shareWarn">
+      <b>⚠️ รูปเก็บอยู่ในเบราว์เซอร์เครื่องนี้เท่านั้น</b>
+      ถ้าส่งลิงก์ให้เด็กเปิดในเครื่องอื่น เขาจะยังไม่เห็นรูปที่คุณใส่
+      ให้กด "บันทึกชุดรูป" แล้วส่งไฟล์ให้เขา "โหลดชุดรูป" อีกที
+    </div>
+
+    <div class="row">
+      <button class="btn ghost sm" id="expImg">💾 บันทึกชุดรูปเป็นไฟล์</button>
+      <button class="btn ghost sm" id="impImgBtn">📂 โหลดชุดรูปจากไฟล์</button>
+      <button class="btn warn sm" id="clrImg">🗑️ ลบรูปทั้งหมด</button>
+    </div>
+    <input type="file" id="impImg" accept="application/json" class="hide">
+
+    <div style="margin-top:10px;font-size:13px;color:var(--dim)">
+      พื้นที่เก็บที่ใช้ไป <b id="usage">0</b> KB <span id="usagePct"></span>
+      <div class="meter"><i id="usageBar" style="width:0%"></i></div>
+    </div>
+
+    <div class="sect"><h3>มอนสเตอร์</h3><div class="slots" id="slotMon"></div></div>
+    <div class="sect"><h3>ฮีโร่</h3><div class="slots" id="slotHero"></div></div>
+    <div class="sect"><h3>การ์ดตัวเลข</h3><div class="slots" id="slotNum"></div></div>
+    <div class="sect"><h3>การ์ดเครื่องหมาย</h3><div class="slots" id="slotOp"></div></div>
   </div>
 
   <!-- ══════ หน้าเล่น ══════ -->
@@ -280,6 +353,88 @@
   let mode = 'ai', h1 = C.HEROES[2].id, h2 = C.HEROES[0].id;
   let st = null, target = null, aiBusy = false;
 
+  /* ══════════════════════════════════════════════════════════════
+     คลังรูปการ์ดที่ครูอัปเอง
+     เก็บใน localStorage ของเบราว์เซอร์ ไม่ต้องมีเซิร์ฟเวอร์
+     รูปถูกย่อก่อนเก็บเสมอ เพราะ localStorage มีพื้นที่จำกัดราว 5 MB
+     ══════════════════════════════════════════════════════════════ */
+  const IMG = (() => {
+    const KEY = 'divisorDuel:images:v1';
+    const MAX_EDGE = 260;      // ด้านยาวสุดหลังย่อ พอสำหรับจอ retina
+    const QUALITY = 0.72;
+    let map = {};
+
+    try { map = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { map = {}; }
+
+    const get = key => map[key] || null;
+    const bytes = () => new Blob([JSON.stringify(map)]).size;
+
+    function save(){
+      try {
+        localStorage.setItem(KEY, JSON.stringify(map));
+        return { ok:true };
+      } catch (e) {
+        return { ok:false, message:'พื้นที่เก็บเต็มแล้ว ลองลบรูปที่ไม่ใช้ออกก่อนนะ' };
+      }
+    }
+
+    /** ย่อรูปด้วย canvas แล้วแปลงเป็น data URI ขนาดเล็ก */
+    function shrink(file){
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('อ่านไฟล์ไม่ได้'));
+        reader.onload = () => {
+          const im = new Image();
+          im.onerror = () => reject(new Error('ไฟล์นี้ไม่ใช่รูปภาพ'));
+          im.onload = () => {
+            const scale = Math.min(1, MAX_EDGE / Math.max(im.width, im.height));
+            const w = Math.max(1, Math.round(im.width * scale));
+            const h = Math.max(1, Math.round(im.height * scale));
+            const cv = document.createElement('canvas');
+            cv.width = w; cv.height = h;
+            cv.getContext('2d').drawImage(im, 0, 0, w, h);
+            // webp เล็กกว่ามาก แต่เบราว์เซอร์เก่าบางตัวไม่รองรับ จึงถอยไป jpeg
+            let out = cv.toDataURL('image/webp', QUALITY);
+            if (!out.startsWith('data:image/webp')) out = cv.toDataURL('image/jpeg', QUALITY);
+            resolve(out);
+          };
+          im.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function set(key, file){
+      const data = await shrink(file);
+      const backup = map[key];
+      map[key] = data;
+      const res = save();
+      if (!res.ok) { if (backup) map[key] = backup; else delete map[key]; }
+      return res;
+    }
+
+    function remove(key){ delete map[key]; save(); }
+    function clear(){ map = {}; save(); }
+    function exportPack(){ return JSON.stringify({ version:1, images:map }); }
+    function importPack(text){
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed.images !== 'object') throw new Error('ไฟล์ไม่ถูกต้อง');
+      map = { ...map, ...parsed.images };
+      return save();
+    }
+    function count(){ return Object.keys(map).length; }
+
+    return { get, set, remove, clear, exportPack, importPack, bytes, count };
+  })();
+
+  /** ใส่รูปพื้นหลังให้ element ถ้ามีรูปของ key นั้น */
+  function applyImage(el, key){
+    const src = IMG.get(key);
+    if (!src) return false;
+    el.style.backgroundImage = `url(${src})`;
+    return true;
+  }
+
   const HERO_EMOJI = {
     'high-priestess-elara':'🙏','grand-wizard-arcanus':'🧙',
     'knight-commander-valerius':'⚔️','lich-queen-morwenna':'💀'
@@ -326,6 +481,116 @@
     $('game').classList.add('hide'); $('setup').classList.remove('hide');
   };
 
+  /* ── หน้าจัดการรูปการ์ด ── */
+  const SLOT_GROUPS = () => ({
+    slotMon:  C.MONSTERS.map(m => ({ key:'mon:'+m.id, label:m.name, fallback:'👾' })),
+    slotHero: C.HEROES.map(h => ({ key:'hero:'+h.id, label:h.name, fallback:HERO_EMOJI[h.id] })),
+    slotNum:  C.NUMBERS.map(n => ({ key:'num:'+n.value, label:'เลข '+n.value, fallback:String(n.value) })),
+    slotOp:   [
+      { key:'op:+',  label:'ดาบ (+)',    fallback:'+' },
+      { key:'op:-',  label:'เคียว (−)',  fallback:'−' },
+      { key:'op:*',  label:'ลูกตุ้ม (×)', fallback:'×' },
+      { key:'op:()', label:'ถุงมือ ( )', fallback:'( )' },
+    ],
+  });
+
+  function renderGallery(){
+    const groups = SLOT_GROUPS();
+    for (const [boxId, items] of Object.entries(groups)) {
+      const box = $(boxId); box.innerHTML = '';
+      items.forEach(it => {
+        const src = IMG.get(it.key);
+        const d = document.createElement('div');
+        d.className = 'slot' + (src ? ' filled' : '');
+        d.innerHTML = `<div class="thumb">${src ? '' : it.fallback}</div>
+                       <div class="lb">${it.label}</div>
+                       <input type="file" accept="image/*">`;
+        if (src) d.querySelector('.thumb').style.backgroundImage = `url(${src})`;
+
+        d.querySelector('input').onchange = async ev => {
+          const file = ev.target.files && ev.target.files[0];
+          if (!file) return;
+          try {
+            const res = await IMG.set(it.key, file);
+            if (!res.ok) alert(res.message);
+          } catch (err) {
+            alert('ใส่รูปนี้ไม่ได้: ' + err.message);
+          }
+          renderGallery();
+        };
+
+        if (src) {
+          const rm = document.createElement('button');
+          rm.className = 'rm'; rm.textContent = '✕';
+          rm.title = 'ลบรูปนี้';
+          rm.onclick = e => { e.stopPropagation(); IMG.remove(it.key); renderGallery(); };
+          d.appendChild(rm);
+        }
+        box.appendChild(d);
+      });
+    }
+
+    // แสดงพื้นที่ที่ใช้ไป เทียบกับขีดจำกัดโดยประมาณของ localStorage
+    const kb = IMG.bytes() / 1024;
+    const pct = Math.min(100, kb / 5120 * 100);
+    $('usage').textContent = kb.toFixed(0);
+    $('usagePct').textContent = `(ใส่รูปแล้ว ${IMG.count()} ช่อง · ราว ${pct.toFixed(0)}% ของพื้นที่)`;
+    $('usageBar').style.width = pct + '%';
+    $('shareWarn').style.display = IMG.count() > 0 ? '' : 'none';
+  }
+
+  $('openGallery').onclick = () => {
+    $('setup').classList.add('hide'); $('gallery').classList.remove('hide'); renderGallery();
+  };
+  $('galBack').onclick = () => {
+    $('gallery').classList.add('hide'); $('setup').classList.remove('hide');
+  };
+  $('clrImg').onclick = () => {
+    if (confirm('ลบรูปการ์ดทั้งหมดที่ใส่ไว้ใช่ไหม')) { IMG.clear(); renderGallery(); }
+  };
+  $('expImg').onclick = async () => {
+    if (IMG.count() === 0) { alert('ยังไม่ได้ใส่รูปเลย'); return; }
+    const pack = IMG.exportPack();
+
+    // ในหน้าที่เผยแพร่ ต้องบันทึกผ่าน window.claude.downloads
+    // เพราะลิงก์ดาวน์โหลดธรรมดาถูกปิดไว้ ส่วนตอนเปิดไฟล์จากเครื่องตรง ๆ ใช้ลิงก์ได้ปกติ
+    const api = window.claude && window.claude.downloads;
+    if (api) {
+      try {
+        await api.save({ filename:'divisor-duel-images.json', data: pack });
+      } catch (err) {
+        const code = err && err.code;
+        if (code === 'declined') return;                       // ผู้ใช้กดยกเลิกเอง ไม่ต้องเตือน
+        if (code === 'too_large') alert('ชุดรูปใหญ่เกินไป ลองลดจำนวนรูปลงนะ');
+        else if (code === 'rate_limited') alert('กำลังบันทึกอยู่ รอสักครู่แล้วลองใหม่');
+        else alert('บันทึกไฟล์ไม่ได้ในหน้านี้ ลองเปิดเกมจากไฟล์ในเครื่องแทน');
+      }
+      return;
+    }
+
+    const blob = new Blob([pack], { type:'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'divisor-duel-images.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  };
+  $('impImgBtn').onclick = () => $('impImg').click();
+  $('impImg').onchange = ev => {
+    const file = ev.target.files && ev.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const res = IMG.importPack(r.result);
+        if (!res.ok) alert(res.message); else alert('โหลดชุดรูปเรียบร้อย');
+      } catch (e) { alert('ไฟล์นี้ใช้ไม่ได้: ' + e.message); }
+      renderGallery();
+    };
+    r.readAsText(file);
+    ev.target.value = '';
+  };
+
   // ── ตัวช่วย ──
   const me = () => st.players[st.turn];
   const isMyTurn = () => me().control === 'human';
@@ -335,7 +600,9 @@
     const dead = u.hp <= 0;
     const selected = target && target.kind === u.kind && target.index === u.index;
     d.className = 'unit' + (dead ? ' dead' : '') + (clickable && !dead && u.isAttackable ? ' tgt' : '') + (selected ? ' sel' : '');
-    d.innerHTML = `<div class="em">${u.emoji}</div>
+    // ใช้รูปที่ครูอัปไว้ถ้ามี ไม่มีก็ใช้อีโมจิเดิม
+    const imgKey = u.imgKey ? IMG.get(u.imgKey) : null;
+    d.innerHTML = `${imgKey ? `<div class="por" style="background-image:url(${imgKey})"></div>` : `<div class="em">${u.emoji}</div>`}
       <div class="nm">${u.name}</div>
       <div class="dv">เกราะ ÷${u.divisor}</div>
       <div class="hpbar"><i class="${isEnemy?'hp-e':'hp-m'}" style="width:${Math.max(0,u.hp/u.maxHp*100)}%"></i></div>
@@ -350,10 +617,22 @@
   function myUnits(){
     const p = me();
     const list = p.guards.map((g,i)=>({kind:'guard',index:i,name:g.name,emoji:g.emoji,
+      imgKey:'mon:'+g.monsterId,
       hp:g.hp,maxHp:g.maxHp,divisor:g.divisor+g.divisorBonus,isAttackable:false}));
-    list.push({kind:'hero',index:-1,name:p.heroName,emoji:'👑',hp:p.heroHp,maxHp:p.heroMaxHp,
-      divisor:p.heroDivisor,isAttackable:false});
+    list.push({kind:'hero',index:-1,name:p.heroName,emoji:'👑',imgKey:'hero:'+p.heroId,
+      hp:p.heroHp,maxHp:p.heroMaxHp,divisor:p.heroDivisor,isAttackable:false});
     return list;
+  }
+
+  /** เติม imgKey ให้เป้าหมายฝั่งตรงข้าม เพื่อให้ใช้รูปที่ครูอัปไว้ได้ */
+  function enemyTargets(){
+    const enemy = st.players[G.opponentOf(st.turn)];
+    return G.getTargets(st).map(t => ({
+      ...t,
+      imgKey: t.kind === 'guard'
+        ? 'mon:' + (enemy.guards[t.index] ? enemy.guards[t.index].monsterId : '')
+        : 'hero:' + enemy.heroId,
+    }));
   }
 
   // ── วาดหน้าจอ ──
@@ -369,7 +648,7 @@
 
     // ฝ่ายตรงข้าม
     const eb = $('enemyUnits'); eb.innerHTML = '';
-    G.getTargets(st).forEach(t => eb.appendChild(unitEl(t, isMyTurn(), true)));
+    enemyTargets().forEach(t => eb.appendChild(unitEl(t, isMyTurn(), true)));
 
     // ฝ่ายเรา
     const mb = $('myUnits'); mb.innerHTML = '';
@@ -416,10 +695,20 @@
       let cls = 'card ';
       if (c.kind === 'number') cls += 'num' + (c.value >= 50 ? ' huge' : c.value >= 10 ? ' big' : '');
       else if (c.kind === 'operator') cls += 'op'; else cls += 'br';
-      b.className = cls + (isUsed ? ' used' : '');
-      b.innerHTML = c.kind === 'number'
-        ? `${c.value}<small>ตัวเลข</small>`
-        : c.kind === 'bracket' ? `( )<small>ถุงมือ</small>` : `${c.label}<small>เครื่องหมาย</small>`;
+      const imgKey = c.kind === 'number' ? 'num:' + c.value
+                   : c.kind === 'bracket' ? 'op:()' : 'op:' + c.symbol;
+      const src = IMG.get(imgKey);
+      b.className = cls + (isUsed ? ' used' : '') + (src ? ' hasimg' : '');
+      if (src) {
+        // มีรูปแล้วก็ยังต้องเห็นค่าการ์ดชัด ๆ เพราะเด็กต้องคิดเลขจากมัน
+        b.style.backgroundImage = `url(${src})`;
+        const face = c.kind === 'number' ? c.value : c.kind === 'bracket' ? '( )' : c.label;
+        b.innerHTML = `<span class="tag">${face}</span>`;
+      } else {
+        b.innerHTML = c.kind === 'number'
+          ? `${c.value}<small>ตัวเลข</small>`
+          : c.kind === 'bracket' ? `( )<small>ถุงมือ</small>` : `${c.label}<small>เครื่องหมาย</small>`;
+      }
       b.disabled = !isMyTurn() || isUsed || c.kind === 'bracket' || c.kind !== expect;
       b.onclick = () => { st = G.placeCard(st, c.uid); render(); };
       hb.appendChild(b);
