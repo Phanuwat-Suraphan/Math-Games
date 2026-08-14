@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion'
+import { WorldSceneArt } from './art/GameArt'
 import type { WorldSummary } from '../hooks/useProgression'
 
 interface WorldCardProps {
@@ -33,11 +34,18 @@ export function WorldCard({ summary, onSelect }: WorldCardProps) {
           : 'cursor-not-allowed border-white/5 bg-night-800/40',
       ].join(' ')}
     >
+      {/* ฉากประจำโลกเป็นภาพพื้นหลัง เด็กจำโลกได้จากภาพโดยไม่ต้องอ่านชื่อ */}
+      <WorldSceneArt
+        worldId={world.id}
+        isLocked={!lock.isUnlocked}
+        className={`absolute inset-0 h-full w-full object-cover transition-opacity ${
+          isPlayable ? 'opacity-60 group-hover:opacity-80' : 'opacity-35'
+        }`}
+      />
+      {/* ไล่สีทับให้ตัวหนังสืออ่านออกทุกฉาก */}
       <div
         aria-hidden="true"
-        className={`absolute inset-0 bg-gradient-to-br ${world.theme.background} ${
-          isPlayable ? 'opacity-70 group-hover:opacity-90' : 'opacity-20'
-        } transition-opacity`}
+        className="absolute inset-0 bg-gradient-to-r from-night-900/95 via-night-900/70 to-night-900/30"
       />
 
       <div className="relative flex items-start gap-4">

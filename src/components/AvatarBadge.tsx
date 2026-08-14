@@ -1,3 +1,5 @@
+import { hasHeroArt } from '../art/heroes'
+import { HeroArt } from './art/GameArt'
 import type { Avatar, AvatarAccent } from '../types/player'
 
 const ACCENT_CLASSES: Record<AvatarAccent, string> = {
@@ -39,7 +41,12 @@ export function AvatarBadge({
       role="img"
       aria-label={`ตัวละคร ${avatar.name}`}
     >
-      <span aria-hidden="true">{avatar.emoji}</span>
+      {/* มีภาพวาดก็ใช้ภาพ ตัวไหนยังไม่มีภาพก็ยังใช้อีโมจิได้เหมือนเดิม */}
+      {hasHeroArt(avatar.id) ? (
+        <HeroArt avatarId={avatar.id} className="h-full w-full p-0.5" />
+      ) : (
+        <span aria-hidden="true">{avatar.emoji}</span>
+      )}
     </div>
   )
 }

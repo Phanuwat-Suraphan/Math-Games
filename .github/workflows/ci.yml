@@ -42,6 +42,12 @@ jobs:
       - name: ทดสอบการต่อด่านเข้ากับ Question Engine
         run: node tests/stageQuestions.test.mjs /tmp/logic
 
+      - name: ทดสอบระบบต่อสู้ (Part 5)
+        run: node tests/battle.test.mjs /tmp/logic
+
+      - name: ทดสอบภาพประกอบ
+        run: node tests/art.test.mjs /tmp/logic
+
       - name: คอมไพล์เครื่องยนต์เกมการ์ด
         run: npx tsc -p tsconfig.duel.json --outDir /tmp/duel
 
