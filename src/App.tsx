@@ -8,6 +8,7 @@ import { RewardToastLayer } from './components/RewardToastLayer'
 import { RequirePlayer } from './routes/RequirePlayer'
 import { Achievements } from './pages/Achievements'
 import { Battle } from './pages/Battle'
+import { PuzzleStage } from './pages/PuzzleStage'
 import { Character } from './pages/Character'
 import { CreatePlayer } from './pages/CreatePlayer'
 import { Home } from './pages/Home'
@@ -61,6 +62,12 @@ function GameRoutes() {
             <RequirePlayer
               render={(player) => <MathChallenge player={player} />}
             />
+          }
+        />
+        <Route
+          path="/puzzle/:worldId/:stageId"
+          element={
+            <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
           }
         />
         <Route

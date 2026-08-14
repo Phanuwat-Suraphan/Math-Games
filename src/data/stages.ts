@@ -28,6 +28,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-2',
+    activity: 'puzzle',
+    puzzleKind: 'missingNumber',
     worldId: 'world-1',
     regionId: 'w1-village',
     name: 'สะพานแห่งการบวก',
@@ -90,6 +92,7 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-5',
+    activity: 'battle',
     worldId: 'world-1',
     regionId: 'w1-deep',
     name: 'ถ้ำแห่งการหาร',
@@ -110,6 +113,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-6',
+    activity: 'puzzle',
+    puzzleKind: 'numberLock',
     worldId: 'world-1',
     regionId: 'w1-deep',
     name: 'แม่น้ำโจทย์ผสม',
@@ -151,6 +156,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-8',
+    activity: 'puzzle',
+    puzzleKind: 'balance',
     worldId: 'world-1',
     regionId: 'w1-peak',
     name: 'ป้อมปราการตัวเลข',
@@ -171,6 +178,7 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-9',
+    activity: 'battle',
     worldId: 'world-1',
     regionId: 'w1-peak',
     name: 'เส้นทางนักคณิตศาสตร์',
@@ -191,6 +199,7 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-10',
+    activity: 'battle',
     worldId: 'world-1',
     regionId: 'w1-peak',
     name: 'ผู้พิทักษ์จำนวน',

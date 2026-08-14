@@ -24,6 +24,7 @@
     "src/utils/**/*.ts",
     "src/math/**/*.ts",
     "src/art/**/*.ts",
+    "src/puzzles/**/*.ts",
     "src/questionEngine/**/*.ts",
     "src/services/storage.ts",
     "src/services/rewardService.ts",

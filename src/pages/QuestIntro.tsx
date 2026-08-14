@@ -147,15 +147,7 @@ export function QuestIntro({ player }: { player: Player }) {
               size="lg"
               fullWidth
               icon="⚔️"
-              onClick={() =>
-                navigate(
-                  // ด่านบอสเป็นการต่อสู้เต็มรูปแบบ ด่านอื่นเป็นการตอบคำถามตามปกติ
-                  // เปลี่ยนเงื่อนไขที่นี่ที่เดียวถ้าอยากให้ด่านอื่นเป็นการต่อสู้ด้วย
-                  stage.isBoss
-                    ? `/battle/${world.id}/${stage.id}`
-                    : `/play/${world.id}/${stage.id}`,
-                )
-              }
+              onClick={() => navigate(stageRoute(world.id, stage))}
               autoFocus
             >
               รับภารกิจ

@@ -3,6 +3,16 @@ import type { SkillId } from './stats'
 export type StageDifficulty = 'easy' | 'medium' | 'hard' | 'boss'
 
 /**
+ * กิจกรรมของด่าน
+ *
+ * เพิ่มมาแก้ปัญหาที่ทุกด่านทำอย่างเดียวกันหมดจนน่าเบื่อ
+ *   quiz   ตอบคำถามแบบเดิม
+ *   puzzle แก้ปริศนา คำตอบเป็นกุญแจไปทำอย่างอื่นต่อ
+ *   battle ต่อสู้กับมอนสเตอร์ ใช้คณิตศาสตร์เป็นพลังโจมตี
+ */
+export type StageActivity = 'quiz' | 'puzzle' | 'battle'
+
+/**
  * สถานะของด่านที่ผู้เล่นเห็นบนแผนที่
  * IN_PROGRESS = เคยลองแล้วแต่ยังไม่ผ่านเกณฑ์
  * MASTERED = ผ่านด้วยดาวสูงสุด
@@ -53,6 +63,14 @@ export interface Stage {
   grade?: 4 | 5 | 6
 
   isBoss: boolean
+
+  /**
+   * ด่านนี้ให้เด็กทำอะไร ถ้าไม่ระบุจะเป็นการตอบคำถามตามปกติ
+   * สลับชนิดกิจกรรมระหว่างด่าน เพื่อไม่ให้เล่นแล้วรู้สึกซ้ำ
+   */
+  activity?: StageActivity
+  /** ชนิดปริศนาของด่านแบบ puzzle */
+  puzzleKind?: string
 
   /** บทพูดของ NPC ก่อนเริ่มด่าน */
   npcId?: string
