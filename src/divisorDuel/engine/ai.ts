@@ -3,6 +3,7 @@ import { detectDeadHand, desperateStrikePower, rawMagicPower } from './deadHand'
 import type { HandCard } from './deck'
 import type { EquationSlot } from './equation'
 import { getTargets, type GameState, type TargetOption } from './game'
+import { buildCandidates, passiveOf, type Candidate } from './suggest'
 
 /**
  * คู่ต่อสู้คอมพิวเตอร์
@@ -12,6 +13,9 @@ import { getTargets, type GameState, type TargetOption } from './game'
  *
  * ระดับความยากคุมด้วยการสุ่มเลือกจากอันดับต้น ๆ แทนที่จะเอาอันดับ 1 เสมอ
  * ระดับง่ายจึงเล่นพลาดบ้าง เหมาะกับเด็กที่เพิ่งเริ่ม
+ *
+ * ตัวประกอบสมการอยู่ใน suggest.ts เพราะระบบแนะนำสมการใช้ชุดเดียวกัน
+ * ถ้าแยกกันเมื่อไร คำแนะนำที่เด็กได้จะไม่ตรงกับที่ AI เล่นจริง
  */
 
 export type AiLevel = 'easy' | 'normal' | 'hard'
@@ -28,120 +32,6 @@ export interface AiPlan {
   fallback: 'none' | 'rawMagic' | 'desperateStrike' | 'tacticalReset'
   /** ตัวเลขที่เลือกใช้ในกรณี Raw Magic */
   rawMagicCards?: [string, string]
-}
-
-const SEARCH_LIMIT = 4000
-
-interface Candidate {
-  slots: EquationSlot[]
-  bracket: AiPlan['bracket']
-  power: number
-}
-
-function numberSlot(card: HandCard & { kind: 'number' }): EquationSlot {
-  return { cardId: card.uid, kind: 'number', value: card.value }
-}
-
-function operatorSlot(card: HandCard & { kind: 'operator' }): EquationSlot {
-  return { cardId: card.uid, kind: 'operator', symbol: card.symbol }
-}
-
-function applyOp(left: number, symbol: string, right: number): number {
-  if (symbol === '+') return left + right
-  if (symbol === '-') return left - right
-  return left * right
-}
-
-/** ประกอบสมการที่เป็นไปได้ทั้งหมด พร้อมคำนวณพลังโจมตี */
-function buildCandidates(hand: readonly HandCard[]): Candidate[] {
-  const numbers = hand.filter(
-    (card): card is HandCard & { kind: 'number' } => card.kind === 'number',
-  )
-  const operators = hand.filter(
-    (card): card is HandCard & { kind: 'operator' } => card.kind === 'operator',
-  )
-  const gauntlet = hand.find((card) => card.kind === 'bracket')
-
-  const candidates: Candidate[] = []
-
-  // สมการพจน์เดียว: ใช้ตัวเลขใบเดียว
-  for (const card of numbers) {
-    candidates.push({ slots: [numberSlot(card)], bracket: null, power: card.value })
-  }
-
-  // สองพจน์: a ? b
-  for (const a of numbers) {
-    for (const b of numbers) {
-      if (a.uid === b.uid) continue
-      for (const op of operators) {
-        if (candidates.length > SEARCH_LIMIT) break
-        candidates.push({
-          slots: [numberSlot(a), operatorSlot(op), numberSlot(b)],
-          bracket: null,
-          power: applyOp(a.value, op.symbol, b.value),
-        })
-      }
-    }
-  }
-
-  // สามพจน์: a ? b ? c ทั้งแบบมีและไม่มีวงเล็บคร่อมสองตัวแรก
-  for (const a of numbers) {
-    for (const b of numbers) {
-      if (b.uid === a.uid) continue
-      for (const c of numbers) {
-        if (c.uid === a.uid || c.uid === b.uid) continue
-        for (const op1 of operators) {
-          for (const op2 of operators) {
-            if (op1.uid === op2.uid) continue
-            if (candidates.length > SEARCH_LIMIT) break
-
-            const slots = [
-              numberSlot(a),
-              operatorSlot(op1),
-              numberSlot(b),
-              operatorSlot(op2),
-              numberSlot(c),
-            ]
-
-            // ลำดับมาตรฐาน คูณก่อนบวกลบ
-            let plain: number
-            if (op1.symbol === '*') {
-              plain = applyOp(applyOp(a.value, '*', b.value), op2.symbol, c.value)
-            } else if (op2.symbol === '*') {
-              plain = applyOp(a.value, op1.symbol, applyOp(b.value, '*', c.value))
-            } else {
-              plain = applyOp(applyOp(a.value, op1.symbol, b.value), op2.symbol, c.value)
-            }
-            candidates.push({ slots, bracket: null, power: plain })
-
-            // ใส่วงเล็บคร่อมสองพจน์แรก ถ้ามีการ์ดถุงมือ
-            if (gauntlet) {
-              candidates.push({
-                slots,
-                bracket: { cardId: gauntlet.uid, startTerm: 0, endTerm: 1 },
-                power: applyOp(
-                  applyOp(a.value, op1.symbol, b.value),
-                  op2.symbol,
-                  c.value,
-                ),
-              })
-              candidates.push({
-                slots,
-                bracket: { cardId: gauntlet.uid, startTerm: 1, endTerm: 2 },
-                power: applyOp(
-                  a.value,
-                  op1.symbol,
-                  applyOp(b.value, op2.symbol, c.value),
-                ),
-              })
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return candidates
 }
 
 function scoreAgainstTarget(
@@ -253,13 +143,7 @@ export function planTurn(state: GameState, level: AiLevel = 'normal'): AiPlan {
   }
 
   // กรณีปกติ: หาสมการที่ดีที่สุด
-  const passive =
-    player.heroId === 'knight-commander-valerius'
-      ? ('precisionStrike' as const)
-      : player.heroId === 'lich-queen-morwenna'
-        ? ('soulSiphon' as const)
-        : null
-
+  const passive = passiveOf(player.heroId)
   const candidates = buildCandidates(player.hand)
   const scored: { plan: AiPlan; score: number }[] = []
 

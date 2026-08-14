@@ -2,8 +2,9 @@ import fs from 'fs'
 import path from 'path'
 const SRC = process.argv[2]
 // เรียงตาม dependency: deadHand ต้องมาหลัง deck เพราะเรียกใช้ countNumbers
+// และ suggest ต้องมาก่อน ai เพราะ ai ยืมตัวประกอบสมการจาก suggest
 const ORDER = ['rules','cards','engine/equation','engine/damage','engine/deck',
-               'engine/deadHand','engine/game','engine/ai']
+               'engine/deadHand','engine/game','engine/suggest','engine/ai']
 const EXP = /export\s+(?:declare\s+)?(?:async\s+)?(?:function|const|let|var|class)\s+([A-Za-z_$][\w$]*)/g
 const out = ['const __M = {};']
 for (const name of ORDER) {

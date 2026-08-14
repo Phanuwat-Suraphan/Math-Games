@@ -149,6 +149,24 @@
   .note.ok{border-color:rgba(74,222,128,.4);background:rgba(22,163,74,.15);color:var(--green)}
   .note b{display:block;margin-bottom:3px}
 
+  /* ── กล่องคำใบ้ ── */
+  .hint{
+    margin-top:10px;padding:11px 13px;border-radius:12px;font-size:13.5px;line-height:1.65;
+    border:1px solid rgba(96,165,250,.4);background:rgba(37,99,235,.14);color:#bfdbfe;
+  }
+  .hint b{display:block;margin-bottom:4px;color:#93c5fd;font-size:14px}
+  .hint .step{font-size:11.5px;opacity:.7;float:right;font-weight:600}
+  /* สมการเฉลย ต้องเด่นกว่าข้อความรอบ ๆ เพราะเป็นสิ่งที่เด็กต้องอ่านแล้วทำตาม */
+  .hint .ans{
+    display:block;margin:8px 0 4px;padding:9px;border-radius:9px;text-align:center;
+    background:rgba(0,0,0,.35);color:#fff;font-size:20px;font-weight:800;
+    font-variant-numeric:tabular-nums;
+  }
+  .hint .ans .to{display:block;font-size:12px;font-weight:600;color:#93c5fd;margin-top:4px}
+  .hint ul{margin:4px 0 0;padding-left:18px}
+  .hint li{margin:2px 0}
+  .hint .nums{color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+
   .log{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:rgba(0,0,0,.25);padding:10px;max-height:150px;overflow-y:auto}
   .log div{font-size:12.5px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.05);color:var(--dim)}
   .log div:last-child{border:0}
@@ -157,7 +175,7 @@
   .modal{position:fixed;inset:0;background:rgba(10,4,22,.9);display:flex;align-items:center;justify-content:center;padding:18px;z-index:60;backdrop-filter:blur(5px)}
   .modal .in{max-width:400px;width:100%;background:linear-gradient(180deg,var(--panel2),var(--panel));border:2px solid var(--gold);border-radius:20px;padding:26px;text-align:center;box-shadow:0 0 50px -10px var(--violet)}
   .modal .in h2{font-size:26px;color:var(--gold-l);margin-bottom:8px}
-  .modal .in p{color:var(--dim);margin-bottom:18px}
+  .modal .in p{color:var(--dim);margin-bottom:18px;white-space:pre-line}
   .big{font-size:52px}
 
   /* ── รูปการ์ดที่ครูอัปเองได้ ── */
@@ -310,12 +328,14 @@
       <div class="eq" id="eq"><span class="ph">แตะการ์ดด้านล่างเพื่อสร้างสมการ</span></div>
       <div class="pw" id="pw"></div>
       <div class="preview" id="preview"></div>
+      <div id="hintBox"></div>
       <div id="deadNote"></div>
       <div class="row">
         <button class="btn ghost sm" id="undo">↩︎ ถอยหลัง 1 ใบ</button>
         <button class="btn ghost sm" id="clear">✕ ล้างสมการ</button>
         <button class="btn ghost sm" id="brk">( ) ใส่วงเล็บ</button>
         <button class="btn ghost sm" id="redraw">♻️ จั่วใหม่</button>
+        <button class="btn ghost sm" id="hint">💡 ขอคำใบ้</button>
       </div>
       <div class="row">
         <button class="btn go" id="atk">⚔️ โจมตี!</button>
@@ -1561,10 +1581,11 @@ function removeBrackets(state) {
 
 return { createGame, opponentOf, currentPlayer, effectiveDivisor, getTargets, attack, deadHandAttack, getRedrawCost, redrawHand, tacticalReset, useDivineAegis, useArcaneManipulation, endTurn, placeCard, undoLastCard, clearEquation, addBracket, removeBrackets };
 })();
-__M['engine/ai'] = (() => {
+__M['engine/suggest'] = (() => {
 const { calculateDamage } = __M['engine/damage'];
-const { detectDeadHand, desperateStrikePower, rawMagicPower } = __M['engine/deadHand'];
+const { toDisplayString } = __M['engine/equation'];
 const { getTargets } = __M['engine/game'];
+/** กันเครื่องค้างบนมือถือเวลามือมีการ์ดเยอะ */
 const SEARCH_LIMIT = 4000;
 function numberSlot(card) {
     return { cardId: card.uid, kind: 'number', value: card.value };
@@ -1579,7 +1600,12 @@ function applyOp(left, symbol, right) {
         return left - right;
     return left * right;
 }
-/** ประกอบสมการที่เป็นไปได้ทั้งหมด พร้อมคำนวณพลังโจมตี */
+/**
+ * ประกอบสมการที่เป็นไปได้ทั้งหมดจากการ์ดในมือ พร้อมคำนวณพลังโจมตี
+ *
+ * จำกัดไม่เกิน 3 พจน์ เพราะมือมีการ์ด 5 ใบ สมการ 3 พจน์ต้องใช้ 5 ใบพอดี
+ * (เลข-เครื่องหมาย-เลข-เครื่องหมาย-เลข) จึงเป็นเพดานจริงของเกมอยู่แล้ว
+ */
 function buildCandidates(hand) {
     const numbers = hand.filter((card) => card.kind === 'number');
     const operators = hand.filter((card) => card.kind === 'operator');
@@ -1605,7 +1631,7 @@ function buildCandidates(hand) {
             }
         }
     }
-    // สามพจน์: a ? b ? c ทั้งแบบมีและไม่มีวงเล็บคร่อมสองตัวแรก
+    // สามพจน์: a ? b ? c ทั้งแบบมีและไม่มีวงเล็บ
     for (const a of numbers) {
         for (const b of numbers) {
             if (b.uid === a.uid)
@@ -1638,7 +1664,7 @@ function buildCandidates(hand) {
                             plain = applyOp(applyOp(a.value, op1.symbol, b.value), op2.symbol, c.value);
                         }
                         candidates.push({ slots, bracket: null, power: plain });
-                        // ใส่วงเล็บคร่อมสองพจน์แรก ถ้ามีการ์ดถุงมือ
+                        // ใส่วงเล็บได้เมื่อมีการ์ดถุงมือ — จุดสำคัญของบทเรียนเรื่องระคน
                         if (gauntlet) {
                             candidates.push({
                                 slots,
@@ -1658,6 +1684,111 @@ function buildCandidates(hand) {
     }
     return candidates;
 }
+/** ความสามารถติดตัวของฮีโร่ที่กำลังเล่นอยู่ */
+function passiveOf(heroId) {
+    if (heroId === 'knight-commander-valerius')
+        return 'precisionStrike';
+    if (heroId === 'lich-queen-morwenna')
+        return 'soulSiphon';
+    return null;
+}
+function bracketToPair(bracket) {
+    return bracket ? [bracket] : [];
+}
+/**
+ * เรียงสมการที่ดีที่สุดให้เด็กดู
+ *
+ * เรียงตามดาเมจมากไปน้อย ถ้าดาเมจเท่ากันเอาสมการที่ใช้การ์ดน้อยกว่าขึ้นก่อน
+ * เพราะอ่านง่ายกว่าและเหลือการ์ดไว้ใช้เทิร์นหน้า
+ */
+function suggestEquations(state, options = {}) {
+    const limit = options.limit ?? 3;
+    const player = state.players[state.turn];
+    const passive = passiveOf(player.heroId);
+    let targets = getTargets(state).filter((t) => t.isAttackable);
+    if (options.target) {
+        const picked = targets.filter((t) => t.kind === options.target.kind && t.index === options.target.index);
+        // เป้าหมายที่เลือกไว้อาจตายไปแล้ว ถ้าหาไม่เจอก็ดูทุกเป้าหมายแทน
+        if (picked.length > 0)
+            targets = picked;
+    }
+    if (targets.length === 0)
+        return [];
+    const found = [];
+    // สมการหลายแบบให้ผลลัพธ์หน้าตาเหมือนกัน เอามาแสดงซ้ำก็รกเปล่า ๆ
+    const seen = new Set();
+    for (const candidate of buildCandidates(player.hand)) {
+        for (const target of targets) {
+            const result = calculateDamage({
+                power: candidate.power,
+                divisor: target.divisor,
+                comboStreak: player.comboStreak,
+                passive,
+            });
+            if (options.criticalOnly && !result.isCritical)
+                continue;
+            if (result.damage <= 0)
+                continue;
+            const display = toDisplayString({
+                slots: candidate.slots,
+                brackets: bracketToPair(candidate.bracket),
+            });
+            const key = `${target.kind}:${target.index}:${display}`;
+            if (seen.has(key))
+                continue;
+            seen.add(key);
+            found.push({
+                slots: candidate.slots,
+                bracket: candidate.bracket,
+                target: {
+                    kind: target.kind,
+                    index: target.index,
+                    name: target.name,
+                    divisor: target.divisor,
+                },
+                power: candidate.power,
+                damage: result.damage,
+                isCritical: result.isCritical,
+                display,
+                cardCount: candidate.slots.length + (candidate.bracket ? 1 : 0),
+            });
+        }
+    }
+    found.sort((a, b) => b.damage - a.damage || a.cardCount - b.cardCount);
+    return found.slice(0, limit);
+}
+/**
+ * คำใบ้ชั้นที่ 1 — บอกทิศทาง ไม่เฉลย
+ *
+ * ตั้งใจไม่คืน slots ออกไป เพื่อไม่ให้หน้าจอเผลอเอาไปเฉลยตั้งแต่ชั้นแรก
+ */
+function summarizeHint(state, target) {
+    const all = suggestEquations(state, { target, limit: Number.MAX_SAFE_INTEGER });
+    if (all.length === 0)
+        return null;
+    const first = all[0];
+    const crits = all.filter((s) => s.isCritical);
+    // ตัวอย่างผลลัพธ์ที่หารลงตัว เรียงจากน้อยไปมาก เอาแค่ 4 ตัวพอเป็นแนวทาง
+    const powers = [...new Set(crits.map((s) => s.power))].sort((a, b) => a - b);
+    return {
+        targetName: first.target.name,
+        divisor: first.target.divisor,
+        hasCritical: crits.length > 0,
+        criticalCount: crits.length,
+        fewestCards: crits.length > 0 ? Math.min(...crits.map((s) => s.cardCount)) : null,
+        targetPowers: powers.slice(0, 4),
+        targetPowerCount: powers.length,
+        bestDamage: first.damage,
+    };
+}
+
+return { buildCandidates, passiveOf, suggestEquations, summarizeHint };
+})();
+__M['engine/ai'] = (() => {
+const { calculateDamage } = __M['engine/damage'];
+const { detectDeadHand, desperateStrikePower, rawMagicPower } = __M['engine/deadHand'];
+const { getTargets } = __M['engine/game'];
+const { buildCandidates, passiveOf } = __M['engine/suggest'];
 function scoreAgainstTarget(candidate, target, comboStreak, passive) {
     const result = calculateDamage({
         power: candidate.power,
@@ -1748,11 +1879,7 @@ function planTurn(state, level = 'normal') {
         };
     }
     // กรณีปกติ: หาสมการที่ดีที่สุด
-    const passive = player.heroId === 'knight-commander-valerius'
-        ? 'precisionStrike'
-        : player.heroId === 'lich-queen-morwenna'
-            ? 'soulSiphon'
-            : null;
+    const passive = passiveOf(player.heroId);
     const candidates = buildCandidates(player.hand);
     const scored = [];
     for (const candidate of candidates) {
@@ -1804,10 +1931,19 @@ return { planTurn };
 (function(){
   const G = __M['engine/game'], AI = __M['engine/ai'], EQ = __M['engine/equation'];
   const DMG = __M['engine/damage'], DH = __M['engine/deadHand'], C = __M['cards'], R = __M['rules'];
+  const SG = __M['engine/suggest'];
 
   const $ = id => document.getElementById(id);
   let mode = 'ai', h1 = C.HEROES[2].id, h2 = C.HEROES[0].id;
   let st = null, target = null, aiBusy = false;
+
+  /*
+   * ระดับคำใบ้ที่เปิดอยู่ในเทิร์นนี้ 0 = ยังไม่เปิด
+   * รีเซ็ตทุกครั้งที่ขึ้นเทิร์นใหม่ เด็กจึงต้องคิดเองก่อนเสมอ
+   */
+  let hintLevel = 0;
+  /** นับว่าแต่ละฝ่ายเปิดคำใบ้ไปกี่ครั้ง ครูเอาไปดูท้ายเกมได้ */
+  let hintUse = { p1: 0, p2: 0 };
 
   /* ══════════════════════════════════════════════════════════════
      คลังรูปการ์ดที่ครูอัปเอง
@@ -1934,6 +2070,7 @@ return { planTurn };
   $('start').onclick = () => {
     st = G.createGame({ p1HeroId:h1, p2HeroId:h2, p2Control:mode });
     target = null;
+    hintLevel = 0; hintUse = { p1: 0, p2: 0 };
     $('setup').classList.add('hide');
     $('game').classList.remove('hide');
     render();
@@ -2193,6 +2330,9 @@ return { planTurn };
     // กติกามือตาย
     renderDeadHand();
 
+    // คำใบ้
+    renderHint();
+
     // ปุ่ม
     const canAtk = isMyTurn() && st.phase === 'build' && target &&
                    (power !== null || st.deadHand !== 'none');
@@ -2219,6 +2359,119 @@ return { planTurn };
     });
 
     if (!isMyTurn() && !st.winner && !aiBusy) runAi();
+  }
+
+  /* ══════════════════════════════════════════════════════════════
+     ระบบแนะนำสมการ
+
+     ให้คำใบ้ทีละชั้น ไม่เฉลยรวดเดียว เพราะถ้ากดปุ่มแล้วได้คำตอบทันที
+     เด็กจะเลิกคิดเองตั้งแต่ตาแรก
+
+       ชั้น 1  บอกว่าต้องหาผลลัพธ์ที่หารด้วยเท่าไรลงตัว และทำได้จริงกี่วิธี
+       ชั้น 2  บอกว่าผลลัพธ์ที่มือนี้ทำได้จริงมีค่าอะไรบ้าง
+       ชั้น 3  เฉลยสมการ พร้อมปุ่มวางการ์ดให้
+     ══════════════════════════════════════════════════════════════ */
+
+  const HINT_MAX = 3;
+
+  /** เป้าหมายที่จะให้คำใบ้ — ที่เด็กเลือกไว้ ถ้ายังไม่เลือกก็ดูทุกตัว */
+  function hintTarget(){ return target; }
+
+  function renderHint(){
+    const box = $('hintBox'); box.innerHTML = '';
+    const btn = $('hint');
+
+    // คำใบ้ใช้ได้เฉพาะตอนสร้างสมการเองเท่านั้น
+    const usable = isMyTurn() && st.phase === 'build' && st.deadHand === 'none' && !st.winner;
+    btn.style.display = usable ? '' : 'none';
+    if (!usable) { hintLevel = 0; return; }
+
+    btn.textContent = hintLevel === 0 ? '💡 ขอคำใบ้'
+      : hintLevel < HINT_MAX ? `💡 ใบ้เพิ่ม (${hintLevel}/${HINT_MAX})`
+      : '🙈 ซ่อนคำใบ้';
+
+    if (hintLevel === 0) return;
+
+    const info = SG.summarizeHint(st, hintTarget());
+    const d = document.createElement('div');
+    d.className = 'hint';
+
+    if (!info) {
+      d.innerHTML = `<b>💡 คำใบ้</b>มือนี้ยังทำดาเมจกับเป้าหมายที่เหลือไม่ได้เลย
+        ลองกด <b style="display:inline">♻️ จั่วใหม่</b> เพื่อเปลี่ยนการ์ดทั้งมือดูนะ`;
+      box.appendChild(d);
+      return;
+    }
+
+    const step = `<span class="step">คำใบ้ ${hintLevel}/${HINT_MAX}</span>`;
+    const parts = [];
+
+    // ── ชั้นที่ 1 — เป้าหมายของโจทย์ ──
+    if (info.hasCritical) {
+      // ตัวอย่างพหุคูณทั่วไป ไม่ใช่คำตอบของมือนี้ เด็กยังต้องคิดต่อเอง
+      const multiples = [1, 2, 3, 4, 5].map(n => n * info.divisor).join(', ');
+      parts.push(`ตอนนี้เล็ง <b style="display:inline">${info.targetName}</b> เกราะ <span class="nums">÷${info.divisor}</span>
+        <ul>
+          <li>อยากได้ <b style="display:inline">Critical Hit</b> ต้องทำผลลัพธ์ให้หารด้วย
+              <span class="nums">${info.divisor}</span> ลงตัว เช่น <span class="nums">${multiples}</span> …</li>
+          <li>มือนี้จัดสมการที่หารลงตัวได้ <span class="nums">${info.criticalCount}</span> แบบ
+              โดยใช้การ์ดอย่างน้อย <span class="nums">${info.fewestCards}</span> ใบ</li>
+        </ul>`);
+    } else {
+      parts.push(`ตอนนี้เล็ง <b style="display:inline">${info.targetName}</b> เกราะ <span class="nums">÷${info.divisor}</span>
+        <ul>
+          <li>มือนี้ <b style="display:inline">ทำ Critical Hit ไม่ได้</b> ไม่ว่าจะจัดสมการยังไง</li>
+          <li>ดาเมจดีที่สุดที่ทำได้คือ <span class="nums">${info.bestDamage}</span>
+              — จะตีเท่าที่ได้ หรือกด ♻️ จั่วใหม่ก็ได้</li>
+        </ul>`);
+    }
+
+    // ── ชั้นที่ 2 — ผลลัพธ์ที่มือนี้ทำได้จริง ──
+    if (hintLevel >= 2 && info.hasCritical) {
+      // บอกให้ครบว่ายังมีค่าอื่นอีกไหม เด็กจะได้ไม่เข้าใจว่ามีแค่ที่เห็น
+      const more = info.targetPowerCount - info.targetPowers.length;
+      const tail = more > 0 ? ` <span style="opacity:.8">(และอีก ${more} ค่า)</span>` : '';
+      parts.push(`<div style="margin-top:8px">ผลลัพธ์ที่หารด้วย <span class="nums">${info.divisor}</span>
+        ลงตัวและมือนี้ทำได้จริง →
+        <span class="nums">${info.targetPowers.join(' · ')}</span>${tail}
+        <br>ลองจัดการ์ดให้ได้ค่าใดค่าหนึ่งดูนะ</div>`);
+    }
+
+    // ── ชั้นที่ 3 — เฉลย ──
+    const best = hintLevel >= HINT_MAX
+      ? SG.suggestEquations(st, { target: hintTarget(), limit: 1 })[0]
+      : null;
+
+    if (best) {
+      parts.push(`<span class="ans">${best.display} = ${best.power}
+        <span class="to">${best.isCritical ? '⚡ Critical Hit' : 'ดาเมจ'} ${best.damage}
+          ใส่ ${best.target.name} (÷${best.target.divisor})</span></span>`);
+    }
+
+    d.innerHTML = `<b>💡 คำใบ้${step}</b>` + parts.join('');
+    box.appendChild(d);
+
+    // ปุ่มวางการ์ดให้ มีเฉพาะชั้นสุดท้าย
+    if (best) {
+      const place = document.createElement('button');
+      place.className = 'btn ghost sm';
+      place.style.marginTop = '8px';
+      place.textContent = '✋ วางการ์ดตามนี้ให้เลย';
+      place.onclick = () => applySuggestion(best);
+      box.appendChild(place);
+    }
+  }
+
+  /** วางการ์ดตามสมการที่แนะนำ แล้วเลือกเป้าหมายให้ด้วย */
+  function applySuggestion(s){
+    st = G.clearEquation(st);
+    for (const slot of s.slots) st = G.placeCard(st, slot.cardId);
+    if (s.bracket) {
+      const res = G.addBracket(st, s.bracket.startTerm, s.bracket.endTerm);
+      if (res.ok) st = res.state;
+    }
+    target = { kind: s.target.kind, index: s.target.index };
+    render();
   }
 
   function renderDeadHand(){
@@ -2274,7 +2527,13 @@ return { planTurn };
   $('redraw').onclick = () => {
     const res = G.redrawHand(st);
     if (!res.ok) { alert(res.message); return; }
-    st = res.state; target = null; render();
+    // มือใหม่แล้ว คำใบ้เดิมใช้ไม่ได้ ต้องเริ่มคิดใหม่
+    st = res.state; target = null; hintLevel = 0; render();
+  };
+  $('hint').onclick = () => {
+    hintLevel = hintLevel >= HINT_MAX ? 0 : hintLevel + 1;
+    if (hintLevel > 0) hintUse[st.turn] += 1;
+    render();
   };
   $('atk').onclick = () => {
     if (st.deadHand !== 'none') { useDeadHand(); return; }
@@ -2315,12 +2574,19 @@ return { planTurn };
     $('resultModal').classList.remove('hide');
     $('rNext').onclick = () => { $('resultModal').classList.add('hide'); onNext(); };
   }
-  function nextTurn(){ st = G.endTurn(st); target = null; render(); }
+  function nextTurn(){ st = G.endTurn(st); target = null; hintLevel = 0; render(); }
   function showWin(){
     const w = st.players[st.winner];
     $('wTitle').textContent = `${w.name} ชนะ!`;
-    $('wBody').textContent = `${w.heroName} เอาชนะการดวลได้ใน ${st.turnNumber} เทิร์น`;
-    $('winModal').classList.remove('hide');
+
+    // จำนวนคำใบ้ที่เปิด ครูใช้ดูได้ว่าเด็กพึ่งคำใบ้มากแค่ไหน
+    const lines = [`${w.heroName} เอาชนะการดวลได้ใน ${st.turnNumber} เทิร์น`];
+    const used = Object.entries(hintUse).filter(([, n]) => n > 0);
+    if (used.length > 0) {
+      lines.push('เปิดคำใบ้ ' + used
+        .map(([side, n]) => `${st.players[side].name} ${n} ครั้ง`).join(' · '));
+    }
+    $('wBody').textContent = lines.join('\n');
   }
 
   // ── เทิร์นคอมพิวเตอร์ ──
