@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { StageCard } from '../components/StageCard'
+import { StagePathMap } from '../components/StagePathMap'
 import { TopBar } from '../components/TopBar'
 import { getStage, getStagesByWorld } from '../data/stages'
 import { getWorld } from '../data/worlds'
@@ -141,6 +142,14 @@ export function World({ player }: { player: Player }) {
           </div>
         ) : (
           <div className="mt-6 space-y-8">
+            {/* แผนที่เส้นทางเป็นตัวนำทางหลัก การ์ดด้านล่างไว้ดูรายละเอียด */}
+            <StagePathMap
+              player={player}
+              worldId={world.id}
+              stages={regions.flatMap((group) => group.stages)}
+              onSelect={startStage}
+            />
+
             {regions.map((group) => (
               <section key={group.region.id}>
                 <h3 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">

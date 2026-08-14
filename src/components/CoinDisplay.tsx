@@ -1,3 +1,4 @@
+import { GameIcon } from './art/GameArt'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 
@@ -30,7 +31,7 @@ export function CoinDisplay({ coins, className = '' }: CoinDisplayProps) {
   return (
     <div className={`relative ${className}`.trim()}>
       <span className="stat-chip text-gold-300">
-        <span aria-hidden="true">🪙</span>
+        <GameIcon name="coin" size="h-5 w-5" />
         <span className="tabular-nums">{coins.toLocaleString('th-TH')}</span>
         <span className="sr-only">เหรียญ</span>
       </span>

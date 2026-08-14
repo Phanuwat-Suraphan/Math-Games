@@ -1,3 +1,4 @@
+import { GameIcon } from './art/GameArt'
 interface HpDisplayProps {
   hp: number
   maxHp: number
@@ -12,7 +13,7 @@ export function HpDisplay({ hp, maxHp, className = '' }: HpDisplayProps) {
     <div className={`w-full ${className}`.trim()}>
       <div className="mb-1 flex items-baseline justify-between text-sm">
         <span className="font-semibold text-ember-400">
-          <span aria-hidden="true">❤️</span> พลังชีวิต
+          <GameIcon name="heart" size="h-4 w-4" /> พลังชีวิต
         </span>
         <span className="tabular-nums text-slate-300">
           {hp} / {safeMax}

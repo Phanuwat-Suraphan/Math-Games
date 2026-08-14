@@ -1,3 +1,4 @@
+import { GameIcon } from './art/GameArt'
 import { motion } from 'framer-motion'
 
 interface StreakBadgeProps {
@@ -27,7 +28,7 @@ export function StreakBadge({
           isHot ? 'text-ember-400' : 'text-slate-300'
         } ${className}`.trim()}
       >
-        <span aria-hidden="true">{isHot ? '🔥' : '✨'}</span>
+        <GameIcon name="flame" size={isHot ? 'h-5 w-5' : 'h-4 w-4'} />
         <span className="tabular-nums">{currentStreak}</span>
         <span className="sr-only">ตอบถูกติดต่อกัน {currentStreak} ข้อ</span>
       </motion.span>
@@ -47,7 +48,7 @@ export function StreakBadge({
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 15 }}
       >
-        {isHot ? '🔥' : '✨'}
+        <GameIcon name="flame" size="h-4 w-4" />
       </motion.p>
 
       <p className="mt-1 text-xs text-slate-400">ตอบถูกติดต่อกัน</p>

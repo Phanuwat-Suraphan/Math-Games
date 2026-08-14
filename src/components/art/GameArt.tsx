@@ -1,4 +1,5 @@
 import { heroArt, HERO_VIEWBOX } from '../../art/heroes'
+import { gameIcon, ICON_VIEWBOX } from '../../art/icons'
 import { monsterArt, MONSTER_VIEWBOX } from '../../art/monsters'
 import { lockedSceneFilter, SCENE_VIEWBOX, worldScene } from '../../art/scenes'
 
@@ -76,6 +77,31 @@ export function WorldSceneArt({
       aria-label={label}
       aria-hidden={label ? undefined : true}
       dangerouslySetInnerHTML={{ __html: worldScene(worldId) }}
+    />
+  )
+}
+
+interface GameIconProps extends ArtProps {
+  name: string
+  /** ขนาดเป็น class ของ Tailwind เช่น h-5 w-5 */
+  size?: string
+}
+
+/**
+ * ไอคอนของรางวัลและสถานะ
+ *
+ * แทนอีโมจิเพราะอีโมจิหน้าตาต่างกันในแต่ละเครื่อง
+ * เด็กในห้องเดียวกันที่ใช้คนละอุปกรณ์จะเห็นเหรียญคนละแบบ
+ */
+export function GameIcon({ name, className, label, size = 'h-5 w-5' }: GameIconProps) {
+  return (
+    <svg
+      viewBox={ICON_VIEWBOX}
+      className={[size, 'inline-block shrink-0', className].filter(Boolean).join(' ')}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      dangerouslySetInnerHTML={{ __html: gameIcon(name) }}
     />
   )
 }
