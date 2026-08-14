@@ -1,0 +1,60 @@
+name: ตรวจสอบโค้ด
+
+# รันทุกครั้งที่มีการ push เพื่อจับ error ตั้งแต่เนิ่น ๆ
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: คอมไพล์และทดสอบ
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: ติดตั้ง dependency
+        run: npm ci || npm install
+
+      # ขั้นนี้สำคัญที่สุด เป็นการตรวจไฟล์ React ที่ตรวจในเครื่องพัฒนาไม่ได้
+      - name: ตรวจ TypeScript ทั้งโปรเจกต์
+        run: npm run typecheck
+
+      - name: build เว็บจริง
+        run: npm run build
+
+      - name: คอมไพล์ตรรกะเกมสำหรับชุดทดสอบ
+        run: |
+          npx tsc --ignoreConfig \
+            src/types/*.ts src/data/*.ts src/utils/*.ts src/math/*.ts \
+            src/questionEngine/*.ts src/questionEngine/**/*.ts \
+            src/services/storage.ts src/services/rewardService.ts \
+            src/services/questService.ts src/services/questionService.ts \
+            --outDir /tmp/logic --target ES2020 --module commonjs \
+            --strict --skipLibCheck --lib ES2020,DOM
+
+      - name: ทดสอบระบบความก้าวหน้า (Part 1–3)
+        run: node tests/progression.test.mjs /tmp/logic
+
+      - name: ทดสอบ Question Engine (Part 4)
+        run: node tests/questionEngine.test.mjs /tmp/logic
+
+      - name: ทดสอบการต่อด่านเข้ากับ Question Engine
+        run: node tests/stageQuestions.test.mjs /tmp/logic
+
+      - name: คอมไพล์เครื่องยนต์เกมการ์ด
+        run: |
+          npx tsc --ignoreConfig \
+            src/divisorDuel/*.ts src/divisorDuel/engine/*.ts \
+            --outDir /tmp/duel --target ES2020 --module commonjs \
+            --strict --skipLibCheck --lib ES2020,DOM
+
+      - name: ทดสอบเกมการ์ด Divisor Duel
+        run: node src/divisorDuel/web/test.mjs /tmp/duel

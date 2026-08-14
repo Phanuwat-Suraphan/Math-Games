@@ -1,0 +1,66 @@
+name: เผยแพร่เว็บขึ้น GitHub Pages
+
+# กดรันเองได้จากแท็บ Actions หรือรันอัตโนมัติเมื่อ push ขึ้น branch หลักของงาน
+on:
+  push:
+    branches:
+      - main
+      - claude/math-adventure-part-1-n7zxcx
+  workflow_dispatch:
+
+# สิทธิ์ที่ GitHub Pages ต้องใช้
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# ถ้ามีการ push ซ้อนกัน ให้รันอันล่าสุดอันเดียวพอ
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: สร้างเว็บ
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: ติดตั้ง dependency
+        run: npm ci || npm install
+
+      # เว็บถูกวางไว้ใต้ /Math-Games/ บน GitHub Pages ไม่ใช่ราก
+      # ถ้าไม่ตั้ง base ไฟล์ JS กับ CSS จะโหลดไม่เจอ หน้าเว็บจะขาวเปล่า
+      - name: build
+        run: npm run build
+        env:
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+
+      # เกมการ์ดเป็นไฟล์ HTML เดี่ยว ก๊อบไปวางคู่กันให้เปิดได้จากลิงก์เดียวกัน
+      - name: แนบเกมการ์ดไปด้วย
+        run: cp divisor-duel.html dist/divisor-duel.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: เผยแพร่
+    needs: build
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
