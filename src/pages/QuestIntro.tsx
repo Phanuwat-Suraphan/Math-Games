@@ -7,6 +7,7 @@ import { getNpc } from '../data/npcs'
 import { getStage } from '../data/stages'
 import { getSkillMeta } from '../data/skills'
 import { getWorld } from '../data/worlds'
+import { stageRoute } from '../utils/stageRoute'
 import type { Player } from '../types/player'
 import {
   getRequiredCorrectAnswers,

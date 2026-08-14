@@ -75,7 +75,7 @@ function PuzzleSession({
   world: World
 }) {
   const navigate = useNavigate()
-  const { finishStage, patchPlayer } = useGame()
+  const { answerQuestion, finishStage, isStageReplay } = useGame()
 
   const [puzzle] = useState(() => {
     // ชนิดที่ด่านกำหนด ถ้าไม่มีหรือชื่อผิดก็ใช้ล็อกรหัสซึ่งเข้าใจง่ายที่สุด
@@ -97,11 +97,36 @@ function PuzzleSession({
   const [shake, setShake] = useState(false)
   const [hintFor, setHintFor] = useState<number | null>(null)
   const rewardDoneRef = useRef(false)
+  const [isReplay] = useState(() => isStageReplay(stage.id))
+  // ยอดที่ได้จริงระหว่างแก้ปริศนา ใช้แสดงในหน้าผลลัพธ์ให้ตรงกับที่ได้จริง
+  const earnedRef = useRef({ exp: 0, coins: 0 })
+  const slotStartedAtRef = useRef(Date.now())
 
   const handleChoice = useCallback(
     (index: number, value: string) => {
       const outcome = fillSlot(puzzle, progress, index, value)
       if (!outcome) return
+
+      /*
+       * บันทึกผ่านระบบรางวัลและสถิติของ Part 2 เหมือนการตอบคำถามปกติ
+       * ไม่จ่ายเหรียญเองด้วย patchPlayer เพราะค่า player ที่ถืออยู่เป็นค่าเก่า
+       * จากตอน render จะเขียนทับเหรียญที่ finishStage เพิ่งให้ไป
+       */
+      const reward = answerQuestion({
+        questionId: `${puzzle.id}-${puzzle.slots[index]?.id ?? index}`,
+        stageId: stage.id,
+        skill: puzzle.skill,
+        isCorrect: outcome.correct,
+        timeMs: Date.now() - slotStartedAtRef.current,
+        isReplay,
+      })
+      if (reward) {
+        earnedRef.current = {
+          exp: earnedRef.current.exp + reward.gainedExp,
+          coins: earnedRef.current.coins + reward.gainedCoins,
+        }
+      }
+      slotStartedAtRef.current = Date.now()
 
       setProgress(outcome.progress)
 
@@ -118,7 +143,7 @@ function PuzzleSession({
         window.setTimeout(() => setShake(false), 400)
       }
     },
-    [progress, puzzle],
+    [answerQuestion, isReplay, progress, puzzle, stage.id],
   )
 
   /** ปิดจบด่าน ส่งผลเข้าระบบความคืบหน้าของ Part 3 ตามเดิม */
@@ -126,19 +151,13 @@ function PuzzleSession({
     if (rewardDoneRef.current) return
     rewardDoneRef.current = true
 
-    const reward = puzzleReward(progress)
     // ปริศนามีช่องน้อยกว่าจำนวนข้อของด่าน จึงนับว่าผ่านเต็มเมื่อแก้สำเร็จ
     const outcome = finishStage({
       stage,
       correctAnswers: stage.questionCount,
       totalQuestions: stage.questionCount,
-      expFromAnswers: reward.exp,
-      coinsFromAnswers: reward.coins,
-    })
-
-    // จ่ายรางวัลของปริศนาเพิ่มจากรางวัลด่าน
-    patchPlayer({
-      coins: player.coins + reward.coins,
+      expFromAnswers: earnedRef.current.exp,
+      coinsFromAnswers: earnedRef.current.coins,
     })
 
     if (!outcome) {
@@ -147,7 +166,7 @@ function PuzzleSession({
     }
     const result: StageResult = outcome.result
     navigate('/result', { replace: true, state: result })
-  }, [finishStage, navigate, patchPlayer, player.coins, progress, stage])
+  }, [finishStage, navigate, stage])
 
   const percent = puzzlePercent(progress)
   const reward = puzzleReward(progress)
