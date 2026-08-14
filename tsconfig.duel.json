@@ -1,0 +1,20 @@
+{
+  // คอมไพล์เครื่องยนต์เกมการ์ด Divisor Duel แยกต่างหาก
+  //
+  // ต้องแยกจาก tsconfig.tests.json เพราะชุดทดสอบของเกมการ์ดโหลดโมดูล
+  // ด้วยเส้นทางแบบ engine/equation ไม่ใช่ divisorDuel/engine/equation
+  // จึงต้องตั้ง rootDir ไว้ที่ src/divisorDuel
+  //
+  // วิธีใช้: npx tsc -p tsconfig.duel.json --outDir /tmp/duel
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "rootDir": "src/divisorDuel",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "types": []
+  },
+  "include": ["src/divisorDuel/**/*.ts"]
+}

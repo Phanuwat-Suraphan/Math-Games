@@ -31,14 +31,7 @@ jobs:
         run: npm run build
 
       - name: คอมไพล์ตรรกะเกมสำหรับชุดทดสอบ
-        run: |
-          npx tsc --ignoreConfig \
-            src/types/*.ts src/data/*.ts src/utils/*.ts src/math/*.ts \
-            src/questionEngine/*.ts src/questionEngine/**/*.ts \
-            src/services/storage.ts src/services/rewardService.ts \
-            src/services/questService.ts src/services/questionService.ts \
-            --outDir /tmp/logic --target ES2020 --module commonjs \
-            --strict --skipLibCheck --lib ES2020,DOM
+        run: npx tsc -p tsconfig.tests.json --outDir /tmp/logic
 
       - name: ทดสอบระบบความก้าวหน้า (Part 1–3)
         run: node tests/progression.test.mjs /tmp/logic
@@ -50,11 +43,7 @@ jobs:
         run: node tests/stageQuestions.test.mjs /tmp/logic
 
       - name: คอมไพล์เครื่องยนต์เกมการ์ด
-        run: |
-          npx tsc --ignoreConfig \
-            src/divisorDuel/*.ts src/divisorDuel/engine/*.ts \
-            --outDir /tmp/duel --target ES2020 --module commonjs \
-            --strict --skipLibCheck --lib ES2020,DOM
+        run: npx tsc -p tsconfig.duel.json --outDir /tmp/duel
 
       - name: ทดสอบเกมการ์ด Divisor Duel
         run: node src/divisorDuel/web/test.mjs /tmp/duel

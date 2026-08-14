@@ -1,0 +1,32 @@
+{
+  // คอมไพล์เฉพาะตรรกะเกมเป็น CommonJS ให้ชุดทดสอบใน tests/ เรียกใช้ได้
+  // ไม่รวมไฟล์ React เพราะชุดทดสอบไม่แตะหน้าจอ
+  //
+  // ใช้ไฟล์นี้แทน flag --ignoreConfig เพราะ flag นั้นมีเฉพาะ TypeScript รุ่นใหม่
+  // ถ้าใช้ flag ชุดทดสอบจะรันไม่ได้บนเครื่องที่ลง TypeScript ตามที่โปรเจกต์กำหนด
+  //
+  // วิธีใช้: npx tsc -p tsconfig.tests.json --outDir /tmp/logic
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020", "DOM"],
+    "rootDir": "src",
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    // ไม่ดึง type ของ node หรือ react เข้ามา ตรรกะเกมไม่ได้ใช้
+    "types": []
+  },
+  "include": [
+    "src/types/**/*.ts",
+    "src/data/**/*.ts",
+    "src/utils/**/*.ts",
+    "src/math/**/*.ts",
+    "src/questionEngine/**/*.ts",
+    "src/services/storage.ts",
+    "src/services/rewardService.ts",
+    "src/services/questService.ts",
+    "src/services/questionService.ts"
+  ]
+}

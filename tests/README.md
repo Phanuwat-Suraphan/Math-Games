@@ -10,24 +10,18 @@
 ## รันทั้งหมด
 
 ```bash
-# Part 1–3 — ระบบความก้าวหน้า
-tsc --ignoreConfig src/types/*.ts src/data/*.ts src/utils/*.ts \
-  src/services/storage.ts src/services/rewardService.ts src/services/questService.ts \
-  --outDir /tmp/ma --target ES2020 --module commonjs --strict --skipLibCheck --lib ES2020,DOM
-node tests/progression.test.mjs /tmp/ma
+# คอมไพล์ตรรกะเกม แล้วรันชุดทดสอบทั้งสาม
+npx tsc -p tsconfig.tests.json --outDir /tmp/logic
+node tests/progression.test.mjs /tmp/logic     # ระบบความก้าวหน้า Part 1–3
+node tests/questionEngine.test.mjs /tmp/logic  # Question Engine และ Math Engine Part 4
+node tests/stageQuestions.test.mjs /tmp/logic  # การต่อด่านเข้ากับ Question Engine
 
-# Part 4 — Question Engine และ Math Engine
-tsc --ignoreConfig src/types/*.ts src/data/*.ts src/utils/*.ts src/math/*.ts \
-  src/questionEngine/*.ts src/questionEngine/**/*.ts \
-  src/services/storage.ts src/services/rewardService.ts src/services/questService.ts \
-  --outDir /tmp/qe --target ES2020 --module commonjs --strict --skipLibCheck --lib ES2020,DOM
-node tests/questionEngine.test.mjs /tmp/qe
-
-# เกมการ์ด Divisor Duel
-tsc --ignoreConfig src/divisorDuel/*.ts src/divisorDuel/engine/*.ts \
-  --outDir /tmp/dd --target ES2020 --module commonjs --strict --skipLibCheck --lib ES2020,DOM
-node src/divisorDuel/web/test.mjs /tmp/dd
+# เกมการ์ด Divisor Duel คอมไพล์แยก เพราะโหลดโมดูลด้วยเส้นทางคนละแบบ
+npx tsc -p tsconfig.duel.json --outDir /tmp/duel
+node src/divisorDuel/web/test.mjs /tmp/duel
 ```
+
+ทุกชุดรันบน GitHub Actions อัตโนมัติทุกครั้งที่ push ดูผลได้ที่แท็บ Actions
 
 ## ครอบคลุมอะไรบ้าง
 
