@@ -44,7 +44,12 @@ jobs:
       - name: แนบเกมการ์ดไปด้วย
         run: cp divisor-duel.html dist/divisor-duel.html
 
+      # enablement: true คือให้เปิด GitHub Pages ให้เองถ้ายังไม่ได้เปิด
+      # เจ้าของ repo จึงไม่ต้องเข้าไปตั้งค่าในหน้า Settings เอง
+      # หมายเหตุ: repo นี้เป็นแบบสาธารณะ เว็บที่ได้จึงเปิดดูได้จากทุกที่
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/upload-pages-artifact@v3
         with:
