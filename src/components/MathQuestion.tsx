@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import type { Question } from '../types/question'
+import type { Question } from '../questionEngine/types'
 
 export type AnswerState = 'idle' | 'correct' | 'wrong'
 
@@ -8,11 +8,20 @@ interface MathQuestionProps {
   questionNumber: number
   totalQuestions: number
   answerState: AnswerState
-  wrongChoices: number[]
-  onAnswer: (choice: number) => void
+  /** ข้อความของตัวเลือกที่ตอบผิดไปแล้ว */
+  wrongChoices: string[]
+  /** เปิดคำใบ้อยู่หรือยัง คุมจากหน้าจอเพื่อบันทึกว่าเด็กใช้คำใบ้กี่ข้อ */
+  hintShown: boolean
+  onAnswer: (choiceText: string) => void
+  onRequestHint: () => void
 }
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง']
+
+/** อ่านตัวเลขให้เป็นธรรมชาติสำหรับโปรแกรมอ่านหน้าจอ เช่น 3/4 → "3 ส่วน 4" */
+function toSpeech(text: string): string {
+  return text.includes('/') ? text.replace('/', ' ส่วน ') : text
+}
 
 export function MathQuestion({
   question,
@@ -20,7 +29,9 @@ export function MathQuestion({
   totalQuestions,
   answerState,
   wrongChoices,
+  hintShown,
   onAnswer,
+  onRequestHint,
 }: MathQuestionProps) {
   const isLocked = answerState === 'correct'
 
@@ -42,24 +53,24 @@ export function MathQuestion({
         transition={{ duration: 0.25 }}
         className="surface-card px-4 py-8 text-center sm:py-12"
       >
-        <p className="break-words text-4xl font-bold tracking-wide text-white sm:text-5xl">
+        <p className="break-words text-3xl font-bold leading-snug tracking-wide text-white sm:text-4xl">
           {question.prompt}
         </p>
       </motion.div>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {question.choices.map((choice, index) => {
-          const isWrongChoice = wrongChoices.includes(choice)
+          const isWrongChoice = wrongChoices.includes(choice.text)
           const isCorrectChoice =
-            answerState === 'correct' && choice === question.answer
+            answerState === 'correct' && choice.text === question.correctAnswer
 
           return (
             <button
-              key={`${question.id}-${choice}`}
+              key={choice.id}
               type="button"
               disabled={isLocked || isWrongChoice}
-              onClick={() => onAnswer(choice)}
-              aria-label={`ตัวเลือก ${CHOICE_LABELS[index] ?? index + 1}: ${choice}${
+              onClick={() => onAnswer(choice.text)}
+              aria-label={`ตัวเลือก ${CHOICE_LABELS[index] ?? index + 1}: ${toSpeech(choice.text)}${
                 isWrongChoice ? ' (ตอบผิดแล้ว)' : ''
               }`}
               className={[
@@ -76,6 +87,7 @@ export function MathQuestion({
                 .filter(Boolean)
                 .join(' ')}
             >
+              {/* ไม่ใช้สีอย่างเดียวบอกสถานะ มีสัญลักษณ์กำกับเสมอ */}
               <span
                 aria-hidden="true"
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-base font-bold ${
@@ -86,11 +98,34 @@ export function MathQuestion({
               >
                 {isCorrectChoice ? '✓' : isWrongChoice ? '✕' : CHOICE_LABELS[index]}
               </span>
-              <span>{choice.toLocaleString('en-US')}</span>
+              <span>{choice.text}</span>
             </button>
           )
         })}
       </div>
+
+      {/* ปุ่มคำใบ้ ไม่แสดงคำใบ้เองอัตโนมัติ เด็กต้องได้คิดก่อน */}
+      {!isLocked && question.hint ? (
+        <div className="mt-4">
+          {hintShown ? (
+            <p
+              role="status"
+              aria-live="polite"
+              className="rounded-2xl border border-sky-400/40 bg-sky-600/15 px-4 py-3 text-center text-sm font-semibold text-sky-300"
+            >
+              💡 {question.hint}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={onRequestHint}
+              className="mx-auto block rounded-2xl border border-sky-400/40 bg-sky-600/10 px-5 py-2.5 text-sm font-bold text-sky-300 transition hover:bg-sky-600/20"
+            >
+              💡 ขอคำใบ้
+            </button>
+          )}
+        </div>
+      ) : null}
 
       <AnimatePresence mode="wait">
         {answerState === 'correct' ? (
@@ -104,7 +139,9 @@ export function MathQuestion({
             className="mt-5 rounded-2xl border border-leaf-500/40 bg-leaf-600/20 p-4 text-center"
           >
             <p className="text-2xl font-bold text-leaf-400">ถูกต้อง! 🎉</p>
-            <p className="mt-1 text-sm text-slate-200">{question.explanation}</p>
+            <p className="mt-1 text-sm leading-relaxed text-slate-200">
+              {question.explanation}
+            </p>
           </motion.div>
         ) : null}
 
@@ -118,11 +155,14 @@ export function MathQuestion({
             aria-live="polite"
             className="mt-5 rounded-2xl border border-gold-400/40 bg-gold-500/15 p-4 text-center"
           >
+            {/* ยังไม่เฉลยตรงนี้ เด็กยังมีตัวเลือกเหลือให้ลองคิดต่อ */}
             <p className="text-xl font-bold text-gold-300">
-              ยังไม่ถูก ลองอีกครั้งนะ! 💪
+              ยังไม่ถูก ลองดูวิธีคิดอีกครั้งนะ 💪
             </p>
             <p className="mt-1 text-sm text-slate-200">
-              ใบ้ให้นิดหนึ่ง: {question.explanation}
+              {question.hint
+                ? 'กดปุ่มขอคำใบ้ด้านบนได้เลย ไม่เสียคะแนนนะ'
+                : 'ลองคิดใหม่อีกครั้ง หนูทำได้แน่นอน'}
             </p>
           </motion.div>
         ) : null}

@@ -6,12 +6,12 @@ import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { getStage } from '../data/stages'
 import { getWorld } from '../data/worlds'
-import { getQuestionSkill } from '../data/skills'
 import { useGame } from '../context/useGame'
 import type { Player } from '../types/player'
 import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
-import { getQuestionsForStage } from '../utils/questionGenerator'
+import { createStageSession } from '../services/questionService'
+import { checkAnswer } from '../questionEngine'
 import { getRequiredCorrectAnswers, isStageUnlocked } from '../utils/stageSystem'
 import { playSfx } from '../services/audioService'
 import { NotFoundNotice } from './NotFoundNotice'
@@ -66,15 +66,18 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
   const { answerQuestion, finishStage, isStageReplay } = useGame()
 
   // สร้างชุดโจทย์ครั้งเดียวตอน mount ชุดโจทย์จึงไม่สลับระหว่างเล่น
-  const [questions] = useState(() => getQuestionsForStage(stage))
+  // Question Engine ของ Part 4 สร้างโจทย์จาก questionTypes และ difficulty ของด่าน
+  const [session] = useState(() => createStageSession(stage))
+  const questions = session.questions
   // ตัดสินสถานะเล่นซ้ำตอนเริ่มด่าน เพื่อให้อัตรารางวัลคงที่ตลอดทั้งด่าน
   const [isReplay] = useState(() => isStageReplay(stage.id))
 
   const [questionIndex, setQuestionIndex] = useState(0)
   const [answerState, setAnswerState] = useState<AnswerState>('idle')
-  const [wrongChoices, setWrongChoices] = useState<number[]>([])
+  const [wrongChoices, setWrongChoices] = useState<string[]>([])
   const [correctCount, setCorrectCount] = useState(0)
   const [attemptedWrong, setAttemptedWrong] = useState(false)
+  const [hintShown, setHintShown] = useState(false)
   const [streakMessage, setStreakMessage] = useState<string | null>(null)
   const [lastGain, setLastGain] = useState<{ exp: number; coins: number } | null>(
     null,
@@ -88,14 +91,14 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
   const currentQuestion = questions[questionIndex]
 
   const handleAnswer = useCallback(
-    (choice: number) => {
+    (choice: string) => {
       if (!currentQuestion || answerState === 'correct') return
 
-      const isCorrect = choice === currentQuestion.answer
+      const isCorrect = checkAnswer(currentQuestion, choice)
       const outcome = answerQuestion({
         questionId: currentQuestion.id,
         stageId: stage.id,
-        skill: getQuestionSkill(currentQuestion),
+        skill: currentQuestion.skill,
         isCorrect,
         timeMs: Date.now() - questionStartedAtRef.current,
         isReplay,
@@ -146,6 +149,8 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
       setAnswerState('idle')
       setWrongChoices([])
       setAttemptedWrong(false)
+      // คำใบ้ต้องขอใหม่ทุกข้อ เด็กจึงได้คิดเองก่อนเสมอ
+      setHintShown(false)
       setStreakMessage(null)
       setLastGain(null)
       questionStartedAtRef.current = Date.now()
@@ -228,7 +233,9 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
           totalQuestions={questions.length}
           answerState={answerState}
           wrongChoices={wrongChoices}
+          hintShown={hintShown}
           onAnswer={handleAnswer}
+          onRequestHint={() => setHintShown(true)}
         />
 
         {answerState === 'correct' ? (

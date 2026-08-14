@@ -42,10 +42,15 @@ export interface Stage {
   /** ด่านที่ต้องผ่านก่อน ถ้าไม่ระบุแปลว่าเล่นได้ทันที */
   requiredStageId?: string
 
-  /** ประเภทโจทย์ของด่านนี้ Part 4 จะนำไปใช้กับ Question Engine */
+  /** ประเภทโจทย์ของด่านนี้ Question Engine ใช้ค่านี้เลือกตัวสร้างโจทย์ */
   questionTypes: SkillId[]
   /** ช่วงตัวเลขที่ใช้สร้างโจทย์ */
   numberRange: { min: number; max: number }
+  /**
+   * ระดับชั้นของเนื้อหา คุมขนาดตัวเลขเท่านั้น ไม่ได้คุมความยาก
+   * ถ้าไม่กำหนด questionService จะเดาจากลำดับของโลก
+   */
+  grade?: 4 | 5 | 6
 
   isBoss: boolean
 
