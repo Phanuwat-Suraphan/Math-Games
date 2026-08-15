@@ -31,6 +31,13 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-gold-500/30 to-gold-600/10',
   },
   {
+    to: '/arena',
+    emoji: '⚔️',
+    label: 'สนามรบตัวเลข',
+    description: 'เดินหลบมอน ยิงเอง เลเวลอัปสุ่มสกิล',
+    accent: 'from-ember-500/30 to-arcane-600/10',
+  },
+  {
     to: '/tower',
     emoji: '🗼',
     label: 'หอคอยไม่รู้จบ',

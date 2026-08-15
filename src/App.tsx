@@ -22,6 +22,7 @@ import { Settings } from './pages/Settings'
 import { Shop } from './pages/Shop'
 import { Journal } from './pages/Journal'
 import { Tower } from './pages/Tower'
+import { Survivor } from './pages/Survivor'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -73,6 +74,10 @@ function GameRoutes() {
           element={
             <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
           }
+        />
+        <Route
+          path="/arena"
+          element={<RequirePlayer render={(player) => <Survivor player={player} />} />}
         />
         <Route
           path="/tower"
