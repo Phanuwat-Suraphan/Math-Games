@@ -37,6 +37,8 @@
     "src/services/questService.ts",
     "src/services/questionService.ts",
     "src/services/battleService.ts",
+    "src/services/inventoryService.ts",
+    "src/services/storyService.ts",
     "src/battle/**/*.ts"
   ]
 }

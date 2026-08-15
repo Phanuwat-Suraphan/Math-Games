@@ -20,6 +20,7 @@ import { QuestIntro } from './pages/QuestIntro'
 import { Quests } from './pages/Quests'
 import { Settings } from './pages/Settings'
 import { Shop } from './pages/Shop'
+import { Journal } from './pages/Journal'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -71,6 +72,10 @@ function GameRoutes() {
           element={
             <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
           }
+        />
+        <Route
+          path="/journal"
+          element={<RequirePlayer render={(player) => <Journal player={player} />} />}
         />
         <Route
           path="/shop"

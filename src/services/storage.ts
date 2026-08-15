@@ -3,6 +3,7 @@ import { HP_CONFIG, MAX_RECENT_ATTEMPTS } from '../data/rewards'
 import { SKILL_IDS } from '../data/skills'
 import { ALL_QUESTS } from '../data/quests'
 import { getItem } from '../data/items'
+import { STORY_BEATS } from '../data/story'
 import { STAGES, getStage } from '../data/stages'
 import { EQUIP_SLOTS } from './inventoryService'
 import type { Equipment } from '../types/item'
@@ -30,7 +31,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 4
+export const CURRENT_SAVE_VERSION = 5
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -153,6 +154,7 @@ export function createPlayer(name: string, avatar: string): Player {
     questProgress: {},
     dailyQuests: { date: '', questIds: [] },
 
+    storyFlags: [],
     inventory: {},
     equipped: {},
 
@@ -359,6 +361,7 @@ function parsePlayer(raw: unknown): Player | null {
     questProgress: parseQuestProgress(raw.questProgress),
     dailyQuests: parseDailyQuests(raw.dailyQuests),
 
+    storyFlags: parseStoryFlags(raw.storyFlags),
     inventory: parseInventory(raw.inventory),
     equipped: parseEquipped(raw.equipped),
 
@@ -410,6 +413,39 @@ function parseEquipped(raw: unknown): Equipment {
     equipped[slot] = itemId
   }
   return equipped
+}
+
+/**
+ * อ่านธงเรื่อง
+ *
+ * ทิ้งธงที่ไม่มีอยู่จริงในเนื้อเรื่องแล้ว และตัดธงซ้ำออก
+ * ถ้าปล่อยธงแปลกปลอมไว้ ความคืบหน้าของเรื่องจะเกินร้อยเปอร์เซ็นต์
+ */
+function parseStoryFlags(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+
+  const known = new Set(
+    STORY_BEATS.map((beat) => beat.grantsFlag).filter(
+      (flag): flag is string => Boolean(flag),
+    ),
+  )
+  const flags: string[] = []
+  for (const value of raw) {
+    if (typeof value !== 'string') continue
+    if (!known.has(value)) continue
+    if (flags.includes(value)) continue
+    flags.push(value)
+  }
+  return flags
+}
+
+/**
+ * เวอร์ชัน 4 → เวอร์ชัน 5
+ * เพิ่มเนื้อเรื่อง ผู้เล่นเดิมเริ่มจากยังไม่ได้อ่านตอนไหนเลย
+ */
+function migrateV4ToV5(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+  return { ...raw, storyFlags: [] }
 }
 
 /**
@@ -516,7 +552,7 @@ function migrateV2ToV3(raw: unknown): unknown {
 function migrateToCurrent(parsed: unknown): unknown {
   // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)))
+    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed))))
   }
 
   if (!isRecord(parsed)) return null
@@ -527,6 +563,7 @@ function migrateToCurrent(parsed: unknown): unknown {
   if (version <= 1) player = migrateV1ToV2(player)
   if (version <= 2) player = migrateV2ToV3(player)
   if (version <= 3) player = migrateV3ToV4(player)
+  if (version <= 4) player = migrateV4ToV5(player)
 
   return player
 }

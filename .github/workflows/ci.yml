@@ -54,6 +54,9 @@ jobs:
       - name: ทดสอบร้านค้าและของสวมใส่ (Part 6)
         run: node tests/inventory.test.mjs /tmp/logic
 
+      - name: ทดสอบเนื้อเรื่อง (Part 7)
+        run: node tests/story.test.mjs /tmp/logic
+
       - name: ทดสอบภาพประกอบ
         run: node tests/art.test.mjs /tmp/logic
 

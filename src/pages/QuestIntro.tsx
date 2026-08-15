@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { StarRow } from '../components/StarRow'
+import { StoryBeatCard } from '../components/StoryBeatCard'
+import { useGame } from '../context/useGame'
+import { grantFlag, pendingBeat } from '../services/storyService'
 import { getNpc } from '../data/npcs'
 import { getStage } from '../data/stages'
 import { getSkillMeta } from '../data/skills'
@@ -20,6 +24,15 @@ import { NotFoundNotice } from './NotFoundNotice'
 export function QuestIntro({ player }: { player: Player }) {
   const navigate = useNavigate()
   const { worldId, stageId } = useParams<{ worldId: string; stageId: string }>()
+
+  /*
+   * hook ทุกตัวต้องถูกเรียกก่อน early return เสมอ
+   * ถ้าวางไว้หลัง if ที่ return ออกไป จะมีรอบที่ React เห็น hook ไม่ครบ
+   * แล้วพังทั้งหน้าด้วย "Rendered fewer hooks than expected"
+   * ซึ่งเกิดตอนเด็กกดเข้าด่านที่ไม่มีอยู่ ซึ่งเป็นตอนที่ไม่ควรพังที่สุด
+   */
+  const { patchPlayer } = useGame()
+  const [beatDone, setBeatDone] = useState(false)
 
   const stage = stageId ? getStage(stageId) : undefined
   const world = worldId ? getWorld(worldId) : undefined
@@ -49,6 +62,26 @@ export function QuestIntro({ player }: { player: Player }) {
 
   const npc = getNpc(stage.npcId)
   const progress = getStageProgress(player, stage.id)
+
+  /*
+   * ตอนเปิดเรื่องของด่านนี้ ถ้ายังไม่เคยอ่าน
+   *
+   * อ่านจบแล้วบันทึกธงทันที ไม่รอให้ผ่านด่านก่อน
+   * เพราะถ้ารอ เด็กที่อ่านแล้วออกไปทำอย่างอื่นจะต้องอ่านซ้ำตอนกลับมา
+   */
+  const beat = pendingBeat(player, stage.id, 'before')
+  const finishBeat = () => {
+    setBeatDone(true)
+    if (beat?.grantsFlag) patchPlayer(grantFlag(player, beat.grantsFlag))
+  }
+
+  if (beat && !beatDone) {
+    return (
+      <ScreenLayout width="narrow" className="flex min-h-screen flex-col justify-center">
+        <StoryBeatCard beat={beat} onFinish={finishBeat} />
+      </ScreenLayout>
+    )
+  }
   const isReplay = progress.completed
   const reward = isReplay ? stage.replayReward : stage.firstClearReward
 

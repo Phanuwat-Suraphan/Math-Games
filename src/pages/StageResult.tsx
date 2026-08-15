@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { StoryBeatCard } from '../components/StoryBeatCard'
+import { grantFlag, pendingBeat } from '../services/storyService'
 import { motion } from 'framer-motion'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
@@ -31,10 +33,11 @@ function isStageResult(value: unknown): value is StageResultData {
 export function StageResult({ player }: { player: Player }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { settings } = useGame()
+  const { settings, patchPlayer } = useGame()
 
   const result = isStageResult(location.state) ? location.state : null
   const [showConfetti, setShowConfetti] = useState(false)
+  const [beatDone, setBeatDone] = useState(false)
 
   useEffect(() => {
     if (!result) return
@@ -55,6 +58,30 @@ export function StageResult({ player }: { player: Player }) {
         actionTo="/map"
         emoji="🎁"
       />
+    )
+  }
+
+  /*
+   * ตอนปิดของด่านนี้ เล่าหลังผ่านด่านเท่านั้น
+   *
+   * ไม่เล่าถ้าเด็กยังไม่ผ่านเกณฑ์ เพราะเรื่องจะเดินไปข้างหน้าทั้งที่เด็กยังไม่ได้ทำสำเร็จ
+   * แล้วพอกลับมาเล่นซ้ำจนผ่านจริง จะไม่มีอะไรให้อ่านอีก
+   */
+  const beat = result.isPassed
+    ? pendingBeat(player, result.stageId, 'after')
+    : undefined
+
+  if (beat && !beatDone) {
+    return (
+      <ScreenLayout width="narrow" className="flex min-h-screen flex-col justify-center">
+        <StoryBeatCard
+          beat={beat}
+          onFinish={() => {
+            setBeatDone(true)
+            if (beat.grantsFlag) patchPlayer(grantFlag(player, beat.grantsFlag))
+          }}
+        />
+      </ScreenLayout>
     )
   }
 
