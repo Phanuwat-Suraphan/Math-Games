@@ -11,6 +11,7 @@
  */
 
 import path from 'path'
+import zlib from 'zlib'
 import { createRequire } from 'module'
 
 const OUT = process.argv[2]
@@ -205,15 +206,33 @@ check('หมุดบอสใหญ่กว่าหมุดปกติแ�
 
 // ══ ขนาดไฟล์ ══
 
+/**
+ * งบขนาดของภาพ
+ *
+ * เดิมวัดจากขนาดข้อความดิบ ซึ่งวัดผิดจุด
+ * เพราะเว็บเสิร์ฟผ่าน gzip เสมอ และ SVG ที่สร้างจากโค้ดมีคำซ้ำเยอะมาก
+ * (ชื่อ tag ชื่อ attribute เลขพิกัด) จึงบีบอัดได้ราวสิบเท่า
+ * เน็ตมือถือจ่ายค่าข้อมูลตามขนาดที่บีบแล้ว จึงต้องคุมตัวเลขนั้น
+ *
+ * ยังคุมขนาดดิบไว้ด้วยแต่ตั้งเพดานหลวม ๆ
+ * ไม่ใช่เพื่อค่าเน็ต แต่กันกรณีเผลอสร้างภาพวนซ้ำจนบวมผิดปกติ
+ */
 check('ภาพทั้งหมดรวมกันต้องเล็กพอสำหรับเน็ตมือถือ', () => {
-  let total = 0
-  for (const id of MA.MONSTER_ART_IDS) total += MA.monsterArt(id).length
-  for (const id of HA.HERO_ART_IDS) total += HA.heroArt(id).length
-  for (const world of WORLDS.WORLDS) total += SA.worldScene(world.id).length
+  let all = ''
+  for (const id of MA.MONSTER_ART_IDS) all += MA.monsterArt(id)
+  for (const id of HA.HERO_ART_IDS) all += HA.heroArt(id)
+  for (const world of WORLDS.WORLDS) all += SA.worldScene(world.id)
 
-  const kb = total / 1024
-  assert(kb < 100, `ภาพรวมกัน ${kb.toFixed(0)} KB ใหญ่เกินไป`)
-  console.log(`      ภาพทั้งหมด ${MA.MONSTER_ART_IDS.length + HA.HERO_ART_IDS.length + WORLDS.WORLDS.length} ภาพ รวม ${kb.toFixed(1)} KB`)
+  const rawKb = Buffer.byteLength(all) / 1024
+  const gzipKb = zlib.gzipSync(all).length / 1024
+  const count = MA.MONSTER_ART_IDS.length + HA.HERO_ART_IDS.length + WORLDS.WORLDS.length
+
+  assert(gzipKb < 45, `ภาพรวมกันหลังบีบอัด ${gzipKb.toFixed(0)} KB ใหญ่เกินไป`)
+  assert(rawKb < 400, `ภาพดิบรวมกัน ${rawKb.toFixed(0)} KB ผิดปกติ อาจมีการสร้างซ้ำ`)
+  console.log(
+    `      ภาพทั้งหมด ${count} ภาพ รวม ${rawKb.toFixed(1)} KB` +
+      ` (ส่งจริงหลัง gzip ${gzipKb.toFixed(1)} KB)`,
+  )
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

@@ -6,6 +6,12 @@
  * และอีโมจิย่อเล็กแล้วอ่านไม่ออก
  *
  * ระบบพิกัด: กรอบ 24 × 24 เหมือนไอคอนทั่วไป
+ *
+ * เรื่องอนิเมชัน: ไอคอนหนึ่งตัวโผล่บนหน้าจอพร้อมกันได้หลายสิบชิ้น
+ * (เหรียญทุกใบ ดาวทุกดวง) จึงใส่การขยับเฉพาะตัวที่ "ควรดูมีชีวิต"
+ * คือเหรียญ ดาว หัวใจ ไฟ และคริสตัล
+ * ส่วนกุญแจ เครื่องหมายถูก โล่ ดาบ เป็นป้ายบอกสถานะ ต้องอยู่นิ่ง
+ * ถ้าทุกอย่างขยับหมด สายตาจะไม่รู้ว่าควรมองตรงไหน
  */
 
 export const ICON_VIEWBOX = '0 0 24 24'
@@ -19,7 +25,15 @@ export function coinIcon(): string {
     <path d="M12 6.6 L13.4 9.6 L16.6 10 L14.2 12.2 L14.9 15.4 L12 13.8
              L9.1 15.4 L9.8 12.2 L7.4 10 L10.6 9.6 Z" fill="#b45309" opacity=".55"/>
     <ellipse cx="9.4" cy="7.6" rx="2" ry="1.2" fill="#fef3c7" opacity=".7"
-      transform="rotate(-30 9.4 7.6)"/>`
+      transform="rotate(-30 9.4 7.6)"/>
+    <!-- ประกายวิ่งผ่านหน้าเหรียญเป็นระยะ บอกว่าเป็นโลหะขัดเงา -->
+    <path d="M4 14 L8 2 L11 2 L7 14 Z" fill="#fffbeb" opacity="0">
+      <animate attributeName="opacity" values="0;0;.6;0;0"
+        keyTimes="0;0.62;0.72;0.84;1" dur="4.6s" repeatCount="indefinite"/>
+      <animateTransform attributeName="transform" type="translate"
+        values="-4 0; -4 0; 14 0; 14 0" keyTimes="0;0.62;0.84;1"
+        dur="4.6s" repeatCount="indefinite"/>
+    </path>`
 }
 
 /** ดาว ใช้ทั้งแบบได้แล้วและยังไม่ได้ */
@@ -31,27 +45,54 @@ export function starIcon(filled = true): string {
   return filled
     ? `<path d="${path}" fill="#fbbf24" stroke="#b45309" stroke-width="1" stroke-linejoin="round"/>
        <path d="M12 5.4 L13.9 9.6 L18.4 10.2 L15.2 13.3 L15.9 17.6 L12 15.5 Z"
-         fill="#fde68a" opacity=".65"/>`
+         fill="#fde68a" opacity=".65"/>
+       <!-- ประกายแวบตรงมุมบนขวา สั้นและห่าง จึงสะดุดตาโดยไม่กวน -->
+       <g fill="#fffbeb" opacity="0">
+         <animate attributeName="opacity" values="0;0;1;0;0"
+           keyTimes="0;0.7;0.78;0.88;1" dur="5.2s" repeatCount="indefinite"/>
+         <path d="M17.6 5.2 L18.3 7 L20.1 7.7 L18.3 8.4 L17.6 10.2
+                  L16.9 8.4 L15.1 7.7 L16.9 7 Z"/>
+       </g>`
     : `<path d="${path}" fill="none" stroke="#475569" stroke-width="1.6" stroke-linejoin="round"/>`
 }
 
 /** หัวใจ ใช้แสดงพลังชีวิต */
 export function heartIcon(): string {
-  return `
+  const body = `
     <path d="M12 21 C12 21 2.6 14.8 2.6 8.8 C2.6 5.6 5 3.4 7.8 3.4
              C9.8 3.4 11.2 4.5 12 5.8 C12.8 4.5 14.2 3.4 16.2 3.4
              C19 3.4 21.4 5.6 21.4 8.8 C21.4 14.8 12 21 12 21 Z" fill="#ef4444"/>
     <path d="M8 6.4 C6.4 6.4 5.2 7.6 5.2 9 C5.2 9.8 5.5 10.6 6 11.4
              C5 9.4 5.6 7 8 6.4 Z" fill="#fca5a5"/>`
+
+  // เต้นแบบหัวใจจริง: บีบเร็วสองจังหวะแล้วพักยาว ไม่ใช่ย่อขยายสม่ำเสมอ
+  return `<g transform-origin="12 12">
+    <animateTransform attributeName="transform" type="scale"
+      values="1;1.13;1;1.07;1;1" keyTimes="0;0.08;0.18;0.26;0.4;1"
+      dur="1.9s" repeatCount="indefinite"/>
+    ${body}
+  </g>`
 }
 
 /** คริสตัลพลัง ใช้แทน EXP */
 export function expIcon(): string {
-  return `
+  const body = `
     <path d="M12 1.8 L19 8 L12 22.2 L5 8 Z" fill="#7c3aed"/>
     <path d="M12 1.8 L19 8 L12 12 L5 8 Z" fill="#a78bfa"/>
     <path d="M12 1.8 L12 12 L5 8 Z" fill="#c4b5fd"/>
-    <path d="M12 12 L12 22.2 L19 8 Z" fill="#6d28d9"/>`
+    <path d="M12 12 L12 22.2 L19 8 Z" fill="#6d28d9"/>
+    <!-- แสงเดินขึ้นตามสันคริสตัล ทำให้ดูเป็นของมีพลังอยู่ข้างใน -->
+    <path d="M12 1.8 L12 22.2" stroke="#ede9fe" stroke-width="1" opacity="0">
+      <animate attributeName="opacity" values="0;.75;0" dur="2.8s" repeatCount="indefinite"/>
+    </path>`
+
+  return `<g>
+    <animateTransform attributeName="transform" type="translate"
+      values="0 0; 0 -1.2; 0 0" dur="3.2s" repeatCount="indefinite"
+      calcMode="spline" keyTimes="0;0.5;1"
+      keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
+    ${body}
+  </g>`
 }
 
 /** ไฟ ใช้แสดงคอมโบและการตอบถูกต่อเนื่อง */
@@ -60,10 +101,18 @@ export function flameIcon(): string {
     <path d="M12 22 C7.6 22 4.6 19 4.6 15.2 C4.6 10.4 9.4 8.6 9.4 4
              C9.4 3 9.2 2.4 9.2 2.4 C13 3.8 14.6 7.4 14.6 10
              C15.6 9.2 16 7.8 16 7.8 C18.4 10 19.4 12.6 19.4 15.2
-             C19.4 19 16.4 22 12 22 Z" fill="#f97316"/>
-    <path d="M12 22 C9.6 22 8 20.4 8 18.2 C8 15.6 11 14.4 11 11.6
-             C11 11.6 14.2 13.6 14.2 16.8 C14.2 16.8 15 16 15.2 15
-             C16 16.2 16 17.4 16 18.2 C16 20.4 14.4 22 12 22 Z" fill="#fbbf24"/>`
+             C19.4 19 16.4 22 12 22 Z" fill="#f97316">
+      <animate attributeName="opacity" values=".92;1;.88;1;.92"
+        dur="0.9s" repeatCount="indefinite"/>
+    </path>
+    <!-- ไส้ไฟด้านในวูบไหวเร็วกว่าเปลวนอก ไฟจริงก็ไหวไม่พร้อมกันทั้งดวง -->
+    <g transform-origin="12 20">
+      <animateTransform attributeName="transform" type="scale"
+        values="1 1;0.92 1.1;1.06 0.95;1 1" dur="0.72s" repeatCount="indefinite"/>
+      <path d="M12 22 C9.6 22 8 20.4 8 18.2 C8 15.6 11 14.4 11 11.6
+               C11 11.6 14.2 13.6 14.2 16.8 C14.2 16.8 15 16 15.2 15
+               C16 16.2 16 17.4 16 18.2 C16 20.4 14.4 22 12 22 Z" fill="#fbbf24"/>
+    </g>`
 }
 
 /** โล่ ใช้แสดงเกราะและการป้องกัน */
