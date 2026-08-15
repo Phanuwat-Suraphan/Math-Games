@@ -13,5 +13,6 @@ export function stageRoute(worldId: string, stage: Stage): string {
 
   if (activity === 'battle') return `/battle/${worldId}/${stage.id}`
   if (activity === 'puzzle') return `/puzzle/${worldId}/${stage.id}`
+  if (activity === 'minigame') return `/minigame/${worldId}/${stage.id}`
   return `/play/${worldId}/${stage.id}`
 }

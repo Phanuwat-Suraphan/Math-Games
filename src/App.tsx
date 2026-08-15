@@ -9,6 +9,7 @@ import { RequirePlayer } from './routes/RequirePlayer'
 import { Achievements } from './pages/Achievements'
 import { Battle } from './pages/Battle'
 import { PuzzleStage } from './pages/PuzzleStage'
+import { MinigameStage } from './pages/MinigameStage'
 import { Character } from './pages/Character'
 import { CreatePlayer } from './pages/CreatePlayer'
 import { Home } from './pages/Home'
@@ -68,6 +69,12 @@ function GameRoutes() {
           path="/puzzle/:worldId/:stageId"
           element={
             <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
+          }
+        />
+        <Route
+          path="/minigame/:worldId/:stageId"
+          element={
+            <RequirePlayer render={(player) => <MinigameStage player={player} />} />
           }
         />
         <Route

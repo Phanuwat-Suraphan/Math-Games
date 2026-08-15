@@ -10,7 +10,7 @@ export type StageDifficulty = 'easy' | 'medium' | 'hard' | 'boss'
  *   puzzle แก้ปริศนา คำตอบเป็นกุญแจไปทำอย่างอื่นต่อ
  *   battle ต่อสู้กับมอนสเตอร์ ใช้คณิตศาสตร์เป็นพลังโจมตี
  */
-export type StageActivity = 'quiz' | 'puzzle' | 'battle'
+export type StageActivity = 'quiz' | 'puzzle' | 'battle' | 'minigame'
 
 /**
  * สถานะของด่านที่ผู้เล่นเห็นบนแผนที่
@@ -71,6 +71,8 @@ export interface Stage {
   activity?: StageActivity
   /** ชนิดปริศนาของด่านแบบ puzzle */
   puzzleKind?: string
+  /** ชนิดมินิเกมของด่านแบบ minigame เช่น จับคู่ โยงเส้น ลากวาง รับของ */
+  minigameKind?: string
 
   /** บทพูดของ NPC ก่อนเริ่มด่าน */
   npcId?: string

@@ -458,6 +458,85 @@ check('ชื่อชนิดเกม: ต้องมีชื่อไท�
   }
 })
 
+
+// ---------- การต่อเข้ากับข้อมูลด่านจริง ----------
+
+const STAGES = load('data/stages')
+const ROUTE = load('utils/stageRoute')
+
+check('ด่านที่ประกาศเป็นมินิเกม ต้องระบุชนิดที่มีอยู่จริง', () => {
+  for (const stage of STAGES.STAGES) {
+    if (stage.activity !== 'minigame') continue
+    assert(
+      GEN.MINIGAME_KINDS.includes(stage.minigameKind),
+      `${stage.id} ระบุชนิด "${stage.minigameKind}" ซึ่งไม่มีอยู่จริง`,
+    )
+  }
+})
+
+check('ด่านมินิเกมต้องสร้างกระดานได้จริงจากทักษะที่ด่านกำหนด', () => {
+  for (const stage of STAGES.STAGES) {
+    if (stage.activity !== 'minigame') continue
+    const skill = stage.questionTypes[0]
+    assert(skill, `${stage.id} ไม่ได้ระบุทักษะเลย`)
+
+    const game = GEN.generateMinigame({
+      kind: stage.minigameKind,
+      seed: stage.id,
+      grade: stage.grade ?? 4,
+      skill,
+    })
+    assert(game.kind === stage.minigameKind, `${stage.id} ได้เกมคนละชนิดกับที่ขอ`)
+
+    // ด่านที่ชนะไม่ได้คือบั๊กที่เด็กไม่มีทางรู้ว่าไม่ใช่ความผิดตัวเอง
+    if (game.kind === 'catch') {
+      const right = game.items.filter((item) => item.correct).length
+      assert(
+        right >= game.targetCatches,
+        `${stage.id} โปรยของถูก ${right} ชิ้น แต่ต้องรับ ${game.targetCatches} ชิ้น`,
+      )
+    }
+    if (game.kind === 'matching') {
+      assert(game.cards.length === game.pairCount * 2, `${stage.id} ไพ่ไม่ครบคู่`)
+    }
+    if (game.kind === 'connect') {
+      assert(game.left.length === game.right.length, `${stage.id} สองฝั่งไม่เท่ากัน`)
+    }
+    if (game.kind === 'dragdrop') {
+      assert(game.tiles.length > game.slots.length, `${stage.id} ไม่มีตัวลวง`)
+    }
+  }
+})
+
+check('เส้นทางของด่านต้องพาไปหน้าที่ตรงกับชนิดกิจกรรม', () => {
+  for (const stage of STAGES.STAGES) {
+    const path = ROUTE.stageRoute(stage.worldId, stage)
+    const activity = stage.activity ?? (stage.isBoss ? 'battle' : 'quiz')
+    const expectedPrefix =
+      activity === 'battle'
+        ? '/battle/'
+        : activity === 'puzzle'
+          ? '/puzzle/'
+          : activity === 'minigame'
+            ? '/minigame/'
+            : '/play/'
+    assert(
+      path.startsWith(expectedPrefix),
+      `${stage.id} เป็น ${activity} แต่เส้นทางคือ ${path}`,
+    )
+    assert(path.endsWith(stage.id), `${stage.id} เส้นทางไม่ได้ชี้กลับมาที่ด่านนี้`)
+  }
+})
+
+check('ด่านในโลกหนึ่งต้องมีกิจกรรมหลากหลาย ไม่ใช่แบบเดียวรวด', () => {
+  const world1 = STAGES.STAGES.filter((stage) => stage.worldId === 'world-1')
+  const kinds = new Set(
+    world1.map((stage) => stage.activity ?? (stage.isBoss ? 'battle' : 'quiz')),
+  )
+  assert(kinds.size >= 3, `โลก 1 มีกิจกรรมแค่ ${kinds.size} แบบ`)
+  assert(kinds.has('minigame'), 'โลก 1 ยังไม่มีด่านมินิเกมเลย')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

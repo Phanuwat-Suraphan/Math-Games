@@ -51,6 +51,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-3',
+    activity: 'minigame',
+    minigameKind: 'catch',
     worldId: 'world-1',
     regionId: 'w1-village',
     name: 'หุบเขาการลบ',
@@ -71,6 +73,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-4',
+    activity: 'minigame',
+    minigameKind: 'matching',
     worldId: 'world-1',
     regionId: 'w1-deep',
     name: 'ป่าการคูณ',
@@ -113,8 +117,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-6',
-    activity: 'puzzle',
-    puzzleKind: 'numberLock',
+    activity: 'minigame',
+    minigameKind: 'connect',
     worldId: 'world-1',
     regionId: 'w1-deep',
     name: 'แม่น้ำโจทย์ผสม',
@@ -156,8 +160,8 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'world-1-stage-8',
-    activity: 'puzzle',
-    puzzleKind: 'balance',
+    activity: 'minigame',
+    minigameKind: 'dragdrop',
     worldId: 'world-1',
     regionId: 'w1-peak',
     name: 'ป้อมปราการตัวเลข',
