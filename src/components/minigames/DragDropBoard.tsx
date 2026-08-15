@@ -115,30 +115,38 @@ export function DragDropBoard({
 
       {/* กองแผ่นตัวเลข */}
       <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+        {/*
+          แผ่นตัวเลขใช้ปุ่มธรรมดา ไม่ใช่ motion.button โดยตั้งใจ
+          เพราะ framer-motion มี onDragStart เป็นของตัวเองสำหรับระบบลากของมันเอง
+          ซึ่งเป็นคนละชนิดกับ onDragStart ของ HTML ที่เราต้องใช้ dataTransfer
+          ถ้าเอาสองอย่างมาปนกันจะต้อง cast ชนิดไปมาโดยไม่จำเป็น
+          ย่อขยายตอนเลือกใช้ CSS transition แทน ได้ผลเหมือนกันและอ่านง่ายกว่า
+        */}
         {game.tiles.map((tile) => {
           const used = usedTiles.has(tile.id)
           const held = heldTile === tile.id
           return (
-            <motion.button
+            <button
               key={tile.id}
               type="button"
               draggable={!used && !done}
               onDragStart={(event) => {
-                const native = event as unknown as React.DragEvent
-                native.dataTransfer?.setData('text/plain', tile.id)
+                event.dataTransfer.setData('text/plain', tile.id)
                 setHeldTile(tile.id)
               }}
+              onDragEnd={() => setHeldTile(null)}
               onClick={() => !used && setHeldTile(held ? null : tile.id)}
               disabled={used || done}
-              animate={{ scale: held ? 1.12 : 1, opacity: used ? 0.25 : 1 }}
-              className={`min-w-[3.2rem] cursor-grab rounded-xl border px-4 py-3 text-xl font-black active:cursor-grabbing ${
+              className={`min-w-[3.2rem] cursor-grab rounded-xl border px-4 py-3 text-xl font-black transition-transform active:cursor-grabbing ${
+                used ? 'opacity-25' : 'opacity-100'
+              } ${
                 held
-                  ? 'border-gold-400 bg-gold-500/30 text-gold-100 ring-2 ring-gold-400/60'
+                  ? 'scale-110 border-gold-400 bg-gold-500/30 text-gold-100 ring-2 ring-gold-400/60'
                   : 'border-sky-400/40 bg-sky-500/15 text-sky-100'
               }`}
             >
               {tile.text}
-            </motion.button>
+            </button>
           )
         })}
       </div>

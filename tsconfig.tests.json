@@ -12,6 +12,11 @@
     "lib": ["ES2020", "DOM"],
     "rootDir": "src",
     "strict": true,
+    // ต้องตรงกับ tsconfig.json ของแอป ไม่งั้นจะคอมไพล์ผ่านในเครื่อง
+    // แล้วไปพังตอน CI ด้วย error ที่เห็นได้ตั้งแต่แรก
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,

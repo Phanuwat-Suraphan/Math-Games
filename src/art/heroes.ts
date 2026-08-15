@@ -25,7 +25,7 @@ import {
   sphereGradient,
   verticalGradient,
 } from './shading'
-import { bob, breathe, flicker, mote, motes, spin, sway } from './motion'
+import { breathe, flicker, mote, motes, sway } from './motion'
 
 export const HERO_VIEWBOX = '0 0 100 100'
 
@@ -100,7 +100,7 @@ function rawFace(): string {
  *
  * ลำดับชั้นที่ทำให้ดูมีระยะ: แขนหลัง (เข้ม) → ลำตัว (ไล่สี) → รอยพับ → คอเสื้อ
  */
-function body(p: string, main: string, dark: string): string {
+function body(p: string, dark: string): string {
   return `
     <!--
       แขนแกว่งรอบหัวไหล่ ซ้ายขวาคนละจังหวะ
@@ -172,7 +172,7 @@ function warrior(): string {
     ${verticalGradient(`${p}-steel`, '#cbd5e1', '#475569')}
     ${sphereGradient(`${p}-gold`, '#fef08a', '#facc15', '#a16207')}`,
     `
-    ${body(p, '#dc2626', '#991b1b')}
+    ${body(p, '#991b1b')}
     ${face()}
 
     <!-- หมวกเหล็ก ไล่สีแนวดิ่งทำให้โลหะดูโค้ง -->
@@ -223,7 +223,7 @@ function mage(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#7c3aed', '#4c1d95')}
+    ${body(p, '#4c1d95')}
     ${face()}
 
     <!-- หมวกกรวยสูงจึงโยกมากกว่าหัว จุดหมุนอยู่ที่ขอบหมวก -->
@@ -283,7 +283,7 @@ function explorer(): string {
     ${verticalGradient(`${p}-brim`, '#eab308', '#a16207')}
     ${sphereGradient(`${p}-brass`, '#fef3c7', '#fbbf24', '#b45309')}`,
     `
-    ${body(p, '#16a34a', '#14532d')}
+    ${body(p, '#14532d')}
     ${face()}
 
     <!-- ปีกหมวกทอดเงาลงบนหน้า เป็นสัญญาณระยะที่อ่านง่ายที่สุด -->
@@ -331,7 +331,7 @@ function inventor(): string {
     ${verticalGradient(`${p}-metal`, '#e2e8f0', '#64748b')}
     ${verticalGradient(`${p}-lens`, '#7dd3fc', '#0369a1')}`,
     `
-    ${body(p, '#ea580c', '#7c2d12')}
+    ${body(p, '#7c2d12')}
     ${face()}
 
     <path d="M28 26 Q28 12 50 12 Q72 12 72 26 L72 24 Q50 18 28 24 Z"
@@ -382,7 +382,7 @@ function scientist(): string {
     ${sphereGradient(`${p}-cap`, '#7dd3fc', '#0ea5e9', '#075985')}
     ${verticalGradient(`${p}-glass`, '#cffafe', '#67e8f9')}`,
     `
-    ${body(p, '#f8fafc', '#94a3b8')}
+    ${body(p, '#94a3b8')}
     <path d="M50 62 L50 96" stroke="#94a3b8" stroke-width="1.6" opacity=".7"/>
     ${face()}
 
@@ -435,7 +435,7 @@ function adventurer(): string {
     <rect x="16" y="72" width="14" height="7" rx="2" fill="#5b3a08"/>
     <rect x="16" y="68" width="3" height="20" rx="1.5" fill="#fff" opacity=".18"/>
 
-    ${body(p, '#e11d48', '#881337')}
+    ${body(p, '#881337')}
     ${face()}
 
     <!-- ผ้าพันคอสะบัดตามลม เป็นชิ้นที่ขยับมากที่สุดในภาพ -->
@@ -488,7 +488,7 @@ export function heroArt(avatarId: string): string {
     '#334155',
     '',
     `
-    ${body('hd', '#64748b', '#334155')}
+    ${body('hd', '#334155')}
     ${face()}`,
   )
 }

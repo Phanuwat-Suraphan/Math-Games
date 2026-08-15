@@ -24,11 +24,6 @@ export interface MathPair {
   key: string
 }
 
-/** ตัวหารร่วมมาก ใช้ทอนเศษส่วน */
-function gcd(a: number, b: number): number {
-  return b === 0 ? Math.abs(a) : gcd(b, a % b)
-}
-
 function multiplicationPair(rng: Rng, grade: Grade): MathPair {
   const max = grade === 4 ? 9 : grade === 5 ? 12 : 15
   const a = rng.int(2, max)
