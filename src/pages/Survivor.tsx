@@ -20,6 +20,7 @@ import {
   summarize,
   takeSkill,
 } from '../survivor/engine'
+import { getWeapon } from '../survivor/weapons'
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../survivor/types'
 import type { Input, WorldState } from '../survivor/types'
 import type { Question } from '../questionEngine/types'
@@ -68,6 +69,9 @@ export function Survivor({ player }: { player: Player }) {
   const [question, setQuestion] = useState<Question | null>(null)
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(null)
   const [immersive, setImmersive] = useState(false)
+  const [weaponBar, setWeaponBar] = useState<
+    { id: string; level: number; name: string; color: string }[]
+  >([])
 
   /*
    * โหมดเต็มจอ
@@ -149,6 +153,30 @@ export function Survivor({ player }: { player: Player }) {
         xpToNext: after.player.xpToNext,
         time: Math.floor(after.time),
         kills: after.kills,
+      })
+
+      /*
+       * แถบอาวุธเปลี่ยนเฉพาะตอนเลเวลอัป ไม่ใช่ทุกเฟรม
+       * จึงเทียบจำนวนก่อนสั่งอัปเดต ไม่งั้นจะสร้างอาเรย์ใหม่ 60 ครั้งต่อวินาที
+       * แล้ว React เรนเดอร์แถบสถานะใหม่ทั้งแถบโดยไม่จำเป็น
+       */
+      const owned = Object.entries(after.weapons)
+      setWeaponBar((current) => {
+        if (
+          current.length === owned.length &&
+          current.every((entry) => after.weapons[entry.id] === entry.level)
+        ) {
+          return current
+        }
+        return owned.map(([id, level]) => {
+          const weapon = getWeapon(id)
+          return {
+            id,
+            level,
+            name: weapon?.name ?? id,
+            color: weapon?.color ?? '#e2e8f0',
+          }
+        })
       })
 
       if (after.phase === 'question') {
@@ -236,6 +264,7 @@ export function Survivor({ player }: { player: Player }) {
     inputRef.current = { move: { x: 0, y: 0 } }
     setSummary(null)
     setQuestion(null)
+    setWeaponBar([])
     setPhase('playing')
   }, [])
 
@@ -303,7 +332,12 @@ export function Survivor({ player }: { player: Player }) {
                 : 'mx-auto w-full max-w-5xl px-4 pb-8'
             }
           >
-            <Hud hud={hud} immersive={immersive} onToggleFullscreen={toggleImmersive} />
+            <Hud
+              hud={hud}
+              weapons={weaponBar}
+              immersive={immersive}
+              onToggleFullscreen={toggleImmersive}
+            />
 
             {/*
               กรอบสนาม
@@ -411,8 +445,12 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     'fraction-bat': '#a78bfa',
     'goblin-calculator': '#84cc16',
     'decimal-scorpion': '#f59e0b',
-    'geometry-golem': '#94a3b8',
+    'big-slime': '#10b981',
     'percentage-bandit': '#f87171',
+    'geometry-golem': '#94a3b8',
+    'math-guardian': '#60a5fa',
+    'fraction-ghost': '#c4b5fd',
+    'dragon-of-numbers': '#dc2626',
   }
 
   for (const enemy of world.enemies) {
@@ -420,6 +458,30 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     ctx.beginPath()
     ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius, 0, Math.PI * 2)
     ctx.fill()
+
+    // ตัวใหญ่พิเศษมีวงแหวนทองรอบตัว ให้เห็นแต่ไกลว่าตัวนี้ไม่ธรรมดา
+    if (enemy.elite) {
+      ctx.strokeStyle = '#fbbf24'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 5, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+
+    // ติดไฟกับโดนแช่แข็งต้องเห็นได้ทันที ไม่งั้นเด็กไม่รู้ว่าอาวุธทำงานอยู่
+    if (enemy.burnFor > 0) {
+      ctx.strokeStyle = 'rgba(249,115,22,.9)'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 3, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    if (enemy.slowFor > 0) {
+      ctx.fillStyle = 'rgba(103,232,249,.35)'
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 2, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     // ตาสองดวง ทำให้รู้สึกว่าเป็นสิ่งมีชีวิตที่กำลังมองเรา
     ctx.fillStyle = '#0f172a'
@@ -438,31 +500,55 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
       ctx.fillRect(
         enemy.pos.x - enemy.radius,
         enemy.pos.y - enemy.radius - 8,
-        width * (enemy.hp / enemy.maxHp),
+        width * Math.max(0, enemy.hp / enemy.maxHp),
         3,
       )
     }
   }
 
-  // กระสุน
-  ctx.fillStyle = '#fcd34d'
-  for (const shot of world.projectiles) {
+  // กระสุนของมอน สีแดงเข้มให้ต่างจากกระสุนของเราชัดเจน
+  ctx.fillStyle = '#ef4444'
+  for (const shot of world.enemyShots) {
     ctx.beginPath()
     ctx.arc(shot.pos.x, shot.pos.y, shot.radius, 0, Math.PI * 2)
     ctx.fill()
   }
 
-  // ดาบหมุนรอบตัว
-  const blades = world.skills.orbit ?? 0
-  if (blades > 0) {
-    ctx.fillStyle = '#e2e8f0'
-    for (let i = 0; i < blades; i += 1) {
-      const angle = world.orbitAngle + (i * Math.PI * 2) / blades
-      const x = world.player.pos.x + Math.cos(angle) * 62
-      const y = world.player.pos.y + Math.sin(angle) * 62
+  // กระสุนของเรา สีตามอาวุธที่ยิง
+  const SHOT_COLORS: Record<string, string> = { fire: '#f97316', ice: '#67e8f9' }
+  for (const shot of world.projectiles) {
+    ctx.fillStyle = SHOT_COLORS[shot.weapon] ?? '#fcd34d'
+    ctx.beginPath()
+    ctx.arc(shot.pos.x, shot.pos.y, shot.radius, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  /*
+   * เอฟเฟกต์อาวุธ
+   * จางลงตามอายุที่เหลือ จึงดูเหมือนแสงที่ค่อย ๆ หายไป
+   * ไม่ใช่รูปที่โผล่มาแล้วหายวับซึ่งตาจับไม่ทัน
+   */
+  for (const effect of world.effects) {
+    const fade = Math.max(0, effect.life / effect.maxLife)
+
+    if (effect.kind === 'slash') {
+      ctx.strokeStyle = `rgba(226,232,240,${fade})`
+      ctx.lineWidth = 5 * fade + 1
       ctx.beginPath()
-      ctx.arc(x, y, 8, 0, Math.PI * 2)
+      ctx.arc(effect.pos.x, effect.pos.y, effect.radius * (1.15 - fade * 0.15), 0, Math.PI * 2)
+      ctx.stroke()
+    } else if (effect.kind === 'blast') {
+      ctx.fillStyle = `rgba(249,115,22,${fade * 0.45})`
+      ctx.beginPath()
+      ctx.arc(effect.pos.x, effect.pos.y, effect.radius * (1.4 - fade * 0.4), 0, Math.PI * 2)
       ctx.fill()
+    } else if (effect.kind === 'bolt' && effect.to) {
+      ctx.strokeStyle = `rgba(56,189,248,${fade})`
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(effect.pos.x, effect.pos.y)
+      ctx.lineTo(effect.to.x, effect.to.y)
+      ctx.stroke()
     }
   }
 
@@ -492,8 +578,9 @@ function Intro({ onStart }: { onStart: () => void }) {
       <ul className="mx-auto mt-4 max-w-md space-y-1.5 text-left text-sm text-slate-300">
         <li>· ล้มมอนแล้วจะได้คริสตัลสีม่วง เดินไปเก็บเพื่อสะสม XP</li>
         <li>· XP เต็มแล้วจะเลเวลอัป เกมจะหยุดแล้วมีโจทย์ขึ้นมา</li>
-        <li>· ตอบถูกได้เลือกสกิล 3 ใบ ตอบผิดได้เลือก 2 ใบ</li>
-        <li>· สกิลสะสมกันไปเรื่อย ๆ ยิ่งอยู่นานยิ่งแรง</li>
+        <li>· ตอบถูกได้เลือก 3 ใบ ตอบผิดได้เลือก 2 ใบ</li>
+        <li>· มีอาวุธ 4 แบบ: ดาบ · เวทไฟ · เวทไฟฟ้า · เวทน้ำแข็ง</li>
+        <li>· แต่ละแบบอัปได้ 5 ระดับ และถือพร้อมกันได้ 4 ชิ้น</li>
         <li>· บังคับด้วยการลากนิ้วบนแป้น หรือปุ่มลูกศร / WASD</li>
       </ul>
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
@@ -505,10 +592,12 @@ function Intro({ onStart }: { onStart: () => void }) {
 
 function Hud({
   hud,
+  weapons,
   immersive,
   onToggleFullscreen,
 }: {
   hud: { hp: number; maxHp: number; level: number; xp: number; xpToNext: number; time: number; kills: number }
+  weapons: { id: string; level: number; name: string; color: string }[]
   immersive: boolean
   onToggleFullscreen: () => void
 }) {
@@ -548,6 +637,21 @@ function Hud({
           {immersive ? 'ย่อจอ' : 'เต็มจอ'}
         </button>
       </div>
+
+      {/* อาวุธที่ถืออยู่ พร้อมระดับของแต่ละชิ้น */}
+      {weapons.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {weapons.map(({ id, level, name, color }) => (
+            <span
+              key={id}
+              className="rounded border px-1.5 py-0.5 text-[11px] font-bold"
+              style={{ borderColor: `${color}66`, color }}
+            >
+              {name} {level}
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* แถบเลือดกับแถบ XP */}
       <div className="mt-2 space-y-1">
@@ -617,11 +721,11 @@ function SkillCards({
 }) {
   const offer = offerSkills(world, offerCount(world.lastAnswerCorrect))
 
-  // สกิลเต็มทุกใบแล้ว ต้องมีทางไปต่อ ไม่ใช่ค้างอยู่ตรงนี้ตลอดไป
+  // เก็บครบทุกอย่างแล้ว ต้องมีทางไปต่อ ไม่ใช่ค้างอยู่ตรงนี้ตลอดไป
   if (offer.length === 0) {
     return (
       <div className="rounded-xl2 border border-white/15 bg-night-800 p-5 text-center">
-        <p className="text-white">เก่งมาก! หนูเก็บสกิลครบทุกอย่างแล้ว</p>
+        <p className="text-white">เก่งมาก! หนูเก็บอาวุธและสกิลครบทุกอย่างแล้ว</p>
         <Button fullWidth className="mt-4" onClick={() => onChoose('')}>
           ลุยต่อ
         </Button>
@@ -632,31 +736,31 @@ function SkillCards({
   return (
     <div>
       <p className="text-center text-sm font-bold text-white">
-        {world.lastAnswerCorrect ? 'ตอบถูก! เลือกสกิล 1 อย่าง' : 'ตอบผิด แต่ยังได้เลือกนะ'}
+        {world.lastAnswerCorrect ? 'ตอบถูก! เลือก 1 อย่าง' : 'ตอบผิด แต่ยังได้เลือกนะ'}
       </p>
       <div className="mt-3 grid gap-2.5">
-        {offer.map((skill) => {
-          const owned = world.skills[skill.id] ?? 0
-          return (
-            <button
-              key={skill.id}
-              type="button"
-              onClick={() => onChoose(skill.id)}
-              className="flex items-center gap-3 rounded-xl border border-violet-400/40 bg-night-800 p-3 text-left"
-            >
-              <GameIcon name={skill.icon} size="h-8 w-8" />
-              <div className="min-w-0 flex-1">
-                <p className="font-bold text-gold-200">
-                  {skill.name}
-                  {owned > 0 && (
-                    <span className="ml-2 text-xs text-slate-400">ชั้น {owned + 1}</span>
-                  )}
-                </p>
-                <p className="text-sm text-slate-300">{skill.description}</p>
-              </div>
-            </button>
-          )
-        })}
+        {offer.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            onClick={() => onChoose(entry.id)}
+            className="flex items-center gap-3 rounded-xl border p-3 text-left"
+            style={{ borderColor: `${entry.color}66`, background: 'rgba(15,10,30,.9)' }}
+          >
+            <GameIcon name={entry.icon} size="h-8 w-8" />
+            <div className="min-w-0 flex-1">
+              <p className="font-bold" style={{ color: entry.color }}>
+                {entry.name}
+                {entry.isNew && (
+                  <span className="ml-2 rounded bg-gold-500/25 px-1.5 py-0.5 text-[11px] text-gold-200">
+                    อาวุธใหม่
+                  </span>
+                )}
+              </p>
+              <p className="text-sm text-slate-300">{entry.description}</p>
+            </div>
+          </button>
+        ))}
       </div>
     </div>
   )

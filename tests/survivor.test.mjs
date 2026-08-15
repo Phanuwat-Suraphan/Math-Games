@@ -29,6 +29,7 @@ const load = (name) => require(path.resolve(OUT, name + '.js'))
 const E = load('survivor/engine')
 const S = load('survivor/skills')
 const T = load('survivor/types')
+const W = load('survivor/weapons')
 
 let passed = 0
 const failures = []
@@ -303,15 +304,326 @@ check('กระสุนต้องหายไปเอง ไม่สะส
 check('สกิลกระสุนแตกต้องทำให้ยิงหลายนัดจริง', () => {
   let world = E.createWorld('แตก')
   for (let i = 0; i < 90; i += 1) world = E.step(world, STILL)
-  if (world.phase !== 'playing') return
+  if (world.phase !== 'playing' || world.enemies.length === 0) return
 
-  const single = world.projectiles.length
-  const boosted = { ...world, skills: { multishot: 3 }, attackCooldown: 0 }
-  const after = E.step(boosted, STILL)
-  assert(
-    after.projectiles.length > single,
-    `มีสกิลแล้วยิงได้ ${after.projectiles.length} เท่าเดิม`,
+  // ดาบไม่ยิงกระสุน จึงต้องทดสอบกับเวทน้ำแข็งซึ่งยิงกระสุนจริง
+  const plain = E.step(
+    { ...world, weapons: { ice: 1 }, weaponCooldowns: {}, projectiles: [] },
+    STILL,
   )
+  const boosted = E.step(
+    { ...world, weapons: { ice: 1 }, weaponCooldowns: {}, projectiles: [], skills: { multishot: 3 } },
+    STILL,
+  )
+
+  assert(plain.projectiles.length > 0, 'เวทน้ำแข็งไม่ยิงเลย')
+  assert(
+    boosted.projectiles.length > plain.projectiles.length,
+    `ปกติยิง ${plain.projectiles.length} นัด มีสกิลยิง ${boosted.projectiles.length} นัด`,
+  )
+})
+
+// ---------- อาวุธสี่แบบ ----------
+
+/** วางมอนไว้ตรงตำแหน่งที่กำหนด เพื่อทดสอบอาวุธแบบควบคุมได้ */
+function withEnemiesAt(seed, positions, hp = 9999) {
+  const base = E.createWorld(seed)
+  return {
+    ...base,
+    // ปิดการเกิดมอนใหม่ระหว่างทดสอบ จะได้เหลือแต่ตัวที่วางเอง
+    spawnCooldown: 999,
+    eliteCooldown: 999,
+    enemies: positions.map((pos, index) => ({
+      id: 100 + index,
+      pos: { ...pos },
+      hp,
+      maxHp: hp,
+      speed: 0,
+      radius: 14,
+      damage: 0,
+      kind: 'number-slime',
+      xpValue: 1,
+      hitFlash: 0,
+      behavior: 'chase',
+      clock: 0,
+      slowFor: 0,
+      burnFor: 0,
+      burnDps: 0,
+      elite: false,
+      splitInto: 0,
+      shootCooldown: 99,
+    })),
+  }
+}
+
+check('อาวุธทุกชิ้นต้องมีครบห้าระดับ และแรงขึ้นทุกระดับ', () => {
+  for (const weapon of W.WEAPONS) {
+    assert(
+      weapon.levels.length === W.MAX_WEAPON_LEVEL,
+      `${weapon.name} มี ${weapon.levels.length} ระดับ`,
+    )
+    for (let i = 1; i < weapon.levels.length; i += 1) {
+      const now = weapon.levels[i]
+      const prev = weapon.levels[i - 1]
+      assert(now.damage > prev.damage, `${weapon.name} ระดับ ${i + 1} ไม่แรงขึ้น`)
+      assert(now.interval <= prev.interval, `${weapon.name} ระดับ ${i + 1} โจมตีช้าลง`)
+      assert(now.range >= prev.range, `${weapon.name} ระดับ ${i + 1} ระยะสั้นลง`)
+    }
+    assert(weapon.playstyle.length > 10, `${weapon.name} ไม่ได้อธิบายว่าเล่นยังไง`)
+  }
+})
+
+check('ขอค่าของระดับที่เกินเพดานต้องได้ระดับสูงสุด ไม่ใช่ค่าว่าง', () => {
+  const top = W.weaponStats('sword', W.MAX_WEAPON_LEVEL)
+  assert(W.weaponStats('sword', 99).damage === top.damage, 'ระดับเกินเพดานไม่ได้ถูกหนีบ')
+  assert(W.weaponStats('sword', 0).damage === W.weaponStats('sword', 1).damage, 'ระดับศูนย์ผิด')
+  assert(!W.weaponStats('อาวุธปลอม', 1), 'อาวุธปลอมกลับมีค่า')
+})
+
+check('เริ่มเกมต้องได้ดาบมาหนึ่งชิ้น ไม่ใช่มือเปล่า', () => {
+  const world = E.createWorld('เริ่มอาวุธ')
+  assert(world.weapons[W.STARTING_WEAPON] === 1, 'ไม่ได้อาวุธเริ่มต้น')
+  assert(Object.keys(world.weapons).length === 1, 'เริ่มมาได้อาวุธหลายชิ้น')
+})
+
+check('ดาบต้องฟันโดนทุกตัวที่อยู่ในวง และไม่โดนตัวที่อยู่ไกล', () => {
+  const near = W.weaponStats('sword', 1).range - 20
+  const world = withEnemiesAt('ดาบ', [
+    { x: T.ARENA_WIDTH / 2 + near, y: T.ARENA_HEIGHT / 2 },
+    { x: T.ARENA_WIDTH / 2 - near, y: T.ARENA_HEIGHT / 2 },
+    { x: T.ARENA_WIDTH / 2 + 300, y: T.ARENA_HEIGHT / 2 },
+  ])
+
+  const after = E.step({ ...world, weapons: { sword: 1 }, weaponCooldowns: {} }, STILL)
+
+  assert(after.enemies[0].hp < 9999, 'ตัวใกล้ทางขวาไม่โดนฟัน')
+  assert(after.enemies[1].hp < 9999, 'ตัวใกล้ทางซ้ายไม่โดนฟัน')
+  assert(after.enemies[2].hp === 9999, 'ตัวที่อยู่ไกลกลับโดนฟันด้วย')
+  assert(after.projectiles.length === 0, 'ดาบไม่ควรยิงกระสุนออกไป')
+  assert(after.effects.some((e) => e.kind === 'slash'), 'ไม่มีเอฟเฟกต์รอยฟัน')
+})
+
+check('เวทไฟฟ้าต้องฟาดทันทีโดยไม่ต้องรอกระสุนบิน และกระโดดต่อหลายตัว', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  const world = withEnemiesAt('ฟ้า', [
+    { x: cx + 90, y: cy },
+    { x: cx + 150, y: cy },
+    { x: cx + 210, y: cy },
+  ])
+
+  const after = E.step({ ...world, weapons: { lightning: 2 }, weaponCooldowns: {} }, STILL)
+
+  const hitCount = after.enemies.filter((enemy) => enemy.hp < 9999).length
+  assert(hitCount >= 2, `สายฟ้าโดนแค่ ${hitCount} ตัว ควรกระโดดต่อ`)
+  assert(after.projectiles.length === 0, 'สายฟ้าไม่ควรมีกระสุนบิน')
+  assert(after.effects.some((e) => e.kind === 'bolt'), 'ไม่มีเอฟเฟกต์สายฟ้า')
+})
+
+check('เวทไฟต้องระเบิดเป็นวงและทำให้มอนติดไฟต่อเนื่อง', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  let world = withEnemiesAt('ไฟ', [
+    { x: cx + 60, y: cy },
+    { x: cx + 78, y: cy },
+  ])
+  world = { ...world, weapons: { fire: 1 }, weaponCooldowns: {} }
+
+  // เดินหลายเฟรมให้ลูกไฟบินไปโดน
+  for (let i = 0; i < 30; i += 1) world = E.step(world, STILL)
+
+  const burning = world.enemies.filter((enemy) => enemy.burnFor > 0)
+  assert(burning.length > 0, 'โดนลูกไฟแล้วไม่ติดไฟเลย')
+
+  // ตัวที่อยู่ข้าง ๆ ต้องโดนแรงระเบิดด้วย แม้ลูกไฟจะไม่ได้พุ่งชนตรง ๆ
+  const hurtCount = world.enemies.filter((enemy) => enemy.hp < 9999).length
+  assert(hurtCount === 2, `ระเบิดโดน ${hurtCount} ตัว ควรโดนทั้งสองตัว`)
+
+  // ไฟต้องกัดเลือดต่อแม้ไม่ได้ยิงเพิ่ม
+  const before = world.enemies[0].hp
+  const frozenSpawn = { ...world, weapons: {}, weaponCooldowns: {} }
+  let later = frozenSpawn
+  for (let i = 0; i < 30; i += 1) later = E.step(later, STILL)
+  assert(later.enemies[0].hp < before, 'ติดไฟแล้วเลือดไม่ลดต่อ')
+})
+
+check('เวทน้ำแข็งต้องทำให้มอนเดินช้าลงจริง', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  let world = withEnemiesAt('แข็ง', [{ x: cx + 70, y: cy }])
+  world = {
+    ...world,
+    weapons: { ice: 1 },
+    weaponCooldowns: {},
+    enemies: [{ ...world.enemies[0], speed: 100 }],
+  }
+
+  for (let i = 0; i < 20; i += 1) world = E.step(world, STILL)
+  assert(world.enemies[0].slowFor > 0, 'โดนน้ำแข็งแล้วไม่ติดสถานะเดินช้า')
+
+  // เทียบระยะที่เดินได้ระหว่างตัวที่โดนน้ำแข็งกับตัวที่ไม่โดน
+  const chilled = { ...world.enemies[0], pos: { x: cx + 200, y: cy } }
+  const normal = { ...chilled, id: 777, slowFor: 0 }
+  let arena = { ...world, weapons: {}, weaponCooldowns: {}, enemies: [chilled, normal] }
+  for (let i = 0; i < 30; i += 1) arena = E.step(arena, STILL)
+
+  const chilledMoved = cx + 200 - arena.enemies[0].pos.x
+  const normalMoved = cx + 200 - arena.enemies[1].pos.x
+  assert(chilledMoved < normalMoved, `ตัวที่โดนน้ำแข็งเดินได้ ${chilledMoved.toFixed(1)} ตัวปกติ ${normalMoved.toFixed(1)}`)
+})
+
+check('อาวุธถือพร้อมกันได้ไม่เกินจำนวนช่อง', () => {
+  let world = E.createWorld('ช่อง')
+  for (const weapon of W.WEAPONS) {
+    world = { ...E.takeSkill(world, weapon.id), phase: 'choosing' }
+  }
+  assert(
+    Object.keys(world.weapons).length <= W.MAX_WEAPON_SLOTS,
+    `ถืออาวุธ ${Object.keys(world.weapons).length} ชิ้น เกินช่อง`,
+  )
+})
+
+check('อัปเกรดอาวุธเกินระดับสูงสุดไม่ได้', () => {
+  let world = { ...E.createWorld('อัปเกิน'), phase: 'choosing' }
+  for (let i = 0; i < 20; i += 1) {
+    world = { ...E.takeSkill(world, 'sword'), phase: 'choosing' }
+  }
+  assert(world.weapons.sword === W.MAX_WEAPON_LEVEL, `ดาบไประดับ ${world.weapons.sword}`)
+})
+
+check('ตัวเลือกตอนเลเวลอัปต้องมีทั้งอาวุธและสกิล ไม่ใช่มีแต่สกิล', () => {
+  let sawWeapon = false
+  let sawSkill = false
+
+  for (let level = 1; level <= 25; level += 1) {
+    const world = { ...E.createWorld(`ผสม${level}`), player: { ...E.createWorld('x').player, level } }
+    for (const offer of E.offerSkills(world, 3)) {
+      if (offer.kind === 'weapon') sawWeapon = true
+      if (offer.kind === 'skill') sawSkill = true
+      assert(offer.name.length > 0, 'ตัวเลือกไม่มีชื่อ')
+      assert(offer.description.length > 0, 'ตัวเลือกไม่มีคำอธิบาย')
+    }
+  }
+  assert(sawWeapon, 'ไม่เคยเสนออาวุธเลย')
+  assert(sawSkill, 'ไม่เคยเสนอสกิลติดตัวเลย')
+})
+
+// ---------- พฤติกรรมมอน ----------
+
+check('มอนต้องมีพฤติกรรมหลากหลาย ไม่ใช่เดินตรงเข้าหาเหมือนกันหมด', () => {
+  const seen = new Set()
+  for (let t = 0; t <= 300; t += 10) {
+    const world = { ...E.createWorld(`พฤติ${t}`), time: t }
+    for (let i = 0; i < 8; i += 1) {
+      const enemy = E.spawnOne(world, `${t}-${i}`)
+      seen.add(enemy.behavior)
+    }
+  }
+  assert(seen.size >= 4, `เจอพฤติกรรมแค่ ${seen.size} แบบ: ${[...seen].join(', ')}`)
+})
+
+check('มอนตัวใหญ่พิเศษต้องโผล่มาเมื่อเล่นไปสักพัก และถึกกว่ามาก', () => {
+  const { world } = simulate(100, { input: { move: { x: 0.6, y: 0.4 } } })
+  const everSeen = world.enemies.some((enemy) => enemy.elite)
+  const normalHp = Math.max(
+    1,
+    ...world.enemies.filter((enemy) => !enemy.elite).map((enemy) => enemy.maxHp),
+  )
+
+  if (everSeen) {
+    const eliteHp = Math.max(...world.enemies.filter((enemy) => enemy.elite).map((e) => e.maxHp))
+    assert(eliteHp > normalHp * 2, `ตัวใหญ่พิเศษเลือด ${eliteHp} ตัวปกติ ${normalHp}`)
+  }
+})
+
+check('สไลม์ใหญ่ตายแล้วต้องแตกเป็นตัวเล็ก', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const world = withEnemiesAt('แตกตัว', [{ x: cx + 200, y: T.ARENA_HEIGHT / 2 }], 1)
+  const splitting = {
+    ...world,
+    weapons: {},
+    weaponCooldowns: {},
+    // เลือดเป็นศูนย์แล้ว เฟรมถัดไปต้องตายและแตกตัว
+    enemies: [{ ...world.enemies[0], hp: 0, splitInto: 3, speed: 0 }],
+  }
+
+  const after = E.step(splitting, STILL)
+  assert(after.enemies.length === 3, `แตกได้ ${after.enemies.length} ตัว ควรเป็น 3`)
+  assert(after.kills === 1, 'ไม่ได้นับว่าล้มตัวแม่')
+  for (const child of after.enemies) {
+    assert(child.splitInto === 0, 'ตัวลูกยังแตกต่อได้อีก จะแตกไม่รู้จบ')
+  }
+})
+
+check('มอนที่ยิงไกลต้องยิงกระสุนใส่ผู้เล่นจริง', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  let world = withEnemiesAt('ยิงไกล', [{ x: cx + 240, y: cy }])
+  world = {
+    ...world,
+    weapons: {},
+    weaponCooldowns: {},
+    enemies: [{ ...world.enemies[0], behavior: 'ranged', speed: 20, damage: 10, shootCooldown: 0.1 }],
+  }
+
+  let sawShot = false
+  for (let i = 0; i < 60; i += 1) {
+    world = E.step(world, STILL)
+    if (world.enemyShots.length > 0) sawShot = true
+  }
+  assert(sawShot, 'มอนยิงไกลไม่เคยยิงเลย')
+})
+
+check('กระสุนของมอนต้องทำให้ผู้เล่นเสียเลือดได้', () => {
+  const base = E.createWorld('โดนยิง')
+  const world = {
+    ...base,
+    spawnCooldown: 999,
+    eliteCooldown: 999,
+    weapons: {},
+    enemyShots: [
+      {
+        id: 1,
+        pos: { ...base.player.pos },
+        vel: { x: 0, y: 0 },
+        damage: 12,
+        radius: 6,
+        life: 2,
+      },
+    ],
+  }
+
+  const after = E.step(world, STILL)
+  assert(after.player.hp < base.player.hp, 'กระสุนมอนทับตัวแล้วไม่เสียเลือด')
+  assert(after.enemyShots.length === 0, 'กระสุนที่โดนแล้วยังอยู่')
+})
+
+check('มอนที่พุ่งเป็นช่วงต้องมีจังหวะหยุดให้ตั้งหลัก', () => {
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  let world = withEnemiesAt('พุ่ง', [{ x: cx + 300, y: cy }])
+  world = {
+    ...world,
+    weapons: {},
+    weaponCooldowns: {},
+    enemies: [{ ...world.enemies[0], behavior: 'dash', speed: 150, clock: 0 }],
+  }
+
+  let stillFrames = 0
+  let movingFrames = 0
+  let previous = world.enemies[0].pos.x
+
+  for (let i = 0; i < 150; i += 1) {
+    world = E.step(world, STILL)
+    if (world.enemies.length === 0) break
+    const now = world.enemies[0].pos.x
+    if (Math.abs(now - previous) < 0.01) stillFrames += 1
+    else movingFrames += 1
+    previous = now
+  }
+
+  assert(stillFrames > 10, `หยุดแค่ ${stillFrames} เฟรม ไม่มีจังหวะให้ตั้งหลัก`)
+  assert(movingFrames > 10, `พุ่งแค่ ${movingFrames} เฟรม แทบไม่ขยับเลย`)
 })
 
 // ---------- คริสตัลและเลเวล ----------
@@ -382,16 +694,26 @@ check('ตอบถูกได้เลือกสามใบ ตอบผิ
   assert(E.offerCount(false) > 0, 'ตอบผิดแล้วไม่ได้อะไรเลย ซึ่งลงโทษหนักเกินไป')
 })
 
-check('สกิลที่เต็มชั้นแล้วต้องไม่ถูกเสนออีก', () => {
-  const maxed = {}
-  for (const skill of S.SKILLS) maxed[skill.id] = skill.maxStacks
+/** สถานะที่เก็บครบทุกอย่างแล้ว ทั้งสกิลและอาวุธ */
+function everythingMaxed(seed) {
+  const skills = {}
+  for (const skill of S.SKILLS) skills[skill.id] = skill.maxStacks
+  const weapons = {}
+  for (const weapon of W.WEAPONS) weapons[weapon.id] = W.MAX_WEAPON_LEVEL
+  return { ...E.createWorld(seed), skills, weapons }
+}
 
-  const world = { ...E.createWorld('เต็ม'), skills: maxed }
-  assert(E.offerSkills(world, 3).length === 0, 'เต็มทุกสกิลแล้วยังเสนออีก')
+check('ของที่เต็มแล้วต้องไม่ถูกเสนออีก', () => {
+  assert(E.offerSkills(everythingMaxed('เต็ม'), 3).length === 0, 'เต็มทุกอย่างแล้วยังเสนออีก')
 
   const partial = { ...E.createWorld('บางส่วน'), skills: { power: 6 } }
-  for (const skill of E.offerSkills(partial, 3)) {
-    assert(skill.id !== 'power', 'พลังโจมตีเต็มแล้วแต่ยังถูกเสนอ')
+  for (const offer of E.offerSkills(partial, 3)) {
+    assert(offer.id !== 'power', 'พลังโจมตีเต็มแล้วแต่ยังถูกเสนอ')
+  }
+
+  const maxedSword = { ...E.createWorld('ดาบเต็ม'), weapons: { sword: W.MAX_WEAPON_LEVEL } }
+  for (const offer of E.offerSkills(maxedSword, 3)) {
+    assert(offer.id !== 'sword', 'ดาบเต็มระดับแล้วแต่ยังถูกเสนอ')
   }
 })
 
@@ -421,7 +743,7 @@ check('ทุกสกิลต้องเปลี่ยนค่าอย่�
 check('ไม่มีสกิลไหนทำให้แย่ลง', () => {
   const base = S.statsFrom({})
   // ค่าที่ยิ่งน้อยยิ่งดี ต้องเทียบกลับด้าน
-  const lowerIsBetter = new Set(['attackInterval'])
+  const lowerIsBetter = new Set(['cooldownMultiplier'])
 
   for (const skill of S.SKILLS) {
     const boosted = S.statsFrom({ [skill.id]: skill.maxStacks })
@@ -435,12 +757,19 @@ check('ไม่มีสกิลไหนทำให้แย่ลง', () =
   }
 })
 
-check('ยิงไวต้องมีพื้นล่าง ไม่ถี่จนเฟรมเดียวยิงหลายนัด', () => {
+check('ยิงไวต้องมีพื้นล่าง ไม่ถี่จนเฟรมเดียวโจมตีหลายครั้ง', () => {
   const maxed = S.statsFrom({ rapid: S.getSkill('rapid').maxStacks })
-  assert(
-    maxed.attackInterval >= E.FIXED_STEP,
-    `ยิงทุก ${maxed.attackInterval} วินาที ซึ่งถี่กว่าหนึ่งเฟรม`,
-  )
+  assert(maxed.cooldownMultiplier > 0, 'ตัวคูณเวลารอเป็นศูนย์หรือติดลบ')
+
+  // อาวุธที่โจมตีถี่ที่สุดเมื่ออัปเต็มและมีสกิลยิงไวเต็ม ก็ยังต้องช้ากว่าหนึ่งเฟรม
+  for (const weapon of W.WEAPONS) {
+    const fastest = W.weaponStats(weapon.id, W.MAX_WEAPON_LEVEL)
+    const interval = fastest.interval * maxed.cooldownMultiplier
+    assert(
+      interval >= E.FIXED_STEP,
+      `${weapon.name} โจมตีทุก ${interval.toFixed(3)} วินาที ซึ่งถี่กว่าหนึ่งเฟรม`,
+    )
+  }
 })
 
 check('สกิลพลังชีวิตต้องฟื้นเลือดให้ทันที ไม่ใช่เพิ่มแต่เพดาน', () => {
@@ -577,19 +906,15 @@ check('ตอบผิดทุกครั้งต้องยังเล่�
 })
 
 check('เก็บสกิลครบทุกใบแล้วต้องยังเล่นต่อได้ ไม่ค้างและไม่วนไม่รู้จบ', () => {
-  const maxed = {}
-  for (const skill of S.SKILLS) maxed[skill.id] = skill.maxStacks
-
-  const base = E.createWorld('ครบ')
+  const base = everythingMaxed('ครบ')
   const world = {
     ...base,
-    skills: maxed,
     // จงใจกอง XP ไว้เยอะ เพื่อบังคับให้ขึ้นเลเวลติดกันหลายครั้ง
     player: { ...base.player, xp: 99, xpToNext: 5 },
     phase: 'choosing',
   }
 
-  assert(E.offerSkills(world, 3).length === 0, 'ยังมีสกิลให้เลือกอยู่ ทดสอบผิดกรณี')
+  assert(E.offerSkills(world, 3).length === 0, 'ยังมีของให้เลือกอยู่ ทดสอบผิดกรณี')
 
   /*
    * การขึ้นเลเวลติดกันหลายครั้งเป็นเรื่องปกติของเกมแนวนี้
@@ -634,6 +959,124 @@ check('เก็บสกิลครบทุกใบแล้วต้อง�
     live = E.step(live, STILL)
   }
   assert(stuck < 60, `ค้างอยู่ที่หน้าเลือกสกิล ${stuck} ครั้ง ซึ่งบ่อยผิดปกติ`)
+})
+
+// ---------- ความสมดุล ----------
+
+/** จำลองการเล่นแบบวิ่งวน โดยคุมความแรงของก้านบังคับได้ */
+function playCircling(seed, magnitude, maxSeconds = 400) {
+  let world = E.createWorld(seed)
+  const steps = Math.round(maxSeconds / E.FIXED_STEP)
+
+  for (let i = 0; i < steps; i += 1) {
+    if (world.phase === 'question') {
+      world = E.resolveQuestion(world, true)
+      continue
+    }
+    if (world.phase === 'choosing') {
+      const offer = E.offerSkills(world, 3)
+      world = offer.length > 0 ? E.takeSkill(world, offer[0].id) : E.skipSkill(world)
+      continue
+    }
+    if (world.phase === 'dead') break
+
+    const angle = (i / 60) * 1.1
+    world = E.step(world, {
+      move: { x: Math.cos(angle) * magnitude, y: Math.sin(angle) * magnitude },
+    })
+  }
+  return world
+}
+
+check('ก้านบังคับต้องคุมความเร็วได้จริง ไม่ใช่วิ่งเต็มสปีดตลอด', () => {
+  let slow = E.createWorld('ช้า')
+  let fast = E.createWorld('เร็ว')
+
+  for (let i = 0; i < 30; i += 1) {
+    slow = E.step(slow, { move: { x: 0.35, y: 0 } })
+    fast = E.step(fast, { move: { x: 1, y: 0 } })
+  }
+
+  const slowMoved = slow.player.pos.x - T.ARENA_WIDTH / 2
+  const fastMoved = fast.player.pos.x - T.ARENA_WIDTH / 2
+  assert(
+    slowMoved < fastMoved * 0.6,
+    `เอียงก้าน 35% เดินได้ ${slowMoved.toFixed(0)} เต็มก้านได้ ${fastMoved.toFixed(0)} ` +
+      'ซึ่งแปลว่าความแรงของก้านถูกทิ้ง',
+  )
+  assert(slowMoved > 0, 'เอียงก้านเบา ๆ แล้วไม่ขยับเลย')
+})
+
+check('ก้านที่เกินความยาวหนึ่งต้องถูกหนีบ ไม่ให้โกงความเร็ว', () => {
+  let normal = E.createWorld('ปกติ')
+  let cheat = E.createWorld('โกง')
+
+  for (let i = 0; i < 30; i += 1) {
+    normal = E.step(normal, { move: { x: 1, y: 0 } })
+    cheat = E.step(cheat, { move: { x: 50, y: 0 } })
+  }
+  assert(
+    Math.abs(normal.player.pos.x - cheat.player.pos.x) < 0.001,
+    'ส่งค่าก้านเกินหนึ่งแล้ววิ่งเร็วกว่าปกติ',
+  )
+})
+
+check('เดินหลบต้องได้ผลดีกว่ายืนนิ่ง ทั้งเรื่องเวลาและของที่เก็บได้', () => {
+  /*
+   * ข้อนี้จับการถดถอยที่เคยเกิดขึ้นจริง
+   *
+   * ตอนแรกมอนเดินช้ากว่าผู้เล่นมาก (46 เทียบกับ 190)
+   * ผู้เล่นที่วิ่งหนีจึงไม่มีมอนเข้าระยะดาบเลย ได้ 1–4 ตัวใน 45 วินาที
+   * ส่วนคนที่ยืนนิ่งกลับได้ 32–42 ตัว ซึ่งกลับหัวกลับหางกับที่ควรเป็น
+   * ถ้าความเร็วมอนถูกปรับกลับไปช้าเมื่อไร ข้อนี้จะจับได้ทันที
+   */
+  const seeds = ['ก', 'ข', 'ค']
+
+  let movingKills = 0
+  let stillKills = 0
+  let movingLevels = 0
+  let stillLevels = 0
+
+  for (const seed of seeds) {
+    const moving = playCircling(seed, 0.8)
+    const still = playCircling(seed, 0)
+    movingKills += moving.kills
+    stillKills += still.kills
+    movingLevels += moving.player.level
+    stillLevels += still.player.level
+  }
+
+  assert(
+    movingKills > stillKills,
+    `เดินหลบล้มได้ ${movingKills} ตัว ยืนนิ่งล้มได้ ${stillKills} ตัว ` +
+      'การเล่นถูกวิธีต้องได้ผลดีกว่า',
+  )
+  assert(
+    movingLevels >= stillLevels,
+    `เดินหลบได้เลเวลรวม ${movingLevels} ยืนนิ่งได้ ${stillLevels}`,
+  )
+})
+
+check('ผู้เล่นที่เล่นเป็นต้องอยู่ได้นานพอจะได้ลองอาวุธชิ้นที่สอง', () => {
+  const seeds = ['ง', 'จ', 'ฉ', 'ช']
+  let totalTime = 0
+  let sawSecondWeapon = 0
+
+  for (const seed of seeds) {
+    const world = playCircling(seed, 0.8)
+    totalTime += world.time
+    if (Object.keys(world.weapons).length >= 2) sawSecondWeapon += 1
+  }
+
+  const average = totalTime / seeds.length
+  assert(
+    average >= 45,
+    `รอดเฉลี่ยแค่ ${average.toFixed(0)} วินาที สั้นเกินกว่าจะสนุก`,
+  )
+  assert(
+    sawSecondWeapon >= seeds.length / 2,
+    `ได้อาวุธชิ้นที่สองแค่ ${sawSecondWeapon} จาก ${seeds.length} รอบ`,
+  )
 })
 
 check('สรุปผลตอนจบต้องให้รางวัลทั้งจากเวลาที่รอดและจำนวนที่ล้มได้', () => {

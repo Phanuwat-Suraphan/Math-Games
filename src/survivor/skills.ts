@@ -88,9 +88,9 @@ export const SKILLS: Skill[] = [
     icon: 'exp',
   },
   {
-    id: 'orbit',
-    name: 'ดาบหมุน',
-    description: 'มีดาบลอยหมุนรอบตัว ฟันมอนที่เข้าใกล้',
+    id: 'reach',
+    name: 'ระยะเอื้อม',
+    description: 'ระยะทำการของอาวุธทุกชิ้นกว้างขึ้น 18%',
     maxStacks: 4,
     weight: 3,
     icon: 'shield',
@@ -113,16 +113,16 @@ export function getSkill(id: string): Skill | undefined {
 
 /** ค่าตั้งต้นก่อนมีสกิลใด ๆ */
 export const BASE_STATS: CombatStats = {
-  damage: 10,
-  attackInterval: 0.75,
-  projectiles: 1,
+  damageMultiplier: 1,
+  cooldownMultiplier: 1,
+  extraProjectiles: 0,
   pierce: 0,
-  projectileSpeed: 420,
+  projectileSpeed: 1,
+  rangeMultiplier: 1,
   moveSpeed: 190,
-  maxHp: 100,
+  maxHp: 130,
   magnetRange: 70,
   xpMultiplier: 1,
-  orbitBlades: 0,
 }
 
 /**
@@ -137,18 +137,16 @@ export function statsFrom(skills: Readonly<Record<string, number>>): CombatStats
   const level = (id: string) => skills[id] ?? 0
 
   return {
-    damage: BASE_STATS.damage * Math.pow(1.4, level('power')),
-    attackInterval: Math.max(
-      0.12,
-      BASE_STATS.attackInterval * Math.pow(0.78, level('rapid')),
-    ),
-    projectiles: BASE_STATS.projectiles + level('multishot'),
-    pierce: BASE_STATS.pierce + level('pierce'),
-    projectileSpeed: BASE_STATS.projectileSpeed * Math.pow(1.25, level('velocity')),
+    damageMultiplier: Math.pow(1.4, level('power')),
+    // มีพื้นล่างที่ 0.3 เท่า กันไม่ให้ถี่จนเฟรมเดียวโจมตีหลายครั้ง
+    cooldownMultiplier: Math.max(0.3, Math.pow(0.82, level('rapid'))),
+    extraProjectiles: level('multishot'),
+    pierce: level('pierce'),
+    projectileSpeed: Math.pow(1.25, level('velocity')),
+    rangeMultiplier: Math.pow(1.18, level('reach')),
     moveSpeed: BASE_STATS.moveSpeed * Math.pow(1.15, level('swift')),
     maxHp: BASE_STATS.maxHp + level('vitality') * 20,
     magnetRange: BASE_STATS.magnetRange * Math.pow(2, level('magnet')),
     xpMultiplier: Math.pow(1.25, level('wisdom')),
-    orbitBlades: level('orbit'),
   }
 }
