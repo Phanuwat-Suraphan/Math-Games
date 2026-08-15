@@ -16,12 +16,18 @@ import {
   offerCount,
   offerSkills,
   readyToEvolve,
+  ultimateProgress,
+  ultimateReady,
   resolveQuestion,
   skipSkill,
   summarize,
   takeSkill,
 } from '../survivor/engine'
 import { getWeapon, weaponDisplayName } from '../survivor/weapons'
+import { ultimateFor } from '../survivor/ultimates'
+import type { Ultimate } from '../survivor/ultimates'
+import { HERO_VIEWBOX, heroArt } from '../art/heroes'
+import { MONSTER_ART_IDS, MONSTER_VIEWBOX, monsterArt } from '../art/monsters'
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../survivor/types'
 import type { Input, WorldState } from '../survivor/types'
 import type { Question } from '../questionEngine/types'
@@ -41,6 +47,86 @@ const SKILL_BY_LEVEL: SkillId[] = [
   'wordProblems',
 ]
 
+/** ท่าทางของตัวละครที่หน้าจอต้องรู้เพื่อวาด */
+interface HeroView {
+  image: HTMLImageElement | null
+  /** ภาพมอนสเตอร์ทุกชนิด แยกตามไอดีภาพ */
+  monsters: Map<string, HTMLImageElement>
+  /** 1 = หันขวา -1 = หันซ้าย */
+  facing: number
+  moving: boolean
+  /** สกิลวิเศษกำลังออกฤทธิ์อยู่ไหม ใช้วาดวงพลังรอบตัว */
+  glow: string | null
+}
+
+/**
+ * แปลงภาพ SVG ของตัวละครเป็นภาพที่ canvas วาดได้
+ *
+ * ทำไมต้องแปลง: สนามวาดด้วย canvas ล้วนเพื่อความเร็ว
+ * canvas วาด SVG ที่เป็นข้อความไม่ได้ ต้องผ่าน Image ก่อน
+ *
+ * แปลงครั้งเดียวตอนเปลี่ยนตัวละคร ไม่ใช่ทุกเฟรม
+ * เพราะการสร้าง Image ใหม่ 60 ครั้งต่อวินาทีจะกินหน่วยความจำจนเครื่องค้าง
+ *
+ * ข้อจำกัดที่ยอมรับ: อนิเมชัน SMIL ในภาพจะไม่ขยับเมื่อวาดลง canvas
+ * จึงทำท่าเดินเอาเองด้วยการขยับขึ้นลงและพลิกซ้ายขวาแทน
+ * ซึ่งได้ผลดีกว่าด้วยซ้ำ เพราะจังหวะตรงกับการเดินจริงของเด็ก
+ */
+function svgToImage(inner: string, viewBox: string, size: number): HTMLImageElement {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}" ` +
+    `width="${size}" height="${size}">${inner}</svg>`
+
+  const image = new Image()
+  image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+  return image
+}
+
+/**
+ * ภาพมอนสเตอร์ทุกตัวจากโหมดเควส แปลงไว้ล่วงหน้าครั้งเดียว
+ *
+ * แปลงตอนเข้าหน้าเลย ไม่ใช่ตอนมอนตัวนั้นโผล่ครั้งแรก
+ * เพราะถ้าแปลงตอนโผล่ มอนตัวแรกของแต่ละชนิดจะหายไปหนึ่งเสี้ยววินาที
+ * ซึ่งเป็นเสี้ยววินาทีที่เด็กกำลังต้องหลบมันพอดี
+ *
+ * เก็บเป็น Map เดียวใช้ทั้งเกม ภาพหนึ่งใบวาดซ้ำได้ไม่จำกัด
+ * การวาดภาพที่แปลงไว้แล้วเร็วกว่าการวาดรูปทรงด้วยมือเสียอีก
+ */
+function useMonsterImages(): MutableRefObject<Map<string, HTMLImageElement>> {
+  const ref = useRef<Map<string, HTMLImageElement>>(new Map())
+
+  useEffect(() => {
+    const cache = new Map<string, HTMLImageElement>()
+    for (const id of MONSTER_ART_IDS) {
+      cache.set(id, svgToImage(monsterArt(id), MONSTER_VIEWBOX, 128))
+    }
+    ref.current = cache
+
+    return () => {
+      ref.current = new Map()
+    }
+  }, [])
+
+  return ref
+}
+
+function useHeroImage(avatarId: string): MutableRefObject<HTMLImageElement | null> {
+  const ref = useRef<HTMLImageElement | null>(null)
+
+  useEffect(() => {
+    const image = svgToImage(heroArt(avatarId), HERO_VIEWBOX, 128)
+    image.onload = () => {
+      ref.current = image
+    }
+
+    return () => {
+      ref.current = null
+    }
+  }, [avatarId])
+
+  return ref
+}
+
 /**
  * โหมดเอาชีวิตรอด — เดินหลบ มอนวิ่งเข้าหา ยิงอัตโนมัติ
  *
@@ -57,7 +143,17 @@ export function Survivor({ player }: { player: Player }) {
   const { answerQuestion, patchPlayer } = useGame()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const worldRef = useRef<WorldState>(createWorld(`${Date.now()}`))
+  const worldRef = useRef<WorldState>(createWorld(`${Date.now()}`, player.avatar))
+  const heroImageRef = useHeroImage(player.avatar)
+  const monsterImagesRef = useMonsterImages()
+  const heroViewRef = useRef<HeroView>({
+    image: null,
+    monsters: new Map(),
+    facing: 1,
+    moving: false,
+    glow: null,
+  })
+  const ultimate = ultimateFor(player.avatar)
   const inputRef = useRef<Input>({ move: { x: 0, y: 0 } })
   const keysRef = useRef<Set<string>>(new Set())
   const lastTimeRef = useRef(0)
@@ -74,6 +170,8 @@ export function Survivor({ player }: { player: Player }) {
     { id: string; level: number; name: string; color: string; evolved: boolean; ready: boolean }[]
   >([])
   const [chests, setChests] = useState(0)
+  const [ultBar, setUltBar] = useState({ progress: 0, ready: false })
+  const ultimateRequestRef = useRef(false)
 
   /*
    * โหมดเต็มจอ
@@ -113,6 +211,11 @@ export function Survivor({ player }: { player: Player }) {
     return () => document.removeEventListener('fullscreenchange', sync)
   }, [])
 
+  /** ขอใช้สกิลวิเศษ ลูปหลักจะหยิบไปใช้ในเฟรมถัดไป */
+  const onUltimate = useCallback(() => {
+    ultimateRequestRef.current = true
+  }, [])
+
   /** ตั้งโจทย์สำหรับเลเวลอัปครั้งนี้ */
   const askQuestion = useCallback(() => {
     const world = worldRef.current
@@ -142,10 +245,24 @@ export function Survivor({ player }: { player: Player }) {
       lastTimeRef.current = now
 
       const before = worldRef.current
-      const after = advance(before, elapsed, inputRef.current)
+      const after = advance(before, elapsed, {
+        ...inputRef.current,
+        useUltimate: ultimateRequestRef.current,
+      })
+      // คำขอใช้สกิลมีผลเฟรมเดียว ไม่งั้นกดค้างแล้วจะใช้ซ้ำทันทีที่ชาร์จเต็ม
+      ultimateRequestRef.current = false
       worldRef.current = after
 
-      draw(canvasRef.current, after)
+      const move = inputRef.current.move
+      const view = heroViewRef.current
+      view.image = heroImageRef.current
+      view.monsters = monsterImagesRef.current
+      view.moving = Math.hypot(move.x, move.y) > 0.06
+      if (move.x > 0.06) view.facing = 1
+      else if (move.x < -0.06) view.facing = -1
+      view.glow = after.ultimate.activeFor > 0 ? ultimate.color : null
+
+      draw(canvasRef.current, after, view)
 
       setHud({
         hp: Math.ceil(after.player.hp),
@@ -157,6 +274,7 @@ export function Survivor({ player }: { player: Player }) {
         kills: after.kills,
       })
       setChests(after.chests)
+      setUltBar({ progress: ultimateProgress(after), ready: ultimateReady(after) })
 
       /*
        * แถบอาวุธเปลี่ยนเฉพาะตอนเลเวลอัป ไม่ใช่ทุกเฟรม
@@ -208,7 +326,7 @@ export function Survivor({ player }: { player: Player }) {
 
     frame = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frame)
-  }, [askQuestion, phase])
+  }, [askQuestion, heroImageRef, monsterImagesRef, phase, ultimate.color])
 
   /*
    * แป้นพิมพ์ WASD และปุ่มลูกศร
@@ -229,6 +347,16 @@ export function Survivor({ player }: { player: Player }) {
 
 
     const down = (event: KeyboardEvent) => {
+      /*
+       * เว้นวรรคใช้สกิลวิเศษ
+       * ใช้ event.code เหมือนปุ่มเดิน จึงไม่ขึ้นกับผังแป้นพิมพ์
+       * และต้องกัน preventDefault ด้วย ไม่งั้นเว้นวรรคจะเลื่อนหน้าเว็บลง
+       */
+      if (event.code === 'Space') {
+        event.preventDefault()
+        if (!event.repeat) onUltimate()
+        return
+      }
       if (!isMoveKey(event.code)) return
       // กันปุ่มลูกศรเลื่อนหน้าเว็บระหว่างเล่น ซึ่งทำให้สนามหลุดจอ
       event.preventDefault()
@@ -259,7 +387,7 @@ export function Survivor({ player }: { player: Player }) {
       window.removeEventListener('keyup', up)
       window.removeEventListener('blur', clearKeys)
     }
-  }, [])
+  }, [onUltimate])
 
   /** จ่ายเหรียญตอนจบ ทำที่เดียวและกันจ่ายซ้ำ */
   useEffect(() => {
@@ -272,12 +400,14 @@ export function Survivor({ player }: { player: Player }) {
 
   const start = useCallback(() => {
     paidRef.current = false
-    worldRef.current = createWorld(`${Date.now()}`)
+    worldRef.current = createWorld(`${Date.now()}`, player.avatar)
     inputRef.current = { move: { x: 0, y: 0 } }
     setSummary(null)
     setQuestion(null)
     setWeaponBar([])
     setChests(0)
+    setUltBar({ progress: 0, ready: false })
+    ultimateRequestRef.current = false
     setPhase('playing')
   }, [])
 
@@ -339,7 +469,7 @@ export function Survivor({ player }: { player: Player }) {
       <div className={immersive ? 'flex h-full w-full flex-col' : ''}>
         {!immersive && (
           <ScreenLayout width="wide">
-            {phase === 'idle' && <Intro onStart={start} />}
+            {phase === 'idle' && <Intro onStart={start} ultimate={ultimate} />}
           </ScreenLayout>
         )}
 
@@ -406,7 +536,24 @@ export function Survivor({ player }: { player: Player }) {
               )}
             </div>
 
-            {phase === 'playing' && <Joystick inputRef={inputRef} compact={immersive} />}
+            {phase === 'playing' && (
+              <div
+                className={
+                  immersive
+                    ? 'flex shrink-0 items-center justify-center gap-6 py-1'
+                    : 'mt-4 flex items-center justify-center gap-8'
+                }
+              >
+                <Joystick inputRef={inputRef} compact={immersive} />
+                <UltimateButton
+                  ultimate={ultimate}
+                  progress={ultBar.progress}
+                  ready={ultBar.ready}
+                  compact={immersive}
+                  onUse={onUltimate}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -423,7 +570,7 @@ export function Survivor({ player }: { player: Player }) {
  * เพราะการแปลง SVG เป็นภาพแล้ววาดร้อยตัวต่อเฟรมช้าเกินไป
  * รูปทรงกับสีที่ต่างกันชัดเจนพอให้เด็กแยกชนิดมอนได้อยู่แล้ว
  */
-function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
+function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroView): void {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -506,16 +653,47 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     'fraction-ghost': '#c4b5fd',
     'dragon-of-numbers': '#dc2626',
     'boss-slime-king': '#059669',
-    'boss-fraction-lord': '#7c3aed',
+    'boss-math-guardian': '#7c3aed',
     'boss-golem-king': '#64748b',
     'boss-number-dragon': '#b91c1c',
   }
 
   for (const enemy of world.enemies) {
-    ctx.fillStyle = enemy.hitFlash > 0 ? '#ffffff' : (COLORS[enemy.kind] ?? '#94a3b8')
-    ctx.beginPath()
-    ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius, 0, Math.PI * 2)
-    ctx.fill()
+    const sprite = hero.monsters.get(enemy.art)
+
+    if (sprite && sprite.complete) {
+      /*
+       * ภาพจริงจากโหมดเควส วาดใหญ่กว่ารัศมีการชนเล็กน้อย
+       * ให้ตัวมอนดูเต็มตาแต่ระยะชนยังเป็นวงกลมเดิม
+       * ถ้าให้ระยะชนเท่ากับขอบภาพ เด็กจะโดนชนตั้งแต่ยังดูเหมือนไม่ติดกัน
+       */
+      // คูณ 3.3 ไม่ใช่ 2 เท่าของรัศมี เพราะภาพมีขอบว่างในตัวราวหนึ่งในห้า
+      // ถ้าใช้เท่ารัศมีพอดี ตัวมอนจะดูเล็กกว่าระยะชนจริงจนเด็กงงว่าทำไมโดน
+      const size = enemy.radius * 3.3
+      const sway = Math.sin(world.time * 3 + enemy.id) * 2
+
+      ctx.save()
+      ctx.translate(enemy.pos.x, enemy.pos.y + sway)
+      // หันหน้าเข้าหาผู้เล่นเสมอ ทำให้ฝูงมอนดูกำลังไล่ล่าจริง ๆ
+      if (enemy.pos.x > world.player.pos.x) ctx.scale(-1, 1)
+      ctx.drawImage(sprite, -size / 2, -size / 2, size, size)
+
+      // กระพริบขาวตอนโดนตี ทับลงบนภาพเดิม
+      if (enemy.hitFlash > 0) {
+        ctx.globalAlpha = 0.75
+        ctx.globalCompositeOperation = 'lighter'
+        ctx.drawImage(sprite, -size / 2, -size / 2, size, size)
+        ctx.globalCompositeOperation = 'source-over'
+        ctx.globalAlpha = 1
+      }
+      ctx.restore()
+    } else {
+      // ภาพยังไม่พร้อม วาดวงกลมสีประจำชนิดไปก่อน
+      ctx.fillStyle = enemy.hitFlash > 0 ? '#ffffff' : (COLORS[enemy.kind] ?? '#94a3b8')
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     // ตัวใหญ่พิเศษมีวงแหวนทองรอบตัว ให้เห็นแต่ไกลว่าตัวนี้ไม่ธรรมดา
     if (enemy.elite) {
@@ -566,13 +744,15 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
       ctx.fill()
     }
 
-    // ตาสองดวง ทำให้รู้สึกว่าเป็นสิ่งมีชีวิตที่กำลังมองเรา
-    ctx.fillStyle = '#0f172a'
-    const eye = enemy.radius * 0.3
-    ctx.beginPath()
-    ctx.arc(enemy.pos.x - eye, enemy.pos.y - eye * 0.4, enemy.radius * 0.18, 0, Math.PI * 2)
-    ctx.arc(enemy.pos.x + eye, enemy.pos.y - eye * 0.4, enemy.radius * 0.18, 0, Math.PI * 2)
-    ctx.fill()
+    // ตาสองดวงเฉพาะตอนที่ยังไม่มีภาพจริง ภาพจริงมีตาอยู่แล้ว
+    if (!sprite || !sprite.complete) {
+      ctx.fillStyle = '#0f172a'
+      const eye = enemy.radius * 0.3
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x - eye, enemy.pos.y - eye * 0.4, enemy.radius * 0.18, 0, Math.PI * 2)
+      ctx.arc(enemy.pos.x + eye, enemy.pos.y - eye * 0.4, enemy.radius * 0.18, 0, Math.PI * 2)
+      ctx.fill()
+    }
 
     // แถบเลือดเฉพาะตัวที่โดนตีแล้ว ไม่งั้นจอรกด้วยแถบเต็มไปหมด
     if (enemy.hp < enemy.maxHp) {
@@ -635,17 +815,74 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     }
   }
 
-  // ผู้เล่น กระพริบตอนเพิ่งโดนตี
+  // ---------- ผู้เล่น ----------
+  const { pos, radius } = world.player
   const hurt = world.player.invulnerable > 0
-  ctx.fillStyle = hurt && Math.floor(world.time * 12) % 2 === 0 ? '#fca5a5' : '#38bdf8'
+  const blink = hurt && Math.floor(world.time * 12) % 2 === 0
+
+  /*
+   * วงพลังตอนใช้สกิลวิเศษ วาดใต้ตัวละคร
+   * ต้องเห็นชัดมาก เพราะเป็นช่วงที่เด็กกล้าเดินเข้าไปกลางฝูงได้
+   * ถ้าดูไม่ออกว่ายังเปิดอยู่ไหม จะเดินอยู่กลางฝูงต่อจนตายพอดี
+   */
+  if (hero.glow) {
+    const wave = 1 + Math.sin(world.time * 9) * 0.08
+    ctx.strokeStyle = hero.glow
+    ctx.globalAlpha = 0.85
+    ctx.lineWidth = 4
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius * 2.6 * wave, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.globalAlpha = 0.16
+    ctx.fillStyle = hero.glow
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius * 2.6 * wave, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+
+  // เงาใต้เท้า ทำให้ตัวละครดูยืนอยู่บนพื้น ไม่ใช่ลอยอยู่เฉย ๆ
+  ctx.fillStyle = 'rgba(0,0,0,.38)'
   ctx.beginPath()
-  ctx.arc(world.player.pos.x, world.player.pos.y, world.player.radius, 0, Math.PI * 2)
+  ctx.ellipse(pos.x, pos.y + radius * 0.82, radius * 0.9, radius * 0.34, 0, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = '#0f172a'
-  ctx.beginPath()
-  ctx.arc(world.player.pos.x - 4, world.player.pos.y - 3, 2.6, 0, Math.PI * 2)
-  ctx.arc(world.player.pos.x + 4, world.player.pos.y - 3, 2.6, 0, Math.PI * 2)
-  ctx.fill()
+
+  if (hero.image) {
+    /*
+     * ท่าเดิน: ขยับขึ้นลงเร็วตอนเดิน ช้าตอนยืนนิ่ง และพลิกตามทิศที่เดิน
+     * เป็นการเคลื่อนไหวที่น้อยที่สุดที่ทำให้ตัวละครดูมีชีวิต
+     * โดยไม่ต้องมีภาพหลายเฟรมให้ต้องวาดเพิ่มทีละตัว
+     */
+    const size = radius * 3.6
+    const bob = hero.moving
+      ? Math.abs(Math.sin(world.time * 11)) * -4
+      : Math.sin(world.time * 2.3) * 1.1
+
+    ctx.save()
+    ctx.translate(pos.x, pos.y + bob)
+    if (hero.facing < 0) ctx.scale(-1, 1)
+    // เอียงตัวเล็กน้อยตอนเดิน ทำให้รู้สึกว่ากำลังออกแรง
+    if (hero.moving) ctx.rotate(Math.sin(world.time * 11) * 0.05)
+    if (blink) ctx.globalAlpha = 0.55
+    ctx.drawImage(hero.image, -size / 2, -size * 0.78, size, size)
+    ctx.restore()
+    ctx.globalAlpha = 1
+  } else {
+    // ภาพยังโหลดไม่เสร็จ วาดวงกลมไปก่อน ดีกว่าให้ตัวละครหายไปเฉย ๆ
+    ctx.fillStyle = blink ? '#fca5a5' : '#38bdf8'
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // วงแดงบางตอนเพิ่งโดนตี บอกว่ากำลังอยู่ในช่วงอมตะสั้น ๆ
+  if (hurt) {
+    ctx.strokeStyle = 'rgba(248,113,113,.75)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius * 1.5, 0, Math.PI * 2)
+    ctx.stroke()
+  }
 
   /*
    * ข้อความแจ้งเหตุการณ์สำคัญ วาดท้ายสุดให้อยู่บนสุดเสมอ
@@ -668,7 +905,7 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
 
 /* ---------- ส่วนประกอบหน้าจอ ---------- */
 
-function Intro({ onStart }: { onStart: () => void }) {
+function Intro({ onStart, ultimate }: { onStart: () => void; ultimate: Ultimate }) {
   return (
     <div className="rounded-xl2 border border-sky-400/30 bg-night-800/60 p-6 text-center">
       <h2 className="text-2xl font-black text-white">สนามรบตัวเลข</h2>
@@ -686,6 +923,24 @@ function Intro({ onStart }: { onStart: () => void }) {
         <li>· อาวุธเต็มระดับ + สกิลคู่ควบ + หีบ = <b>ร่างสมบูรณ์</b> ที่แรงขึ้นเท่าตัว</li>
         <li>· บังคับด้วยการลากนิ้วบนแป้น หรือปุ่มลูกศร / WASD</li>
       </ul>
+
+      {/* สกิลวิเศษต่างกันตามตัวละคร จึงต้องบอกก่อนเข้าสนามว่าของตัวนี้คืออะไร */}
+      <div
+        className="mx-auto mt-5 flex max-w-md items-center gap-3 rounded-xl border p-3 text-left"
+        style={{ borderColor: `${ultimate.color}55`, background: 'rgba(255,255,255,.04)' }}
+      >
+        <GameIcon name={ultimate.icon} size="h-10 w-10" />
+        <div>
+          <p className="text-xs text-slate-400">สกิลวิเศษประจำตัวของหนู</p>
+          <p className="font-black" style={{ color: ultimate.color }}>
+            {ultimate.name}
+          </p>
+          <p className="text-sm text-slate-300">{ultimate.description}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            ล้มมอนให้ครบ {ultimate.cost} ตัวเพื่อชาร์จ แล้วกดปุ่มวงกลม หรือเคาะเว้นวรรค
+          </p>
+        </div>
+      </div>
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
         เข้าสนาม
       </Button>
@@ -959,6 +1214,65 @@ function DeadCard({
   )
 }
 
+
+/**
+ * ปุ่มสกิลวิเศษ
+ *
+ * แสดงทั้งแถบความคืบหน้าและจำนวนที่เหลือ
+ * แถบอย่างเดียวบอกได้แค่ "ใกล้แล้ว" แต่ตัวเลขบอกได้ว่า "อีกกี่ตัว"
+ * ซึ่งเปลี่ยนจากการรอเฉย ๆ เป็นเป้าหมายที่ไล่ล่าได้
+ */
+function UltimateButton({
+  ultimate,
+  progress,
+  ready,
+  compact,
+  onUse,
+}: {
+  ultimate: Ultimate
+  progress: number
+  ready: boolean
+  compact: boolean
+  onUse: () => void
+}) {
+  const size = compact ? 'h-20 w-20' : 'h-28 w-28'
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={onUse}
+        disabled={!ready}
+        aria-label={`ใช้สกิล ${ultimate.name}`}
+        className={`relative ${size} rounded-full border-4 transition ${
+          ready
+            ? 'animate-pulse border-gold-300 bg-gold-500/25'
+            : 'border-white/15 bg-night-800/70'
+        }`}
+        style={ready ? { borderColor: ultimate.color } : undefined}
+      >
+        {/* แถบความคืบหน้าเป็นวงแหวนรอบปุ่ม เห็นได้โดยไม่ต้องละสายตาจากสนาม */}
+        <span
+          className="absolute inset-1 rounded-full"
+          style={{
+            background: `conic-gradient(${ultimate.color} ${progress * 360}deg, rgba(255,255,255,.08) 0deg)`,
+          }}
+        />
+        <span className="absolute inset-2.5 flex items-center justify-center rounded-full bg-night-900">
+          <GameIcon name={ultimate.icon} size={compact ? 'h-7 w-7' : 'h-9 w-9'} />
+        </span>
+      </button>
+
+      <span
+        className="text-[11px] font-bold"
+        style={{ color: ready ? ultimate.color : '#94a3b8' }}
+      >
+        {ready ? `${ultimate.name}!` : `${Math.round(progress * 100)}%`}
+      </span>
+    </div>
+  )
+}
+
 /**
  * แป้นบังคับสำหรับจอสัมผัส
  *
@@ -1007,7 +1321,7 @@ function Joystick({
   }, [inputRef])
 
   return (
-    <div className={compact ? 'flex shrink-0 justify-center py-1' : 'mt-4 flex justify-center'}>
+    <div className="flex justify-center">
       <div
         ref={padRef}
         onPointerDown={(event) => {

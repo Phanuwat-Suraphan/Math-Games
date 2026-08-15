@@ -65,8 +65,10 @@ export interface EnemyEntity {
   speed: number
   radius: number
   damage: number
-  /** ชนิดที่ใช้เลือกภาพ */
+  /** ชนิดที่ใช้เลือกสีและพฤติกรรม */
   kind: string
+  /** ไอดีภาพจากชุดมอนสเตอร์ของโหมดเควส */
+  art: string
   /** ให้ XP เท่าไรเมื่อตาย */
   xpValue: number
   /** วินาทีที่เพิ่งโดนตี ใช้ทำเอฟเฟกต์กระพริบ */
@@ -261,6 +263,7 @@ export interface WorldState {
   bossCooldown: number
   /** ล้มบอสไปแล้วกี่ตัว ใช้สรุปผลตอนจบ */
   bossesDown: number
+  ultimate: UltimateState
   /** วินาทีที่เหลือก่อนมอนกลุ่มถัดไปโผล่ */
   spawnCooldown: number
   nextId: number
@@ -275,4 +278,24 @@ export interface WorldState {
 /** ปุ่มบังคับ ทิศทางเป็นเวกเตอร์หน่วย ความยาวไม่เกิน 1 */
 export interface Input {
   move: Vec
+  /** กดปุ่มสกิลวิเศษในเฟรมนี้ */
+  useUltimate?: boolean
+}
+
+/**
+ * สถานะสกิลวิเศษประจำตัวละคร
+ *
+ * เก็บ charge เป็นจำนวนมอนที่ล้มได้ ไม่ใช่เป็นเปอร์เซ็นต์
+ * เพราะเด็กต้องรู้ว่า "อีกกี่ตัว" ไม่ใช่ "อีกกี่เปอร์เซ็นต์"
+ * ตัวเลขที่นับได้ทำให้เป้าหมายชัดกว่าแถบที่ค่อย ๆ เต็มขึ้นเฉย ๆ
+ */
+export interface UltimateState {
+  /** ไอดีของอวตาร ใช้เปิดตารางสกิล */
+  id: string
+  /** ล้มมอนไปแล้วกี่ตัวนับจากใช้ครั้งล่าสุด */
+  charge: number
+  /** วินาทีที่ผลยังคงอยู่ 0 = ไม่ได้ออกฤทธิ์อยู่ */
+  activeFor: number
+  /** ใช้ไปแล้วกี่ครั้งในรอบนี้ ใช้สรุปผลตอนจบ */
+  used: number
 }

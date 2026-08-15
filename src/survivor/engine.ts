@@ -37,9 +37,11 @@ import {
   type PickupEntity,
   type PickupKind,
   type ProjectileEntity,
+  type UltimateState,
   type Vec,
   type WorldState,
 } from './types'
+import { ultimateFor } from './ultimates'
 
 /** ก้าวเวลาคงที่ 1/60 วินาที */
 export const FIXED_STEP = 1 / 60
@@ -53,6 +55,14 @@ const XP_GROWTH = 1.2
 /** ชนิดมอนสเตอร์ที่โผล่ตามเวลา */
 interface EnemyKind {
   kind: string
+  /**
+   * ไอดีภาพจากชุดมอนสเตอร์ของโหมดเควส
+   *
+   * ใช้ภาพชุดเดียวกันทั้งเกมโดยตั้งใจ
+   * มอนที่เด็กเจอในเควสกับที่เจอในสนามรบต้องเป็นตัวเดียวกัน
+   * ไม่งั้นสองโหมดจะรู้สึกเหมือนเป็นคนละเกมที่บังเอิญอยู่ในแอปเดียวกัน
+   */
+  art: string
   hp: number
   speed: number
   damage: number
@@ -83,25 +93,25 @@ const ENEMY_KINDS: EnemyKind[] = [
    * พอมอนตามได้ทัน มันจะไล่ต่อกันเป็นหางยาวตามหลังผู้เล่น
    * ซึ่งเป็นจังหวะหลักของเกมแนวนี้ คือวิ่งวนแล้วกวาดตัวที่ตามมาติด ๆ
    */
-  { kind: 'number-slime', hp: 22, speed: 108, damage: 8, radius: 16, xpValue: 1,
+  { kind: 'number-slime', art: 'number-slime', hp: 22, speed: 108, damage: 8, radius: 16, xpValue: 1,
     behavior: 'chase', splitInto: 0, fromTime: 0 },
-  { kind: 'fraction-bat', hp: 16, speed: 150, damage: 6, radius: 13, xpValue: 2,
+  { kind: 'fraction-bat', art: 'fraction-bat', hp: 16, speed: 150, damage: 6, radius: 13, xpValue: 2,
     behavior: 'zigzag', splitInto: 0, fromTime: 20 },
-  { kind: 'goblin-calculator', hp: 48, speed: 98, damage: 12, radius: 19, xpValue: 3,
+  { kind: 'goblin-calculator', art: 'goblin-calculator', hp: 48, speed: 98, damage: 12, radius: 19, xpValue: 3,
     behavior: 'chase', splitInto: 0, fromTime: 45 },
-  { kind: 'decimal-scorpion', hp: 34, speed: 230, damage: 10, radius: 16, xpValue: 3,
+  { kind: 'decimal-scorpion', art: 'decimal-scorpion', hp: 34, speed: 230, damage: 10, radius: 16, xpValue: 3,
     behavior: 'dash', splitInto: 0, fromTime: 70 },
-  { kind: 'big-slime', hp: 80, speed: 88, damage: 12, radius: 26, xpValue: 4,
+  { kind: 'big-slime', art: 'number-slime', hp: 80, speed: 88, damage: 12, radius: 26, xpValue: 4,
     behavior: 'chase', splitInto: 3, fromTime: 95 },
-  { kind: 'percentage-bandit', hp: 50, speed: 120, damage: 14, radius: 18, xpValue: 5,
+  { kind: 'percentage-bandit', art: 'percentage-bandit', hp: 50, speed: 120, damage: 14, radius: 18, xpValue: 5,
     behavior: 'ranged', splitInto: 0, fromTime: 120 },
-  { kind: 'geometry-golem', hp: 170, speed: 72, damage: 18, radius: 26, xpValue: 7,
+  { kind: 'geometry-golem', art: 'geometry-golem', hp: 170, speed: 72, damage: 18, radius: 26, xpValue: 7,
     behavior: 'tank', splitInto: 0, fromTime: 150 },
-  { kind: 'math-guardian', hp: 100, speed: 158, damage: 15, radius: 19, xpValue: 6,
+  { kind: 'math-guardian', art: 'math-guardian', hp: 100, speed: 158, damage: 15, radius: 19, xpValue: 6,
     behavior: 'zigzag', splitInto: 0, fromTime: 185 },
-  { kind: 'fraction-ghost', hp: 66, speed: 260, damage: 12, radius: 15, xpValue: 6,
+  { kind: 'fraction-ghost', art: 'fraction-bat', hp: 66, speed: 260, damage: 12, radius: 15, xpValue: 6,
     behavior: 'dash', splitInto: 0, fromTime: 215 },
-  { kind: 'dragon-of-numbers', hp: 240, speed: 126, damage: 22, radius: 28, xpValue: 12,
+  { kind: 'dragon-of-numbers', art: 'dragon-of-numbers', hp: 240, speed: 126, damage: 22, radius: 28, xpValue: 12,
     behavior: 'chase', splitInto: 0, fromTime: 250 },
 ]
 
@@ -118,19 +128,31 @@ const ENEMY_KINDS: EnemyKind[] = [
  * ซึ่งเปลี่ยนรูปเกมช่วงกลางรอบไปทั้งหมด
  */
 const BOSS_KINDS: EnemyKind[] = [
-  { kind: 'boss-slime-king', hp: 300, speed: 96, damage: 20, radius: 40, xpValue: 40,
-    behavior: 'chase', splitInto: 4, fromTime: 0 },
-  { kind: 'boss-fraction-lord', hp: 430, speed: 118, damage: 22, radius: 38, xpValue: 50,
-    behavior: 'zigzag', splitInto: 0, fromTime: 0 },
-  { kind: 'boss-golem-king', hp: 640, speed: 78, damage: 28, radius: 46, xpValue: 62,
-    behavior: 'tank', splitInto: 0, fromTime: 0 },
-  { kind: 'boss-number-dragon', hp: 820, speed: 132, damage: 30, radius: 44, xpValue: 78,
-    behavior: 'ranged', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-slime-king', art: 'number-slime', hp: 300, speed: 96, damage: 20,
+    radius: 40, xpValue: 40, behavior: 'chase', splitInto: 4, fromTime: 0 },
+  { kind: 'boss-math-guardian', art: 'math-guardian', hp: 430, speed: 118, damage: 22,
+    radius: 40, xpValue: 50, behavior: 'zigzag', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-golem-king', art: 'geometry-golem', hp: 640, speed: 78, damage: 28,
+    radius: 46, xpValue: 62, behavior: 'tank', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-number-dragon', art: 'dragon-of-numbers', hp: 820, speed: 132, damage: 30,
+    radius: 46, xpValue: 78, behavior: 'ranged', splitInto: 0, fromTime: 0 },
 ]
+
+/** ชื่อบอสที่แสดงตอนโผล่ ไล่ตามลำดับเดียวกับ BOSS_KINDS */
+const BOSS_NAMES = ['ราชาสไลม์', 'ผู้พิทักษ์คณิต', 'ราชาโกเลม', 'มังกรแห่งตัวเลข']
+
+/** ชื่อบอสตัวที่เท่าไร ใช้ทั้งตอนประกาศและตอนสรุปผล */
+export function bossNameAt(index: number): string {
+  const name = BOSS_NAMES[index % BOSS_NAMES.length]
+  const lap = Math.floor(index / BOSS_NAMES.length)
+  // วนรอบที่สองเป็นต้นไปใส่ดาวกำกับ ให้รู้ว่าตัวนี้แข็งกว่าตัวเดิมที่เคยเจอ
+  return lap > 0 ? `${name} ${'★'.repeat(Math.min(3, lap))}` : name
+}
 
 /** ตัวเล็กที่แตกออกมาจากสไลม์ใหญ่ */
 const SPLIT_CHILD: EnemyKind = {
   kind: 'number-slime',
+  art: 'number-slime',
   hp: 18,
   speed: 132,
   damage: 6,
@@ -164,7 +186,7 @@ export function xpNeededFor(level: number): number {
   return Math.round(XP_BASE * Math.pow(XP_GROWTH, level - 1))
 }
 
-export function createWorld(seed: string): WorldState {
+export function createWorld(seed: string, avatarId = 'adventurer'): WorldState {
   const stats = statsFrom({})
 
   return {
@@ -197,6 +219,7 @@ export function createWorld(seed: string): WorldState {
     eliteCooldown: 45,
     bossCooldown: 60,
     bossesDown: 0,
+    ultimate: { id: avatarId, charge: 0, activeFor: 0, used: 0 },
     nextId: 1,
     phase: 'playing',
     kills: 0,
@@ -277,6 +300,7 @@ function makeEnemy(
     radius: template.radius * (elite ? 1.7 : 1),
     damage: Math.round(template.damage * (elite ? 1.6 : 1)),
     kind: template.kind,
+    art: template.art,
     xpValue: template.xpValue * (elite ? 10 : 1),
     hitFlash: 0,
     behavior: template.behavior,
@@ -359,6 +383,24 @@ export function readyToEvolve(world: WorldState): string[] {
   return out
 }
 
+/**
+ * ความคืบหน้าของสกิลวิเศษ 0 ถึง 1
+ *
+ * คืนเป็นสัดส่วนเพื่อให้หน้าจอวาดแถบได้ตรง ๆ
+ * แต่หน้าจอยังแสดงเป็นจำนวนตัวที่เหลือควบคู่ไปด้วย
+ * เพราะ "อีก 6 ตัว" เป็นเป้าหมายที่ชัดกว่า "อีก 20%"
+ */
+export function ultimateProgress(world: WorldState): number {
+  const spec = ultimateFor(world.ultimate.id)
+  return Math.min(1, world.ultimate.charge / spec.cost)
+}
+
+/** ใช้สกิลวิเศษได้ตอนนี้ไหม */
+export function ultimateReady(world: WorldState): boolean {
+  const spec = ultimateFor(world.ultimate.id)
+  return world.ultimate.charge >= spec.cost && world.ultimate.activeFor <= 0
+}
+
 /** มอนที่อยู่ใกล้ผู้เล่นที่สุด ใช้เล็งเป้าอัตโนมัติ */
 export function nearestEnemy(world: WorldState): EnemyEntity | undefined {
   let best: EnemyEntity | undefined
@@ -407,16 +449,43 @@ export function step(world: WorldState, input: Input): WorldState {
    *
    * หนีบความยาวไม่ให้เกิน 1 แทน เดินทแยงจึงยังไม่เร็วกว่าเดินตรง
    */
+  /*
+   * สกิลวิเศษ ต้องคิดก่อนการเคลื่อนที่
+   * เพราะสกิลของนักสำรวจเพิ่มความเร็วเดิน ซึ่งต้องมีผลในเฟรมเดียวกันที่กด
+   */
+  const ultSpec = ultimateFor(world.ultimate.id)
+  const previousActive = world.ultimate.activeFor
+  let ultimate: UltimateState = {
+    ...world.ultimate,
+    activeFor: Math.max(0, previousActive - dt),
+  }
+
+  const canUseUltimate = ultimate.charge >= ultSpec.cost && previousActive <= 0
+  const justActivated = Boolean(input.useUltimate) && canUseUltimate
+  if (justActivated) {
+    ultimate = {
+      ...ultimate,
+      charge: 0,
+      // สกิลที่ออกฤทธิ์ทันทีตั้งเวลาสั้น ๆ ไว้ เพื่อให้เอฟเฟกต์ภาพทันได้เห็น
+      activeFor: Math.max(ultSpec.duration, 0.35),
+      used: ultimate.used + 1,
+    }
+  }
+  const ultimateOn = ultimate.activeFor > 0
+  /** ระหว่างใช้สกิลบางอย่างจะไม่เจ็บเลย ไม่ใช่แค่ลดความเสียหาย */
+  const ultimateGuard = ultimateOn && (ultSpec.kind === 'dash' || ultSpec.kind === 'shield')
+
   const raw = input.move
   const rawLength = length(raw)
   const dir =
     rawLength > 1 ? { x: raw.x / rawLength, y: raw.y / rawLength } : raw
   const player = { ...world.player }
   player.maxHp = stats.maxHp
-  player.speed = stats.moveSpeed
+  const moveSpeed = stats.moveSpeed * (ultimateOn && ultSpec.kind === 'dash' ? 1.85 : 1)
+  player.speed = moveSpeed
   player.pos = {
-    x: clamp(player.pos.x + dir.x * stats.moveSpeed * dt, player.radius, ARENA_WIDTH - player.radius),
-    y: clamp(player.pos.y + dir.y * stats.moveSpeed * dt, player.radius, ARENA_HEIGHT - player.radius),
+    x: clamp(player.pos.x + dir.x * moveSpeed * dt, player.radius, ARENA_WIDTH - player.radius),
+    y: clamp(player.pos.y + dir.y * moveSpeed * dt, player.radius, ARENA_HEIGHT - player.radius),
   }
   player.invulnerable = Math.max(0, player.invulnerable - dt)
 
@@ -460,11 +529,16 @@ export function step(world: WorldState, input: Input): WorldState {
     .filter((notice) => notice.life > 0)
 
   if (bossCooldown <= 0) {
-    const index = Math.round((time - 60) / 60)
-    enemies.push(makeBoss(nextId, Math.max(0, index), time, createRng(`${world.seed}-boss-${nextId}`)))
+    const index = Math.max(0, Math.round((time - 60) / 60))
+    enemies.push(makeBoss(nextId, index, time, createRng(`${world.seed}-boss-${nextId}`)))
     nextId += 1
     bossCooldown = 60
-    notices.push({ id: nextId, text: 'บอสมาแล้ว! ล้มให้ได้จะมีหีบตก', life: 2.6, maxLife: 2.6 })
+    notices.push({
+      id: nextId,
+      text: `${bossNameAt(index)} ปรากฏตัว! ล้มให้ได้จะมีหีบตก`,
+      life: 3,
+      maxLife: 3,
+    })
     nextId += 1
   }
 
@@ -481,10 +555,17 @@ export function step(world: WorldState, input: Input): WorldState {
       enemy.hp -= enemy.burnDps * dt
     }
 
-    // น้ำแข็งทำให้เดินช้าลงครึ่งหนึ่ง
+    // น้ำแข็งทำให้เดินช้าลงครึ่งหนึ่ง ส่วนสกิลหยุดเวลาแทบหยุดสนิท
     const slowed = enemy.slowFor > 0
     if (slowed) enemy.slowFor -= dt
-    const speed = enemy.speed * (slowed ? 0.45 : 1)
+    const frozen = ultimateOn && ultSpec.kind === 'freeze'
+    const speed = enemy.speed * (frozen ? 0.1 : slowed ? 0.45 : 1)
+
+    // โล่พลังงานเผาทุกตัวที่เข้ามาใกล้ตลอดเวลาที่เปิดอยู่
+    if (ultimateOn && ultSpec.kind === 'shield' && distance(enemy.pos, player.pos) < 96) {
+      enemy.hp -= 70 * stats.damageMultiplier * dt
+      enemy.hitFlash = 0.1
+    }
 
     const toPlayer = normalize({
       x: player.pos.x - enemy.pos.x,
@@ -543,6 +624,67 @@ export function step(world: WorldState, input: Input): WorldState {
     .filter((effect) => effect.life > 0)
 
   const weaponCooldowns = { ...world.weaponCooldowns }
+
+  /*
+   * ผลของสกิลวิเศษที่ออกฤทธิ์เป็นจังหวะ
+   *
+   * ตวัดพายุฟันสามครั้ง อุกกาบาตตกหลายลูก
+   * ทำเป็นจังหวะแทนที่จะรวบเป็นครั้งเดียว เพราะการเห็นมันเกิดต่อเนื่อง
+   * คือสิ่งที่ทำให้รู้สึกว่า "ท่าไม้ตายกำลังทำงานอยู่"
+   * ถ้ารวบเป็นเฟรมเดียว เด็กจะเห็นแค่มอนหายไปเฉย ๆ โดยไม่รู้ว่าเพราะอะไร
+   */
+  const ultDuration = Math.max(ultSpec.duration, 0.35)
+  const ultElapsedAfter = ultDuration - ultimate.activeFor
+  const ultElapsedBefore = justActivated ? 0 : ultDuration - previousActive
+  const ultPulse = (period: number): boolean =>
+    justActivated ||
+    (ultimateOn && Math.floor(ultElapsedBefore / period) !== Math.floor(ultElapsedAfter / period))
+
+  /** ดูดคริสตัลทั้งสนามในเฟรมนี้ ใช้โดยสกิลขุมทรัพย์ */
+  let harvestNow = false
+
+  if (ultimateOn || justActivated) {
+    if (ultSpec.kind === 'sweep' && ultPulse(0.3)) {
+      const radius = 210 * stats.rangeMultiplier
+      for (const enemy of enemies) {
+        if (enemy.hp <= 0) continue
+        if (distance(enemy.pos, player.pos) > radius + enemy.radius) continue
+        hurt(enemy, 130 * stats.damageMultiplier)
+      }
+      effects.push({
+        id: nextId,
+        kind: 'slash',
+        pos: { ...player.pos },
+        radius,
+        life: 0.3,
+        maxLife: 0.3,
+      })
+      nextId += 1
+    }
+
+    if (ultSpec.kind === 'meteor' && ultPulse(0.2)) {
+      const rng = createRng(`${world.seed}-meteor-${Math.round(ultElapsedAfter * 100)}`)
+      const at = { x: rng.int(60, ARENA_WIDTH - 60), y: rng.int(60, ARENA_HEIGHT - 60) }
+      const radius = 130
+
+      for (const enemy of enemies) {
+        if (enemy.hp <= 0) continue
+        if (distance(enemy.pos, at) > radius + enemy.radius) continue
+        hurt(enemy, 120 * stats.damageMultiplier)
+        enemy.burnFor = Math.max(enemy.burnFor, 3)
+        enemy.burnDps = Math.max(enemy.burnDps, 30)
+      }
+      effects.push({ id: nextId, kind: 'blast', pos: at, radius, life: 0.42, maxLife: 0.42 })
+      nextId += 1
+    }
+
+    if (ultSpec.kind === 'harvest' && justActivated) harvestNow = true
+  }
+
+  if (justActivated) {
+    notices.push({ id: nextId, text: `${ultSpec.name}!`, life: 1.8, maxLife: 1.8 })
+    nextId += 1
+  }
 
   for (const [weaponId, level] of Object.entries(world.weapons)) {
     const evolved = world.evolved.includes(weaponId)
@@ -749,7 +891,11 @@ export function step(world: WorldState, input: Input): WorldState {
     }
     if (moved.life <= 0) continue
 
-    if (invulnerable <= 0 && distance(moved.pos, player.pos) <= player.radius + moved.radius) {
+    if (
+      invulnerable <= 0 &&
+      !ultimateGuard &&
+      distance(moved.pos, player.pos) <= player.radius + moved.radius
+    ) {
       hp -= moved.damage
       invulnerable = 0.9
       continue
@@ -779,6 +925,11 @@ export function step(world: WorldState, input: Input): WorldState {
       continue
     }
     kills += 1
+    // ชาร์จสกิลวิเศษด้วยการล้มมอน บอสกับตัวใหญ่พิเศษนับหลายตัว
+    ultimate = {
+      ...ultimate,
+      charge: ultimate.charge + (enemy.boss ? 10 : enemy.elite ? 5 : 1),
+    }
     gems.push({ id: nextId, pos: { ...enemy.pos }, value: enemy.xpValue })
     nextId += 1
 
@@ -831,6 +982,12 @@ export function step(world: WorldState, input: Input): WorldState {
   for (const gem of gems) {
     const dist = distance(gem.pos, player.pos)
 
+    // สกิลขุมทรัพย์กวาดคริสตัลทั้งสนามเข้ามาในเฟรมเดียว ไม่ต้องเดินไปเก็บ
+    if (harvestNow) {
+      xp += gem.value * stats.xpMultiplier
+      continue
+    }
+
     if (dist <= player.radius + 8) {
       xp += gem.value * stats.xpMultiplier
       continue
@@ -848,6 +1005,8 @@ export function step(world: WorldState, input: Input): WorldState {
 
     remainingGems.push(gem)
   }
+
+  if (harvestNow) hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.5)
 
   // ---------- เก็บของที่ตกอยู่ ----------
   const remainingPickups: PickupEntity[] = []
@@ -925,7 +1084,7 @@ export function step(world: WorldState, input: Input): WorldState {
   }
 
   // ---------- มอนชนผู้เล่น ----------
-  if (invulnerable <= 0) {
+  if (invulnerable <= 0 && !ultimateGuard) {
     for (const enemy of aliveEnemies) {
       if (distance(enemy.pos, player.pos) > enemy.radius + player.radius) continue
       hp -= enemy.damage
@@ -961,6 +1120,7 @@ export function step(world: WorldState, input: Input): WorldState {
     eliteCooldown,
     bossCooldown,
     bossesDown,
+    ultimate,
     nextId,
     kills,
     phase: dead ? 'dead' : leveledUp ? 'question' : 'playing',
@@ -1271,6 +1431,8 @@ export interface RunSummary {
   bossesDown: number
   /** ชื่อร่างสมบูรณ์ที่ทำได้ในรอบนี้ */
   evolvedNames: string[]
+  /** ใช้สกิลวิเศษไปกี่ครั้ง */
+  ultimatesUsed: number
 }
 
 export function summarize(world: WorldState): RunSummary {
@@ -1286,5 +1448,6 @@ export function summarize(world: WorldState): RunSummary {
     coins: Math.floor(world.time / 3) + world.kills * 2 + world.bossesDown * 25,
     bossesDown: world.bossesDown,
     evolvedNames: world.evolved.map((id) => weaponDisplayName(id, true)),
+    ultimatesUsed: world.ultimate.used,
   }
 }

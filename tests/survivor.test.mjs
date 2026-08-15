@@ -30,6 +30,7 @@ const E = load('survivor/engine')
 const S = load('survivor/skills')
 const T = load('survivor/types')
 const W = load('survivor/weapons')
+const U = load('survivor/ultimates')
 
 let passed = 0
 const failures = []
@@ -1336,6 +1337,190 @@ check('รอบหนึ่งต้องยาวพอให้ได้ต�
 
   const average = total / seeds.length
   assert(average >= 9, `เฉลี่ยได้ตอบโจทย์แค่ ${average.toFixed(1)} ข้อต่อรอบ ซึ่งน้อยเกินไป`)
+})
+
+
+
+// ---------- สกิลวิเศษประจำตัวละคร ----------
+
+/** โลกที่ชาร์จสกิลเต็มแล้ว พร้อมกด */
+function chargedWorld(avatarId, extra = {}) {
+  const base = E.createWorld('สกิล', avatarId)
+  const spec = U.ultimateFor(avatarId)
+  return {
+    ...base,
+    ...extra,
+    ultimate: { ...base.ultimate, charge: spec.cost },
+  }
+}
+
+check('ตัวละครทุกตัวต้องมีสกิลวิเศษ และต้องไม่ซ้ำกัน', () => {
+  const ids = U.ULTIMATE_IDS
+  assert(ids.length >= 6, `มีสกิลวิเศษแค่ ${ids.length} แบบ`)
+
+  const kinds = ids.map((id) => U.ultimateFor(id).kind)
+  assert(new Set(kinds).size === kinds.length, `สกิลวิเศษทำงานซ้ำแบบกัน: ${kinds.join(', ')}`)
+
+  for (const id of ids) {
+    const spec = U.ultimateFor(id)
+    assert(spec.cost > 0, `${spec.name} ชาร์จเต็มโดยไม่ต้องล้มมอนเลย`)
+    assert(spec.name && spec.description, `${id} ไม่มีชื่อหรือคำอธิบาย`)
+  }
+
+  // อวตารที่ไม่รู้จักต้องได้สกิลสำรอง ไม่ใช่ undefined
+  assert(U.ultimateFor('ไม่มีตัวนี้'), 'อวตารที่ไม่รู้จักไม่ได้สกิลสำรอง')
+})
+
+check('สกิลวิเศษต้องกดไม่ได้จนกว่าจะชาร์จเต็ม', () => {
+  let world = E.createWorld('ยังไม่เต็ม', 'warrior')
+  assert(!E.ultimateReady(world), 'เพิ่งเริ่มเกมแต่กดสกิลได้แล้ว')
+
+  // กดตอนยังไม่เต็มต้องไม่มีอะไรเกิดขึ้น และต้องไม่ล้างพลังที่สะสมไว้
+  world = { ...world, ultimate: { ...world.ultimate, charge: 5 } }
+  const after = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+  assert(after.ultimate.used === 0, 'กดตอนยังไม่เต็มแล้วกลับใช้ได้')
+  assert(after.ultimate.charge === 5, 'กดตอนยังไม่เต็มแล้วพลังที่สะสมหายไป')
+})
+
+check('ล้มมอนแล้วต้องชาร์จสกิล และบอสให้มากกว่ามอนธรรมดา', () => {
+  const make = (boss) => ({
+    id: 1, pos: { x: 400, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
+    damage: 0, kind: boss ? 'boss-slime-king' : 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss, splitInto: 0, shootCooldown: 9,
+  })
+
+  const normal = E.step({ ...E.createWorld('ชาร์จ', 'warrior'), enemies: [make(false)] }, STILL)
+  const boss = E.step({ ...E.createWorld('ชาร์จ', 'warrior'), enemies: [make(true)] }, STILL)
+
+  assert(normal.ultimate.charge === 1, `ล้มมอนธรรมดาได้ ${normal.ultimate.charge} หน่วย`)
+  assert(boss.ultimate.charge > normal.ultimate.charge, 'ล้มบอสชาร์จได้ไม่มากกว่ามอนธรรมดา')
+})
+
+check('ตวัดพายุต้องกวาดมอนที่รุมอยู่รอบตัว', () => {
+  const near = {
+    id: 1, pos: { x: 420, y: 300 }, hp: 500, maxHp: 500, speed: 0, radius: 16,
+    damage: 0, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
+    clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
+    splitInto: 0, shootCooldown: 9,
+  }
+  const world = chargedWorld('warrior', { enemies: [near] })
+  const after = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+
+  assert(after.enemies[0].hp < 500, 'ใช้ตวัดพายุแล้วมอนที่อยู่ติดตัวไม่เจ็บเลย')
+  assert(after.ultimate.used === 1, 'ใช้สกิลแล้วไม่ได้นับ')
+  assert(after.ultimate.charge === 0, 'ใช้สกิลแล้วพลังไม่ถูกใช้')
+})
+
+check('หยุดเวลาต้องทำให้มอนเกือบหยุดนิ่งจริง', () => {
+  const enemy = () => ({
+    id: 1, pos: { x: 100, y: 300 }, hp: 999, maxHp: 999, speed: 150, radius: 16,
+    damage: 0, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
+    clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
+    splitInto: 0, shootCooldown: 9,
+  })
+
+  let frozen = chargedWorld('scientist', { enemies: [enemy()] })
+  let normal = chargedWorld('scientist', { enemies: [enemy()] })
+
+  frozen = E.step(frozen, { move: { x: 0, y: 0 }, useUltimate: true })
+  normal = E.step(normal, { move: { x: 0, y: 0 } })
+
+  for (let i = 0; i < 30; i += 1) {
+    frozen = E.step(frozen, { move: { x: 0, y: 0 } })
+    normal = E.step(normal, { move: { x: 0, y: 0 } })
+  }
+
+  const frozenMoved = frozen.enemies[0].pos.x - 100
+  const normalMoved = normal.enemies[0].pos.x - 100
+  assert(
+    frozenMoved < normalMoved * 0.35,
+    `หยุดเวลาแล้วมอนยังเดินได้ ${frozenMoved.toFixed(1)} เทียบกับปกติ ${normalMoved.toFixed(1)}`,
+  )
+})
+
+check('ลมกรดกับโล่พลังงานต้องทำให้ไม่เจ็บจริง', () => {
+  const hugging = {
+    id: 1, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
+    damage: 40, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
+    clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
+    splitInto: 0, shootCooldown: 9,
+  }
+
+  for (const avatar of ['explorer', 'inventor']) {
+    let world = chargedWorld(avatar, { enemies: [{ ...hugging }] })
+    world = { ...world, player: { ...world.player, pos: { x: 400, y: 300 } } }
+    world = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+    const hp = world.player.hp
+
+    for (let i = 0; i < 120; i += 1) world = E.step(world, { move: { x: 0, y: 0 } })
+
+    assert(
+      world.player.hp >= hp,
+      `${U.ultimateFor(avatar).name} เปิดอยู่แต่ยังเจ็บ เลือดลดจาก ${hp} เหลือ ${world.player.hp}`,
+    )
+  }
+})
+
+check('ลมกรดต้องทำให้เดินเร็วขึ้นจริง', () => {
+  let fast = chargedWorld('explorer')
+  let normal = chargedWorld('explorer')
+
+  fast = E.step(fast, { move: { x: 1, y: 0 }, useUltimate: true })
+  normal = E.step(normal, { move: { x: 1, y: 0 } })
+
+  assert(
+    fast.player.pos.x > normal.player.pos.x,
+    'เปิดลมกรดแล้วเดินไม่ได้เร็วกว่าปกติ',
+  )
+})
+
+check('ขุมทรัพย์ต้องดูดคริสตัลทั้งสนามและฟื้นเลือด', () => {
+  let world = chargedWorld('adventurer', {
+    gems: [
+      { id: 1, pos: { x: 20, y: 20 }, value: 4 },
+      { id: 2, pos: { x: 780, y: 580 }, value: 4 },
+    ],
+  })
+  world = { ...world, player: { ...world.player, hp: 30 } }
+
+  const after = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+
+  assert(after.gems.length === 0, 'ใช้ขุมทรัพย์แล้วยังมีคริสตัลค้างอยู่ในสนาม')
+  assert(after.player.hp > 30, 'ใช้ขุมทรัพย์แล้วเลือดไม่ฟื้น')
+})
+
+check('อุกกาบาตถล่มต้องตกหลายลูก ไม่ใช่ลูกเดียว', () => {
+  let world = chargedWorld('mage')
+  let blasts = 0
+
+  world = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+  blasts += world.effects.filter((effect) => effect.kind === 'blast').length
+
+  // เดินต่อจนสกิลหมดฤทธิ์ แล้วนับลูกที่ตกระหว่างนั้น
+  const seen = new Set(world.effects.map((effect) => effect.id))
+  for (let i = 0; i < 120 && world.ultimate.activeFor > 0; i += 1) {
+    world = E.step(world, { move: { x: 0, y: 0 } })
+    for (const effect of world.effects) {
+      if (effect.kind === 'blast' && !seen.has(effect.id)) {
+        seen.add(effect.id)
+        blasts += 1
+      }
+    }
+  }
+
+  assert(blasts >= 4, `อุกกาบาตตกแค่ ${blasts} ลูก ซึ่งน้อยเกินกว่าจะเรียกว่าถล่ม`)
+})
+
+check('ใช้สกิลแล้วต้องรอชาร์จใหม่ กดรัวไม่ได้', () => {
+  let world = chargedWorld('warrior')
+  world = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+  assert(world.ultimate.used === 1, 'กดครั้งแรกไม่ทำงาน')
+
+  for (let i = 0; i < 10; i += 1) {
+    world = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+  }
+  assert(world.ultimate.used === 1, `กดรัวแล้วใช้ได้ ${world.ultimate.used} ครั้งติด`)
 })
 
 
