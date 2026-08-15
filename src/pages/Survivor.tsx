@@ -11,6 +11,8 @@ import { applyBonusPercent, totalStats } from '../services/inventoryService'
 import {
   advance,
   createWorld,
+  isMoveKey,
+  moveFromKeys,
   offerCount,
   offerSkills,
   resolveQuestion,
@@ -58,12 +60,52 @@ export function Survivor({ player }: { player: Player }) {
   const keysRef = useRef<Set<string>>(new Set())
   const lastTimeRef = useRef(0)
   const paidRef = useRef(false)
+  const shellRef = useRef<HTMLDivElement>(null)
 
   // สถานะที่หน้าจอต้องรู้จริง ๆ เท่านั้นที่เก็บเป็น state
   const [phase, setPhase] = useState<'idle' | 'playing' | 'question' | 'choosing' | 'dead'>('idle')
   const [hud, setHud] = useState({ hp: 100, maxHp: 100, level: 1, xp: 0, xpToNext: 5, time: 0, kills: 0 })
   const [question, setQuestion] = useState<Question | null>(null)
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(null)
+  const [immersive, setImmersive] = useState(false)
+
+  /*
+   * โหมดเต็มจอ
+   *
+   * ทำสองชั้นซ้อนกันโดยตั้งใจ
+   * 1. ขอ Fullscreen API จากเบราว์เซอร์ ซึ่งซ่อนแถบที่อยู่และแถบแท็บได้จริง
+   * 2. ขยายเต็มหน้าต่างด้วย CSS ควบคู่ไปด้วยเสมอ
+   *
+   * ที่ต้องมีชั้นที่สองเพราะ Safari บน iPhone ไม่รองรับ Fullscreen API
+   * กับ element ทั่วไป (รองรับเฉพาะวิดีโอ)
+   * ถ้าพึ่ง API อย่างเดียว เด็กที่ใช้ iPhone จะกดปุ่มแล้วไม่มีอะไรเกิดขึ้นเลย
+   * ส่วน iPad รุ่นใหม่รองรับ จึงได้เต็มจอจริง
+   */
+  const toggleImmersive = useCallback(async () => {
+    const next = !immersive
+    setImmersive(next)
+
+    try {
+      if (next) {
+        if (shellRef.current?.requestFullscreen && !document.fullscreenElement) {
+          await shellRef.current.requestFullscreen()
+        }
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch {
+      // เบราว์เซอร์ปฏิเสธหรือไม่รองรับ ไม่เป็นไร ชั้น CSS ยังทำงานอยู่
+    }
+  }, [immersive])
+
+  /* กดปุ่ม Esc ออกจากเต็มจอ ต้องให้ CSS กลับมาตรงกันด้วย */
+  useEffect(() => {
+    const sync = () => {
+      if (!document.fullscreenElement) setImmersive(false)
+    }
+    document.addEventListener('fullscreenchange', sync)
+    return () => document.removeEventListener('fullscreenchange', sync)
+  }, [])
 
   /** ตั้งโจทย์สำหรับเลเวลอัปครั้งนี้ */
   const askQuestion = useCallback(() => {
@@ -128,32 +170,54 @@ export function Survivor({ player }: { player: Player }) {
     return () => cancelAnimationFrame(frame)
   }, [askQuestion, phase])
 
-  /* แป้นพิมพ์สำหรับเครื่องที่มีคีย์บอร์ด */
+  /*
+   * แป้นพิมพ์ WASD และปุ่มลูกศร
+   *
+   * ใช้ event.code ไม่ใช่ event.key เด็ดขาด
+   *
+   * event.key คือ "ตัวอักษรที่พิมพ์ออกมา" ซึ่งเปลี่ยนตามผังแป้นพิมพ์
+   * ถ้าเด็กเปิดแป้นภาษาไทยค้างไว้ กด W จะได้ "ไ" กด A จะได้ "ฟ"
+   * WASD จะใช้ไม่ได้เลยทั้งชุด ซึ่งในห้องเรียนไทยเกิดขึ้นแน่นอน
+   * และถ้าเปิด Caps Lock ไว้ event.key จะเป็น "W" ตัวใหญ่ซึ่งก็ไม่ตรงอีก
+   *
+   * event.code คือ "ปุ่มไหนบนแป้น" ไม่ขึ้นกับภาษาและไม่ขึ้นกับ Caps Lock
+   */
   useEffect(() => {
     const apply = () => {
-      const keys = keysRef.current
-      const move = { x: 0, y: 0 }
-      if (keys.has('ArrowLeft') || keys.has('a')) move.x -= 1
-      if (keys.has('ArrowRight') || keys.has('d')) move.x += 1
-      if (keys.has('ArrowUp') || keys.has('w')) move.y -= 1
-      if (keys.has('ArrowDown') || keys.has('s')) move.y += 1
-      inputRef.current = { move }
+      inputRef.current = { move: moveFromKeys(keysRef.current) }
     }
 
+
     const down = (event: KeyboardEvent) => {
-      keysRef.current.add(event.key)
+      if (!isMoveKey(event.code)) return
+      // กันปุ่มลูกศรเลื่อนหน้าเว็บระหว่างเล่น ซึ่งทำให้สนามหลุดจอ
+      event.preventDefault()
+      keysRef.current.add(event.code)
       apply()
     }
     const up = (event: KeyboardEvent) => {
-      keysRef.current.delete(event.key)
+      if (!isMoveKey(event.code)) return
+      keysRef.current.delete(event.code)
       apply()
     }
 
-    window.addEventListener('keydown', down)
+    /*
+     * สลับแท็บหรือคลิกออกไปนอกหน้าต่างระหว่างกดปุ่มค้างอยู่
+     * เบราว์เซอร์จะไม่ส่ง keyup มาให้ ปุ่มจะค้างว่ากดอยู่ตลอด
+     * แล้วตัวละครจะเดินชนขอบจอไปเรื่อย ๆ ทั้งที่เด็กปล่อยมือแล้ว
+     */
+    const clearKeys = () => {
+      keysRef.current.clear()
+      apply()
+    }
+
+    window.addEventListener('keydown', down, { passive: false })
     window.addEventListener('keyup', up)
+    window.addEventListener('blur', clearKeys)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
+      window.removeEventListener('blur', clearKeys)
     }
   }, [])
 
@@ -212,23 +276,60 @@ export function Survivor({ player }: { player: Player }) {
   }, [])
 
   return (
-    <>
-      <TopBar player={player} title="สนามรบตัวเลข" backTo="/menu" backLabel="กลับเมนู" />
+    <div
+      ref={shellRef}
+      className={
+        immersive
+          ? 'fixed inset-0 z-50 flex flex-col items-center justify-center bg-night-900 p-2'
+          : ''
+      }
+    >
+      {!immersive && (
+        <TopBar player={player} title="สนามรบตัวเลข" backTo="/menu" backLabel="กลับเมนู" />
+      )}
 
-      <ScreenLayout width="wide">
-        {phase === 'idle' && <Intro onStart={start} />}
+      <div className={immersive ? 'flex h-full w-full flex-col' : ''}>
+        {!immersive && (
+          <ScreenLayout width="wide">
+            {phase === 'idle' && <Intro onStart={start} />}
+          </ScreenLayout>
+        )}
 
         {phase !== 'idle' && (
-          <>
-            <Hud hud={hud} />
+          <div
+            className={
+              immersive
+                ? 'flex h-full w-full flex-col gap-2'
+                : 'mx-auto w-full max-w-5xl px-4 pb-8'
+            }
+          >
+            <Hud hud={hud} immersive={immersive} onToggleFullscreen={toggleImmersive} />
 
-            <div className="relative mt-3">
+            {/*
+              กรอบสนาม
+              เต็มจอใช้ min-h-0 เพื่อให้ flex ย่อกรอบลงได้จริง
+              ถ้าไม่ใส่ กรอบจะดันความสูงจนแป้นบังคับหลุดออกนอกจอ
+            */}
+            <div
+              className={
+                immersive
+                  ? 'relative flex min-h-0 flex-1 items-center justify-center'
+                  : 'relative mt-3'
+              }
+            >
               <canvas
                 ref={canvasRef}
                 width={ARENA_WIDTH}
                 height={ARENA_HEIGHT}
-                className="w-full rounded-xl2 border border-white/10 bg-night-900"
-                style={{ aspectRatio: `${ARENA_WIDTH} / ${ARENA_HEIGHT}`, touchAction: 'none' }}
+                className={
+                  immersive
+                    ? 'max-h-full max-w-full rounded-lg border border-white/10 bg-night-900'
+                    : 'w-full rounded-xl2 border border-white/10 bg-night-900'
+                }
+                style={{
+                  aspectRatio: `${ARENA_WIDTH} / ${ARENA_HEIGHT}`,
+                  touchAction: 'none',
+                }}
               />
 
               {phase === 'question' && question && (
@@ -239,10 +340,7 @@ export function Survivor({ player }: { player: Player }) {
 
               {phase === 'choosing' && (
                 <Overlay>
-                  <SkillCards
-                    world={worldRef.current}
-                    onChoose={chooseSkill}
-                  />
+                  <SkillCards world={worldRef.current} onChoose={chooseSkill} />
                 </Overlay>
               )}
 
@@ -253,11 +351,11 @@ export function Survivor({ player }: { player: Player }) {
               )}
             </div>
 
-            {phase === 'playing' && <Joystick inputRef={inputRef} />}
-          </>
+            {phase === 'playing' && <Joystick inputRef={inputRef} compact={immersive} />}
+          </div>
         )}
-      </ScreenLayout>
-    </>
+      </div>
+    </div>
   )
 }
 
@@ -407,14 +505,24 @@ function Intro({ onStart }: { onStart: () => void }) {
 
 function Hud({
   hud,
+  immersive,
+  onToggleFullscreen,
 }: {
   hud: { hp: number; maxHp: number; level: number; xp: number; xpToNext: number; time: number; kills: number }
+  immersive: boolean
+  onToggleFullscreen: () => void
 }) {
   const minutes = Math.floor(hud.time / 60)
   const seconds = hud.time % 60
 
   return (
-    <div className="rounded-xl2 border border-white/10 bg-night-800/60 p-3">
+    <div
+      className={
+        immersive
+          ? 'shrink-0 rounded-lg border border-white/10 bg-night-800/60 px-3 py-2'
+          : 'rounded-xl2 border border-white/10 bg-night-800/60 p-3'
+      }
+    >
       <div className="flex flex-wrap items-center gap-3 text-sm font-bold">
         <span className="flex items-center gap-1 text-rose-300">
           <GameIcon name="heart" size="h-4 w-4" />
@@ -431,6 +539,14 @@ function Hud({
         <span className="ml-auto tabular-nums text-gold-300">
           {minutes}:{String(seconds).padStart(2, '0')}
         </span>
+        <button
+          type="button"
+          onClick={onToggleFullscreen}
+          aria-label={immersive ? 'ออกจากเต็มจอ' : 'เล่นเต็มจอ'}
+          className="rounded-lg border border-white/20 bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-200"
+        >
+          {immersive ? 'ย่อจอ' : 'เต็มจอ'}
+        </button>
       </div>
 
       {/* แถบเลือดกับแถบ XP */}
@@ -594,7 +710,13 @@ function DeadCard({
  * เขียนลงใน ref ตรง ๆ ไม่ผ่าน state
  * เพราะนิ้วขยับถี่มาก ถ้า setState ทุกครั้งจะเรนเดอร์ใหม่ทั้งหน้าจนกระตุก
  */
-function Joystick({ inputRef }: { inputRef: MutableRefObject<Input> }) {
+function Joystick({
+  inputRef,
+  compact = false,
+}: {
+  inputRef: MutableRefObject<Input>
+  compact?: boolean
+}) {
   const padRef = useRef<HTMLDivElement>(null)
   const [knob, setKnob] = useState({ x: 0, y: 0 })
 
@@ -627,7 +749,7 @@ function Joystick({ inputRef }: { inputRef: MutableRefObject<Input> }) {
   }, [inputRef])
 
   return (
-    <div className="mt-4 flex justify-center">
+    <div className={compact ? 'flex shrink-0 justify-center py-1' : 'mt-4 flex justify-center'}>
       <div
         ref={padRef}
         onPointerDown={(event) => {
@@ -640,10 +762,14 @@ function Joystick({ inputRef }: { inputRef: MutableRefObject<Input> }) {
         }}
         onPointerUp={release}
         onPointerCancel={release}
-        className="relative h-36 w-36 touch-none rounded-full border-2 border-white/15 bg-night-800/70"
+        className={`relative touch-none rounded-full border-2 border-white/15 bg-night-800/70 ${
+          compact ? 'h-24 w-24' : 'h-36 w-36'
+        }`}
       >
         <div
-          className="absolute left-1/2 top-1/2 h-14 w-14 rounded-full border-2 border-sky-400/60 bg-sky-500/30"
+          className={`absolute left-1/2 top-1/2 rounded-full border-2 border-sky-400/60 bg-sky-500/30 ${
+            compact ? 'h-10 w-10' : 'h-14 w-14'
+          }`}
           style={{ transform: `translate(calc(-50% + ${knob.x}px), calc(-50% + ${knob.y}px))` }}
         />
       </div>

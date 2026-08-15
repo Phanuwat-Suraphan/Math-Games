@@ -146,6 +146,86 @@ check('เดินทแยงต้องไม่เร็วกว่าเ�
   )
 })
 
+// ---------- ปุ่มบังคับ ----------
+
+check('WASD ต้องเดินได้ทุกทิศ และตรงกับปุ่มลูกศร', () => {
+  const cases = [
+    [['KeyW'], { x: 0, y: -1 }],
+    [['KeyS'], { x: 0, y: 1 }],
+    [['KeyA'], { x: -1, y: 0 }],
+    [['KeyD'], { x: 1, y: 0 }],
+    [['ArrowUp'], { x: 0, y: -1 }],
+    [['ArrowDown'], { x: 0, y: 1 }],
+    [['ArrowLeft'], { x: -1, y: 0 }],
+    [['ArrowRight'], { x: 1, y: 0 }],
+    [['KeyW', 'KeyD'], { x: 1, y: -1 }],
+  ]
+
+  for (const [codes, expected] of cases) {
+    const move = E.moveFromKeys(new Set(codes))
+    assert(
+      move.x === expected.x && move.y === expected.y,
+      `${codes.join('+')} ได้ (${move.x},${move.y}) ควรเป็น (${expected.x},${expected.y})`,
+    )
+  }
+})
+
+check('กดสองทิศตรงข้ามพร้อมกันต้องหักล้างกัน ไม่ไถลไปทางใดทางหนึ่ง', () => {
+  const leftRight = E.moveFromKeys(new Set(['KeyA', 'KeyD']))
+  assert(leftRight.x === 0, `ซ้าย+ขวาได้ x = ${leftRight.x}`)
+
+  const upDown = E.moveFromKeys(new Set(['KeyW', 'KeyS']))
+  assert(upDown.y === 0, `บน+ล่างได้ y = ${upDown.y}`)
+})
+
+check('ไม่กดอะไรเลยต้องอยู่นิ่ง', () => {
+  const move = E.moveFromKeys(new Set())
+  assert(move.x === 0 && move.y === 0, 'ไม่กดปุ่มแต่ขยับ')
+})
+
+check('ปุ่มที่ไม่เกี่ยวกับการเดินต้องไม่ทำอะไร', () => {
+  const move = E.moveFromKeys(new Set(['Space', 'Enter', 'KeyQ', 'ShiftLeft']))
+  assert(move.x === 0 && move.y === 0, 'ปุ่มอื่นทำให้ขยับ')
+
+  assert(!E.isMoveKey('Space'), 'Space ถูกนับเป็นปุ่มเดิน')
+  assert(!E.isMoveKey('KeyQ'), 'Q ถูกนับเป็นปุ่มเดิน')
+  assert(E.isMoveKey('KeyW'), 'W ไม่ถูกนับเป็นปุ่มเดิน')
+  assert(E.isMoveKey('ArrowUp'), 'ลูกศรขึ้นไม่ถูกนับเป็นปุ่มเดิน')
+})
+
+check('รหัสปุ่มต้องเป็นรหัสตำแหน่งบนแป้น ไม่ใช่ตัวอักษรที่พิมพ์ออกมา', () => {
+  /*
+   * ถ้าเผลอกลับไปใช้ event.key รายการนี้จะกลายเป็น 'w' 'a' 's' 'd'
+   * ซึ่งจะพังทันทีเมื่อเด็กเปิดแป้นภาษาไทยหรือ Caps Lock
+   * ข้อนี้จึงเฝ้าไม่ให้ถอยกลับไปแบบนั้นโดยไม่ตั้งใจ
+   */
+  for (const code of E.MOVE_KEY_CODES) {
+    assert(
+      code.startsWith('Key') || code.startsWith('Arrow'),
+      `${code} ไม่ใช่รหัสตำแหน่งปุ่ม`,
+    )
+  }
+
+  // ตัวอักษรไทยที่ได้จากการกด WASD บนแป้นภาษาไทย ต้องไม่ถูกนับว่าเป็นปุ่มเดิน
+  for (const thai of ['ไ', 'ฟ', 'ห', 'ก']) {
+    assert(!E.isMoveKey(thai), `ตัวอักษรไทย ${thai} ถูกนับเป็นปุ่มเดิน`)
+  }
+  // ตัวอักษรอังกฤษตัวเล็กก็ต้องไม่ถูกนับ เพราะนั่นคือค่าจาก event.key
+  for (const letter of ['w', 'a', 's', 'd', 'W']) {
+    assert(!E.isMoveKey(letter), `ตัวอักษร ${letter} ถูกนับเป็นปุ่มเดิน ซึ่งแปลว่ากลับไปใช้ event.key`)
+  }
+})
+
+check('ทิศจากปุ่มต้องขับเคลื่อนตัวละครได้จริงในเกม', () => {
+  let world = E.createWorld('ปุ่มจริง')
+  const startY = world.player.pos.y
+
+  for (let i = 0; i < 30; i += 1) {
+    world = E.step(world, { move: E.moveFromKeys(new Set(['KeyW'])) })
+  }
+  assert(world.player.pos.y < startY, 'กด W แล้วไม่เดินขึ้น')
+})
+
 // ---------- มอนสเตอร์ ----------
 
 check('มอนต้องโผล่มาเองเมื่อเวลาผ่านไป', () => {

@@ -23,6 +23,10 @@ jobs:
       - name: ติดตั้ง dependency
         run: npm install
 
+      # ตรวจการนำเข้าชื่อข้ามไฟล์ ไม่ต้องใช้ dependency จึงรันได้ทันที
+      - name: ตรวจการนำเข้าชื่อข้ามไฟล์
+        run: node tests/imports.test.mjs
+
       # ขั้นนี้สำคัญที่สุด เป็นการตรวจไฟล์ React ที่ตรวจในเครื่องพัฒนาไม่ได้
       - name: ตรวจ TypeScript ทั้งโปรเจกต์
         run: npm run typecheck

@@ -439,6 +439,45 @@ export function advance(world: WorldState, elapsedSeconds: number, input: Input)
 }
 
 /**
+ * ปุ่มที่ใช้เดิน เก็บเป็นรหัสตำแหน่งปุ่มบนแป้น ไม่ใช่ตัวอักษรที่พิมพ์ออกมา
+ *
+ * ต้องใช้ event.code ไม่ใช่ event.key
+ * event.key คือตัวอักษรที่พิมพ์ออกมา ซึ่งเปลี่ยนตามผังแป้นพิมพ์
+ * เด็กที่เปิดแป้นภาษาไทยค้างไว้ กด W จะได้ "ไ" กด A จะได้ "ฟ"
+ * WASD จะใช้ไม่ได้ทั้งชุด ซึ่งในห้องเรียนไทยเกิดขึ้นแน่นอน
+ * และถ้าเปิด Caps Lock ไว้ event.key จะเป็นตัวใหญ่ซึ่งก็ไม่ตรงอีก
+ */
+export const MOVE_KEY_CODES = [
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'KeyA',
+  'KeyD',
+  'KeyW',
+  'KeyS',
+] as const
+
+export function isMoveKey(code: string): boolean {
+  return (MOVE_KEY_CODES as readonly string[]).includes(code)
+}
+
+/**
+ * แปลงปุ่มที่กดค้างอยู่เป็นทิศทางเดิน
+ *
+ * กดซ้ายกับขวาพร้อมกันต้องได้ศูนย์ ไม่ใช่เอียงไปทางใดทางหนึ่ง
+ * เด็กกดรัวสองปุ่มพร้อมกันบ่อยมาก ถ้าไม่หักล้างกันตัวละครจะไถลเอง
+ */
+export function moveFromKeys(codes: ReadonlySet<string>): Vec {
+  const move = { x: 0, y: 0 }
+  if (codes.has('ArrowLeft') || codes.has('KeyA')) move.x -= 1
+  if (codes.has('ArrowRight') || codes.has('KeyD')) move.x += 1
+  if (codes.has('ArrowUp') || codes.has('KeyW')) move.y -= 1
+  if (codes.has('ArrowDown') || codes.has('KeyS')) move.y += 1
+  return move
+}
+
+/**
  * สกิลที่เสนอให้เลือก
  *
  * ตอบโจทย์ถูกได้เลือกสามใบ ตอบผิดได้สองใบ
