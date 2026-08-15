@@ -15,12 +15,13 @@ import {
   moveFromKeys,
   offerCount,
   offerSkills,
+  readyToEvolve,
   resolveQuestion,
   skipSkill,
   summarize,
   takeSkill,
 } from '../survivor/engine'
-import { getWeapon } from '../survivor/weapons'
+import { getWeapon, weaponDisplayName } from '../survivor/weapons'
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../survivor/types'
 import type { Input, WorldState } from '../survivor/types'
 import type { Question } from '../questionEngine/types'
@@ -70,8 +71,9 @@ export function Survivor({ player }: { player: Player }) {
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(null)
   const [immersive, setImmersive] = useState(false)
   const [weaponBar, setWeaponBar] = useState<
-    { id: string; level: number; name: string; color: string }[]
+    { id: string; level: number; name: string; color: string; evolved: boolean; ready: boolean }[]
   >([])
+  const [chests, setChests] = useState(0)
 
   /*
    * โหมดเต็มจอ
@@ -154,6 +156,7 @@ export function Survivor({ player }: { player: Player }) {
         time: Math.floor(after.time),
         kills: after.kills,
       })
+      setChests(after.chests)
 
       /*
        * แถบอาวุธเปลี่ยนเฉพาะตอนเลเวลอัป ไม่ใช่ทุกเฟรม
@@ -161,19 +164,28 @@ export function Survivor({ player }: { player: Player }) {
        * แล้ว React เรนเดอร์แถบสถานะใหม่ทั้งแถบโดยไม่จำเป็น
        */
       const owned = Object.entries(after.weapons)
+      const ready = readyToEvolve(after)
       setWeaponBar((current) => {
         if (
           current.length === owned.length &&
-          current.every((entry) => after.weapons[entry.id] === entry.level)
+          current.every(
+            (entry) =>
+              after.weapons[entry.id] === entry.level &&
+              after.evolved.includes(entry.id) === entry.evolved &&
+              ready.includes(entry.id) === entry.ready,
+          )
         ) {
           return current
         }
         return owned.map(([id, level]) => {
           const weapon = getWeapon(id)
+          const evolved = after.evolved.includes(id)
           return {
             id,
             level,
-            name: weapon?.name ?? id,
+            evolved,
+            ready: ready.includes(id),
+            name: weaponDisplayName(id, evolved),
             color: weapon?.color ?? '#e2e8f0',
           }
         })
@@ -265,7 +277,14 @@ export function Survivor({ player }: { player: Player }) {
     setSummary(null)
     setQuestion(null)
     setWeaponBar([])
+    setChests(0)
     setPhase('playing')
+  }, [])
+
+  /** จบรอบเองโดยไม่ต้องรอตาย เพื่อรับเหรียญที่สะสมไว้ */
+  const endRun = useCallback(() => {
+    setSummary(summarize(worldRef.current))
+    setPhase('dead')
   }, [])
 
   const submitAnswer = useCallback(
@@ -335,8 +354,10 @@ export function Survivor({ player }: { player: Player }) {
             <Hud
               hud={hud}
               weapons={weaponBar}
+              chests={chests}
               immersive={immersive}
               onToggleFullscreen={toggleImmersive}
+              onEndRun={phase === 'playing' ? endRun : undefined}
             />
 
             {/*
@@ -439,6 +460,39 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     ctx.fill()
   }
 
+  /*
+   * ของที่ตกอยู่บนพื้น
+   * วาดก่อนมอน เพื่อให้มอนที่เดินผ่านทับได้ตามธรรมชาติ
+   * แต่หีบวาดใหญ่และกะพริบ เพราะเป็นของที่ห้ามพลาด
+   */
+  for (const pickup of world.pickups) {
+    const pulse = 1 + Math.sin(world.time * 6) * 0.12
+
+    if (pickup.kind === 'chest') {
+      ctx.fillStyle = '#fbbf24'
+      ctx.fillRect(pickup.pos.x - 13 * pulse, pickup.pos.y - 10 * pulse, 26 * pulse, 20 * pulse)
+      ctx.fillStyle = '#92400e'
+      ctx.fillRect(pickup.pos.x - 13 * pulse, pickup.pos.y - 2, 26 * pulse, 4)
+      ctx.strokeStyle = '#fff7ed'
+      ctx.lineWidth = 2
+      ctx.strokeRect(pickup.pos.x - 13 * pulse, pickup.pos.y - 10 * pulse, 26 * pulse, 20 * pulse)
+      continue
+    }
+
+    const LOOK: Record<string, string> = {
+      heart: '#fb7185',
+      bomb: '#f8fafc',
+      magnet: '#c084fc',
+    }
+    ctx.fillStyle = LOOK[pickup.kind] ?? '#e2e8f0'
+    ctx.beginPath()
+    ctx.arc(pickup.pos.x, pickup.pos.y, 9 * pulse, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.strokeStyle = 'rgba(255,255,255,.85)'
+    ctx.lineWidth = 2
+    ctx.stroke()
+  }
+
   // มอนสเตอร์ สีต่างกันตามชนิด
   const COLORS: Record<string, string> = {
     'number-slime': '#34d399',
@@ -451,6 +505,10 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
     'math-guardian': '#60a5fa',
     'fraction-ghost': '#c4b5fd',
     'dragon-of-numbers': '#dc2626',
+    'boss-slime-king': '#059669',
+    'boss-fraction-lord': '#7c3aed',
+    'boss-golem-king': '#64748b',
+    'boss-number-dragon': '#b91c1c',
   }
 
   for (const enemy of world.enemies) {
@@ -466,6 +524,31 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
       ctx.beginPath()
       ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 5, 0, Math.PI * 2)
       ctx.stroke()
+    }
+
+    /*
+     * บอสมีมงกุฎหนามสองชั้นและวงแหวนแดง
+     * ต้องแยกออกจากตัวใหญ่พิเศษได้ในพริบตา เพราะสองอย่างนี้ทำคนละหน้าที่
+     * ตัวใหญ่พิเศษล้มหรือไม่ล้มก็ได้ แต่บอสคือของที่ต้องล้มให้ได้เพื่อเอาหีบ
+     */
+    if (enemy.boss) {
+      ctx.strokeStyle = '#f43f5e'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius + 7, 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.fillStyle = '#fbbf24'
+      const spikes = 5
+      const top = enemy.pos.y - enemy.radius - 10
+      ctx.beginPath()
+      for (let i = 0; i < spikes; i += 1) {
+        const x = enemy.pos.x - enemy.radius * 0.6 + (i * enemy.radius * 1.2) / (spikes - 1)
+        ctx.moveTo(x - 4, top + 8)
+        ctx.lineTo(x, top - 4)
+        ctx.lineTo(x + 4, top + 8)
+      }
+      ctx.fill()
     }
 
     // ติดไฟกับโดนแช่แข็งต้องเห็นได้ทันที ไม่งั้นเด็กไม่รู้ว่าอาวุธทำงานอยู่
@@ -563,6 +646,24 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState): void {
   ctx.arc(world.player.pos.x - 4, world.player.pos.y - 3, 2.6, 0, Math.PI * 2)
   ctx.arc(world.player.pos.x + 4, world.player.pos.y - 3, 2.6, 0, Math.PI * 2)
   ctx.fill()
+
+  /*
+   * ข้อความแจ้งเหตุการณ์สำคัญ วาดท้ายสุดให้อยู่บนสุดเสมอ
+   * ลอยขึ้นและจางลงพร้อมกัน ตาจึงจับได้แม้กำลังโฟกัสที่การหลบมอนอยู่
+   */
+  ctx.textAlign = 'center'
+  world.notices.forEach((notice, index) => {
+    const fade = Math.max(0, Math.min(1, notice.life / notice.maxLife))
+    const rise = (1 - fade) * 26
+    const y = 96 + index * 30 - rise
+
+    ctx.font = 'bold 22px system-ui, sans-serif'
+    ctx.fillStyle = `rgba(15,10,30,${fade * 0.7})`
+    ctx.fillText(notice.text, ARENA_WIDTH / 2 + 2, y + 2)
+    ctx.fillStyle = `rgba(253,224,71,${fade})`
+    ctx.fillText(notice.text, ARENA_WIDTH / 2, y)
+  })
+  ctx.textAlign = 'start'
 }
 
 /* ---------- ส่วนประกอบหน้าจอ ---------- */
@@ -581,6 +682,8 @@ function Intro({ onStart }: { onStart: () => void }) {
         <li>· ตอบถูกได้เลือก 3 ใบ ตอบผิดได้เลือก 2 ใบ</li>
         <li>· มีอาวุธ 4 แบบ: ดาบ · เวทไฟ · เวทไฟฟ้า · เวทน้ำแข็ง</li>
         <li>· แต่ละแบบอัปได้ 5 ระดับ และถือพร้อมกันได้ 4 ชิ้น</li>
+        <li>· ทุก 1 นาทีจะมี <b>บอส</b> โผล่มา ล้มได้จะมี <b>หีบสมบัติ</b> ตก</li>
+        <li>· อาวุธเต็มระดับ + สกิลคู่ควบ + หีบ = <b>ร่างสมบูรณ์</b> ที่แรงขึ้นเท่าตัว</li>
         <li>· บังคับด้วยการลากนิ้วบนแป้น หรือปุ่มลูกศร / WASD</li>
       </ul>
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
@@ -593,13 +696,17 @@ function Intro({ onStart }: { onStart: () => void }) {
 function Hud({
   hud,
   weapons,
+  chests,
   immersive,
   onToggleFullscreen,
+  onEndRun,
 }: {
   hud: { hp: number; maxHp: number; level: number; xp: number; xpToNext: number; time: number; kills: number }
-  weapons: { id: string; level: number; name: string; color: string }[]
+  weapons: { id: string; level: number; name: string; color: string; evolved: boolean; ready: boolean }[]
+  chests: number
   immersive: boolean
   onToggleFullscreen: () => void
+  onEndRun?: () => void
 }) {
   const minutes = Math.floor(hud.time / 60)
   const seconds = hud.time % 60
@@ -636,20 +743,46 @@ function Hud({
         >
           {immersive ? 'ย่อจอ' : 'เต็มจอ'}
         </button>
+        {/*
+          ปุ่มจบรอบ จำเป็นเพราะบิลด์ที่สมบูรณ์แล้วแทบไม่ตาย
+          จำลองแล้วมีรอบที่เล่นถึงสิบห้านาทีก็ยังไม่ตาย
+          และเหรียญจ่ายตอนจบรอบเท่านั้น เด็กที่เก่งที่สุดจึงไม่ได้รางวัลสักที
+        */}
+        {onEndRun && (
+          <button
+            type="button"
+            onClick={onEndRun}
+            className="rounded-lg border border-rose-400/40 bg-rose-500/10 px-2.5 py-1 text-xs font-bold text-rose-200"
+          >
+            จบรอบ
+          </button>
+        )}
       </div>
 
       {/* อาวุธที่ถืออยู่ พร้อมระดับของแต่ละชิ้น */}
       {weapons.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {weapons.map(({ id, level, name, color }) => (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {weapons.map(({ id, level, name, color, evolved, ready }) => (
             <span
               key={id}
-              className="rounded border px-1.5 py-0.5 text-[11px] font-bold"
-              style={{ borderColor: `${color}66`, color }}
+              className={`rounded border px-1.5 py-0.5 text-[11px] font-bold ${
+                evolved ? 'ring-1 ring-gold-300' : ''
+              }`}
+              style={{
+                borderColor: evolved ? '#fcd34d' : `${color}66`,
+                color: evolved ? '#fcd34d' : color,
+              }}
             >
-              {name} {level}
+              {name} {evolved ? '★' : level}
+              {/* บอกทันทีว่าอาวุธนี้รอแค่หีบแล้ว เด็กจะได้รู้ว่าต้องไปล้มบอส */}
+              {ready && <span className="ml-1 text-gold-200">พร้อม!</span>}
             </span>
           ))}
+          {chests > 0 && (
+            <span className="rounded border border-gold-400/60 bg-gold-500/15 px-1.5 py-0.5 text-[11px] font-bold text-gold-200">
+              หีบเก็บไว้ {chests}
+            </span>
+          )}
         </div>
       )}
 
@@ -781,9 +914,26 @@ function DeadCard({
       <h2 className="text-2xl font-black text-white">
         รอดได้ {minutes}:{String(seconds).padStart(2, '0')}
       </h2>
-      <p className="mt-2 text-sm text-slate-300">รอบหน้าลองเดินหลบให้นานกว่านี้นะ</p>
+      <p className="mt-2 text-sm text-slate-300">
+        {summary.evolvedNames.length > 0
+          ? 'สุดยอด! ทำอาวุธให้สมบูรณ์ได้ด้วย'
+          : 'ลองอัปอาวุธชิ้นเดียวให้เต็ม แล้วเก็บสกิลคู่ควบดูนะ'}
+      </p>
 
-      <dl className="mt-4 grid grid-cols-3 gap-2 text-sm">
+      {summary.evolvedNames.length > 0 && (
+        <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+          {summary.evolvedNames.map((name) => (
+            <span
+              key={name}
+              className="rounded-full border border-gold-400/60 bg-gold-500/15 px-2.5 py-1 text-xs font-bold text-gold-200"
+            >
+              ★ {name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <dl className="mt-4 grid grid-cols-4 gap-2 text-sm">
         <div className="rounded-lg border border-white/10 bg-white/5 py-2">
           <dt className="text-[11px] text-slate-400">เลเวล</dt>
           <dd className="text-lg font-black text-white">{summary.level}</dd>
@@ -791,6 +941,10 @@ function DeadCard({
         <div className="rounded-lg border border-white/10 bg-white/5 py-2">
           <dt className="text-[11px] text-slate-400">ล้มมอน</dt>
           <dd className="text-lg font-black text-white">{summary.kills}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/5 py-2">
+          <dt className="text-[11px] text-slate-400">ล้มบอส</dt>
+          <dd className="text-lg font-black text-rose-300">{summary.bossesDown}</dd>
         </div>
         <div className="rounded-lg border border-white/10 bg-white/5 py-2">
           <dt className="text-[11px] text-slate-400">เหรียญ</dt>

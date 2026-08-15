@@ -31,6 +31,33 @@ export interface WeaponLevel {
   count: number
 }
 
+/**
+ * ร่างสมบูรณ์ของอาวุธ
+ *
+ * เงื่อนไขสามข้อ: อาวุธเต็มระดับ + มีสกิลคู่ควบครบชั้น + เปิดหีบจากบอส
+ *
+ * ทำไมต้องมีสามข้อ ไม่ใช่ข้อเดียว
+ * ถ้าอัปอาวุธเต็มแล้วได้เลย มันก็แค่ระดับที่หกที่ได้มาเองโดยไม่ต้องคิด
+ * การบังคับให้มีสกิลคู่ควบด้วย ทำให้เด็กต้อง "วางแผนตั้งแต่ต้นรอบ"
+ * ว่าจะไปทางไหน แล้วเก็บสกิลที่ตรงทางนั้น ไม่ใช่กดมั่วทุกใบที่โผล่มา
+ * ส่วนหีบจากบอสทำให้มีเป้าหมายที่ต้องออกไปสู้ ไม่ใช่หนีอย่างเดียวจนจบ
+ *
+ * สกิลคู่ควบของแต่ละอาวุธตั้งใจให้ไม่ซ้ำกันเลย
+ * เพราะถ้าซ้ำ เด็กจะเก็บสกิลตัวเดียวแล้วได้ร่างสมบูรณ์พร้อมกันหมด
+ * ซึ่งทำลายการตัดสินใจที่เป็นหัวใจของระบบนี้ไปเลย
+ */
+export interface Evolution {
+  name: string
+  description: string
+  /** สกิลติดตัวที่ต้องมีก่อน */
+  requiresSkill: string
+  /** ต้องมีสกิลนั้นกี่ชั้น */
+  requiresStacks: number
+  /** ชื่อสกิลที่แสดงให้เด็กอ่าน ไม่ต้องไปเปิดตารางเอง */
+  requiresLabel: string
+  stats: WeaponLevel
+}
+
 export interface Weapon {
   id: WeaponId
   name: string
@@ -40,6 +67,7 @@ export interface Weapon {
   color: string
   icon: string
   levels: WeaponLevel[]
+  evolution: Evolution
 }
 
 export const MAX_WEAPON_LEVEL = 5
@@ -59,6 +87,14 @@ export const WEAPONS: Weapon[] = [
       { damage: 38, interval: 0.52, range: 118, count: 1 },
       { damage: 52, interval: 0.45, range: 130, count: 1 },
     ],
+    evolution: {
+      name: 'ดาบอนันต์',
+      description: 'วงฟันกว้างขึ้นมากและแรงขึ้นเท่าตัว กวาดทั้งฝูงในครั้งเดียว',
+      requiresSkill: 'power',
+      requiresStacks: 2,
+      requiresLabel: 'พลังโจมตี 2 ชั้น',
+      stats: { damage: 98, interval: 0.32, range: 172, count: 1 },
+    },
   },
   {
     id: 'fire',
@@ -74,6 +110,14 @@ export const WEAPONS: Weapon[] = [
       { damage: 40, interval: 1.05, range: 70, count: 2 },
       { damage: 54, interval: 0.9, range: 80, count: 3 },
     ],
+    evolution: {
+      name: 'อุกกาบาตเพลิง',
+      description: 'ระเบิดวงใหญ่กว่าเดิมมาก ไฟไหม้นานขึ้นและลามหนักขึ้น',
+      requiresSkill: 'rapid',
+      requiresStacks: 2,
+      requiresLabel: 'ยิงไว 2 ชั้น',
+      stats: { damage: 100, interval: 0.62, range: 118, count: 4 },
+    },
   },
   {
     id: 'lightning',
@@ -89,6 +133,14 @@ export const WEAPONS: Weapon[] = [
       { damage: 42, interval: 1.15, range: 250, count: 5 },
       { damage: 56, interval: 1.0, range: 280, count: 6 },
     ],
+    evolution: {
+      name: 'สายฟ้าลูกโซ่',
+      description: 'กระโดดต่อได้ถึงสิบตัว ครอบคลุมเกือบทั้งสนาม',
+      requiresSkill: 'reach',
+      requiresStacks: 2,
+      requiresLabel: 'ระยะเอื้อม 2 ชั้น',
+      stats: { damage: 104, interval: 0.7, range: 360, count: 10 },
+    },
   },
   {
     id: 'ice',
@@ -104,6 +156,14 @@ export const WEAPONS: Weapon[] = [
       { damage: 21, interval: 0.8, range: 400, count: 3 },
       { damage: 28, interval: 0.7, range: 420, count: 4 },
     ],
+    evolution: {
+      name: 'พายุน้ำแข็ง',
+      description: 'ยิงเป็นชุดหกนัด และแช่แข็งได้นานกว่าเดิมเท่าตัว',
+      requiresSkill: 'multishot',
+      requiresStacks: 2,
+      requiresLabel: 'กระสุนแตก 2 ชั้น',
+      stats: { damage: 60, interval: 0.5, range: 460, count: 6 },
+    },
   },
 ]
 
@@ -125,6 +185,32 @@ export function weaponStats(id: string, level: number): WeaponLevel | undefined 
   if (!weapon) return undefined
   const index = Math.min(weapon.levels.length, Math.max(1, level)) - 1
   return weapon.levels[index]
+}
+
+/**
+ * ค่าที่ใช้จริงตอนนี้ นับร่างสมบูรณ์ด้วย
+ *
+ * ร่างสมบูรณ์ไม่ได้เปลี่ยนเป็นอาวุธคนละไอดี แต่ใช้ไอดีเดิมแล้วสลับชุดค่า
+ *
+ * ที่เลือกทำแบบนี้เพราะวิธีการโจมตีของแต่ละอาวุธไม่ได้เปลี่ยนไป
+ * ดาบอนันต์ก็ยังฟันเป็นวง สายฟ้าลูกโซ่ก็ยังกระโดดต่อ
+ * ถ้าแยกเป็นไอดีใหม่ ตรรกะการยิงทุกก้อนจะต้องรู้จักชื่อเพิ่มอีกสี่ชื่อ
+ * ซึ่งเป็นที่ที่พลาดได้ง่ายมากโดยไม่ได้อะไรกลับมาเลย
+ */
+export function activeStats(
+  id: string,
+  level: number,
+  evolved: boolean,
+): WeaponLevel | undefined {
+  if (evolved) return getWeapon(id)?.evolution.stats
+  return weaponStats(id, level)
+}
+
+/** ชื่อที่แสดงบนหน้าจอ เปลี่ยนเป็นชื่อร่างสมบูรณ์เมื่อสมบูรณ์แล้ว */
+export function weaponDisplayName(id: string, evolved: boolean): string {
+  const weapon = getWeapon(id)
+  if (!weapon) return id
+  return evolved ? weapon.evolution.name : weapon.name
 }
 
 /** อาวุธชิ้นแรกที่ทุกคนได้ตั้งแต่เริ่ม */

@@ -14,7 +14,16 @@
 import { createRng } from '../math/rng'
 import type { Rng } from '../math/rng'
 import { SKILLS, getSkill, statsFrom } from './skills'
-import { MAX_WEAPON_LEVEL, MAX_WEAPON_SLOTS, STARTING_WEAPON, WEAPONS, getWeapon, weaponStats } from './weapons'
+import {
+  MAX_WEAPON_LEVEL,
+  MAX_WEAPON_SLOTS,
+  STARTING_WEAPON,
+  WEAPONS,
+  activeStats,
+  getWeapon,
+  weaponDisplayName,
+  weaponStats,
+} from './weapons'
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
@@ -24,6 +33,9 @@ import {
   type EnemyShot,
   type GemEntity,
   type Input,
+  type Notice,
+  type PickupEntity,
+  type PickupKind,
   type ProjectileEntity,
   type Vec,
   type WorldState,
@@ -36,7 +48,7 @@ export const FIXED_STEP = 1 / 60
 export const MAX_STEPS_PER_FRAME = 5
 
 const XP_BASE = 5
-const XP_GROWTH = 1.27
+const XP_GROWTH = 1.2
 
 /** ชนิดมอนสเตอร์ที่โผล่ตามเวลา */
 interface EnemyKind {
@@ -91,6 +103,29 @@ const ENEMY_KINDS: EnemyKind[] = [
     behavior: 'dash', splitInto: 0, fromTime: 215 },
   { kind: 'dragon-of-numbers', hp: 240, speed: 126, damage: 22, radius: 28, xpValue: 12,
     behavior: 'chase', splitInto: 0, fromTime: 250 },
+]
+
+/**
+ * บอสประจำนาที
+ *
+ * ตัวแรกโผล่ที่ 60 วินาที แล้วทุก 60 วินาทีหลังจากนั้น
+ * ไล่ตามลำดับในรายการนี้ พอหมดรายการก็วนกลับมาตัวแรกแต่แข็งขึ้นตามเวลา
+ *
+ * ทำไมต้องมีบอส ทั้งที่มีตัวใหญ่พิเศษอยู่แล้ว
+ * ตัวใหญ่พิเศษเป็นแค่ถุง XP ที่เดินได้ ล้มหรือไม่ล้มก็ได้
+ * แต่บอสทำหีบตก ซึ่งเป็นทางเดียวที่จะได้ร่างสมบูรณ์ของอาวุธ
+ * เด็กจึงมีเหตุผลที่จะ "หันกลับไปสู้" แทนที่จะวิ่งหนีอย่างเดียวจนหมดเวลา
+ * ซึ่งเปลี่ยนรูปเกมช่วงกลางรอบไปทั้งหมด
+ */
+const BOSS_KINDS: EnemyKind[] = [
+  { kind: 'boss-slime-king', hp: 300, speed: 96, damage: 20, radius: 40, xpValue: 40,
+    behavior: 'chase', splitInto: 4, fromTime: 0 },
+  { kind: 'boss-fraction-lord', hp: 430, speed: 118, damage: 22, radius: 38, xpValue: 50,
+    behavior: 'zigzag', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-golem-king', hp: 640, speed: 78, damage: 28, radius: 46, xpValue: 62,
+    behavior: 'tank', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-number-dragon', hp: 820, speed: 132, damage: 30, radius: 44, xpValue: 78,
+    behavior: 'ranged', splitInto: 0, fromTime: 0 },
 ]
 
 /** ตัวเล็กที่แตกออกมาจากสไลม์ใหญ่ */
@@ -151,11 +186,17 @@ export function createWorld(seed: string): WorldState {
     enemyShots: [],
     effects: [],
     gems: [],
+    pickups: [],
+    notices: [],
     skills: {},
     weapons: { [STARTING_WEAPON]: 1 },
+    evolved: [],
+    chests: 0,
     weaponCooldowns: {},
     spawnCooldown: 1,
     eliteCooldown: 45,
+    bossCooldown: 60,
+    bossesDown: 0,
     nextId: 1,
     phase: 'playing',
     kills: 0,
@@ -177,20 +218,43 @@ function spawnPlan(time: number): { count: number; interval: number } {
    *
    * ชุดแรกโหดเกินไปมาก ผู้เล่นที่เล่นถูกวิธีตายที่ราว 40 วินาทีทุกรอบ
    * ซึ่งสั้นเกินกว่าจะได้ลองอาวุธชิ้นที่สองด้วยซ้ำ
-   * เด็กที่ตายใน 40 วินาทีทุกครั้งจะเลิกเล่นเร็วมาก
    *
-   * ชุดนี้ให้ช่วงต้นหายใจได้ แล้วค่อยบีบขึ้นเรื่อย ๆ
-   * เป้าหมายคือผู้เล่นที่เล่นดีควรอยู่ได้หลายนาที ไม่ใช่ไม่กี่สิบวินาที
+   * ชุดที่สองยังสั้นอยู่ดี วัดได้ 50–96 วินาที
+   * ตอนนั้นเกมมีอาวุธสี่ชิ้น ชิ้นละห้าระดับ และร่างสมบูรณ์
+   * ซึ่งเป็นเนื้อหาของรอบยาวสี่ห้านาที เด็กจึงไม่มีวันได้เห็นเลยสักอย่าง
+   * สาเหตุคือมอนเกิดเร็วกว่าที่ผู้เล่นจะล้มได้ตั้งแต่วินาทีแรก
+   * จำนวนมอนบนจอจึงพอกขึ้นเรื่อย ๆ (4 → 6 → 10 → 18 ตัวใน 60 วินาที)
+   * แล้วจบลงด้วยการโดนรุมตายเสมอ ไม่ว่าจะเล่นดีแค่ไหน
+   *
+   * ชุดนี้ลดแรงกดดันช่วงต้นลง เพื่อให้ผู้เล่นตามทันตั้งแต่แรก
+   * และยังบีบขึ้นเรื่อย ๆ อยู่ แค่ช้าลงจนไล่ตามได้
+   *
+   * อีกเหตุผลที่สำคัญไม่แพ้กัน: เลเวลอัปหนึ่งครั้งคือโจทย์หนึ่งข้อ
+   * รอบที่ยาว 60 วินาทีได้ตอบโจทย์แค่ห้าข้อ ซึ่งน้อยเกินไปสำหรับคาบเรียน
    */
   return {
-    count: Math.min(6, 1 + Math.floor(minutes * 1.1)),
-    interval: Math.max(0.85, 2.6 - minutes * 0.25),
+    count: Math.min(5, 1 + Math.floor(minutes * 0.8)),
+    interval: Math.max(1.05, 2.8 - minutes * 0.2),
   }
 }
 
-/** ตัวคูณพลังมอนตามเวลา ทำให้มอนตัวเดิมแข็งขึ้นเรื่อย ๆ */
+/** วินาทีที่เริ่มเร่งความยากขั้นสุดท้าย */
+const ENDGAME_FROM = 420
+
+/**
+ * ตัวคูณพลังมอนตามเวลา ทำให้มอนตัวเดิมแข็งขึ้นเรื่อย ๆ
+ *
+ * หลังนาทีที่เจ็ดจะเร่งขึ้นอีกชั้น เพื่อให้รอบหนึ่ง "จบได้จริง"
+ *
+ * ที่ต้องมีเพราะจำลองแล้วพบว่าบิลด์ที่สมบูรณ์แล้วไม่ตายเลย
+ * เล่นถึงสิบห้านาทีก็ยังไม่ตาย ซึ่งฟังดูดีแต่กลับเป็นปัญหา
+ * เพราะเหรียญจ่ายตอนจบรอบเท่านั้น เด็กที่เก่งที่สุดจึงไม่ได้รางวัลสักที
+ * และในคาบเรียนจริงก็ต้องมีจุดจบที่คาดเดาได้ ไม่ใช่เล่นยาวจนหมดคาบ
+ */
 function difficultyScale(time: number): number {
-  return 1 + time / 130
+  const base = 1 + time / 200
+  if (time <= ENDGAME_FROM) return base
+  return base * (1 + (time - ENDGAME_FROM) / 150)
 }
 
 function makeEnemy(
@@ -199,6 +263,7 @@ function makeEnemy(
   pos: Vec,
   scale: number,
   elite: boolean,
+  boss = false,
 ): EnemyEntity {
   // ตัวใหญ่พิเศษถึกกว่ามาก ตัวโตกว่า และให้ XP คุ้มกับที่ต้องออกแรง
   const hp = Math.round(template.hp * scale * (elite ? 8 : 1))
@@ -221,9 +286,25 @@ function makeEnemy(
     burnFor: 0,
     burnDps: 0,
     elite,
+    boss,
     splitInto: template.splitInto,
     shootCooldown: 1.2,
   }
+}
+
+/**
+ * สร้างบอสประจำนาที
+ *
+ * เกิดที่ขอบสนามเหมือนตัวอื่น ไม่โผล่กลางจอ
+ * บอสที่โผล่ทับตัวผู้เล่นคือความตายที่หลบไม่ได้ ซึ่งไม่ยุติธรรมเป็นพิเศษ
+ * เพราะบอสแรงกว่ามอนธรรมดาหลายเท่า
+ */
+function makeBoss(id: number, index: number, time: number, rng: Rng): EnemyEntity {
+  const template = BOSS_KINDS[index % BOSS_KINDS.length]
+  // วนรอบที่สองเป็นต้นไปแข็งขึ้นอีกชั้น ไม่งั้นบอสตัวเดิมจะกลายเป็นของง่าย
+  const lap = Math.floor(index / BOSS_KINDS.length)
+  const scale = difficultyScale(time) * (1 + lap * 0.6)
+  return makeEnemy(id, template, edgeSpawn(rng), scale, false, true)
 }
 
 /** สุ่มตำแหน่งเกิดที่ขอบสนาม */
@@ -249,6 +330,33 @@ function spawnEnemy(world: WorldState, rng: Rng, elite = false): EnemyEntity {
 /** สร้างมอนหนึ่งตัวสำหรับชุดทดสอบ ใช้ตรวจว่าพฤติกรรมหลากหลายจริง */
 export function spawnOne(world: WorldState, seed: string): EnemyEntity {
   return spawnEnemy(world, createRng(`${world.seed}-${seed}`))
+}
+
+/**
+ * อาวุธที่พร้อมจะกลายเป็นร่างสมบูรณ์ทันทีที่เปิดหีบ
+ *
+ * เงื่อนไข: อาวุธเต็มระดับ + มีสกิลคู่ควบครบชั้น + ยังไม่เคยสมบูรณ์
+ *
+ * แยกออกมาเป็นฟังก์ชันเดี่ยวเพราะถูกใช้สองที่ที่ต้องตรงกันเป๊ะ
+ * คือตอนเปิดหีบจริง กับตอนบอกเด็กบนหน้าจอว่า "อาวุธนี้พร้อมแล้ว"
+ * ถ้าเขียนแยกกันสองชุด วันหนึ่งจะเพี้ยนจากกันแล้วเด็กจะรู้สึกว่าโดนหลอก
+ */
+export function readyToEvolve(world: WorldState): string[] {
+  const out: string[] = []
+
+  for (const [weaponId, level] of Object.entries(world.weapons)) {
+    if (level < MAX_WEAPON_LEVEL) continue
+    if (world.evolved.includes(weaponId)) continue
+
+    const weapon = getWeapon(weaponId)
+    if (!weapon) continue
+
+    const stacks = world.skills[weapon.evolution.requiresSkill] ?? 0
+    if (stacks < weapon.evolution.requiresStacks) continue
+
+    out.push(weaponId)
+  }
+  return out
 }
 
 /** มอนที่อยู่ใกล้ผู้เล่นที่สุด ใช้เล็งเป้าอัตโนมัติ */
@@ -341,6 +449,25 @@ export function step(world: WorldState, input: Input): WorldState {
     eliteCooldown = 45
   }
 
+  /*
+   * บอสประจำนาที
+   * นับจากจำนวนที่โผล่มาแล้ว ไม่ใช่จากเวลา เพราะเวลาเป็นทศนิยม
+   * การหารเวลาเพื่อหาว่าเป็นบอสตัวที่เท่าไรจะคลาดเคลื่อนได้
+   */
+  let bossCooldown = world.bossCooldown - dt
+  const notices: Notice[] = world.notices
+    .map((notice) => ({ ...notice, life: notice.life - dt }))
+    .filter((notice) => notice.life > 0)
+
+  if (bossCooldown <= 0) {
+    const index = Math.round((time - 60) / 60)
+    enemies.push(makeBoss(nextId, Math.max(0, index), time, createRng(`${world.seed}-boss-${nextId}`)))
+    nextId += 1
+    bossCooldown = 60
+    notices.push({ id: nextId, text: 'บอสมาแล้ว! ล้มให้ได้จะมีหีบตก', life: 2.6, maxLife: 2.6 })
+    nextId += 1
+  }
+
   // ---------- มอนเคลื่อนที่ตามพฤติกรรมของตัวเอง ----------
   const enemyShots: EnemyShot[] = world.enemyShots.map((shot) => ({ ...shot }))
 
@@ -418,7 +545,8 @@ export function step(world: WorldState, input: Input): WorldState {
   const weaponCooldowns = { ...world.weaponCooldowns }
 
   for (const [weaponId, level] of Object.entries(world.weapons)) {
-    const spec = weaponStats(weaponId, level)
+    const evolved = world.evolved.includes(weaponId)
+    const spec = activeStats(weaponId, level, evolved)
     if (!spec) continue
 
     const cooldown = (weaponCooldowns[weaponId] ?? 0) - dt
@@ -529,8 +657,9 @@ export function step(world: WorldState, input: Input): WorldState {
         damage,
         radius: weaponId === 'fire' ? 9 : 6,
         blastRadius: weaponId === 'fire' ? range : 0,
-        slowFor: weaponId === 'ice' ? 2.2 : 0,
-        burnFor: weaponId === 'fire' ? 3 : 0,
+        // ร่างสมบูรณ์ของน้ำแข็งแช่ได้นานเท่าตัว และของไฟไหม้นานกว่าเดิม
+        slowFor: weaponId === 'ice' ? (evolved ? 4.4 : 2.2) : 0,
+        burnFor: weaponId === 'fire' ? (evolved ? 5.5 : 3) : 0,
         hitsLeft: 1 + stats.pierce,
         life: 1.8,
         hitIds: [],
@@ -638,7 +767,11 @@ export function step(world: WorldState, input: Input): WorldState {
   // ---------- มอนที่ตายแล้ว ----------
   const aliveEnemies: EnemyEntity[] = []
   const gems: GemEntity[] = [...world.gems]
+  const pickups: PickupEntity[] = world.pickups
+    .map((pickup) => ({ ...pickup, life: pickup.life - dt }))
+    .filter((pickup) => pickup.life > 0)
   let kills = world.kills
+  let bossesDown = world.bossesDown
 
   for (const enemy of enemies) {
     if (enemy.hp > 0) {
@@ -648,6 +781,29 @@ export function step(world: WorldState, input: Input): WorldState {
     kills += 1
     gems.push({ id: nextId, pos: { ...enemy.pos }, value: enemy.xpValue })
     nextId += 1
+
+    if (enemy.boss) {
+      bossesDown += 1
+      // หีบไม่มีวันหมดอายุ เด็กที่กำลังหนีอยู่จะได้ไม่เสียรางวัลที่หามาได้
+      pickups.push({ id: nextId, kind: 'chest', pos: { ...enemy.pos }, life: Infinity })
+      nextId += 1
+    } else {
+      /*
+       * ของตกจากมอนธรรมดา
+       *
+       * โอกาสตั้งไว้ต่ำโดยตั้งใจ ประมาณหนึ่งในยี่สิบตัว
+       * ถ้าตกบ่อยกว่านี้ เลือดจะเต็มตลอดเวลาจนไม่มีความกดดันเหลือเลย
+       * แต่ถ้าไม่มีเลย ช่วงกลางรอบจะเงียบสนิทเพราะไม่มีอะไรเกิดขึ้น
+       */
+      const roll = createRng(`${world.seed}-drop-${enemy.id}`).next()
+      const kind: PickupKind | undefined =
+        roll < 0.028 ? 'heart' : roll < 0.045 ? 'bomb' : roll < 0.062 ? 'magnet' : undefined
+
+      if (kind) {
+        pickups.push({ id: nextId, kind, pos: { ...enemy.pos }, life: 12 })
+        nextId += 1
+      }
+    }
 
     // สไลม์ใหญ่แตกเป็นตัวเล็ก ทำให้การล้มมันไม่ใช่จุดจบทันที
     for (let i = 0; i < enemy.splitInto; i += 1) {
@@ -693,6 +849,81 @@ export function step(world: WorldState, input: Input): WorldState {
     remainingGems.push(gem)
   }
 
+  // ---------- เก็บของที่ตกอยู่ ----------
+  const remainingPickups: PickupEntity[] = []
+  const evolved = [...world.evolved]
+  let chests = world.chests
+  let gemsAfterPickups = remainingGems
+
+  for (const pickup of pickups) {
+    if (distance(pickup.pos, player.pos) > player.radius + 16) {
+      remainingPickups.push(pickup)
+      continue
+    }
+
+    if (pickup.kind === 'heart') {
+      hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.25)
+      notices.push({ id: nextId, text: 'ฟื้นเลือด!', life: 1.4, maxLife: 1.4 })
+      nextId += 1
+    } else if (pickup.kind === 'bomb') {
+      // ระเบิดทั้งสนาม เป็นปุ่มหนีตายที่ได้มาจากโชค ไม่ใช่จากการกดปุ่ม
+      for (const enemy of aliveEnemies) hurt(enemy, 120 * stats.damageMultiplier)
+      effects.push({
+        id: nextId,
+        kind: 'blast',
+        pos: { ...player.pos },
+        radius: 420,
+        life: 0.5,
+        maxLife: 0.5,
+      })
+      nextId += 1
+      notices.push({ id: nextId, text: 'ระเบิดทั้งสนาม!', life: 1.4, maxLife: 1.4 })
+      nextId += 1
+    } else if (pickup.kind === 'magnet') {
+      for (const gem of gemsAfterPickups) xp += gem.value * stats.xpMultiplier
+      gemsAfterPickups = []
+      notices.push({ id: nextId, text: 'ดูดคริสตัลทั้งสนาม!', life: 1.4, maxLife: 1.4 })
+      nextId += 1
+    } else {
+      /*
+       * หีบจากบอส
+       *
+       * ถ้ามีอาวุธที่พร้อมจะสมบูรณ์ ให้อันนั้นก่อนเสมอ
+       * ถ้ายังไม่มีอะไรพร้อม ต้องไม่ปล่อยให้ได้ "หีบเปล่า"
+       * เพราะการล้มบอสได้แล้วไม่ได้อะไรเลยคือความผิดหวังที่แรงมาก
+       * จึงให้ XP ก้อนใหญ่แทน ซึ่งมักดันให้เลเวลอัปทันทีอยู่ดี
+       */
+      chests += 1
+      // ได้ XP ด้วยเสมอ หีบจึงคุ้มค่าทันทีแม้ยังไม่มีอาวุธไหนพร้อม
+      xp += player.xpToNext * 0.5
+      notices.push({ id: nextId, text: 'ได้หีบสมบัติ!', life: 2, maxLife: 2 })
+      nextId += 1
+    }
+  }
+
+  /*
+   * ใช้หีบที่เก็บไว้ทันทีที่มีอาวุธพร้อม
+   *
+   * ตรวจทุกเฟรม ไม่ใช่ตอนเปิดหีบอย่างเดียว
+   * เพราะสิ่งที่ทำให้อาวุธ "พร้อม" คือการเลือกการ์ดตอนเลเวลอัป
+   * ซึ่งเกิดคนละจังหวะกับการเปิดหีบเสมอ
+   */
+  while (chests > 0) {
+    const ready = readyToEvolve({ ...world, weapons: world.weapons, skills: world.skills, evolved })
+    if (ready.length === 0) break
+
+    const weaponId = ready[0]
+    evolved.push(weaponId)
+    chests -= 1
+    notices.push({
+      id: nextId,
+      text: `${weaponDisplayName(weaponId, true)} สมบูรณ์แล้ว!`,
+      life: 3.4,
+      maxLife: 3.4,
+    })
+    nextId += 1
+  }
+
   // ---------- มอนชนผู้เล่น ----------
   if (invulnerable <= 0) {
     for (const enemy of aliveEnemies) {
@@ -720,10 +951,16 @@ export function step(world: WorldState, input: Input): WorldState {
     projectiles: survivingProjectiles,
     enemyShots: survivingEnemyShots,
     effects,
-    gems: remainingGems,
+    gems: gemsAfterPickups,
+    pickups: remainingPickups,
+    notices,
+    evolved,
+    chests,
     weaponCooldowns,
     spawnCooldown,
     eliteCooldown,
+    bossCooldown,
+    bossesDown,
     nextId,
     kills,
     phase: dead ? 'dead' : leveledUp ? 'question' : 'playing',
@@ -844,11 +1081,20 @@ function availableOffers(world: WorldState): { offer: Offer; weight: number }[] 
 
     const next = weaponStats(weapon.id, level + 1)
     const now = weaponStats(weapon.id, level)
-    const gain =
+    let gain =
       next && now
         ? `แรงขึ้น ${Math.round((next.damage / now.damage - 1) * 100)}%` +
           (next.count > now.count ? ` และเพิ่มเป็น ${next.count} เป้า` : '')
         : 'แรงขึ้น'
+
+    /*
+     * ใบที่จะทำให้อาวุธเต็มระดับต้องบอกด้วยว่าต่อไปต้องทำอะไร
+     * ไม่งั้นเด็กจะอัปจนเต็มแล้วไม่รู้เลยว่ามีร่างสมบูรณ์อยู่
+     * ระบบที่ต้องเปิดคู่มืออ่านถึงจะรู้ว่ามีอยู่ เท่ากับไม่มี
+     */
+    if (level + 1 >= MAX_WEAPON_LEVEL) {
+      gain += ` · เต็มระดับแล้ว! มี${weapon.evolution.requiresLabel}แล้วล้มบอสเอาหีบ จะได้ ${weapon.evolution.name}`
+    }
 
     out.push({
       weight: 6,
@@ -900,6 +1146,30 @@ export function offerSkills(world: WorldState, count: number): Offer[] {
   }
 
   const picked: Offer[] = []
+
+  /*
+   * ใบแรกต้องเป็นอาวุธเสมอ ถ้ายังมีอาวุธให้เลือกอยู่
+   *
+   * ข้อนี้ไม่ใช่การปรับสมดุลเล็ก ๆ แต่เป็นการตัดวงจรที่ทำให้เกมพัง
+   *
+   * จำลองแล้วพบว่ารอบที่ดวงไม่ดีจะไม่ได้อัปอาวุธเลยหลายเลเวลติด
+   * พอความแรงไม่ขึ้น ก็ล้มมอนไม่ทัน พอล้มไม่ทัน XP ก็ไม่เข้า
+   * พอไม่ได้เลเวลก็ยิ่งไม่ได้อัปอาวุธ แล้ววนกลับไปแย่ลงเรื่อย ๆ จนตาย
+   * วัดได้ว่ารอบแบบนี้ตายที่ 60 วินาทีด้วยดาบระดับ 1 ทั้งที่เล่นถูกวิธี
+   * ส่วนรอบที่ดวงดีอยู่ได้เกินเจ็ดนาที ต่างกันเกินเจ็ดเท่าโดยที่ฝีมือเท่ากัน
+   *
+   * เด็กที่เจอรอบแบบนั้นจะสรุปว่า "เกมนี้เล่นยังไงก็ตาย" ซึ่งไม่จริง
+   * และไม่มีทางรู้เลยว่าที่ตายเพราะดวง ไม่ใช่เพราะเล่นผิด
+   */
+  const weaponOffers = available.filter((entry) => entry.offer.kind === 'weapon')
+  if (weaponOffers.length > 0 && count > 0) {
+    const weaponPool: Offer[] = []
+    for (const entry of weaponOffers) {
+      for (let i = 0; i < entry.weight; i += 1) weaponPool.push(entry.offer)
+    }
+    picked.push(rng.pick(weaponPool))
+  }
+
   for (let attempt = 0; attempt < 120 && picked.length < count; attempt += 1) {
     if (pool.length === 0) break
     const offer = rng.pick(pool)
@@ -998,6 +1268,9 @@ export interface RunSummary {
   kills: number
   level: number
   coins: number
+  bossesDown: number
+  /** ชื่อร่างสมบูรณ์ที่ทำได้ในรอบนี้ */
+  evolvedNames: string[]
 }
 
 export function summarize(world: WorldState): RunSummary {
@@ -1005,7 +1278,13 @@ export function summarize(world: WorldState): RunSummary {
     survivedSeconds: Math.floor(world.time),
     kills: world.kills,
     level: world.player.level,
-    // เหรียญมาจากทั้งเวลาที่รอดและจำนวนที่ล้มได้ เล่นสไตล์ไหนก็ได้รางวัล
-    coins: Math.floor(world.time / 3) + world.kills * 2,
+    /*
+     * เหรียญมาจากเวลาที่รอด จำนวนที่ล้มได้ และบอสที่ล้มได้
+     * เล่นสไตล์ไหนก็ได้รางวัล แต่การล้มบอลให้ก้อนโตที่สุด
+     * เพราะเป็นสิ่งที่ต้องกล้าหันกลับไปสู้ ไม่ใช่แค่รอดไปเรื่อย ๆ
+     */
+    coins: Math.floor(world.time / 3) + world.kills * 2 + world.bossesDown * 25,
+    bossesDown: world.bossesDown,
+    evolvedNames: world.evolved.map((id) => weaponDisplayName(id, true)),
   }
 }

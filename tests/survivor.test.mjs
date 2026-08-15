@@ -1093,6 +1093,252 @@ check('สรุปผลตอนจบต้องให้รางวัล�
   assert(passive.coins > 0, 'รอดนานแต่ไม่ล้มมอนแล้วได้ศูนย์')
 })
 
+
+// ---------- บอส หีบ และร่างสมบูรณ์ ----------
+
+check('บอสต้องโผล่ที่นาทีแรก และเป็นคนละอย่างกับตัวใหญ่พิเศษ', () => {
+  const { world } = simulate(62, { input: { move: { x: 0.4, y: 0.3 } } })
+  const bosses = world.enemies.filter((enemy) => enemy.boss)
+
+  assert(bosses.length > 0 || world.bossesDown > 0, 'เล่นไปเกินหนึ่งนาทีแล้วยังไม่เจอบอสเลย')
+
+  // บอสกับตัวใหญ่พิเศษต้องไม่ใช่ตัวเดียวกัน ไม่งั้นระบบหีบจะพังเงียบ ๆ
+  for (const boss of bosses) {
+    assert(!boss.elite, 'บอสถูกทำเครื่องหมายเป็นตัวใหญ่พิเศษด้วย ซึ่งไม่ควรซ้อนกัน')
+    assert(boss.maxHp > 200, `บอสเลือดแค่ ${boss.maxHp} ซึ่งน้อยเกินกว่าจะเป็นบอส`)
+  }
+})
+
+check('ล้มบอสแล้วต้องมีหีบตก ไม่ใช่หายไปเฉย ๆ', () => {
+  let world = E.createWorld('หีบ')
+  // วางบอสเลือดน้อยไว้ติดตัวผู้เล่น แล้วปล่อยให้ดาบฟันจนตาย
+  world = {
+    ...world,
+    enemies: [
+      {
+        id: 999, pos: { x: world.player.pos.x + 70, y: world.player.pos.y },
+        hp: 1, maxHp: 300, speed: 0, radius: 20, damage: 0, kind: 'boss-slime-king',
+        xpValue: 40, hitFlash: 0, behavior: 'chase', clock: 0, slowFor: 0,
+        burnFor: 0, burnDps: 0, elite: false, boss: true, splitInto: 0, shootCooldown: 9,
+      },
+    ],
+  }
+
+  for (let i = 0; i < 90 && world.phase === 'playing'; i += 1) {
+    world = E.step(world, { move: { x: 0, y: 0 } })
+  }
+
+  assert(world.bossesDown === 1, `ล้มบอสแล้วนับได้ ${world.bossesDown} ตัว`)
+  assert(
+    world.pickups.some((pickup) => pickup.kind === 'chest'),
+    'ล้มบอสแล้วไม่มีหีบตกเลย ซึ่งตัดทางเข้าถึงร่างสมบูรณ์ทั้งหมด',
+  )
+})
+
+check('ร่างสมบูรณ์ต้องครบทั้งสามเงื่อนไข ขาดข้อใดข้อหนึ่งไม่ได้', () => {
+  const base = E.createWorld('เงื่อนไข')
+  const weapon = W.getWeapon('sword')
+  const need = weapon.evolution
+
+  // ครบทุกอย่าง
+  const ready = {
+    ...base,
+    weapons: { sword: W.MAX_WEAPON_LEVEL },
+    skills: { [need.requiresSkill]: need.requiresStacks },
+  }
+  assert(E.readyToEvolve(ready).includes('sword'), 'ครบเงื่อนไขแล้วแต่ยังไม่พร้อม')
+
+  // อาวุธยังไม่เต็มระดับ
+  const lowWeapon = { ...ready, weapons: { sword: W.MAX_WEAPON_LEVEL - 1 } }
+  assert(E.readyToEvolve(lowWeapon).length === 0, 'อาวุธยังไม่เต็มระดับแต่กลับพร้อม')
+
+  // ยังไม่มีสกิลคู่ควบ
+  const noSkill = { ...ready, skills: {} }
+  assert(E.readyToEvolve(noSkill).length === 0, 'ไม่มีสกิลคู่ควบแต่กลับพร้อม')
+
+  // สมบูรณ์ไปแล้วต้องไม่พร้อมซ้ำ
+  const done = { ...ready, evolved: ['sword'] }
+  assert(E.readyToEvolve(done).length === 0, 'อาวุธที่สมบูรณ์แล้วยังถูกนับว่าพร้อมอีก')
+})
+
+check('เก็บหีบไว้ก่อนได้ แล้วต้องทำงานเองทันทีที่อาวุธพร้อม', () => {
+  /*
+   * ข้อนี้จับข้อจำกัดที่เคยทำให้ระบบทั้งระบบเข้าไม่ถึง
+   *
+   * ตอนแรกหีบใช้ได้เฉพาะ "ตอนที่มีอาวุธพร้อมพอดี" ถ้ายังไม่พร้อมก็เสียไปเปล่า
+   * จำลอง 40 รอบแล้วได้ร่างสมบูรณ์แค่ 3 ครั้ง ทั้งที่ล้มบอสได้หลายตัว
+   * เพราะจังหวะที่บอสตายกับจังหวะที่อาวุธเต็มระดับแทบไม่เคยตรงกันเลย
+   */
+  const weapon = W.getWeapon('sword')
+  const need = weapon.evolution
+
+  // มีหีบเก็บไว้ แต่ยังไม่มีอะไรพร้อม
+  let world = {
+    ...E.createWorld('เก็บหีบ'),
+    chests: 1,
+    weapons: { sword: W.MAX_WEAPON_LEVEL },
+    skills: {},
+  }
+  world = E.step(world, { move: { x: 0, y: 0 } })
+  assert(world.evolved.length === 0, 'ยังไม่มีสกิลคู่ควบแต่หีบทำงานไปแล้ว')
+  assert(world.chests === 1, 'หีบหายไปทั้งที่ยังใช้ไม่ได้')
+
+  // พอได้สกิลคู่ควบครบ หีบที่เก็บไว้ต้องทำงานเอง
+  world = { ...world, skills: { [need.requiresSkill]: need.requiresStacks } }
+  world = E.step(world, { move: { x: 0, y: 0 } })
+
+  assert(world.evolved.includes('sword'), 'พร้อมครบแล้วแต่หีบที่เก็บไว้ไม่ทำงาน')
+  assert(world.chests === 0, 'ใช้หีบแล้วแต่ยอดหีบไม่ลด')
+  assert(
+    world.notices.some((notice) => notice.text.includes(need.name)),
+    'ได้ร่างสมบูรณ์แล้วแต่ไม่มีข้อความบอกเด็กเลย',
+  )
+})
+
+check('ร่างสมบูรณ์ต้องแรงกว่าระดับสูงสุดจริง ไม่ใช่แค่เปลี่ยนชื่อ', () => {
+  for (const weapon of W.WEAPONS) {
+    const top = W.weaponStats(weapon.id, W.MAX_WEAPON_LEVEL)
+    const evo = W.activeStats(weapon.id, W.MAX_WEAPON_LEVEL, true)
+
+    assert(evo.damage > top.damage * 1.4, `${weapon.name} ร่างสมบูรณ์แรงขึ้นน้อยเกินไป`)
+    assert(evo.interval < top.interval, `${weapon.name} ร่างสมบูรณ์ยังโจมตีช้าเท่าเดิม`)
+    assert(
+      W.weaponDisplayName(weapon.id, true) === weapon.evolution.name,
+      `${weapon.name} ไม่ได้เปลี่ยนชื่อเมื่อสมบูรณ์`,
+    )
+  }
+})
+
+check('สกิลคู่ควบของอาวุธแต่ละชิ้นต้องไม่ซ้ำกัน', () => {
+  // ถ้าซ้ำ เด็กจะเก็บสกิลตัวเดียวแล้วได้ร่างสมบูรณ์พร้อมกันหมด
+  // ซึ่งทำให้การเลือกทางเดินของบิลด์ไม่มีความหมาย
+  const used = W.WEAPONS.map((weapon) => weapon.evolution.requiresSkill)
+  assert(new Set(used).size === used.length, `สกิลคู่ควบซ้ำกัน: ${used.join(', ')}`)
+
+  // และต้องเป็นสกิลที่มีอยู่จริง ไม่ใช่ชื่อที่พิมพ์ผิด
+  for (const weapon of W.WEAPONS) {
+    assert(
+      S.getSkill(weapon.evolution.requiresSkill),
+      `${weapon.name} อ้างสกิล "${weapon.evolution.requiresSkill}" ที่ไม่มีอยู่จริง`,
+    )
+  }
+})
+
+// ---------- ของที่ตกจากมอน ----------
+
+check('เก็บหัวใจแล้วต้องฟื้นเลือดจริง', () => {
+  let world = E.createWorld('หัวใจ')
+  world = {
+    ...world,
+    player: { ...world.player, hp: 20 },
+    pickups: [{ id: 1, kind: 'heart', pos: { ...world.player.pos }, life: 10 }],
+  }
+  world = E.step(world, { move: { x: 0, y: 0 } })
+
+  assert(world.player.hp > 20, `เก็บหัวใจแล้วเลือดยังเท่าเดิมที่ ${world.player.hp}`)
+  assert(world.pickups.length === 0, 'เก็บหัวใจแล้วของยังอยู่บนพื้น')
+})
+
+check('เก็บระเบิดแล้วต้องทำร้ายมอนทั้งสนาม', () => {
+  let world = E.createWorld('ระเบิด')
+  const far = { x: world.player.pos.x + 300, y: world.player.pos.y + 200 }
+  world = {
+    ...world,
+    enemies: [
+      {
+        id: 1, pos: far, hp: 500, maxHp: 500, speed: 0, radius: 16, damage: 0,
+        kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase', clock: 0,
+        slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
+        splitInto: 0, shootCooldown: 9,
+      },
+    ],
+    pickups: [{ id: 2, kind: 'bomb', pos: { ...world.player.pos }, life: 10 }],
+  }
+  world = E.step(world, { move: { x: 0, y: 0 } })
+
+  assert(world.enemies[0].hp < 500, 'เก็บระเบิดแล้วมอนที่อยู่ไกลไม่โดนอะไรเลย')
+})
+
+check('เก็บแม่เหล็กแล้วต้องได้คริสตัลทั้งสนาม', () => {
+  let world = E.createWorld('แม่เหล็ก')
+  world = {
+    ...world,
+    gems: [
+      { id: 1, pos: { x: 10, y: 10 }, value: 5 },
+      { id: 2, pos: { x: 790, y: 590 }, value: 5 },
+    ],
+    pickups: [{ id: 3, kind: 'magnet', pos: { ...world.player.pos }, life: 10 }],
+  }
+  const before = world.player.xp
+  world = E.step(world, { move: { x: 0, y: 0 } })
+
+  assert(world.gems.length === 0, 'เก็บแม่เหล็กแล้วยังมีคริสตัลค้างอยู่')
+  assert(world.player.xp > before, 'ดูดคริสตัลเข้ามาแล้วแต่ไม่ได้ XP')
+})
+
+// ---------- ความยาวรอบ ----------
+
+check('การ์ดที่สุ่มมาต้องมีอาวุธอย่างน้อยหนึ่งใบเสมอ', () => {
+  /*
+   * ข้อนี้จับวงจรที่เคยทำให้เกมพัง
+   *
+   * เดิมการ์ดสุ่มล้วน รอบที่ดวงไม่ดีจะไม่ได้อัปอาวุธเลยหลายเลเวลติด
+   * พอความแรงไม่ขึ้นก็ล้มมอนไม่ทัน พอล้มไม่ทัน XP ก็ไม่เข้า แล้ววนแย่ลงจนตาย
+   * วัดได้ว่ารอบแบบนั้นตายที่ 60 วินาทีด้วยดาบระดับ 1 ทั้งที่เล่นถูกวิธี
+   * ส่วนรอบที่ดวงดีอยู่ได้เกินเจ็ดนาที ต่างกันเกินเจ็ดเท่าโดยฝีมือเท่ากัน
+   */
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    for (let level = 1; level <= 6; level += 1) {
+      const world = { ...E.createWorld(seed), player: { ...E.createWorld(seed).player, level } }
+      const offers = E.offerSkills(world, 3)
+      assert(
+        offers.some((offer) => offer.kind === 'weapon'),
+        `เมล็ด ${seed} เลเวล ${level} สุ่มการ์ดมาแล้วไม่มีอาวุธเลยสักใบ`,
+      )
+    }
+  }
+})
+
+check('รอบหนึ่งต้องยาวพอให้ได้ตอบโจทย์หลายข้อ', () => {
+  /*
+   * ข้อนี้เป็นข้อกำหนดทางการเรียน ไม่ใช่แค่เรื่องความสนุก
+   * เลเวลอัปหนึ่งครั้งคือโจทย์หนึ่งข้อ
+   * เคยวัดได้ว่ารอบจบใน 50–96 วินาที ซึ่งได้ตอบแค่ห้าข้อต่อรอบ
+   * น้อยเกินไปสำหรับการใช้ในคาบเรียน
+   */
+  let total = 0
+  const seeds = ['ก', 'ข', 'ค', 'ง']
+
+  for (const seed of seeds) {
+    // ต้องเดินวน ไม่ใช่เดินตรง เพราะเดินตรงจะไปติดขอบจอแล้วยืนนิ่งอยู่ตรงนั้น
+    let world = E.createWorld(seed)
+    let levelUps = 0
+    const steps = Math.round(240 / E.FIXED_STEP)
+
+    for (let i = 0; i < steps; i += 1) {
+      if (world.phase === 'question') {
+        world = E.resolveQuestion(world, true)
+        continue
+      }
+      if (world.phase === 'choosing') {
+        const offer = E.offerSkills(world, 3)
+        world = offer.length > 0 ? E.takeSkill(world, offer[0].id) : E.skipSkill(world)
+        levelUps += 1
+        continue
+      }
+      if (world.phase === 'dead') break
+
+      const angle = (i / 60) * 1.1
+      world = E.step(world, { move: { x: Math.cos(angle) * 0.7, y: Math.sin(angle) * 0.7 } })
+    }
+    total += levelUps
+  }
+
+  const average = total / seeds.length
+  assert(average >= 9, `เฉลี่ยได้ตอบโจทย์แค่ ${average.toFixed(1)} ข้อต่อรอบ ซึ่งน้อยเกินไป`)
+})
+
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
