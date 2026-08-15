@@ -2,7 +2,10 @@ import { DEFAULT_AVATAR_ID, isValidAvatarId } from '../data/avatars'
 import { HP_CONFIG, MAX_RECENT_ATTEMPTS } from '../data/rewards'
 import { SKILL_IDS } from '../data/skills'
 import { ALL_QUESTS } from '../data/quests'
+import { getItem } from '../data/items'
 import { STAGES, getStage } from '../data/stages'
+import { EQUIP_SLOTS } from './inventoryService'
+import type { Equipment } from '../types/item'
 import type { GameSettings, Player } from '../types/player'
 import type { DailyQuestState, QuestProgress } from '../types/quest'
 import type { StageProgress } from '../types/stage'
@@ -27,7 +30,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 3
+export const CURRENT_SAVE_VERSION = 4
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -149,6 +152,9 @@ export function createPlayer(name: string, avatar: string): Player {
 
     questProgress: {},
     dailyQuests: { date: '', questIds: [] },
+
+    inventory: {},
+    equipped: {},
 
     statistics: createEmptyStatistics(),
     recentAttempts: [],
@@ -353,6 +359,9 @@ function parsePlayer(raw: unknown): Player | null {
     questProgress: parseQuestProgress(raw.questProgress),
     dailyQuests: parseDailyQuests(raw.dailyQuests),
 
+    inventory: parseInventory(raw.inventory),
+    equipped: parseEquipped(raw.equipped),
+
     statistics: parseStatistics(raw.statistics),
     recentAttempts: parseRecentAttempts(raw.recentAttempts),
 
@@ -362,6 +371,54 @@ function parsePlayer(raw: unknown): Player | null {
 
   // คำนวณโลกที่เปิดจากความคืบหน้าจริง กันไม่ให้แก้ localStorage เพื่อข้ามด่าน
   return { ...player, unlockedWorlds: resolveUnlockedWorlds(player) }
+}
+
+/**
+ * อ่านกระเป๋าของ
+ *
+ * ทิ้งรหัสของที่ไม่มีอยู่จริงแล้ว เช่นของที่เคยมีในเกมเวอร์ชันเก่า
+ * ถ้าปล่อยไว้ หน้าจอจะพยายามวาดของที่ไม่มีข้อมูลแล้วพัง
+ */
+function parseInventory(raw: unknown): Record<string, number> {
+  if (!isRecord(raw)) return {}
+
+  const inventory: Record<string, number> = {}
+  for (const [itemId, value] of Object.entries(raw)) {
+    if (!getItem(itemId)) continue
+    const count = toSafeInt(value, 0, 0, 999)
+    if (count > 0) inventory[itemId] = count
+  }
+  return inventory
+}
+
+/**
+ * อ่านของที่สวมอยู่
+ *
+ * ตรวจสองชั้น: ของต้องมีอยู่จริง และต้องสวมในช่องที่ตรงกับชนิดของมัน
+ * ชั้นที่สองสำคัญ เพราะถ้าแก้ไฟล์บันทึกให้เอาอาวุธตำนานไปใส่ช่องเกราะ
+ * จะได้ค่าพลังซ้อนกันสองช่องจากของชิ้นเดียว
+ */
+function parseEquipped(raw: unknown): Equipment {
+  if (!isRecord(raw)) return {}
+
+  const equipped: Equipment = {}
+  for (const slot of EQUIP_SLOTS) {
+    const itemId = raw[slot]
+    if (typeof itemId !== 'string') continue
+    const item = getItem(itemId)
+    if (!item || item.kind !== slot) continue
+    equipped[slot] = itemId
+  }
+  return equipped
+}
+
+/**
+ * เวอร์ชัน 3 → เวอร์ชัน 4
+ * เพิ่มระบบร้านค้าและของสวมใส่ ผู้เล่นเดิมเริ่มต้นด้วยกระเป๋าว่าง
+ */
+function migrateV3ToV4(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+  return { ...raw, inventory: {}, equipped: {} }
 }
 
 /**
@@ -459,7 +516,7 @@ function migrateV2ToV3(raw: unknown): unknown {
 function migrateToCurrent(parsed: unknown): unknown {
   // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateV2ToV3(migrateV1ToV2(parsed))
+    return migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)))
   }
 
   if (!isRecord(parsed)) return null
@@ -469,6 +526,7 @@ function migrateToCurrent(parsed: unknown): unknown {
 
   if (version <= 1) player = migrateV1ToV2(player)
   if (version <= 2) player = migrateV2ToV3(player)
+  if (version <= 3) player = migrateV3ToV4(player)
 
   return player
 }

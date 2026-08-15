@@ -19,6 +19,7 @@ import { NotFoundNotice } from './pages/NotFoundNotice'
 import { QuestIntro } from './pages/QuestIntro'
 import { Quests } from './pages/Quests'
 import { Settings } from './pages/Settings'
+import { Shop } from './pages/Shop'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -70,6 +71,10 @@ function GameRoutes() {
           element={
             <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
           }
+        />
+        <Route
+          path="/shop"
+          element={<RequirePlayer render={(player) => <Shop player={player} />} />}
         />
         <Route
           path="/minigame/:worldId/:stageId"

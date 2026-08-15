@@ -31,6 +31,13 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-gold-500/30 to-gold-600/10',
   },
   {
+    to: '/shop',
+    emoji: '🛒',
+    label: 'ร้านค้า',
+    description: 'ใช้เหรียญซื้อของ แล้วสวมใส่ได้เลย',
+    accent: 'from-ember-500/30 to-ember-600/10',
+  },
+  {
     to: '/character',
     emoji: '👤',
     label: 'ตัวละคร',

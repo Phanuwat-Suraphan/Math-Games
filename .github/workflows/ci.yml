@@ -51,6 +51,9 @@ jobs:
       - name: ทดสอบมินิเกม (จับคู่ โยงเส้น ลากวาง รับของ)
         run: node tests/minigames.test.mjs /tmp/logic
 
+      - name: ทดสอบร้านค้าและของสวมใส่ (Part 6)
+        run: node tests/inventory.test.mjs /tmp/logic
+
       - name: ทดสอบภาพประกอบ
         run: node tests/art.test.mjs /tmp/logic
 

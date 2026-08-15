@@ -52,6 +52,15 @@ export interface CreateBattleInput {
     level: number
     hp: number
     maxHp: number
+    /**
+     * พลังโจมตีและพลังป้องกันที่รวมของสวมใส่มาแล้ว
+     *
+     * ผู้เรียกเป็นคนคำนวณให้ ไม่ใช่ให้เครื่องยนต์ไปอ่านของในกระเป๋าเอง
+     * เพราะเครื่องยนต์ต่อสู้ไม่ควรรู้จักระบบร้านค้าเลย
+     * ถ้าไม่ส่งมา จะใช้ค่าที่คิดจากเลเวลอย่างเดียวตามเดิม
+     */
+    attackPower?: number
+    defense?: number
   }
   /** ระบุเพื่อให้ผลการสุ่ม (คริติคอล/มอนสเตอร์โจมตี) ซ้ำเดิมได้ตอนทดสอบ */
   seed?: string
@@ -87,8 +96,8 @@ export function createBattle(input: CreateBattleInput): BattleState {
     hp: input.player.hp,
     maxHp: input.player.maxHp,
     shield: 0,
-    attackPower: attackPowerOf(input.player.level),
-    defense: BATTLE_CONFIG.basePlayerDefense,
+    attackPower: input.player.attackPower ?? attackPowerOf(input.player.level),
+    defense: input.player.defense ?? BATTLE_CONFIG.basePlayerDefense,
   }
 
   return {

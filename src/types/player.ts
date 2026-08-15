@@ -1,3 +1,4 @@
+import type { Equipment } from './item'
 import type { DailyQuestState, QuestProgress } from './quest'
 import type { StageProgress } from './stage'
 import type { PlayerStatistics, QuestionAttempt } from './stats'
@@ -30,6 +31,15 @@ export interface Player {
 
   questProgress: Record<string, QuestProgress>
   dailyQuests: DailyQuestState
+
+  /**
+   * ของในกระเป๋า นับเป็นจำนวนชิ้นต่อรหัสของ
+   * ของที่สวมอยู่จะไม่อยู่ในนี้ ย้ายไปอยู่ใน equipped แทน
+   * เพื่อไม่ให้นับซ้ำสองที่แล้วสวมของชิ้นเดียวกันได้สองครั้ง
+   */
+  inventory: Record<string, number>
+  /** ของที่สวมอยู่ ช่องละหนึ่งชิ้น */
+  equipped: Equipment
 
   statistics: PlayerStatistics
   /** ประวัติการตอบล่าสุด เก็บจำกัดจำนวนตาม MAX_RECENT_ATTEMPTS */

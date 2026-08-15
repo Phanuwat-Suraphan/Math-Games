@@ -1,5 +1,6 @@
 import { heroArt, HERO_VIEWBOX } from '../../art/heroes'
 import { gameIcon, ICON_VIEWBOX } from '../../art/icons'
+import { itemArt, ITEM_VIEWBOX } from '../../art/items'
 import { monsterArt, MONSTER_VIEWBOX } from '../../art/monsters'
 import { lockedSceneFilter, SCENE_VIEWBOX, worldScene } from '../../art/scenes'
 
@@ -102,6 +103,24 @@ export function GameIcon({ name, className, label, size = 'h-5 w-5' }: GameIconP
       aria-label={label}
       aria-hidden={label ? undefined : true}
       dangerouslySetInnerHTML={{ __html: gameIcon(name) }}
+    />
+  )
+}
+
+interface ItemArtProps extends ArtProps {
+  /** ชื่อภาพของ ไม่ใช่รหัสของ เพราะยาสองขนาดใช้รูปทรงเดียวกัน */
+  art: string
+}
+
+export function ItemArt({ art, className, label }: ItemArtProps) {
+  return (
+    <svg
+      viewBox={ITEM_VIEWBOX}
+      className={className}
+      role={label ? 'img' : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
+      dangerouslySetInnerHTML={{ __html: itemArt(art) }}
     />
   )
 }

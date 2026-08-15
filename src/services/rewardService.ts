@@ -8,6 +8,7 @@ import {
 } from '../data/rewards'
 import { getNextStage, getStagesByWorld } from '../data/stages'
 import { getWorld } from '../data/worlds'
+import { applyBonusPercent, totalStats } from './inventoryService'
 import type { Player } from '../types/player'
 import type { Stage, StageProgress, StageResult } from '../types/stage'
 import type { QuestionAttempt, SkillId } from '../types/stats'
@@ -154,13 +155,27 @@ export function recordAnswer(player: Player, input: AnswerInput): AnswerOutcome 
   const isNewBestStreak = currentStreak > player.bestStreak
   const bestStreak = Math.max(player.bestStreak, currentStreak)
 
-  const gainedExp = applyReplayMultiplier(ANSWER_REWARD.exp, input.isReplay)
+  /*
+   * โบนัสจากของที่สวมอยู่ คิดหลังตัวคูณของการเล่นซ้ำเสมอ
+   *
+   * ลำดับสำคัญ: ถ้าคิดโบนัสก่อนแล้วค่อยหารด้วยตัวคูณเล่นซ้ำ
+   * การปัดเศษจะกินโบนัสหายไปจนของที่ซื้อมาแทบไม่มีผลตอนเล่นซ้ำ
+   * ซึ่งเป็นตอนที่เด็กใส่ของครบที่สุดพอดี
+   */
+  const bonus = totalStats(player)
+
+  const gainedExp = applyBonusPercent(
+    applyReplayMultiplier(ANSWER_REWARD.exp, input.isReplay),
+    bonus.expBonusPercent,
+  )
   const streakBonus = getStreakReward(currentStreak)
   const streakCoins = streakBonus
     ? applyReplayMultiplier(streakBonus.coins, input.isReplay)
     : 0
-  const gainedCoins =
-    applyReplayMultiplier(ANSWER_REWARD.coins, input.isReplay) + streakCoins
+  const gainedCoins = applyBonusPercent(
+    applyReplayMultiplier(ANSWER_REWARD.coins, input.isReplay) + streakCoins,
+    bonus.coinBonusPercent,
+  )
 
   next = { ...next, currentStreak, bestStreak }
   next = addCoins(next, gainedCoins)

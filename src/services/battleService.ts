@@ -11,7 +11,12 @@ import {
   difficultyForBattle,
   isBattleOver,
 } from '../battle/battleEngine'
-import { attackPowerOf, calculatePlayerDamage } from '../battle/damage'
+import { BATTLE_CONFIG, attackPowerOf, calculatePlayerDamage } from '../battle/damage'
+import {
+  attackWithGear,
+  defenseWithGear,
+  effectiveMaxHp,
+} from './inventoryService'
 import {
   buildSessionConfig,
   resolveDifficulty,
@@ -89,7 +94,7 @@ export interface StartBattleInput {
 
 export function startStageBattle(input: StartBattleInput): BattleState {
   const monster = pickMonsterForStage(input.stage)
-  const attackPower = attackPowerOf(input.player.level)
+  const attackPower = attackWithGear(input.player, attackPowerOf(input.player.level))
   const questions = createBattleQuestions(input.stage, attackPower, input.seed)
 
   return createBattle({
@@ -102,7 +107,11 @@ export function startStageBattle(input: StartBattleInput): BattleState {
       avatar: input.player.avatar,
       level: input.player.level,
       hp: input.player.hp,
-      maxHp: input.player.maxHp,
+      // เกราะเพิ่มพลังชีวิตสูงสุด จึงต้องใช้ค่าที่รวมของแล้วในการต่อสู้ด้วย
+      maxHp: effectiveMaxHp(input.player),
+      // ของที่สวมอยู่ต้องมีผลจริง ไม่งั้นซื้ออาวุธไปก็ไม่ต่างอะไร
+      attackPower,
+      defense: defenseWithGear(input.player, BATTLE_CONFIG.basePlayerDefense),
     },
     seed: input.seed,
   })
