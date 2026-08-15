@@ -30,6 +30,7 @@
     "src/math/**/*.ts",
     "src/art/**/*.ts",
     "src/puzzles/**/*.ts",
+    "src/roguelike/**/*.ts",
     "src/minigames/**/*.ts",
     "src/questionEngine/**/*.ts",
     "src/services/storage.ts",

@@ -21,6 +21,7 @@ import { Quests } from './pages/Quests'
 import { Settings } from './pages/Settings'
 import { Shop } from './pages/Shop'
 import { Journal } from './pages/Journal'
+import { Tower } from './pages/Tower'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -72,6 +73,10 @@ function GameRoutes() {
           element={
             <RequirePlayer render={(player) => <PuzzleStage player={player} />} />
           }
+        />
+        <Route
+          path="/tower"
+          element={<RequirePlayer render={(player) => <Tower player={player} />} />}
         />
         <Route
           path="/journal"

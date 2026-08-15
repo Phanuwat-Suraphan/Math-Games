@@ -31,6 +31,13 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-gold-500/30 to-gold-600/10',
   },
   {
+    to: '/tower',
+    emoji: '🗼',
+    label: 'หอคอยไม่รู้จบ',
+    description: 'ปีนให้สูงที่สุด ยิ่งสูงยิ่งยาก ตายแล้วเริ่มใหม่',
+    accent: 'from-arcane-500/30 to-ember-600/10',
+  },
+  {
     to: '/journal',
     emoji: '📖',
     label: 'สมุดบันทึก',
