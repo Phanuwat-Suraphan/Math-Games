@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '../components/Button'
 import { GameIcon, ItemArt } from '../components/art/GameArt'
@@ -10,7 +11,6 @@ import {
   EQUIP_SLOTS,
   buyBlockedReason,
   buyItem,
-  countOf,
   effectiveMaxHp,
   equipItem,
   totalStats,
@@ -193,7 +193,7 @@ export function Shop({ player }: { player: Player }) {
                         {item.price}
                       </span>
                       <Button
-                        size="sm"
+                        size="md"
                         variant={blocked ? 'ghost' : 'primary'}
                         onClick={() => handleBuy(item)}
                       >
@@ -232,11 +232,11 @@ export function Shop({ player }: { player: Player }) {
                     <StatLine item={item} />
                     <div className="mt-2 flex justify-end">
                       {item.kind === 'consumable' ? (
-                        <Button size="sm" onClick={() => handleUse(item)}>
+                        <Button size="md" onClick={() => handleUse(item)}>
                           ใช้ (ฟื้น {item.healAmount})
                         </Button>
                       ) : (
-                        <Button size="sm" onClick={() => handleEquip(item)}>
+                        <Button size="md" onClick={() => handleEquip(item)}>
                           สวมใส่
                         </Button>
                       )}
@@ -297,7 +297,7 @@ function TabButton({
 }: {
   active: boolean
   onClick: () => void
-  children: React.ReactNode
+  children: ReactNode
 }) {
   return (
     <button
