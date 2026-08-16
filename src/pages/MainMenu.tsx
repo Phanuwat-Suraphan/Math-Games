@@ -56,6 +56,15 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-ember-500/30 to-arcane-600/10',
   },
   {
+    to: '/duel',
+    emoji: '🃏',
+    label: 'ศึกผ่าสมการ',
+    description: 'เกมการ์ด สร้างสมการให้หารเกราะศัตรูลงตัว',
+    accent: 'from-sky-500/30 to-arcane-600/10',
+    art: { kind: 'monster', id: 'chaos-cube' },
+    glow: '#38bdf8',
+  },
+  {
     to: '/tower',
     emoji: '🗼',
     art: { kind: 'monster', id: 'geometry-golem' },

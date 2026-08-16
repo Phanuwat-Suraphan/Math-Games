@@ -23,6 +23,7 @@ import { Shop } from './pages/Shop'
 import { Journal } from './pages/Journal'
 import { Tower } from './pages/Tower'
 import { Survivor } from './pages/Survivor'
+import { DivisorDuel } from './pages/DivisorDuel'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -78,6 +79,12 @@ function GameRoutes() {
         <Route
           path="/arena"
           element={<RequirePlayer render={(player) => <Survivor player={player} />} />}
+        />
+        <Route
+          path="/duel"
+          element={
+            <RequirePlayer render={(player) => <DivisorDuel player={player} />} />
+          }
         />
         <Route
           path="/tower"
