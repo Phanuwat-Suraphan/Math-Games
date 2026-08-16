@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
+import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PlayerCard } from '../components/PlayerCard'
 import { ScreenLayout } from '../components/ScreenLayout'
+import { MonsterArt, WorldSceneArt } from '../components/art/GameArt'
 import { useGame } from '../context/useGame'
 import { useProgression } from '../hooks/useProgression'
 import { getOverallAccuracy } from '../utils/statistics'
@@ -13,12 +15,24 @@ interface MenuItem {
   label: string
   description: string
   accent: string
+  /**
+   * ภาพประกอบของโหมดนี้
+   *
+   * โหมดที่เป็น "การเล่น" จะมีภาพจริง ส่วนโหมดที่เป็นการตั้งค่าใช้อิโมจิพอ
+   * ตั้งใจให้ต่างกัน เพราะถ้าทุกใบเด่นเท่ากันก็เท่ากับไม่มีใบไหนเด่น
+   * เด็กที่เพิ่งเข้าเมนูควรถูกดึงไปที่ "ไปเล่น" ก่อน ไม่ใช่ไปหน้าตั้งค่า
+   */
+  art?: { kind: 'scene'; id: string } | { kind: 'monster'; id: string }
+  /** สีเรืองแสงประจำใบ ใช้ตอนชี้ */
+  glow?: string
 }
 
 const MENU_ITEMS: MenuItem[] = [
   {
     to: '/map',
     emoji: '🗺️',
+    art: { kind: 'scene', id: 'world-1' },
+    glow: '#4ade80',
     label: 'แผนที่โลก',
     description: 'ออกเดินทางไปยังโลกต่าง ๆ',
     accent: 'from-leaf-500/30 to-leaf-600/10',
@@ -26,6 +40,8 @@ const MENU_ITEMS: MenuItem[] = [
   {
     to: '/quests',
     emoji: '📜',
+    art: { kind: 'monster', id: 'math-guardian' },
+    glow: '#fbbf24',
     label: 'ภารกิจ',
     description: 'ดูภารกิจที่กำลังทำอยู่',
     accent: 'from-gold-500/30 to-gold-600/10',
@@ -33,6 +49,8 @@ const MENU_ITEMS: MenuItem[] = [
   {
     to: '/arena',
     emoji: '⚔️',
+    art: { kind: 'monster', id: 'dragon-of-numbers' },
+    glow: '#f43f5e',
     label: 'สนามรบตัวเลข',
     description: 'เดินหลบมอน ยิงเอง เลเวลอัปสุ่มสกิล',
     accent: 'from-ember-500/30 to-arcane-600/10',
@@ -40,6 +58,8 @@ const MENU_ITEMS: MenuItem[] = [
   {
     to: '/tower',
     emoji: '🗼',
+    art: { kind: 'monster', id: 'geometry-golem' },
+    glow: '#a78bfa',
     label: 'หอคอยไม่รู้จบ',
     description: 'ปีนให้สูงที่สุด ยิ่งสูงยิ่งยาก ตายแล้วเริ่มใหม่',
     accent: 'from-arcane-500/30 to-ember-600/10',
@@ -129,23 +149,49 @@ export function MainMenu({ player }: { player: Player }) {
             <li key={item.to} className={index === 0 ? 'sm:col-span-2' : ''}>
               <motion.button
                 type="button"
-                whileHover={{ y: -3 }}
+                whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate(item.to)}
-                className={`relative flex w-full items-center gap-4 overflow-hidden rounded-xl2 border border-white/10 bg-gradient-to-br ${item.accent} p-5 text-left transition-colors hover:border-white/25`}
+                style={
+                  item.glow
+                    ? ({ '--glow': item.glow } as CSSProperties)
+                    : undefined
+                }
+                className={`menu-tile group relative flex w-full items-center gap-4 overflow-hidden rounded-xl2 border border-white/10 bg-gradient-to-br ${item.accent} p-5 text-left`}
               >
-                <span aria-hidden="true" className="text-3xl sm:text-4xl">
+                {/*
+                  ภาพประกอบวางไว้ขวาสุดและถูกตัดขอบ
+                  ทำให้การ์ดดูเหมือนหน้าต่างที่มองเข้าไปเห็นโหมดนั้นจริง ๆ
+                  ต่างจากไอคอนกลม ๆ ที่วางไว้เฉย ๆ ซึ่งอ่านเป็นปุ่มเมนูทั่วไป
+                */}
+                {item.art ? (
+                  <span
+                    aria-hidden="true"
+                    className="menu-tile-art pointer-events-none absolute -right-4 top-1/2 h-[130%] w-32 -translate-y-1/2 opacity-45 transition-all duration-300 group-hover:scale-110 group-hover:opacity-65 sm:w-40"
+                  >
+                    {item.art.kind === 'scene' ? (
+                      <WorldSceneArt worldId={item.art.id} className="h-full w-full" />
+                    ) : (
+                      <MonsterArt monsterId={item.art.id} className="h-full w-full" />
+                    )}
+                  </span>
+                ) : null}
+
+                <span aria-hidden="true" className="relative text-3xl sm:text-4xl">
                   {item.emoji}
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-lg font-bold text-white">
+                <span className="relative min-w-0 flex-1">
+                  <span className="block text-lg font-black text-white">
                     {item.label}
                   </span>
                   <span className="block text-sm text-slate-300">
                     {item.description}
                   </span>
                 </span>
-                <span aria-hidden="true" className="text-xl text-slate-400">
+                <span
+                  aria-hidden="true"
+                  className="relative text-xl text-slate-400 transition-transform duration-200 group-hover:translate-x-1 group-hover:text-white"
+                >
                   →
                 </span>
               </motion.button>

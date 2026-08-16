@@ -398,6 +398,119 @@ html[data-animations='off'] *::after {
 
 
 
+/* ---------- ภาพหลักหน้าแรก ---------- */
+
+/*
+ * เวทีของภาพหลัก
+ *
+ * ทำไมต้องมี: หน้าแรกเดิมเป็นตัวอักษรบนพื้นไล่สี ซึ่งบอกได้ว่าเป็นเว็บอะไร
+ * แต่ไม่ได้ทำให้อยากกดเล่น เกมที่เห็นแล้วอยากเล่นทันทีมีของเหมือนกันหมด
+ * คือมีภาพหนึ่งภาพที่บอกทั้งเรื่อง ว่าเราคือใคร อยู่ที่ไหน และจะไปสู้กับอะไร
+ *
+ * เวทีนี้จึงซ้อนสามชั้นแบบฉากละคร ฉากหลัง ตัวละคร และแสง
+ */
+.stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  isolation: isolate;
+}
+
+/* ลำแสงส่องลงมาจากด้านบน หมุนช้ามากจนแทบไม่รู้ตัวว่าขยับ */
+.stage-rays {
+  position: absolute;
+  left: 50%;
+  top: -60%;
+  width: 160%;
+  height: 190%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    conic-gradient(
+      from 200deg at 50% 0%,
+      transparent 0deg,
+      rgba(252, 211, 77, 0.16) 12deg,
+      transparent 24deg,
+      transparent 36deg,
+      rgba(167, 139, 250, 0.14) 48deg,
+      transparent 60deg,
+      transparent 84deg,
+      rgba(56, 189, 248, 0.12) 96deg,
+      transparent 108deg
+    );
+  animation: rays 26s linear infinite;
+}
+
+/*
+ * ฐานเรืองแสงใต้ตัวละคร
+ * ทำให้ตัวละครดู "ยืนอยู่บนเวที" ไม่ใช่ภาพที่ลอยแปะอยู่กลางกล่อง
+ */
+.stage-pedestal {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  width: 62%;
+  height: 22%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 60%, rgba(252, 211, 77, 0.42), transparent 70%);
+  filter: blur(10px);
+  animation: pedestal 4.6s ease-in-out infinite;
+}
+
+/*
+ * สัญลักษณ์คณิตศาสตร์ลอยขึ้น
+ * ใช้ตัวอักษรจริงไม่ใช่ภาพ จึงคมทุกจอและไม่เพิ่มขนาดไฟล์เลย
+ */
+.float-symbol {
+  position: absolute;
+  pointer-events: none;
+  font-weight: 900;
+  color: rgba(252, 211, 77, 0.42);
+  text-shadow: 0 0 14px rgba(252, 211, 77, 0.4);
+  animation: rise 9s ease-in-out infinite;
+}
+
+/*
+ * ปุ่มเรียกให้เล่น ต้องเด่นกว่าทุกอย่างบนหน้า
+ * เต้นเป็นจังหวะช้า ๆ เหมือนหัวใจ ซึ่งตาจับได้แม้ไม่ได้มองตรง ๆ
+ */
+.cta-glow {
+  animation: cta 2.8s ease-in-out infinite;
+}
+
+/*
+ * การ์ดโหมดในเมนูหลัก
+ *
+ * ขอบเรืองแสงตามสีประจำโหมดตอนชี้ ทำให้รู้ว่ากำลังจะกดอะไรก่อนกดจริง
+ * และทำให้แต่ละโหมดมี "สีประจำตัว" ที่เด็กจำได้เร็วกว่าจำชื่อ
+ */
+.menu-tile {
+  transition: border-color 0.2s ease, box-shadow 0.25s ease, transform 0.18s ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 12px 30px -18px rgba(0, 0, 0, 0.9);
+}
+
+/*
+ * ภาพประกอบในการ์ดต้องไล่จางทางซ้าย
+ *
+ * ถ้าไม่ไล่จาง ภาพจะมีขอบตัดเป็นกล่องสี่เหลี่ยมกลางการ์ด
+ * ซึ่งอ่านเป็น "ภาพที่แปะทับ" ไม่ใช่ "หน้าต่างที่มองเข้าไปเห็นโหมดนั้น"
+ * และขอบแข็งยังไปแย่งสายตากับตัวหนังสือที่อยู่ข้าง ๆ ด้วย
+ */
+.menu-tile-art {
+  -webkit-mask-image: linear-gradient(to left, #000 45%, transparent 92%);
+  mask-image: linear-gradient(to left, #000 45%, transparent 92%);
+}
+
+.menu-tile:hover {
+  border-color: color-mix(in srgb, var(--glow, #ffffff) 55%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 0 0 1px color-mix(in srgb, var(--glow, #ffffff) 25%, transparent),
+    0 22px 46px -22px color-mix(in srgb, var(--glow, #ffffff) 60%, transparent),
+    0 18px 40px -20px rgba(0, 0, 0, 0.95);
+}
+
 /* ---------- การลอยขึ้นเมื่อชี้ ---------- */
 
 .lift {
@@ -450,4 +563,33 @@ html[data-animations='off'] *::after {
 @keyframes bar-shine {
   0%, 60% { transform: translateX(-100%); }
   100%    { transform: translateX(100%); }
+}
+
+@keyframes rays {
+  from { transform: translateX(-50%) rotate(0deg); }
+  to   { transform: translateX(-50%) rotate(360deg); }
+}
+
+@keyframes pedestal {
+  0%, 100% { opacity: 0.75; transform: translateX(-50%) scaleX(1); }
+  50%      { opacity: 1;    transform: translateX(-50%) scaleX(1.08); }
+}
+
+/*
+ * ระยะลอยสั้นลงเหลือ 44px จากเดิม 90px
+ *
+ * เดิมลอยไกลเกินจนสัญลักษณ์ทุกตัวไปจบที่ขอบบนพร้อมกัน
+ * กลายเป็นแถวตัวอักษรเรียงกันซึ่งดูเหมือนสูตรที่หลงมา ไม่ใช่บรรยากาศ
+ * ระยะสั้นบวกกับตำแหน่งเริ่มต้นที่ต่างกันทำให้ไม่มีจังหวะไหนที่มาเรียงตรงกัน
+ */
+@keyframes rise {
+  0%   { opacity: 0; transform: translateY(14px) rotate(-8deg); }
+  22%  { opacity: 0.9; }
+  78%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translateY(-44px) rotate(8deg); }
+}
+
+@keyframes cta {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.55), 0 10px 30px -10px rgba(0,0,0,.8); }
+  50%      { box-shadow: 0 0 0 14px rgba(252, 211, 77, 0), 0 10px 30px -10px rgba(0,0,0,.8); }
 }
