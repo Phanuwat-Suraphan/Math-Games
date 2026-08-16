@@ -27,6 +27,11 @@ jobs:
       - name: ตรวจการนำเข้าชื่อข้ามไฟล์
         run: node tests/imports.test.mjs
 
+      # ตรวจว่าคลาส CSS ที่หน้าจอใช้มีนิยามอยู่จริง
+      # คลาสที่หายไปไม่ทำให้ build พัง จึงไม่มีทางถูกจับได้จากขั้นอื่นเลย
+      - name: ตรวจระบบดีไซน์
+        run: node tests/styles.test.mjs
+
       # ขั้นนี้สำคัญที่สุด เป็นการตรวจไฟล์ React ที่ตรวจในเครื่องพัฒนาไม่ได้
       - name: ตรวจ TypeScript ทั้งโปรเจกต์
         run: npm run typecheck

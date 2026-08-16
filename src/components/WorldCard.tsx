@@ -1,10 +1,26 @@
 import { motion } from 'framer-motion'
+import type { CSSProperties } from 'react'
 import { WorldSceneArt } from './art/GameArt'
 import type { WorldSummary } from '../hooks/useProgression'
 
 interface WorldCardProps {
   summary: WorldSummary
   onSelect: (worldId: string) => void
+}
+
+/**
+ * สีประจำโลก ไล่ตามบรรยากาศของฉากแต่ละโลก
+ *
+ * ใช้เป็นสีเรืองแสงตอนชี้การ์ด ทำให้แต่ละโลกมีเอกลักษณ์ของตัวเอง
+ * เด็กจำโลกได้จากสีเร็วกว่าจำจากชื่อ ซึ่งช่วยมากเมื่อมีถึงหกโลก
+ */
+const WORLD_GLOW: Record<string, string> = {
+  'world-1': '#4ade80',
+  'world-2': '#a78bfa',
+  'world-3': '#fbbf24',
+  'world-4': '#38bdf8',
+  'world-5': '#e2e8f0',
+  'world-6': '#f43f5e',
 }
 
 export function WorldCard({ summary, onSelect }: WorldCardProps) {
@@ -28,11 +44,12 @@ export function WorldCard({ summary, onSelect }: WorldCardProps) {
       disabled={!isPlayable}
       aria-label={`โลกที่ ${world.order} ${world.name} เรื่อง ${world.subtitle} — ${statusLabel}`}
       className={[
-        'group relative w-full overflow-hidden rounded-xl2 border p-5 text-left transition-colors',
+        'menu-tile group relative w-full overflow-hidden rounded-xl2 border p-5 text-left',
         isPlayable
-          ? 'cursor-pointer border-white/15 bg-night-800/80 shadow-card hover:border-white/30'
-          : 'cursor-not-allowed border-white/5 bg-night-800/40',
+          ? 'cursor-pointer border-white/15'
+          : 'cursor-not-allowed border-white/5 opacity-70',
       ].join(' ')}
+      style={{ '--glow': WORLD_GLOW[world.id] ?? '#a78bfa' } as CSSProperties}
     >
       {/* ฉากประจำโลกเป็นภาพพื้นหลัง เด็กจำโลกได้จากภาพโดยไม่ต้องอ่านชื่อ */}
       <WorldSceneArt

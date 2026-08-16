@@ -114,17 +114,21 @@ export function StageResult({ player }: { player: Player }) {
     >
       {showConfetti ? <Confetti /> : null}
 
+      {/*
+        ด่านที่ผ่านได้ใช้แผงแบบเด่นพร้อมมุมประดับ ด่านที่เก็บดาวครบมีแสงกวาดผ่านด้วย
+        ส่วนด่านที่ยังไม่ผ่านใช้แผงธรรมดา
+        ความต่างตรงนี้คือสิ่งแรกที่เด็กเห็นก่อนจะได้อ่านตัวหนังสือใด ๆ
+        และต้องบอกผลได้ทันทีโดยไม่ต้องอ่าน
+      */}
       <motion.section
         initial={{ opacity: 0, scale: 0.92, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ type: 'spring', stiffness: 180, damping: 18 }}
-        className="surface-card relative overflow-hidden p-6 text-center sm:p-8"
+        className={`panel relative overflow-hidden p-6 text-center sm:p-8 ${
+          result.isPassed ? 'panel-hero panel-corners' : ''
+        } ${result.isMastered ? 'sheen' : ''}`}
         aria-labelledby="stage-result-title"
       >
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-gold-300 via-arcane-400 to-leaf-400"
-        />
 
         <motion.p
           aria-hidden="true"
@@ -137,8 +141,8 @@ export function StageResult({ player }: { player: Player }) {
 
         <h1
           id="stage-result-title"
-          className={`mt-3 text-2xl font-bold sm:text-3xl ${
-            result.isPassed ? 'text-gold-300' : 'text-sky-400'
+          className={`mt-3 text-2xl font-black sm:text-3xl ${
+            result.isPassed ? 'title-gold' : 'title-hero'
           }`}
         >
           {headline}

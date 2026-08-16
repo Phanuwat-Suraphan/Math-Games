@@ -461,7 +461,7 @@ function OverPanel({ run, onRestart }: { run: RunState; onRestart: () => void })
 
   return (
     <div className="mt-4 rounded-xl2 border border-white/10 bg-night-800/60 p-6 text-center">
-      <h2 className="text-2xl font-black text-white">จบรอบที่ชั้น {run.reachedFloor}</h2>
+      <h2 className="title-gold text-2xl font-black">จบรอบที่ชั้น {run.reachedFloor}</h2>
       <p className="mt-2 text-sm text-slate-300">
         ไม่เป็นไร รอบหน้าขึ้นได้สูงกว่านี้แน่นอน
       </p>

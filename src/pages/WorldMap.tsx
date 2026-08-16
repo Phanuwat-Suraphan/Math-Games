@@ -26,6 +26,7 @@ export function WorldMap({ player }: { player: Player }) {
           <p className="mt-2 text-slate-300">
             พิชิตทุกด่านในโลกหนึ่ง เพื่อปลดล็อกโลกถัดไป
           </p>
+          <div className="divider-ornate mx-auto mt-4 max-w-sm text-sm">◆</div>
 
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <span className="stat-chip text-gold-300">
