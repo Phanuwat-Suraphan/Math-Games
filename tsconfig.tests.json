@@ -40,6 +40,8 @@
     "src/services/questionService.ts",
     "src/services/battleService.ts",
     "src/services/inventoryService.ts",
+    "src/services/upgradeService.ts",
+    "src/services/avatarService.ts",
     "src/services/storyService.ts",
     "src/battle/**/*.ts"
   ]

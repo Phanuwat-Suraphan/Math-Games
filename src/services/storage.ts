@@ -6,6 +6,7 @@ import { getItem } from '../data/items'
 import { STORY_BEATS } from '../data/story'
 import { STAGES, getStage } from '../data/stages'
 import { EQUIP_SLOTS } from './inventoryService'
+import { MAX_STARS } from './upgradeService'
 import type { Equipment } from '../types/item'
 import type { GameSettings, Player } from '../types/player'
 import type { DailyQuestState, QuestProgress } from '../types/quest'
@@ -31,7 +32,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 5
+export const CURRENT_SAVE_VERSION = 6
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -157,6 +158,9 @@ export function createPlayer(name: string, avatar: string): Player {
     storyFlags: [],
     inventory: {},
     equipped: {},
+    upgrades: {},
+    // ตัวละครที่เลือกตอนสร้างผู้เล่นถือว่าเป็นของตัวเองทันที
+    ownedAvatars: [isValidAvatarId(avatar) ? avatar : DEFAULT_AVATAR_ID],
 
     statistics: createEmptyStatistics(),
     recentAttempts: [],
@@ -321,6 +325,11 @@ function parsePlayer(raw: unknown): Player | null {
     totalQuestions,
   )
 
+  const avatar =
+    typeof raw.avatar === 'string' && isValidAvatarId(raw.avatar)
+      ? raw.avatar
+      : DEFAULT_AVATAR_ID
+
   const bestStreak = toSafeInt(raw.bestStreak, 0, 0, 9_999_999)
   const stageProgress = parseStageProgress(raw.stageProgress)
 
@@ -335,10 +344,7 @@ function parsePlayer(raw: unknown): Player | null {
         ? raw.id.slice(0, 100)
         : createId(),
     name,
-    avatar:
-      typeof raw.avatar === 'string' && isValidAvatarId(raw.avatar)
-        ? raw.avatar
-        : DEFAULT_AVATAR_ID,
+    avatar,
 
     level,
     exp,
@@ -364,6 +370,8 @@ function parsePlayer(raw: unknown): Player | null {
     storyFlags: parseStoryFlags(raw.storyFlags),
     inventory: parseInventory(raw.inventory),
     equipped: parseEquipped(raw.equipped),
+    upgrades: parseUpgrades(raw.upgrades),
+    ownedAvatars: parseOwnedAvatars(raw.ownedAvatars, avatar),
 
     statistics: parseStatistics(raw.statistics),
     recentAttempts: parseRecentAttempts(raw.recentAttempts),
@@ -392,6 +400,42 @@ function parseInventory(raw: unknown): Record<string, number> {
     if (count > 0) inventory[itemId] = count
   }
   return inventory
+}
+
+/**
+ * อ่านดาวตีบวก
+ *
+ * หนีบไว้ไม่ให้เกินเพดาน เพราะไฟล์บันทึกอยู่ใน localStorage ซึ่งแก้ได้
+ * ถ้าไม่หนีบ ใครแก้เป็นล้านดาวก็จะได้ค่าพลังมหาศาลจากของชิ้นเดียว
+ */
+function parseUpgrades(raw: unknown): Record<string, number> {
+  if (!isRecord(raw)) return {}
+
+  const upgrades: Record<string, number> = {}
+  for (const [itemId, value] of Object.entries(raw)) {
+    if (!getItem(itemId)) continue
+    const stars = toSafeInt(value, 0, 0, MAX_STARS)
+    if (stars > 0) upgrades[itemId] = stars
+  }
+  return upgrades
+}
+
+/**
+ * อ่านตัวละครที่ปลดล็อกแล้ว
+ *
+ * ตัวที่ใช้อยู่ต้องอยู่ในรายการเสมอ ไม่ว่าไฟล์บันทึกจะเขียนว่าอย่างไร
+ * ไม่งั้นจะเกิดสภาพที่เด็กใช้ตัวละครที่ระบบบอกว่าไม่มี ซึ่งออกจากไม่ได้
+ */
+function parseOwnedAvatars(raw: unknown, currentAvatarId: string): string[] {
+  const owned = new Set<string>()
+  if (Array.isArray(raw)) {
+    for (const value of raw) {
+      if (typeof value === 'string' && isValidAvatarId(value)) owned.add(value)
+    }
+  }
+
+  owned.add(isValidAvatarId(currentAvatarId) ? currentAvatarId : DEFAULT_AVATAR_ID)
+  return [...owned]
 }
 
 /**
@@ -437,6 +481,23 @@ function parseStoryFlags(raw: unknown): string[] {
     flags.push(value)
   }
   return flags
+}
+
+/**
+ * เวอร์ชัน 5 → เวอร์ชัน 6
+ *
+ * เพิ่มการตีบวกของและการซื้อตัวละคร
+ * ผู้เล่นเดิมยังไม่มีดาว และมีเฉพาะตัวละครที่ใช้อยู่ตอนนี้
+ *
+ * ตั้งใจไม่แจกตัวละครฟรีย้อนหลังให้ทุกตัว
+ * เพราะจะทำให้เป้าหมายใหม่ทั้งหมดหายไปตั้งแต่เปิดเกมครั้งแรก
+ * แต่ตัวที่ใช้อยู่ต้องได้ไปแน่นอน ไม่งั้นจะโดนบังคับเปลี่ยนตัวโดยไม่ได้ทำอะไรผิด
+ */
+function migrateV5ToV6(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+
+  const avatar = typeof raw.avatar === 'string' ? raw.avatar : DEFAULT_AVATAR_ID
+  return { ...raw, upgrades: {}, ownedAvatars: [avatar] }
 }
 
 /**
@@ -552,7 +613,7 @@ function migrateV2ToV3(raw: unknown): unknown {
 function migrateToCurrent(parsed: unknown): unknown {
   // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed))))
+    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)))))
   }
 
   if (!isRecord(parsed)) return null
@@ -564,6 +625,7 @@ function migrateToCurrent(parsed: unknown): unknown {
   if (version <= 2) player = migrateV2ToV3(player)
   if (version <= 3) player = migrateV3ToV4(player)
   if (version <= 4) player = migrateV4ToV5(player)
+  if (version <= 5) player = migrateV5ToV6(player)
 
   return player
 }

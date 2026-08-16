@@ -13,6 +13,7 @@
 import { getItem } from '../data/items'
 import type { EquipSlot, Item, TotalStats } from '../types/item'
 import type { Player } from '../types/player'
+import { starsOf, statsWithStars } from './upgradeService'
 
 /** ค่าที่ไม่มีของสวมเลย */
 export const EMPTY_STATS: TotalStats = {
@@ -56,9 +57,13 @@ export function buyBlockedReason(player: Player, itemId: string): string | null 
   if (player.coins < item.price) {
     return `ยังขาดอีก ${item.price - player.coins} เหรียญ`
   }
-  // ของสวมใส่ซื้อซ้ำไม่ได้ เพราะสวมได้ทีละชิ้นอยู่แล้ว ซื้อซ้ำคือเสียเหรียญเปล่า
+  /*
+   * ของสวมใส่ซื้อซ้ำไม่ได้ เพราะสวมได้ทีละชิ้นอยู่แล้ว
+   * แต่ต้องบอกทางต่อให้ด้วยว่าเหรียญเอาไปตีบวกได้
+   * ไม่งั้นเด็กจะเห็นแค่ปุ่มที่กดไม่ได้ แล้วคิดว่าของชิ้นนี้จบแค่นี้
+   */
   if (item.kind !== 'consumable' && owns(player, itemId)) {
-    return 'มีของชิ้นนี้แล้ว'
+    return 'มีแล้ว — เอาเหรียญไปตีบวกได้'
   }
   return null
 }
@@ -159,7 +164,13 @@ export function useConsumable(
   }
 }
 
-/** รวมค่าจากของที่สวมอยู่ทั้งหมด */
+/**
+ * รวมค่าจากของที่สวมอยู่ทั้งหมด นับดาวตีบวกด้วย
+ *
+ * อ่านดาวจาก player.upgrades ทุกครั้ง ไม่เก็บค่าที่รวมแล้วไว้ที่ไหน
+ * ถ้าเก็บไว้ ตอนตีบวกเพิ่มจะต้องไล่อัปเดตทุกที่ที่เคยเก็บ
+ * ซึ่งเป็นที่มาของบั๊กแบบ "ตีบวกแล้วค่าไม่ขึ้นจนกว่าจะถอดใส่ใหม่"
+ */
 export function totalStats(player: Player): TotalStats {
   const total = { ...EMPTY_STATS }
 
@@ -169,11 +180,13 @@ export function totalStats(player: Player): TotalStats {
     const item = getItem(itemId)
     if (!item) continue
 
-    total.attack += item.stats.attack ?? 0
-    total.defense += item.stats.defense ?? 0
-    total.maxHp += item.stats.maxHp ?? 0
-    total.expBonusPercent += item.stats.expBonusPercent ?? 0
-    total.coinBonusPercent += item.stats.coinBonusPercent ?? 0
+    const stats = statsWithStars(item, starsOf(player, itemId))
+
+    total.attack += stats.attack ?? 0
+    total.defense += stats.defense ?? 0
+    total.maxHp += stats.maxHp ?? 0
+    total.expBonusPercent += stats.expBonusPercent ?? 0
+    total.coinBonusPercent += stats.coinBonusPercent ?? 0
   }
 
   return total

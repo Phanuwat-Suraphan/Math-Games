@@ -46,6 +46,16 @@ export interface Player {
   inventory: Record<string, number>
   /** ของที่สวมอยู่ ช่องละหนึ่งชิ้น */
   equipped: Equipment
+  /**
+   * ดาวตีบวกของแต่ละชิ้น นับแยกตามรหัสของ
+   *
+   * เก็บแยกจาก inventory เพราะดาวติดอยู่กับ "ชนิดของ" ไม่ใช่ตัวชิ้น
+   * ถอดออกใส่เข้าหรือซื้อใหม่ ดาวก็ยังอยู่
+   * ถ้าผูกกับตัวชิ้น เด็กจะเสียดาวทั้งหมดตอนเผลอถอดของ ซึ่งไม่ยุติธรรม
+   */
+  upgrades: Record<string, number>
+  /** ตัวละครที่ปลดล็อกแล้ว */
+  ownedAvatars: string[]
 
   statistics: PlayerStatistics
   /** ประวัติการตอบล่าสุด เก็บจำกัดจำนวนตาม MAX_RECENT_ATTEMPTS */
@@ -61,6 +71,10 @@ export interface Avatar {
   emoji: string
   description: string
   accent: AvatarAccent
+  /** ราคาปลดล็อก 0 = เลือกได้ตั้งแต่แรก */
+  price: number
+  /** ต้องถึงเลเวลนี้ก่อนจึงจะซื้อได้ */
+  requiredLevel?: number
 }
 
 export type AvatarAccent = 'ember' | 'arcane' | 'leaf' | 'gold' | 'sky' | 'rose'

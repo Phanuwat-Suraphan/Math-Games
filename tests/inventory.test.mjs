@@ -25,6 +25,9 @@ const load = (name) => require(path.resolve(OUT, name + '.js'))
 const INV = load('services/inventoryService')
 const ITEMS = load('data/items')
 const STORAGE = load('services/storage')
+const UP = load('services/upgradeService')
+const AV = load('services/avatarService')
+const AVATARS = load('data/avatars')
 
 let passed = 0
 const failures = []
@@ -427,6 +430,210 @@ check('ผู้เล่นเวอร์ชันเก่าที่ยั�
     'กระเป๋าไม่ว่างหลังอัปเกรด',
   )
 })
+
+
+// ---------- ตีบวกของ ----------
+
+check('ตีบวกแล้วค่าต้องขึ้นจริง และหักเหรียญถูกต้อง', () => {
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+  let player = makePlayer({ coins: 99999, inventory: { [item.id]: 1 } })
+
+  const before = INV.totalStats(INV.equipItem(player, item.id)).attack
+  const cost = UP.upgradeCost(item.id, 0)
+
+  player = UP.upgradeItem(player, item.id)
+  assert(player, 'ตีบวกไม่สำเร็จทั้งที่เหรียญพอ')
+  assert(player.coins === 99999 - cost, `หักเหรียญผิด เหลือ ${player.coins}`)
+  assert(UP.starsOf(player, item.id) === 1, 'ตีบวกแล้วดาวไม่ขึ้น')
+
+  const after = INV.totalStats(INV.equipItem(player, item.id)).attack
+  assert(after > before, `ตีบวกแล้วพลังโจมตีเท่าเดิมที่ ${after}`)
+})
+
+check('ตีบวกได้ถึงเพดานแล้วต้องหยุด', () => {
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'armor')
+  let player = makePlayer({ coins: 9999999, inventory: { [item.id]: 1 } })
+
+  for (let i = 0; i < UP.MAX_STARS; i += 1) {
+    const next = UP.upgradeItem(player, item.id)
+    assert(next, `ตีบวกดาวที่ ${i + 1} ไม่สำเร็จ`)
+    player = next
+  }
+
+  assert(UP.starsOf(player, item.id) === UP.MAX_STARS, 'ดาวไม่ถึงเพดาน')
+  assert(UP.upgradeItem(player, item.id) === null, 'ตีบวกเกินเพดานได้')
+  assert(UP.upgradeCost(item.id, UP.MAX_STARS) === null, 'ยังคืนราคาทั้งที่ตีบวกต่อไม่ได้')
+})
+
+check('ตีบวกของที่ไม่มีในกระเป๋าไม่ได้', () => {
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+  const player = makePlayer({ coins: 99999, inventory: {}, equipped: {} })
+
+  assert(UP.upgradeItem(player, item.id) === null, 'ตีบวกของที่ยังไม่มีได้')
+  assert(
+    UP.upgradeBlockedReason(player, item.id).includes('ต้องมีของ'),
+    'ไม่ได้บอกเหตุผลว่ายังไม่มีของ',
+  )
+})
+
+check('ตีบวกของที่สวมอยู่ได้ ไม่ต้องถอดออกก่อน', () => {
+  /*
+   * ข้อนี้สำคัญเพราะเด็กจะตีบวกของที่ใช้อยู่เป็นหลัก
+   * ถ้าบังคับให้ถอดก่อน เด็กจะไม่รู้ว่าต้องทำอะไร แล้วคิดว่าตีบวกของชิ้นนั้นไม่ได้
+   */
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+  let player = makePlayer({ coins: 99999, inventory: { [item.id]: 1 } })
+  player = INV.equipItem(player, item.id)
+
+  assert(INV.countOf(player, item.id) === 0, 'สวมแล้วของยังอยู่ในกระเป๋า')
+  assert(UP.canUpgrade(player, item.id), 'ตีบวกของที่สวมอยู่ไม่ได้')
+})
+
+check('เหรียญไม่พอต้องตีบวกไม่ได้ และบอกว่าขาดเท่าไร', () => {
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+  const cost = UP.upgradeCost(item.id, 0)
+  const player = makePlayer({ coins: cost - 1, inventory: { [item.id]: 1 } })
+
+  assert(UP.upgradeItem(player, item.id) === null, 'เหรียญไม่พอแต่ตีบวกได้')
+  assert(
+    UP.upgradeBlockedReason(player, item.id).includes('ขาดอีก 1'),
+    `ข้อความบอกเหตุผลผิด: ${UP.upgradeBlockedReason(player, item.id)}`,
+  )
+})
+
+check('ราคาตีบวกต้องขึ้นเร็วกว่าค่าที่ได้', () => {
+  /*
+   * ตั้งใจให้เป็นแบบนี้ เพื่อให้การกระจายตีบวกหลายชิ้นคุ้มกว่าทุ่มชิ้นเดียวจนสุด
+   * ถ้าราคาขึ้นช้ากว่าค่าที่ได้ คำตอบที่ดีที่สุดจะมีแค่ทางเดียวเสมอ
+   * ซึ่งทำให้ไม่มีอะไรให้ตัดสินใจเลย
+   */
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+
+  for (let star = 1; star < UP.MAX_STARS; star += 1) {
+    const previous = UP.upgradeCost(item.id, star - 1)
+    const current = UP.upgradeCost(item.id, star)
+    assert(current > previous, `ดาวที่ ${star + 1} ไม่ได้แพงกว่าดาวก่อนหน้า`)
+  }
+
+  const base = UP.statsWithStars(item, 0).attack
+  const full = UP.statsWithStars(item, UP.MAX_STARS).attack
+  assert(full > base, 'ตีบวกจนสุดแล้วค่าไม่ขึ้นเลย')
+  assert(full < base * 4, `ตีบวกจนสุดแล้วแรงขึ้น ${(full / base).toFixed(1)} เท่า ซึ่งมากเกินไป`)
+})
+
+check('ของราคาถูกที่มีค่าน้อยต้องได้ค่าเพิ่มอย่างน้อยหนึ่งหน่วยต่อดาว', () => {
+  // ถ้าปัดลง ของที่มีค่าพื้นฐาน 2 จะไม่ขึ้นเลยในดาวแรก แล้วเด็กจะรู้สึกว่าจ่ายฟรี
+  for (const item of ITEMS.ITEMS) {
+    if (item.kind === 'consumable') continue
+    const base = UP.statsWithStars(item, 0)
+    const one = UP.statsWithStars(item, 1)
+
+    for (const key of Object.keys(base)) {
+      if (!base[key]) continue
+      assert(one[key] > base[key], `${item.name} ค่า ${key} ไม่ขึ้นเลยตอนตีบวกดาวแรก`)
+    }
+  }
+})
+
+check('ดาวต้องไม่หายตอนถอดของออกแล้วใส่กลับ', () => {
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+  let player = makePlayer({ coins: 99999, inventory: { [item.id]: 1 } })
+  player = UP.upgradeItem(player, item.id)
+  player = UP.upgradeItem(player, item.id)
+
+  player = INV.equipItem(player, item.id)
+  player = INV.unequipSlot(player, 'weapon')
+  player = INV.equipItem(player, item.id)
+
+  assert(UP.starsOf(player, item.id) === 2, `ดาวหายไป เหลือ ${UP.starsOf(player, item.id)}`)
+})
+
+// ---------- ซื้อและเปลี่ยนตัวละคร ----------
+
+check('ตัวละครทุกตัวมีราคาและมีตัวเริ่มต้นให้เลือกมากกว่าหนึ่งตัว', () => {
+  for (const avatar of AVATARS.AVATARS) {
+    assert(typeof avatar.price === 'number' && avatar.price >= 0, `${avatar.id} ไม่มีราคา`)
+  }
+
+  assert(
+    AVATARS.STARTER_AVATAR_IDS.length >= 2,
+    `ตัวเริ่มต้นมีแค่ ${AVATARS.STARTER_AVATAR_IDS.length} ตัว ซึ่งไม่ถือว่าได้เลือก`,
+  )
+  assert(
+    AVATARS.STARTER_AVATAR_IDS.includes(AVATARS.DEFAULT_AVATAR_ID),
+    'ตัวละครค่าเริ่มต้นกลับต้องซื้อก่อน',
+  )
+  assert(
+    AVATARS.AVATARS.some((avatar) => avatar.price > 0),
+    'ไม่มีตัวละครที่ต้องซื้อเลย ระบบร้านตัวละครจึงไม่มีความหมาย',
+  )
+})
+
+check('ผู้เล่นใหม่ต้องมีเฉพาะตัวที่เลือกไว้ ไม่ใช่มีครบทุกตัว', () => {
+  const player = STORAGE.createPlayer('เด็กใหม่', 'mage')
+
+  assert(AV.ownsAvatar(player, 'mage'), 'ตัวที่เลือกตอนสร้างกลับไม่ได้เป็นของตัวเอง')
+  const paid = AVATARS.AVATARS.find((avatar) => avatar.price > 0)
+  assert(!AV.ownsAvatar(player, paid.id), 'ผู้เล่นใหม่ได้ตัวละครที่ต้องซื้อไปฟรี')
+})
+
+check('ซื้อตัวละครแล้วต้องหักเหรียญ เป็นเจ้าของ และเปลี่ยนให้ทันที', () => {
+  const paid = AVATARS.AVATARS.find((avatar) => avatar.price > 0 && !avatar.requiredLevel)
+  const player = makePlayer({ coins: paid.price + 10 })
+
+  const after = AV.buyAvatar(player, paid.id)
+  assert(after, 'ซื้อไม่สำเร็จทั้งที่เหรียญพอ')
+  assert(after.coins === 10, `หักเหรียญผิด เหลือ ${after.coins}`)
+  assert(AV.ownsAvatar(after, paid.id), 'ซื้อแล้วไม่ได้เป็นเจ้าของ')
+  assert(after.avatar === paid.id, 'ซื้อแล้วไม่ได้เปลี่ยนไปใช้ตัวใหม่ทันที')
+})
+
+check('ซื้อซ้ำไม่ได้ และเหรียญไม่พอก็ซื้อไม่ได้', () => {
+  const paid = AVATARS.AVATARS.find((avatar) => avatar.price > 0 && !avatar.requiredLevel)
+
+  const poor = makePlayer({ coins: paid.price - 1 })
+  assert(AV.buyAvatar(poor, paid.id) === null, 'เหรียญไม่พอแต่ซื้อได้')
+
+  const rich = AV.buyAvatar(makePlayer({ coins: 99999 }), paid.id)
+  assert(AV.buyAvatar(rich, paid.id) === null, 'ซื้อตัวเดิมซ้ำได้')
+})
+
+check('ตัวละครที่มีเงื่อนไขเลเวลต้องกันไว้จริง', () => {
+  const gated = AVATARS.AVATARS.find((avatar) => avatar.requiredLevel)
+  assert(gated, 'ไม่มีตัวละครที่ใช้เงื่อนไขเลเวลเลย')
+
+  const low = makePlayer({ coins: 999999, level: 1 })
+  assert(AV.buyAvatar(low, gated.id) === null, 'เลเวลไม่ถึงแต่ซื้อได้')
+  assert(
+    AV.buyAvatarBlockedReason(low, gated.id).includes('เลเวล'),
+    'ไม่ได้บอกว่าติดเงื่อนไขเลเวล',
+  )
+
+  const high = makePlayer({ coins: 999999, level: gated.requiredLevel })
+  assert(AV.buyAvatar(high, gated.id), 'เลเวลถึงแล้วยังซื้อไม่ได้')
+})
+
+check('เปลี่ยนไปใช้ตัวที่ยังไม่มีไม่ได้ และของที่สวมอยู่ต้องไม่หาย', () => {
+  const paid = AVATARS.AVATARS.find((avatar) => avatar.price > 0 && !avatar.requiredLevel)
+  const item = ITEMS.ITEMS.find((entry) => entry.kind === 'weapon')
+
+  let player = makePlayer({ coins: 99999, inventory: { [item.id]: 1 } })
+  player = INV.equipItem(player, item.id)
+  player = UP.upgradeItem(player, item.id)
+
+  assert(AV.selectAvatar(player, paid.id) === null, 'เปลี่ยนไปใช้ตัวที่ยังไม่มีได้')
+
+  const bought = AV.buyAvatar(player, paid.id)
+  assert(bought.equipped.weapon === item.id, 'เปลี่ยนตัวละครแล้วของที่สวมอยู่หาย')
+  assert(UP.starsOf(bought, item.id) === 1, 'เปลี่ยนตัวละครแล้วดาวตีบวกหาย')
+})
+
+check('ตัวที่ใช้อยู่ต้องนับเป็นของตัวเองเสมอ แม้ข้อมูลจะเพี้ยน', () => {
+  // กันสภาพที่ออกจากไม่ได้ คือใช้ตัวละครที่ระบบบอกว่าไม่มี จึงเลือกซ้ำไม่ได้
+  const broken = makePlayer({ avatar: 'scientist', ownedAvatars: [] })
+  assert(AV.ownsAvatar(broken, 'scientist'), 'ตัวที่ใช้อยู่กลับไม่ถือว่าเป็นของตัวเอง')
+})
+
 
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {

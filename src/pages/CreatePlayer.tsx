@@ -105,8 +105,14 @@ export function CreatePlayer() {
             เลือกอาชีพ
           </legend>
 
+          {/*
+            แสดงเฉพาะอาชีพที่เลือกได้ฟรี
+            ตัวที่ต้องซื้อไม่เอามาโชว์ตรงนี้ เพราะเด็กที่เพิ่งเปิดเกมยังไม่มีเหรียญเลย
+            การโชว์ของที่กดไม่ได้ตั้งแต่หน้าจอแรกทำให้รู้สึกว่าถูกกันไว้ก่อนจะได้เริ่มด้วยซ้ำ
+            ตัวที่เหลือไปเจอในร้านค้าตอนมีเหรียญแล้ว ซึ่งเป็นจังหวะที่ซื้อได้จริง
+          */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {AVATARS.map((avatar) => {
+            {AVATARS.filter((avatar) => avatar.price === 0).map((avatar) => {
               const isSelected = avatar.id === avatarId
 
               return (
