@@ -87,6 +87,33 @@ export function exerciseUi(level: AiLevel = 'normal'): {
   void isValid
   void checkMessage
 
+  /*
+   * ฟิลด์ขององครักษ์ที่หน้าจอใช้วาดภาพจริง
+   * monsterId คือตัวที่ใช้เปิดตารางจับคู่ภาพ ถ้าเปลี่ยนชื่อฟิลด์เมื่อไร
+   * หน้าจอจะวาดภาพสำรองทุกใบโดยไม่มี error ให้เห็น จึงต้องยึดไว้ตรงนี้
+   */
+  for (const guard of state.players.p2.guards) {
+    const monsterId: string = guard.monsterId
+    const caption = `${guard.emoji} ${guard.name} ÷${guard.divisor} ${guard.hp}/${guard.maxHp}`
+    void monsterId
+    void caption
+  }
+  const foeHeroId: string = state.players.p2.heroId
+  void foeHeroId
+
+  // ชนิดของการ์ดในมือ ต้องแยกได้ครบทั้งสามแบบตามที่หน้าจอวาด
+  for (const card of state.players.p1.hand) {
+    if (card.kind === 'number') {
+      const value: number = card.value
+      void value
+    } else if (card.kind === 'operator') {
+      const symbol: string = card.symbol
+      void symbol
+    }
+    const label: string = card.label
+    void label
+  }
+
   // เป้าหมาย ต้องมีฟิลด์ครบตามที่หน้าจอวาด
   const targets: TargetOption[] = getTargets(state)
   for (const option of targets) {

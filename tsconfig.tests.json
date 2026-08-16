@@ -29,6 +29,7 @@
     "src/utils/**/*.ts",
     "src/math/**/*.ts",
     "src/art/**/*.ts",
+    "src/components/art/duelArt.ts",
     "src/puzzles/**/*.ts",
     "src/roguelike/**/*.ts",
     "src/survivor/**/*.ts",

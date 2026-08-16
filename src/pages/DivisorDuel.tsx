@@ -3,6 +3,13 @@ import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { playSfx } from '../services/audioService'
+import { HeroArt, ItemArt, MonsterArt } from '../components/art/GameArt'
+import {
+  duelHeroArt,
+  duelMonsterArt,
+  duelOperatorArt,
+  numberCardLook,
+} from '../components/art/duelArt'
 import { HEROES } from '../divisorDuel/cards'
 import { planTurn } from '../divisorDuel/engine/ai'
 import { evaluate, toDisplayString, validate } from '../divisorDuel/engine/equation'
@@ -214,7 +221,44 @@ export function DivisorDuel({ player }: { player: Player }) {
   const me = state.players.p1
   const foe = state.players.p2
   const myTurn = state.turn === 'p1' && !state.winner
-  const targets = getTargets(state)
+  /*
+   * รายการเป้าหมายที่แสดงบนแถบบน
+   *
+   * getTargets คืนเป้าหมายของ "ฝ่ายที่ถึงตา" ซึ่งตอนคอมพิวเตอร์เดินจะเป็นฝั่งเรา
+   * ถ้าเอามาวาดตรง ๆ แถบบนจะกลายเป็นองครักษ์ของเราเองระหว่างตาคอมพิวเตอร์
+   * แล้วเด็กจะเห็นเลือดตัวเองอยู่ในช่องของศัตรู ซึ่งสับสนมาก
+   *
+   * จึงวาดจากฝั่งตรงข้ามเสมอ แล้วใช้ getTargets เฉพาะตอนที่ถึงตาเราจริง ๆ
+   * เพื่อรู้ว่าตอนนี้ตีอะไรได้บ้าง
+   */
+  const attackable = myTurn ? getTargets(state) : []
+
+  const targets: TargetOption[] = [
+    ...foe.guards.map((guard, index) => ({
+      kind: 'guard' as const,
+      index,
+      name: guard.name,
+      emoji: guard.emoji,
+      hp: guard.hp,
+      maxHp: guard.maxHp,
+      divisor: guard.divisor,
+      isAttackable: attackable.some(
+        (option) => option.kind === 'guard' && option.index === index && option.isAttackable,
+      ),
+    })),
+    {
+      kind: 'hero' as const,
+      index: -1,
+      name: foe.heroName,
+      emoji: '👑',
+      hp: foe.heroHp,
+      maxHp: foe.heroMaxHp,
+      divisor: foe.heroDivisor,
+      isAttackable: attackable.some(
+        (option) => option.kind === 'hero' && option.isAttackable,
+      ),
+    },
+  ]
   const power = evaluate(state.equation)
   const check = validate(state.equation)
   const deadHand = getDeadHandInfo(state.deadHand)
@@ -265,22 +309,29 @@ export function DivisorDuel({ player }: { player: Player }) {
                   type="button"
                   disabled={!option.isAttackable || !myTurn}
                   onClick={() => setTarget(option)}
-                  className={`rounded-xl border p-2 text-center transition ${
-                    dead
-                      ? 'border-white/5 bg-black/30 opacity-40'
-                      : selected
-                        ? 'border-gold-300 bg-gold-500/20'
-                        : option.isAttackable
-                          ? 'border-white/15 bg-white/5 hover:border-white/35'
-                          : 'border-white/10 bg-white/5 opacity-55'
-                  }`}
+                  className={`duel-guard p-2 text-center ${
+                    dead ? 'duel-guard-dead' : selected ? 'duel-guard-selected' : ''
+                  } ${!option.isAttackable && !dead ? 'opacity-60' : ''}`}
                 >
-                  <p aria-hidden="true" className="text-2xl">
-                    {option.emoji}
-                  </p>
+                  {/* ภาพจริงจากชุดเดียวกับทั้งเกม เด็กจึงจำมอนตัวนี้ได้จากโหมดอื่น */}
+                  {option.kind === 'hero' ? (
+                    <HeroArt
+                      avatarId={duelHeroArt(foe.heroId)}
+                      className="mx-auto h-14 w-14"
+                      label={option.name}
+                    />
+                  ) : (
+                    <MonsterArt
+                      monsterId={duelMonsterArt(
+                        foe.guards[option.index]?.monsterId ?? '',
+                      )}
+                      className="mx-auto h-14 w-14"
+                      label={option.name}
+                    />
+                  )}
                   <p className="truncate text-xs font-bold text-white">{option.name}</p>
-                  {/* เกราะคือเลขที่ผลลัพธ์ต้องหารลงตัว จึงต้องเด่นที่สุดบนการ์ด */}
-                  <p className="text-sm font-black text-gold-300">÷ {option.divisor}</p>
+                  {/* เกราะคือเลขที่ผลลัพธ์ต้องหารลงตัว จึงต้องเด่นที่สุดบนป้าย */}
+                  <p className="text-base font-black text-gold-300">÷ {option.divisor}</p>
                   <div className="bar-track mt-1 h-1.5">
                     <div
                       className="bar-fill bg-gradient-to-r from-ember-500 to-ember-400"
@@ -417,30 +468,49 @@ export function DivisorDuel({ player }: { player: Player }) {
           </div>
 
           <div className="mt-2 flex flex-wrap gap-2">
-            {me.hand.map((card) => (
-              <button
-                key={card.uid}
-                type="button"
-                disabled={!myTurn}
-                onClick={() => {
-                  if (card.kind === 'bracket') {
-                    // วงเล็บครอบสองพจน์แรกเสมอ ซึ่งเป็นรูปแบบที่เด็กใช้จริงเกือบทุกครั้ง
-                    const outcome = addBracket(state, 0, 1)
-                    setState(outcome.state)
-                    if (!outcome.ok) say(outcome.message)
-                    return
-                  }
-                  act(placeCard(state, card.uid))
-                }}
-                className={`min-w-[3.4rem] rounded-xl border px-3 py-2 text-lg font-black transition ${
-                  card.kind === 'number'
-                    ? 'border-sky-400/40 bg-sky-500/15 text-sky-100'
-                    : 'border-arcane-400/40 bg-arcane-500/15 text-arcane-400'
-                } ${myTurn ? 'hover:-translate-y-0.5' : 'opacity-50'}`}
-              >
-                {card.label}
-              </button>
-            ))}
+            {me.hand.map((card) => {
+              const look = card.kind === 'number' ? numberCardLook(card.value) : null
+
+              return (
+                <button
+                  key={card.uid}
+                  type="button"
+                  disabled={!myTurn}
+                  onClick={() => {
+                    if (card.kind === 'bracket') {
+                      // วงเล็บครอบสองพจน์แรกเสมอ ซึ่งเป็นรูปแบบที่เด็กใช้จริงเกือบทุกครั้ง
+                      const outcome = addBracket(state, 0, 1)
+                      setState(outcome.state)
+                      if (!outcome.ok) say(outcome.message)
+                      return
+                    }
+                    act(placeCard(state, card.uid))
+                  }}
+                  className={`duel-card ${look ? look.className : 'card-operator'} ${
+                    myTurn ? '' : 'opacity-50'
+                  }`}
+                >
+                  <span className="duel-card-corner">{card.label}</span>
+
+                  {card.kind === 'number' ? (
+                    <>
+                      <span className="text-2xl font-black leading-none">{card.value}</span>
+                      <span className="mt-1 text-[10px] opacity-80">{look?.label}</span>
+                    </>
+                  ) : card.kind === 'operator' ? (
+                    <>
+                      <ItemArt art={duelOperatorArt(card.symbol)} className="h-8 w-8" />
+                      <span className="text-lg font-black leading-none">{card.label}</span>
+                    </>
+                  ) : (
+                    <>
+                      <ItemArt art="hourglass" className="h-8 w-8" />
+                      <span className="text-sm font-black leading-none">( )</span>
+                    </>
+                  )}
+                </button>
+              )
+            })}
           </div>
 
           <div className="mt-2 flex flex-wrap gap-2">

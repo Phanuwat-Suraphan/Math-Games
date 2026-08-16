@@ -511,6 +511,112 @@ html[data-animations='off'] *::after {
     0 18px 40px -20px rgba(0, 0, 0, 0.95);
 }
 
+/* ---------- การ์ดของเกมศึกผ่าสมการ ---------- */
+
+/*
+ * หน้าการ์ด
+ *
+ * การ์ดจริงในเกมกระดานมีสามอย่างที่ทำให้อ่านออกในพริบตา
+ * คือกรอบสีบอกระดับ ตัวเลขใหญ่กลางใบ และเลขมุมที่อ่านได้ตอนถือเรียงซ้อนกัน
+ * หน้าจอนี้จึงทำครบทั้งสามอย่าง ไม่ใช่แค่ปุ่มสี่เหลี่ยมที่มีตัวเลขอยู่ข้างใน
+ */
+.duel-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.9rem;
+  min-height: 5.2rem;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 6px rgba(0, 0, 0, 0.35),
+    0 8px 18px -8px rgba(0, 0, 0, 0.85);
+  transition: transform 0.15s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.15s ease;
+}
+
+.duel-card:not(:disabled):hover {
+  transform: translateY(-6px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 18px 30px -12px rgba(0, 0, 0, 0.95);
+}
+
+/* เลขมุมบนซ้าย เหมือนไพ่จริงที่อ่านได้แม้ถือซ้อนกัน */
+.duel-card-corner {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 0.62rem;
+  font-weight: 900;
+  opacity: 0.75;
+}
+
+.card-basic {
+  background: linear-gradient(160deg, rgba(56, 189, 248, 0.28), rgba(12, 74, 110, 0.55));
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #e0f2fe;
+}
+
+.card-advanced {
+  background: linear-gradient(160deg, rgba(74, 222, 128, 0.28), rgba(20, 83, 45, 0.55));
+  border-color: rgba(74, 222, 128, 0.45);
+  color: #dcfce7;
+}
+
+.card-legendary {
+  background: linear-gradient(160deg, rgba(251, 191, 36, 0.32), rgba(120, 53, 15, 0.55));
+  border-color: rgba(251, 191, 36, 0.55);
+  color: #fef3c7;
+}
+
+/*
+ * ระดับว่างเปล่าคือการ์ดที่แรงที่สุด จึงเป็นใบเดียวที่เรืองแสงตลอดเวลา
+ * เด็กจะเห็นทันทีว่ามีใบใหญ่อยู่ในมือ โดยไม่ต้องอ่านตัวเลขทุกใบ
+ */
+.card-void {
+  background: linear-gradient(160deg, rgba(167, 139, 250, 0.35), rgba(46, 16, 101, 0.6));
+  border-color: rgba(167, 139, 250, 0.6);
+  color: #ede9fe;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    0 0 18px -4px rgba(167, 139, 250, 0.65),
+    0 8px 18px -8px rgba(0, 0, 0, 0.85);
+}
+
+.card-operator {
+  background: linear-gradient(160deg, rgba(244, 63, 94, 0.28), rgba(76, 5, 25, 0.55));
+  border-color: rgba(244, 63, 94, 0.45);
+  color: #ffe4e6;
+}
+
+/*
+ * แผ่นป้ายของมอนสเตอร์องครักษ์
+ * เกราะคือเลขที่ผลลัพธ์ต้องหารลงตัว จึงต้องเด่นที่สุดบนป้าย
+ * เด่นกว่าชื่อและเด่นกว่าเลือดด้วย เพราะเป็นเลขที่เด็กต้องคิดถึงตลอดเวลา
+ */
+.duel-guard {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.28));
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.duel-guard-selected {
+  border-color: rgba(252, 211, 77, 0.85);
+  box-shadow: 0 0 0 1px rgba(252, 211, 77, 0.35), 0 16px 34px -16px rgba(252, 211, 77, 0.6);
+  transform: translateY(-3px);
+}
+
+.duel-guard-dead {
+  opacity: 0.38;
+  filter: grayscale(1);
+}
+
 /* ---------- การลอยขึ้นเมื่อชี้ ---------- */
 
 .lift {
