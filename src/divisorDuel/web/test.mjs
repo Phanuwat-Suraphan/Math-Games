@@ -403,6 +403,29 @@ check('เล่นตามคำแนะนำได้จริงตลอ�
 
 // ── สรุป ──
 
+
+check('หน้าจอเรียกเครื่องยนต์ได้ครบทุกฟังก์ชันโดยไม่พัง', () => {
+  /*
+   * ข้อนี้คู่กับ src/divisorDuel/uiContract.ts
+   *
+   * ไฟล์นั้นเรียกทุกฟังก์ชันที่หน้าจอ .tsx ใช้ ด้วยค่าชนิดเดียวกับของจริง
+   * และเป็น .ts ธรรมดา จึงถูกคอมไพเลอร์ตรวจตั้งแต่ในเครื่องพัฒนา
+   * ส่วนข้อนี้ตรวจอีกชั้นว่าเรียกแล้วทำงานได้จริง ไม่ใช่แค่ชนิดถูก
+   *
+   * ที่ต้องมีเพราะหน้าจอเป็น .tsx ซึ่งคอมไพล์ในเครื่องไม่ได้
+   * ตอนต่อหน้าจอเข้ากับเครื่องยนต์ครั้งแรกเรียกผิดไปห้าจุด
+   * และรู้ทีละจุดจาก CI ซึ่งเสียเวลาสองนาทีต่อจุด
+   */
+  const contract = load('uiContract')
+
+  for (const level of ['easy', 'normal', 'hard']) {
+    const result = contract.exerciseUi(level)
+    assert(result.targetCount >= 2, `ระดับ ${level} มีเป้าหมายแค่ ${result.targetCount}`)
+    assert(result.redrawCost > 0, 'ค่าจั่วใหม่ต้องมากกว่าศูนย์')
+    assert(Array.isArray(result.logLines), 'บันทึกการต่อสู้ต้องเป็นรายการ')
+  }
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

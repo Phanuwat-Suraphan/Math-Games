@@ -72,7 +72,7 @@ export function DivisorDuel({ player }: { player: Player }) {
       createGame({
         p1HeroId: heroId,
         p2HeroId: HEROES[(HEROES.findIndex((h) => h.id === heroId) + 1) % HEROES.length].id,
-        p2Control: 'cpu',
+        p2Control: 'ai',
         p1Name: player.name,
         p2Name: 'คู่ต่อสู้',
       }),
