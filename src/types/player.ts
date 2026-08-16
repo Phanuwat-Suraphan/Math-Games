@@ -56,6 +56,13 @@ export interface Player {
   upgrades: Record<string, number>
   /** ตัวละครที่ปลดล็อกแล้ว */
   ownedAvatars: string[]
+  /**
+   * พลังถาวรที่ซื้อไว้ ติดตัวไปทุกรอบของสนามรบ
+   *
+   * แยกจาก upgrades เพราะคนละเรื่องกัน
+   * upgrades ผูกกับของที่ต้องมีและต้องสวม ส่วนพลังถาวรไม่ต้องมีอะไรก่อน
+   */
+  perks: Record<string, number>
 
   statistics: PlayerStatistics
   /** ประวัติการตอบล่าสุด เก็บจำกัดจำนวนตาม MAX_RECENT_ATTEMPTS */

@@ -8,6 +8,8 @@ import { useGame } from '../context/useGame'
 import { generateQuestion } from '../questionEngine'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
+import { allPerkLevels, buyPerk, perkBlockedReason, perkLevel } from '../services/perkService'
+import { PERKS, perkCost } from '../data/perks'
 import {
   advance,
   createWorld,
@@ -143,7 +145,9 @@ export function Survivor({ player }: { player: Player }) {
   const { answerQuestion, patchPlayer } = useGame()
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const worldRef = useRef<WorldState>(createWorld(`${Date.now()}`, player.avatar))
+  const worldRef = useRef<WorldState>(
+    createWorld(`${Date.now()}`, player.avatar, allPerkLevels(player)),
+  )
   const heroImageRef = useHeroImage(player.avatar)
   const monsterImagesRef = useMonsterImages()
   const heroViewRef = useRef<HeroView>({
@@ -400,7 +404,7 @@ export function Survivor({ player }: { player: Player }) {
 
   const start = useCallback(() => {
     paidRef.current = false
-    worldRef.current = createWorld(`${Date.now()}`, player.avatar)
+    worldRef.current = createWorld(`${Date.now()}`, player.avatar, allPerkLevels(player))
     inputRef.current = { move: { x: 0, y: 0 } }
     setSummary(null)
     setQuestion(null)
@@ -469,7 +473,12 @@ export function Survivor({ player }: { player: Player }) {
       <div className={immersive ? 'flex h-full w-full flex-col' : ''}>
         {!immersive && (
           <ScreenLayout width="wide">
-            {phase === 'idle' && <Intro onStart={start} ultimate={ultimate} />}
+            {phase === 'idle' && (
+              <>
+                <Intro onStart={start} ultimate={ultimate} />
+                <PerkShop player={player} />
+              </>
+            )}
           </ScreenLayout>
         )}
 
@@ -952,6 +961,104 @@ function Intro({ onStart, ultimate }: { onStart: () => void; ultimate: Ultimate 
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
         เข้าสนาม
       </Button>
+    </div>
+  )
+}
+
+
+/**
+ * ร้านพลังถาวร วางไว้ใต้คำแนะนำของหน้าเริ่ม
+ *
+ * ทำไมวางตรงนี้ ไม่ใช่ในหน้าร้านค้ารวม
+ * เพราะพลังพวกนี้มีผลเฉพาะในสนามรบ การเห็นมันตอนกำลังจะเข้าสนาม
+ * ทำให้เด็กเชื่อมโยงได้ทันทีว่า "ซื้อแล้วรอบหน้าจะดีขึ้นยังไง"
+ * ถ้าไปอยู่ในร้านรวมกับเสื้อเกราะ เด็กจะไม่รู้ว่ามันเกี่ยวกับโหมดไหน
+ *
+ * และที่สำคัญกว่านั้น มันคือหน้าจอที่เด็กเห็นทันทีหลังตาย
+ * ซึ่งเป็นจังหวะที่ต้องบอกให้ได้ว่า "รอบที่เพิ่งเสียไปไม่ได้สูญเปล่า"
+ */
+function PerkShop({ player }: { player: Player }) {
+  const { patchPlayer } = useGame()
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const buy = (perkId: string) => {
+    const next = buyPerk(player, perkId)
+    if (!next) {
+      playSfx('wrong')
+      setNotice(perkBlockedReason(player, perkId) ?? 'ซื้อไม่ได้')
+      return
+    }
+    playSfx('levelUp')
+    patchPlayer(next)
+    setNotice(null)
+  }
+
+  return (
+    <div className="panel panel-corners mt-5 p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="title-gold text-lg font-black">พลังถาวร</h3>
+        <p className="text-xs text-slate-400">
+          ซื้อครั้งเดียว ติดตัวทุกรอบ · มี {player.coins.toLocaleString('th-TH')} เหรียญ
+        </p>
+      </div>
+      <p className="mt-1 text-xs leading-relaxed text-slate-400">
+        เหรียญที่ได้จากทุกรอบเอามาใช้ตรงนี้ได้ แม้แต่รอบที่แพ้ก็ยังได้เหรียญกลับไป
+      </p>
+
+      {notice ? (
+        <p className="mt-2 rounded-lg border border-gold-400/40 bg-gold-500/10 px-3 py-1.5 text-xs font-bold text-gold-200">
+          {notice}
+        </p>
+      ) : null}
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {PERKS.map((perk) => {
+          const level = perkLevel(player, perk.id)
+          const cost = perkCost(perk.id, level)
+          const blocked = perkBlockedReason(player, perk.id)
+          const maxed = level >= perk.maxLevel
+
+          return (
+            <div
+              key={perk.id}
+              className={`flex gap-3 rounded-xl border p-3 ${
+                maxed ? 'border-gold-400/45 bg-gold-500/10' : 'border-white/10 bg-white/5'
+              }`}
+            >
+              <GameIcon name={perk.icon} size="h-8 w-8" />
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className="truncate font-bold text-white">{perk.name}</p>
+                  <span className="shrink-0 text-xs font-bold text-gold-300">
+                    {level}/{perk.maxLevel}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-slate-300">{perk.description}</p>
+                <p className="mt-0.5 text-xs font-bold text-emerald-300">
+                  ชั้นละ {perk.perLevel}
+                </p>
+
+                <div className="mt-2 flex justify-end">
+                  {maxed ? (
+                    <span className="text-xs font-bold text-gold-300">เต็มแล้ว</span>
+                  ) : (
+                    <Button
+                      size="md"
+                      variant={blocked ? 'ghost' : 'secondary'}
+                      onClick={() => buy(perk.id)}
+                    >
+                      {blocked && !blocked.startsWith('ยังขาด')
+                        ? blocked
+                        : `ซื้อ ${cost} เหรียญ`}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

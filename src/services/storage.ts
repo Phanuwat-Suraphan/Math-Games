@@ -7,6 +7,7 @@ import { STORY_BEATS } from '../data/story'
 import { STAGES, getStage } from '../data/stages'
 import { EQUIP_SLOTS } from './inventoryService'
 import { MAX_STARS } from './upgradeService'
+import { getPerk } from '../data/perks'
 import type { Equipment } from '../types/item'
 import type { GameSettings, Player } from '../types/player'
 import type { DailyQuestState, QuestProgress } from '../types/quest'
@@ -32,7 +33,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 6
+export const CURRENT_SAVE_VERSION = 7
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -159,6 +160,7 @@ export function createPlayer(name: string, avatar: string): Player {
     inventory: {},
     equipped: {},
     upgrades: {},
+    perks: {},
     // ตัวละครที่เลือกตอนสร้างผู้เล่นถือว่าเป็นของตัวเองทันที
     ownedAvatars: [isValidAvatarId(avatar) ? avatar : DEFAULT_AVATAR_ID],
 
@@ -371,6 +373,7 @@ function parsePlayer(raw: unknown): Player | null {
     inventory: parseInventory(raw.inventory),
     equipped: parseEquipped(raw.equipped),
     upgrades: parseUpgrades(raw.upgrades),
+    perks: parsePerks(raw.perks),
     ownedAvatars: parseOwnedAvatars(raw.ownedAvatars, avatar),
 
     statistics: parseStatistics(raw.statistics),
@@ -418,6 +421,23 @@ function parseUpgrades(raw: unknown): Record<string, number> {
     if (stars > 0) upgrades[itemId] = stars
   }
   return upgrades
+}
+
+/**
+ * อ่านพลังถาวร
+ * หนีบไม่ให้เกินเพดานของแต่ละตัว เพราะไฟล์บันทึกอยู่ใน localStorage ซึ่งแก้ได้
+ */
+function parsePerks(raw: unknown): Record<string, number> {
+  if (!isRecord(raw)) return {}
+
+  const perks: Record<string, number> = {}
+  for (const [perkId, value] of Object.entries(raw)) {
+    const perk = getPerk(perkId)
+    if (!perk) continue
+    const level = toSafeInt(value, 0, 0, perk.maxLevel)
+    if (level > 0) perks[perkId] = level
+  }
+  return perks
 }
 
 /**
@@ -481,6 +501,15 @@ function parseStoryFlags(raw: unknown): string[] {
     flags.push(value)
   }
   return flags
+}
+
+/**
+ * เวอร์ชัน 6 → เวอร์ชัน 7
+ * เพิ่มพลังถาวรของสนามรบ ผู้เล่นเดิมเริ่มจากยังไม่มีพลังใด ๆ
+ */
+function migrateV6ToV7(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+  return { ...raw, perks: {} }
 }
 
 /**
@@ -613,7 +642,9 @@ function migrateV2ToV3(raw: unknown): unknown {
 function migrateToCurrent(parsed: unknown): unknown {
   // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed)))))
+    return migrateV6ToV7(
+      migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed))))),
+    )
   }
 
   if (!isRecord(parsed)) return null
@@ -626,6 +657,7 @@ function migrateToCurrent(parsed: unknown): unknown {
   if (version <= 3) player = migrateV3ToV4(player)
   if (version <= 4) player = migrateV4ToV5(player)
   if (version <= 5) player = migrateV5ToV6(player)
+  if (version <= 6) player = migrateV6ToV7(player)
 
   return player
 }

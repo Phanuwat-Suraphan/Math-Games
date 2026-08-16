@@ -215,20 +215,33 @@ export const BASE_STATS: CombatStats = {
  *
  * ส่วนยิงไวมีพื้นล่างที่ 0.12 วินาที ไม่ให้ถี่จนเฟรมเดียวยิงหลายนัด
  */
-export function statsFrom(skills: Readonly<Record<string, number>>): CombatStats {
+export function statsFrom(
+  skills: Readonly<Record<string, number>>,
+  perks: Readonly<Record<string, number>> = {},
+): CombatStats {
   const level = (id: string) => skills[id] ?? 0
+  /*
+   * พลังถาวรคูณทับค่าที่ได้จากสกิลในรอบ ไม่ใช่บวกเข้าไปตรง ๆ
+   *
+   * เลือกคูณเพราะทำให้พลังถาวรมีค่าเท่ากันตลอดรอบ
+   * ถ้าบวกเป็นค่าคงที่ มันจะรู้สึกมากตอนต้นรอบและแทบไม่มีผลตอนท้ายรอบ
+   * ซึ่งตรงข้ามกับสิ่งที่ต้องการ คือช่วยให้ "อยู่ได้นานขึ้น" ตลอดทั้งรอบ
+   */
+  const perk = (id: string) => perks[id] ?? 0
 
   return {
-    damageMultiplier: Math.pow(1.4, level('power')),
+    damageMultiplier: Math.pow(1.4, level('power')) * (1 + perk('might') * 0.08),
     // มีพื้นล่างที่ 0.3 เท่า กันไม่ให้ถี่จนเฟรมเดียวโจมตีหลายครั้ง
     cooldownMultiplier: Math.max(0.3, Math.pow(0.82, level('rapid'))),
     extraProjectiles: level('multishot'),
     pierce: level('pierce'),
     projectileSpeed: Math.pow(1.25, level('velocity')),
     rangeMultiplier: Math.pow(1.18, level('reach')),
-    moveSpeed: BASE_STATS.moveSpeed * Math.pow(1.15, level('swift')),
-    maxHp: BASE_STATS.maxHp + level('vitality') * 20,
-    magnetRange: BASE_STATS.magnetRange * Math.pow(2, level('magnet')),
+    moveSpeed:
+      BASE_STATS.moveSpeed * Math.pow(1.15, level('swift')) * (1 + perk('boots') * 0.04),
+    maxHp: BASE_STATS.maxHp + level('vitality') * 20 + perk('vigor') * 14,
+    magnetRange:
+      BASE_STATS.magnetRange * Math.pow(2, level('magnet')) * (1 + perk('lodestone') * 0.3),
     xpMultiplier: Math.pow(1.25, level('wisdom')),
 
     /*

@@ -217,8 +217,19 @@ export function xpNeededFor(level: number): number {
   return Math.round(XP_BASE * Math.pow(XP_GROWTH, level - 1))
 }
 
-export function createWorld(seed: string, avatarId = 'adventurer'): WorldState {
-  const stats = statsFrom({})
+export function createWorld(
+  seed: string,
+  avatarId = 'adventurer',
+  perks: Readonly<Record<string, number>> = {},
+): WorldState {
+  const stats = statsFrom({}, perks)
+
+  /*
+   * พลังถาวร "ฝึกฝนมาก่อน" ทำให้เริ่มรอบด้วยดาบที่อัประดับมาแล้ว
+   * หนีบไม่ให้เกินเพดานปกติ ไม่งั้นจะข้ามไปเป็นร่างสมบูรณ์ตั้งแต่ยังไม่ล้มบอส
+   * ซึ่งจะทำให้ระบบร่างสมบูรณ์ทั้งระบบไม่มีความหมาย
+   */
+  const startingLevel = Math.min(MAX_WEAPON_LEVEL, 1 + (perks.training ?? 0))
 
   return {
     seed,
@@ -242,7 +253,7 @@ export function createWorld(seed: string, avatarId = 'adventurer'): WorldState {
     pickups: [],
     notices: [],
     skills: {},
-    weapons: { [STARTING_WEAPON]: 1 },
+    weapons: { [STARTING_WEAPON]: startingLevel },
     evolved: [],
     chests: 0,
     weaponCooldowns: {},
@@ -251,6 +262,8 @@ export function createWorld(seed: string, avatarId = 'adventurer'): WorldState {
     bossCooldown: 60,
     bossesDown: 0,
     ultimate: { id: avatarId, charge: 0, activeFor: 0, used: 0 },
+    perks: { ...perks },
+    revivesLeft: perks.phoenix ?? 0,
     nextId: 1,
     phase: 'playing',
     kills: 0,
@@ -464,7 +477,7 @@ export function step(world: WorldState, input: Input): WorldState {
   if (world.phase !== 'playing') return world
 
   const dt = FIXED_STEP
-  const stats = statsFrom(world.skills)
+  const stats = statsFrom(world.skills, world.perks)
   const time = world.time + dt
   let nextId = world.nextId
 
@@ -1156,6 +1169,59 @@ export function step(world: WorldState, input: Input): WorldState {
   }
 
   const leveledUp = xp >= player.xpToNext
+
+  /*
+   * ฟื้นคืนชีพ
+   *
+   * ต้องผลักมอนรอบตัวออกไปด้วย ไม่ใช่แค่เติมเลือด
+   * เพราะจังหวะที่เลือดหมดคือจังหวะที่โดนรุมอยู่พอดีเสมอ
+   * ถ้าฟื้นแล้วยังยืนอยู่กลางวงเดิม จะโดนตีตายซ้ำในเสี้ยววินาทีถัดมา
+   * ซึ่งเท่ากับจ่ายเงินซื้อของที่ไม่ได้ช่วยอะไรเลย
+   */
+  let revivesLeft = world.revivesLeft
+  let revivedEnemies = aliveEnemies
+
+  if (hp <= 0 && revivesLeft > 0) {
+    revivesLeft -= 1
+    hp = stats.maxHp * 0.6
+    invulnerable = 2.4
+
+    const PUSH = 230
+    revivedEnemies = aliveEnemies.map((enemy) => {
+      const gap = distance(enemy.pos, player.pos)
+      if (gap > PUSH) return enemy
+
+      const away = normalize({
+        x: enemy.pos.x - player.pos.x,
+        y: enemy.pos.y - player.pos.y,
+      })
+      // มอนที่ทับตัวผู้เล่นพอดีจะไม่มีทิศ จึงผลักขึ้นบนเป็นค่าเริ่มต้น
+      const dirX = away.x === 0 && away.y === 0 ? 0 : away.x
+      const dirY = away.x === 0 && away.y === 0 ? -1 : away.y
+
+      return {
+        ...enemy,
+        pos: {
+          x: clamp(player.pos.x + dirX * PUSH, 0, ARENA_WIDTH),
+          y: clamp(player.pos.y + dirY * PUSH, 0, ARENA_HEIGHT),
+        },
+        slowFor: Math.max(enemy.slowFor, 1.5),
+      }
+    })
+
+    effects.push({
+      id: nextId,
+      kind: 'blast',
+      pos: { ...player.pos },
+      radius: PUSH,
+      life: 0.6,
+      maxLife: 0.6,
+    })
+    nextId += 1
+    notices.push({ id: nextId, text: 'ขนนกฟีนิกซ์ช่วยไว้!', life: 2.6, maxLife: 2.6 })
+    nextId += 1
+  }
+
   const dead = hp <= 0
 
   return {
@@ -1167,7 +1233,7 @@ export function step(world: WorldState, input: Input): WorldState {
       xp,
       invulnerable,
     },
-    enemies: aliveEnemies,
+    enemies: revivedEnemies,
     projectiles: survivingProjectiles,
     enemyShots: survivingEnemyShots,
     effects,
@@ -1182,6 +1248,7 @@ export function step(world: WorldState, input: Input): WorldState {
     bossCooldown,
     bossesDown,
     ultimate,
+    revivesLeft,
     nextId,
     kills,
     phase: dead ? 'dead' : leveledUp ? 'question' : 'playing',
@@ -1470,7 +1537,7 @@ export function takeSkill(world: WorldState, id: string): WorldState {
 
   const level = world.player.level + 1
   const leftover = Math.max(0, world.player.xp - world.player.xpToNext)
-  const statsAfter = statsFrom(skills)
+  const statsAfter = statsFrom(skills, world.perks)
 
   return {
     ...world,

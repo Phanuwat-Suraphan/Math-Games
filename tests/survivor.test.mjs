@@ -31,6 +31,9 @@ const S = load('survivor/skills')
 const T = load('survivor/types')
 const W = load('survivor/weapons')
 const U = load('survivor/ultimates')
+const PERK = load('data/perks')
+const PS = load('services/perkService')
+const STORAGE = load('services/storage')
 
 let passed = 0
 const failures = []
@@ -1796,6 +1799,177 @@ check('บอสทุกตัวต้องมีชื่อและภา�
 
   // วนรอบที่สองต้องมีเครื่องหมายกำกับว่าแข็งกว่าเดิม
   assert(E.bossNameAt(6) !== E.bossNameAt(0), 'บอสวนรอบสองใช้ชื่อเดิมเป๊ะ')
+})
+
+
+
+// ---------- พลังถาวรข้ามรอบ ----------
+
+check('พลังถาวรทุกตัวมีข้อมูลครบและราคาขึ้นตามชั้น', () => {
+  assert(PERK.PERKS.length >= 5, `มีพลังถาวรแค่ ${PERK.PERKS.length} แบบ`)
+
+  const ids = new Set()
+  for (const perk of PERK.PERKS) {
+    assert(!ids.has(perk.id), `รหัสซ้ำ: ${perk.id}`)
+    ids.add(perk.id)
+    assert(perk.maxLevel >= 1, `${perk.id} ซื้อไม่ได้เลย`)
+    assert(perk.description.length >= 10, `${perk.id} คำอธิบายสั้นเกินไป`)
+
+    for (let level = 1; level < perk.maxLevel; level += 1) {
+      const before = PERK.perkCost(perk.id, level - 1)
+      const current = PERK.perkCost(perk.id, level)
+      assert(current >= before, `${perk.id} ชั้นที่ ${level + 1} ไม่ได้แพงกว่าชั้นก่อน`)
+    }
+    assert(PERK.perkCost(perk.id, perk.maxLevel) === null, `${perk.id} ยังคืนราคาทั้งที่เต็มแล้ว`)
+  }
+})
+
+check('ซื้อพลังถาวรแล้วหักเหรียญและขึ้นชั้นจริง', () => {
+  const perk = PERK.PERKS[0]
+  const base = { ...STORAGE.createPlayer('เด็กทดสอบ', 'warrior'), coins: 99999 }
+  const cost = PERK.perkCost(perk.id, 0)
+
+  const after = PS.buyPerk(base, perk.id)
+  assert(after, 'ซื้อไม่สำเร็จทั้งที่เหรียญพอ')
+  assert(after.coins === 99999 - cost, `หักเหรียญผิด เหลือ ${after.coins}`)
+  assert(PS.perkLevel(after, perk.id) === 1, 'ซื้อแล้วชั้นไม่ขึ้น')
+
+  const poor = { ...base, coins: cost - 1 }
+  assert(PS.buyPerk(poor, perk.id) === null, 'เหรียญไม่พอแต่ซื้อได้')
+})
+
+check('ซื้อเกินเพดานไม่ได้', () => {
+  const perk = PERK.PERKS[0]
+  let player = { ...STORAGE.createPlayer('เด็กทดสอบ', 'warrior'), coins: 9999999 }
+
+  for (let i = 0; i < perk.maxLevel; i += 1) {
+    const next = PS.buyPerk(player, perk.id)
+    assert(next, `ซื้อชั้นที่ ${i + 1} ไม่สำเร็จ`)
+    player = next
+  }
+  assert(PS.buyPerk(player, perk.id) === null, 'ซื้อเกินเพดานได้')
+})
+
+check('พลังถาวรต้องมีผลจริงตั้งแต่วินาทีแรกของรอบ', () => {
+  /*
+   * ข้อนี้ดักความผิดพลาดที่เงียบที่สุด
+   * คือเพิ่มพลังใหม่ในตารางแล้วลืมต่อเข้ากับการคำนวณค่าจริง
+   * เด็กจะจ่ายเหรียญไปแล้วไม่มีอะไรเปลี่ยน โดยไม่มี error ให้เห็นเลย
+   */
+  const plain = E.createWorld('ไม่มีพลัง', 'warrior', {})
+
+  const tough = E.createWorld('มีพลัง', 'warrior', { vigor: 5 })
+  assert(tough.player.maxHp > plain.player.maxHp, 'ร่างกายแข็งแรงไม่ได้เพิ่มพลังชีวิต')
+
+  const fast = E.createWorld('เร็ว', 'warrior', { boots: 5 })
+  assert(fast.player.speed > plain.player.speed, 'รองเท้าวิเศษไม่ได้ทำให้เดินเร็วขึ้น')
+
+  const trained = E.createWorld('ฝึกมา', 'warrior', { training: 3 })
+  assert(
+    trained.weapons.sword > plain.weapons.sword,
+    'ฝึกฝนมาก่อนไม่ได้ทำให้เริ่มด้วยดาบที่แรงกว่า',
+  )
+
+  const phoenix = E.createWorld('ฟีนิกซ์', 'warrior', { phoenix: 1 })
+  assert(phoenix.revivesLeft === 1, 'ขนนกฟีนิกซ์ไม่ได้ให้โอกาสฟื้น')
+
+  // ความแรงต้องเพิ่มจริง เทียบผ่านค่าที่ใช้คำนวณ
+  const strong = S.statsFrom({}, { might: 5 })
+  const normal = S.statsFrom({}, {})
+  assert(
+    strong.damageMultiplier > normal.damageMultiplier,
+    'พลังติดตัวไม่ได้เพิ่มความเสียหาย',
+  )
+
+  const magnet = S.statsFrom({}, { lodestone: 4 })
+  assert(magnet.magnetRange > normal.magnetRange, 'หินดูดคริสตัลไม่ได้เพิ่มระยะดูด')
+})
+
+check('ฝึกฝนมาก่อนต้องไม่ดันดาบข้ามเพดานปกติ', () => {
+  // ถ้าข้ามเพดานได้ จะกลายเป็นร่างสมบูรณ์ตั้งแต่ยังไม่ล้มบอส
+  // ซึ่งทำให้ระบบร่างสมบูรณ์ทั้งระบบไม่มีความหมาย
+  const world = E.createWorld('เกินเพดาน', 'warrior', { training: 99 })
+  assert(
+    world.weapons.sword <= W.MAX_WEAPON_LEVEL,
+    `เริ่มด้วยดาบระดับ ${world.weapons.sword} ซึ่งเกินเพดาน ${W.MAX_WEAPON_LEVEL}`,
+  )
+})
+
+check('ฟื้นคืนชีพต้องช่วยได้จริง และช่วยได้ครั้งเดียวต่อรอบ', () => {
+  const hugging = (id) => ({
+    id, pos: { x: 400, y: 300 }, hp: 99999, maxHp: 99999, speed: 0, radius: 20,
+    damage: 9999, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  })
+
+  let world = E.createWorld('ฟื้น', 'warrior', { phoenix: 1 })
+  world = {
+    ...world,
+    weapons: {},
+    enemies: [hugging(1)],
+    player: { ...world.player, pos: { x: 400, y: 300 }, hp: 1, invulnerable: 0 },
+  }
+
+  world = E.step(world, STILL)
+  assert(world.phase !== 'dead', 'มีขนนกฟีนิกซ์แต่ตายทันที')
+  assert(world.revivesLeft === 0, 'ฟื้นแล้วแต่ยอดไม่ลด')
+  assert(world.player.hp > 1, 'ฟื้นแล้วเลือดไม่เพิ่ม')
+
+  // มอนต้องถูกผลักออกไป ไม่งั้นจะโดนตีตายซ้ำทันที
+  const gap = Math.hypot(
+    world.enemies[0].pos.x - world.player.pos.x,
+    world.enemies[0].pos.y - world.player.pos.y,
+  )
+  assert(gap > 100, `ฟื้นแล้วมอนยังอยู่ห่างแค่ ${Math.round(gap)} หน่วย`)
+
+  // ครั้งที่สองต้องตายจริง
+  let again = {
+    ...world,
+    player: { ...world.player, hp: 1, invulnerable: 0 },
+    enemies: [hugging(2)],
+  }
+  again = E.step(again, STILL)
+  assert(again.phase === 'dead', 'ฟื้นได้เกินหนึ่งครั้งต่อรอบ')
+})
+
+check('พลังถาวรครบชุดต้องทำให้อยู่ได้นานขึ้นจริง', () => {
+  /*
+   * วัดผลรวม ไม่ใช่ดูแค่ว่าตัวเลขเปลี่ยน
+   * เพราะจุดประสงค์ของระบบนี้คือทำให้รอบถัดไปดีขึ้น ไม่ใช่แค่มีตัวเลขสวย
+   */
+  const full = { vigor: 5, might: 5, boots: 5, training: 3, lodestone: 4 }
+  const seeds = ['ก', 'ข', 'ค', 'ง']
+
+  const survive = (perks) => {
+    let total = 0
+    for (const seed of seeds) {
+      let world = E.createWorld(seed, 'warrior', perks)
+      for (let i = 0; i < 240 / E.FIXED_STEP; i += 1) {
+        if (world.phase === 'question') { world = E.resolveQuestion(world, true); continue }
+        if (world.phase === 'choosing') {
+          const offer = E.offerSkills(world, 3)
+          world = offer.length > 0 ? E.takeSkill(world, offer[0].id) : E.skipSkill(world)
+          continue
+        }
+        if (world.phase === 'dead') break
+        const angle = (i / 60) * 1.1
+        world = E.step(world, {
+          move: { x: Math.cos(angle) * 0.7, y: Math.sin(angle) * 0.7 },
+        })
+      }
+      total += world.time
+    }
+    return total / seeds.length
+  }
+
+  const withPerks = survive(full)
+  const without = survive({})
+  assert(
+    withPerks > without,
+    `ซื้อพลังครบแล้วรอดเฉลี่ย ${withPerks.toFixed(0)} วินาที ` +
+      `เทียบกับไม่ซื้อเลย ${without.toFixed(0)} วินาที ซึ่งไม่ได้ดีขึ้น`,
+  )
 })
 
 
