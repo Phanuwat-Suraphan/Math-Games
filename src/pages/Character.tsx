@@ -37,7 +37,7 @@ export function Character({ player }: { player: Player }) {
             <div className="w-full min-w-0 flex-1">
               <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-baseline sm:justify-between">
                 <div className="text-center sm:text-left">
-                  <h2 className="text-2xl font-bold text-white sm:text-3xl">
+                  <h2 className="title-hero text-2xl font-black sm:text-3xl">
                     {player.name}
                   </h2>
                   <p className="mt-0.5 text-sm text-arcane-400">

@@ -27,14 +27,14 @@ export function TopBar({
   const avatar = getAvatar(player.avatar)
 
   return (
-    <header className="sticky top-0 z-30 border-b border-white/10 bg-night-900/85 backdrop-blur">
+    <header className="topbar sticky top-0 z-30">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
         {backTo ? (
           <button
             type="button"
             onClick={() => navigate(backTo)}
             aria-label={backLabel}
-            className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 px-3 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-white/10"
+            className="btn-3d flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm font-bold text-slate-200 transition-colors hover:bg-white/10"
           >
             <span aria-hidden="true">←</span>
             <span className="hidden sm:inline">{backLabel}</span>
@@ -44,7 +44,7 @@ export function TopBar({
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <AvatarBadge avatar={avatar} size="sm" className="hidden sm:flex" />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold text-white sm:text-lg">
+            <h1 className="title-hero truncate text-base font-black sm:text-lg">
               {title}
             </h1>
             <p className="truncate text-xs text-slate-400">

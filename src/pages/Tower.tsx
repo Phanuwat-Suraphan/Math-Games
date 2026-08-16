@@ -264,7 +264,7 @@ export function Tower({ player }: { player: Player }) {
 function IntroPanel({ onStart }: { onStart: () => void }) {
   return (
     <div className="rounded-xl2 border border-violet-400/30 bg-night-800/60 p-6 text-center">
-      <h2 className="text-2xl font-black text-white">หอคอยไม่รู้จบ</h2>
+      <h2 className="title-hero text-2xl font-black">หอคอยไม่รู้จบ</h2>
       <p className="mt-3 text-sm leading-relaxed text-slate-200">
         ปีนหอคอยให้สูงที่สุดเท่าที่จะทำได้ ทุกชั้นยากขึ้นเรื่อย ๆ
         และทุกรอบสุ่มไม่เหมือนกัน จำทางไม่ได้ ต้องคิดจริง

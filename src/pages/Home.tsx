@@ -39,16 +39,17 @@ export function Home() {
           🧭
         </motion.p>
 
-        <h1 className="mt-4 bg-gradient-to-r from-gold-300 via-arcane-400 to-sky-400 bg-clip-text text-4xl font-bold text-transparent sm:text-6xl">
+        <h1 className="title-gold mt-4 text-4xl font-black tracking-tight sm:text-6xl">
           Math Adventure
         </h1>
         <p className="mt-3 text-base text-slate-300 sm:text-lg">
           ผจญภัยไปกับตัวเลข สำหรับนักเรียนชั้น ป.4 – ป.6
         </p>
+        <div className="divider-ornate mx-auto mt-5 max-w-xs text-sm">◆</div>
       </motion.div>
 
       {hasSave ? (
-        <div className="surface-card mt-8 flex items-center gap-4 p-4">
+        <div className="surface-card panel-hero panel-corners lift mt-8 flex items-center gap-4 p-5">
           <AvatarBadge avatar={getAvatar(player.avatar)} size="sm" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-lg font-bold text-white">{player.name}</p>

@@ -40,7 +40,7 @@ export function CreatePlayer() {
   return (
     <ScreenLayout width="normal">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-white sm:text-4xl">
+        <h1 className="title-hero text-3xl font-black sm:text-4xl">
           สร้างตัวละครของหนู
         </h1>
         <p className="mt-2 text-slate-300">

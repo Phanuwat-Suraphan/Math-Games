@@ -84,7 +84,7 @@ export function World({ player }: { player: Player }) {
               <p className="text-xs font-semibold uppercase tracking-wider text-slate-200">
                 โลกที่ {world.order} · {world.subtitle}
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-white sm:text-3xl">
+              <h2 className="title-hero mt-1 text-2xl font-black sm:text-3xl">
                 {world.name}
               </h2>
               <p className="mt-3 rounded-2xl bg-night-900/50 p-3 text-sm italic text-slate-200">

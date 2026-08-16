@@ -26,7 +26,7 @@ export function NotFoundNotice({
         <p aria-hidden="true" className="text-6xl">
           {emoji}
         </p>
-        <h1 className="mt-4 text-2xl font-bold text-white">{title}</h1>
+        <h1 className="title-hero mt-4 text-2xl font-black">{title}</h1>
         <p className="mt-2 text-slate-300">{message}</p>
         <Button
           className="mt-6"

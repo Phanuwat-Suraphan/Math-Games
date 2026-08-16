@@ -22,7 +22,7 @@ export function Achievements({ player }: { player: Player }) {
           <p aria-hidden="true" className="text-4xl">
             🏆
           </p>
-          <h2 className="mt-2 text-2xl font-bold text-white">ถ้วยรางวัลของหนู</h2>
+          <h2 className="title-gold mt-2 text-2xl font-black">ถ้วยรางวัลของหนู</h2>
           <p className="mt-1 text-slate-300">
             ปลดล็อกแล้ว{' '}
             <span className="font-bold text-gold-300">{unlockedCount}</span> จาก{' '}

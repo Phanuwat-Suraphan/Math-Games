@@ -20,7 +20,7 @@ export function WorldMap({ player }: { player: Player }) {
 
       <ScreenLayout width="wide">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-white sm:text-3xl">
+          <h2 className="title-hero text-2xl font-black sm:text-3xl">
             เลือกโลกที่จะไปผจญภัย 🗺️
           </h2>
           <p className="mt-2 text-slate-300">

@@ -108,7 +108,7 @@ export function QuestIntro({ player }: { player: Player }) {
           </p>
           <h1
             id="quest-intro-title"
-            className="mt-1 text-2xl font-bold text-white sm:text-3xl"
+            className="title-hero mt-1 text-2xl font-black sm:text-3xl"
           >
             {stage.emoji} {stage.name}
           </h1>

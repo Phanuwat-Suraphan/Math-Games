@@ -30,7 +30,7 @@ export function Settings() {
         >
           <span aria-hidden="true">←</span>
         </button>
-        <h1 className="text-2xl font-bold text-white">⚙️ ตั้งค่า</h1>
+        <h1 className="title-hero text-2xl font-black">⚙️ ตั้งค่า</h1>
       </div>
 
       <div className="surface-card mt-5 divide-y divide-white/10">

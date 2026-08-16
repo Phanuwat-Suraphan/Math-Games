@@ -34,12 +34,10 @@ export function ExpBar({
         aria-valuemax={progress.required}
         aria-valuenow={progress.exp}
         aria-label={`ค่าประสบการณ์ เลเวล ${level}: ${label}`}
-        className={`w-full overflow-hidden rounded-full border border-white/10 bg-night-900/80 ${
-          size === 'sm' ? 'h-2.5' : 'h-4'
-        }`}
+        className={`bar-track w-full ${size === 'sm' ? 'h-2.5' : 'h-4'}`}
       >
         <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-arcane-400 via-arcane-500 to-sky-400"
+          className="bar-fill bg-gradient-to-r from-arcane-400 via-arcane-500 to-sky-400"
           initial={false}
           animate={{ width: `${progress.percent}%` }}
           transition={{ type: 'spring', stiffness: 120, damping: 20 }}

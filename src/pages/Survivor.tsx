@@ -916,7 +916,7 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
 function Intro({ onStart, ultimate }: { onStart: () => void; ultimate: Ultimate }) {
   return (
     <div className="rounded-xl2 border border-sky-400/30 bg-night-800/60 p-6 text-center">
-      <h2 className="text-2xl font-black text-white">สนามรบตัวเลข</h2>
+      <h2 className="title-hero text-2xl font-black">สนามรบตัวเลข</h2>
       <p className="mt-3 text-sm leading-relaxed text-slate-200">
         มอนสเตอร์จะวิ่งเข้าหาหนูเรื่อย ๆ หน้าที่ของหนูคือ <b>เดินหลบ</b> อย่างเดียว
         การโจมตียิงเองอัตโนมัติ ไม่ต้องกดปุ่มยิง

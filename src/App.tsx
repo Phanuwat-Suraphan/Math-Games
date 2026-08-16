@@ -158,7 +158,20 @@ export default function App() {
     <ErrorBoundary>
       <GameProvider>
         <HashRouter>
-          <GameRoutes />
+          {/*
+            ชั้นบรรยากาศของทั้งเกม อยู่หลังทุกอย่างและไม่รับการคลิก
+            วางที่นี่ครั้งเดียวแทนที่จะใส่ทีละหน้า ทุกหน้าจึงได้เหมือนกันหมด
+            และตอนเปลี่ยนหน้าฉากหลังจะไม่กระพริบ เพราะไม่ได้ถูกสร้างใหม่
+          */}
+          <div className="ambient" aria-hidden="true">
+            <div className="ambient-stars" />
+            <div className="ambient-vignette" />
+            <div className="ambient-grain" />
+          </div>
+
+          <div className="relative z-10">
+            <GameRoutes />
+          </div>
         </HashRouter>
       </GameProvider>
     </ErrorBoundary>

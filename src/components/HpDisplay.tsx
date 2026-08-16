@@ -25,10 +25,10 @@ export function HpDisplay({ hp, maxHp, className = '' }: HpDisplayProps) {
         aria-valuemax={safeMax}
         aria-valuenow={hp}
         aria-label={`พลังชีวิต ${hp} จาก ${safeMax}`}
-        className="h-2.5 w-full overflow-hidden rounded-full border border-white/10 bg-night-900/80"
+        className="bar-track h-2.5 w-full"
       >
         <div
-          className="h-full rounded-full bg-gradient-to-r from-ember-500 to-ember-400 transition-all duration-500"
+          className="bar-fill bg-gradient-to-r from-ember-500 to-ember-400"
           style={{ width: `${percent}%` }}
         />
       </div>
