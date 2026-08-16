@@ -31,6 +31,7 @@ const G = load('math/geometry')
 const RNG = load('math/rng')
 const QE = load('questionEngine/index')
 const S = load('questionEngine/session')
+const SOL = load('questionEngine/solution')
 const V = load('questionEngine/validators')
 
 let passed = 0
@@ -554,6 +555,140 @@ check('ความยากขยับได้ทีละขั้นเท�
 })
 
 // ══ สรุป ══
+
+
+// ---------- เฉลยทีละขั้น ----------
+
+/** ดึงตัวเลขทั้งหมดที่ปรากฏในข้อความ ตัดลูกน้ำคั่นหลักพันออกก่อน */
+function numbersIn(text) {
+  return (text.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number)
+}
+
+check('โจทย์ทุกชนิดต้องมีเฉลยทีละขั้น อย่างน้อยหนึ่งขั้น', () => {
+  const types = [
+    'addition', 'subtraction', 'multiplication', 'division',
+    'fractions', 'decimals', 'percentages', 'geometry', 'wordProblems',
+  ]
+
+  for (const type of types) {
+    for (const grade of [4, 5, 6]) {
+      const question = QE.generateQuestion({
+        type, grade, difficulty: 'medium', seed: `ขั้นตอน-${type}-${grade}`,
+      })
+      const steps = SOL.solutionSteps(question)
+
+      assert(steps.length >= 1, `${type} ป.${grade} ไม่มีเฉลยทีละขั้นเลย`)
+      for (const step of steps) {
+        assert(step.title && step.title.length > 0, `${type} มีขั้นที่ไม่มีหัวข้อ`)
+        assert(step.detail && step.detail.length >= 3, `${type} มีขั้นที่ไม่มีเนื้อหา`)
+      }
+    }
+  }
+})
+
+check('ขั้นสุดท้ายของโจทย์คำนวณต้องมีคำตอบที่ถูกต้องอยู่จริง', () => {
+  /*
+   * ข้อนี้สำคัญที่สุดในหมวดนี้
+   * เฉลยที่ลงท้ายด้วยตัวเลขผิดแย่กว่าไม่มีเฉลยเลย
+   * เพราะเด็กจะเชื่อเฉลยมากกว่าเชื่อตัวเอง แล้วจำวิธีผิดไปใช้ต่อ
+   */
+  for (const type of ['addition', 'subtraction', 'multiplication', 'division']) {
+    for (const difficulty of ['easy', 'medium', 'hard']) {
+      for (let round = 0; round < 12; round += 1) {
+        const question = QE.generateQuestion({
+          type, grade: 5, difficulty, seed: `คำตอบ-${type}-${difficulty}-${round}`,
+        })
+        const steps = SOL.solutionSteps(question)
+        const last = steps[steps.length - 1]
+        const expected = Number(question.correctAnswer)
+
+        assert(
+          numbersIn(last.detail).includes(expected),
+          `${question.prompt} ขั้นสุดท้ายว่า "${last.detail}" ซึ่งไม่มีคำตอบ ${expected}`,
+        )
+      }
+    }
+  }
+})
+
+check('โจทย์บวกลบต้องไล่ครบทุกหลัก ไม่ใช่บอกแค่คำตอบ', () => {
+  const question = QE.generateQuestion({
+    type: 'addition', grade: 6, difficulty: 'hard', seed: 'ไล่หลัก',
+  })
+  const steps = SOL.solutionSteps(question)
+
+  // ต้องมีขั้นของหลักหน่วยและหลักสิบเป็นอย่างน้อย
+  const titles = steps.map((step) => step.title).join(' ')
+  assert(titles.includes('หน่วย'), `ไม่มีขั้นของหลักหน่วย ได้ "${titles}"`)
+  assert(titles.includes('สิบ'), `ไม่มีขั้นของหลักสิบ ได้ "${titles}"`)
+  assert(steps.length >= 4, `มีแค่ ${steps.length} ขั้น ซึ่งน้อยเกินกว่าจะเรียกว่าทีละขั้น`)
+})
+
+check('การยืมในโจทย์ลบต้องถูกต้องตามหลักจริง', () => {
+  /*
+   * ตรวจด้วยการประกอบผลลัพธ์ของแต่ละหลักกลับเป็นจำนวนเต็ม
+   * ถ้าตรรกะการยืมผิด ผลรวมที่ประกอบกลับจะไม่เท่ากับคำตอบจริง
+   */
+  for (let round = 0; round < 25; round += 1) {
+    const question = QE.generateQuestion({
+      type: 'subtraction', grade: 6, difficulty: 'hard', seed: `ยืม-${round}`,
+    })
+    const steps = SOL.solutionSteps(question)
+    const perPlace = steps.filter((step) => step.title.startsWith('หลัก'))
+
+    let rebuilt = 0
+    perPlace.forEach((step, index) => {
+      const numbers = numbersIn(step.detail)
+      const digit = numbers[numbers.length - 1]
+      rebuilt += digit * 10 ** index
+    })
+
+    assert(
+      rebuilt === Number(question.correctAnswer),
+      `${question.prompt} ประกอบหลักกลับได้ ${rebuilt} แต่คำตอบคือ ${question.correctAnswer}`,
+    )
+  }
+})
+
+check('การแยกหลักในโจทย์คูณต้องรวมกลับได้เท่าคำตอบ', () => {
+  for (let round = 0; round < 20; round += 1) {
+    const question = QE.generateQuestion({
+      type: 'multiplication', grade: 6, difficulty: 'hard', seed: `คูณ-${round}`,
+    })
+    const steps = SOL.solutionSteps(question)
+    const parts = steps.filter((step) => step.title.startsWith('คูณด้วย'))
+
+    if (parts.length === 0) continue
+
+    const sum = parts.reduce((total, step) => {
+      const numbers = numbersIn(step.detail)
+      return total + numbers[numbers.length - 1]
+    }, 0)
+
+    assert(
+      sum === Number(question.correctAnswer),
+      `${question.prompt} รวมผลคูณแต่ละหลักได้ ${sum} แต่คำตอบคือ ${question.correctAnswer}`,
+    )
+  }
+})
+
+check('โจทย์เลขคณิตต้องเก็บตัวเลขไว้ใน metadata ให้สร้างเฉลยได้', () => {
+  // ถ้าลืมใส่ operands เฉลยจะตกไปใช้การแยกข้อความแทน ซึ่งหยาบกว่ามาก
+  for (const type of ['addition', 'subtraction', 'multiplication', 'division']) {
+    const question = QE.generateQuestion({
+      type, grade: 5, difficulty: 'medium', seed: `metadata-${type}`,
+    })
+    const operands = question.metadata.operands
+
+    assert(Array.isArray(operands), `${type} ไม่มี operands ใน metadata`)
+    assert(operands.length >= 2, `${type} มี operands แค่ ${operands.length} ตัว`)
+    assert(
+      operands.every((value) => Number.isFinite(value)),
+      `${type} มี operands ที่ไม่ใช่ตัวเลข`,
+    )
+  }
+})
+
 
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {

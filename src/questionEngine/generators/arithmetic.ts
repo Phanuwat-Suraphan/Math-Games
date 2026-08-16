@@ -92,6 +92,7 @@ export function generateAddition(context: GeneratorContext): GeneratedCore {
     distractors: additionDistractors(a, b, answer, rng),
     metadata: {
       operation: 'add',
+      operands: values,
       numberRange: { min: left.min, max: left.max },
       carries,
       steps: terms - 1,
@@ -124,6 +125,7 @@ export function generateSubtraction(context: GeneratorContext): GeneratedCore {
     distractors: subtractionDistractors(left, right, answer, rng),
     metadata: {
       operation: 'subtract',
+      operands: [left, right],
       numberRange: { min: leftRange.min, max: leftRange.max },
       borrows,
       steps: 1,
@@ -159,6 +161,7 @@ export function generateMultiplication(context: GeneratorContext): GeneratedCore
     distractors: multiplicationDistractors(left, right, answer, rng),
     metadata: {
       operation: 'multiply',
+      operands: [left, right],
       numberRange: { min: leftRange.min, max: leftRange.max },
       steps: canSplit ? 2 : 1,
     },
@@ -188,6 +191,7 @@ export function generateDivision(context: GeneratorContext): GeneratedCore {
     distractors: divisionDistractors(dividend, divisor, quotient, rng),
     metadata: {
       operation: 'divide',
+      operands: [dividend, divisor],
       numberRange: { min: quotientRange.min, max: quotientRange.max },
       steps: 1,
     },

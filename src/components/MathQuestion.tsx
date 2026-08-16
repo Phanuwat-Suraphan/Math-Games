@@ -1,4 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
+import { useEffect, useState } from 'react'
+import { Calculator } from './Calculator'
+import { SolutionSteps } from './SolutionSteps'
 import type { Question } from '../questionEngine/types'
 
 export type AnswerState = 'idle' | 'correct' | 'wrong'
@@ -34,6 +37,19 @@ export function MathQuestion({
   onRequestHint,
 }: MathQuestionProps) {
   const isLocked = answerState === 'correct'
+
+  /*
+   * ตัวช่วยปิดอยู่เป็นค่าเริ่มต้นเสมอ และรีเซ็ตเมื่อเปลี่ยนข้อ
+   * ถ้าเปิดค้างข้ามข้อ เด็กจะกดเครื่องคิดเลขทุกข้อโดยไม่ได้ตัดสินใจอีกเลย
+   * ซึ่งเป็นคนละเรื่องกับการเลือกใช้ตัวช่วยเฉพาะข้อที่ติดจริง
+   */
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [showSteps, setShowSteps] = useState(false)
+
+  useEffect(() => {
+    setShowCalculator(false)
+    setShowSteps(false)
+  }, [question.id])
 
   return (
     <div className="w-full">
@@ -104,26 +120,61 @@ export function MathQuestion({
         })}
       </div>
 
-      {/* ปุ่มคำใบ้ ไม่แสดงคำใบ้เองอัตโนมัติ เด็กต้องได้คิดก่อน */}
-      {!isLocked && question.hint ? (
-        <div className="mt-4">
-          {hintShown ? (
-            <p
-              role="status"
-              aria-live="polite"
-              className="rounded-2xl border border-sky-400/40 bg-sky-600/15 px-4 py-3 text-center text-sm font-semibold text-sky-300"
-            >
-              💡 {question.hint}
-            </p>
-          ) : (
-            <button
-              type="button"
-              onClick={onRequestHint}
-              className="mx-auto block rounded-2xl border border-sky-400/40 bg-sky-600/10 px-5 py-2.5 text-sm font-bold text-sky-300 transition hover:bg-sky-600/20"
-            >
-              💡 ขอคำใบ้
-            </button>
-          )}
+      {/* คำใบ้ ไม่แสดงเองอัตโนมัติ เด็กต้องได้คิดก่อน */}
+      {hintShown && question.hint ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-4 rounded-2xl border border-sky-400/40 bg-sky-600/15 px-4 py-3 text-center text-sm font-semibold text-sky-300"
+        >
+          💡 {question.hint}
+        </p>
+      ) : null}
+
+      {/*
+        แถวปุ่มตัวช่วย
+        วางสามปุ่มไว้ด้วยกันโดยตั้งใจ เพื่อให้เด็กเห็นว่ามีทางเลือกมากกว่าเดามั่ว
+        เด็กที่ติดจริง ๆ จะได้เลือกเองว่าจะขอคำใบ้ ขอเครื่องคิดเลข หรือขอดูวิธีคิด
+      */}
+      <div className="mt-4 flex flex-wrap justify-center gap-2">
+        {!isLocked && question.hint && !hintShown ? (
+          <button
+            type="button"
+            onClick={onRequestHint}
+            className="rounded-2xl border border-sky-400/40 bg-sky-600/10 px-4 py-2.5 text-sm font-bold text-sky-300 transition hover:bg-sky-600/20"
+          >
+            💡 ขอคำใบ้
+          </button>
+        ) : null}
+
+        <button
+          type="button"
+          onClick={() => setShowCalculator((value) => !value)}
+          aria-pressed={showCalculator}
+          className="rounded-2xl border border-arcane-400/40 bg-arcane-600/10 px-4 py-2.5 text-sm font-bold text-arcane-400 transition hover:bg-arcane-600/20"
+        >
+          🧮 {showCalculator ? 'ปิดเครื่องคิดเลข' : 'เครื่องคิดเลข'}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setShowSteps((value) => !value)}
+          aria-pressed={showSteps}
+          className="rounded-2xl border border-gold-400/40 bg-gold-500/10 px-4 py-2.5 text-sm font-bold text-gold-300 transition hover:bg-gold-500/20"
+        >
+          📖 {showSteps ? 'ปิดวิธีคิด' : 'ดูวิธีคิดทีละขั้น'}
+        </button>
+      </div>
+
+      {showCalculator ? (
+        <div className="mt-3">
+          <Calculator onClose={() => setShowCalculator(false)} />
+        </div>
+      ) : null}
+
+      {showSteps ? (
+        <div className="mt-3">
+          <SolutionSteps question={question} />
         </div>
       ) : null}
 
@@ -142,6 +193,20 @@ export function MathQuestion({
             <p className="mt-1 text-sm leading-relaxed text-slate-200">
               {question.explanation}
             </p>
+            {/*
+              ตอบถูกแล้วยังกดดูวิธีคิดเต็มได้
+              เด็กที่เดาถูกกับเด็กที่คิดถูกได้คะแนนเท่ากัน แต่เข้าใจไม่เท่ากัน
+              ปุ่มนี้เป็นทางเดียวที่เด็กกลุ่มแรกจะได้เห็นวิธีที่ถูกต้อง
+            */}
+            {!showSteps ? (
+              <button
+                type="button"
+                onClick={() => setShowSteps(true)}
+                className="mt-2 rounded-xl border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-200"
+              >
+                📖 ดูวิธีคิดทีละขั้น
+              </button>
+            ) : null}
           </motion.div>
         ) : null}
 
