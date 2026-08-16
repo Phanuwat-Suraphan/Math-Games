@@ -27,6 +27,7 @@ const STORY = load('data/story')
 const SVC = load('services/storyService')
 const STAGES = load('data/stages')
 const NPCS = load('data/npcs')
+const WORLDS = load('data/worlds')
 const STORAGE = load('services/storage')
 
 let passed = 0
@@ -331,6 +332,99 @@ check('ผู้เล่นเวอร์ชันก่อนมีเนื�
   assert(restored.storyFlags.length === 0, 'ผู้เล่นเก่ากลับมีธงมาแล้ว')
   assert(SVC.pendingBeat(restored, 'world-1-stage-1', 'before'), 'ไม่ได้เริ่มอ่านจากต้น')
 })
+
+
+// ---------- ความครบถ้วนของเนื้อหาทั้งเกม ----------
+
+check('ทุกโลกต้องมีด่านให้เล่นจริง', () => {
+  /*
+   * ข้อนี้จับปัญหาที่เคยเกิดขึ้นจริงและร้ายแรงที่สุดข้อหนึ่ง
+   *
+   * โลกที่ 2 ถึง 6 เคยไม่มีด่านเลยสักด่าน ทั้งที่มีชื่อโลก มีคำอธิบาย
+   * และมีภาพฉากครบทุกโลก เด็กที่เล่นจบโลกแรกจึงเจอทางตัน
+   * โดยไม่มีอะไรบอกว่าเกิดอะไรขึ้น และไม่มี error ให้ใครเห็นด้วย
+   *
+   * ความว่างเปล่าแบบนี้ไม่ทำให้โปรแกรมพัง จึงไม่มีทางถูกจับได้เอง
+   * ต้องมีข้อทดสอบที่ถามตรง ๆ ว่า "มีของให้เล่นไหม" เท่านั้น
+   */
+  for (const world of WORLDS.WORLDS) {
+    const stages = STAGES.getStagesByWorld(world.id)
+    assert(
+      stages.length >= 5,
+      `${world.name} มีแค่ ${stages.length} ด่าน ซึ่งน้อยเกินกว่าจะเรียกว่าโลกหนึ่งโลก`,
+    )
+
+    // ต้องมีบอสปิดโลก ไม่งั้นจบโลกแล้วไม่รู้สึกว่าจบ
+    assert(
+      stages.some((stage) => stage.isBoss),
+      `${world.name} ไม่มีด่านบอสปิดโลก`,
+    )
+
+    // ด่านต้องต่อกันเป็นเส้นเดียว ไม่มีด่านไหนที่เข้าไม่ถึง
+    for (let i = 1; i < stages.length; i += 1) {
+      assert(
+        stages[i].requiredStageId === stages[i - 1].id,
+        `${stages[i].id} ไม่ได้ต่อจาก ${stages[i - 1].id} ทำให้เดินไปไม่ถึง`,
+      )
+    }
+  }
+})
+
+check('ทุกด่านต้องมีข้อมูลครบและสมเหตุสมผล', () => {
+  const ids = new Set()
+
+  for (const stage of STAGES.STAGES) {
+    assert(!ids.has(stage.id), `รหัสด่านซ้ำ: ${stage.id}`)
+    ids.add(stage.id)
+
+    assert(stage.name.length >= 3, `${stage.id} ชื่อสั้นเกินไป`)
+    assert(stage.description.length >= 10, `${stage.id} คำอธิบายสั้นเกินไป`)
+    assert(stage.questionCount >= 3, `${stage.id} มีโจทย์แค่ ${stage.questionCount} ข้อ`)
+    assert(
+      stage.passingScore >= 50 && stage.passingScore <= 90,
+      `${stage.id} เกณฑ์ผ่าน ${stage.passingScore}% ซึ่งผิดปกติ`,
+    )
+    assert(stage.questionTypes.length >= 1, `${stage.id} ไม่ได้ระบุชนิดโจทย์`)
+    assert(
+      stage.numberRange.min < stage.numberRange.max,
+      `${stage.id} ช่วงตัวเลขกลับหัว`,
+    )
+    assert(
+      stage.firstClearReward.exp > stage.replayReward.exp,
+      `${stage.id} เล่นซ้ำได้ EXP ไม่น้อยกว่าครั้งแรก`,
+    )
+  }
+})
+
+check('ทุกโลกต้องมีเนื้อเรื่องของตัวเอง', () => {
+  // โลกที่มีด่านให้เล่นแต่ไม่มีเรื่องเลย จะรู้สึกเหมือนด่านฝึกซ้อม ไม่ใช่การผจญภัย
+  for (const world of WORLDS.WORLDS) {
+    const beats = STORY.STORY_BEATS.filter((beat) =>
+      beat.stageId.startsWith(`${world.id}-`),
+    )
+    assert(beats.length >= 2, `${world.name} มีเนื้อเรื่องแค่ ${beats.length} ตอน`)
+  }
+
+  assert(
+    STORY.STORY_CHAPTERS.length === WORLDS.WORLDS.length,
+    `มีบท ${STORY.STORY_CHAPTERS.length} บท แต่มี ${WORLDS.WORLDS.length} โลก`,
+  )
+  for (const chapter of STORY.STORY_CHAPTERS) {
+    assert(chapter.beatIds.length > 0, `${chapter.title} ไม่มีตอนอยู่ในบทเลย`)
+  }
+})
+
+check('ทุกตอนของเนื้อเรื่องต้องผูกกับด่านที่มีอยู่จริง', () => {
+  // ตอนที่ผูกกับด่านที่ไม่มีอยู่จะไม่มีวันถูกแสดง และไม่มีใครรู้ว่ามันหายไป
+  for (const beat of STORY.STORY_BEATS) {
+    assert(
+      STAGES.getStage(beat.stageId),
+      `ตอน "${beat.title}" ผูกกับด่าน ${beat.stageId} ที่ไม่มีอยู่จริง`,
+    )
+    assert(beat.lines.length >= 2, `ตอน "${beat.title}" สั้นเกินไป`)
+  }
+})
+
 
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
