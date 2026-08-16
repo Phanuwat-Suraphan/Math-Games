@@ -656,6 +656,14 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     'boss-math-guardian': '#7c3aed',
     'boss-golem-king': '#64748b',
     'boss-number-dragon': '#b91c1c',
+    'decimal-worm': '#f59e0b',
+    'equation-wraith': '#a5b4fc',
+    'chaos-cube': '#e11d48',
+    'prime-knight': '#94a3b8',
+    'wraith-swarm': '#818cf8',
+    'cube-sentinel': '#be123c',
+    'boss-prime-knight': '#cbd5e1',
+    'boss-chaos-cube': '#fb7185',
   }
 
   for (const enemy of world.enemies) {

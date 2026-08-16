@@ -522,6 +522,202 @@ function dragonOfNumbers(): string {
     </g>`
 }
 
+
+/**
+ * ผีสมการ ตัวโปร่งแสงที่ไม่มีขา ลอยส่ายไปมา
+ *
+ * ทำเป็นชายผ้าหยักด้านล่างแทนขา แล้วให้หยักขยับตลอดเวลา
+ * เป็นวิธีที่ทำให้ "ลอย" อ่านออกทันทีโดยไม่ต้องมีเงาหรือคำอธิบาย
+ * เงาบนพื้นจึงจางกว่าตัวอื่นมาก เพราะมันไม่ได้ยืนอยู่บนพื้นจริง
+ */
+function equationWraith(): string {
+  const p = 'ew'
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#e0e7ff', '#a5b4fc', '#4c1d95')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${blurFilter(`${p}-soft`, 2)}
+      ${glowFilter(`${p}-glow`, 2.4)}
+    </defs>
+
+    <!-- เงาจางมาก เพราะตัวนี้ลอยอยู่ ไม่ได้แตะพื้น -->
+    <ellipse cx="50" cy="94" rx="20" ry="4" fill="#000" opacity=".2" filter="url(#${p}-blur)"/>
+
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -4.5; 0 0" dur="3.7s" repeatCount="indefinite"/>
+
+      <!-- ตัวผี ชายล่างหยักและขยับตลอด -->
+      <path d="M26 60 Q26 26 50 26 Q74 26 74 60 L74 82
+               Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z"
+        fill="url(#${p}-body)" opacity=".93">
+        <animate attributeName="d"
+          values="M26 60 Q26 26 50 26 Q74 26 74 60 L74 82 Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z;
+                  M26 60 Q26 26 50 26 Q74 26 74 60 L74 84 Q68 92 62 84 Q56 76 50 84 Q44 92 38 84 Q32 76 26 84 Z;
+                  M26 60 Q26 26 50 26 Q74 26 74 60 L74 82 Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z"
+          dur="2.9s" repeatCount="indefinite"/>
+      </path>
+
+      ${rimLight('M50 26 Q74 26 74 60', '#ede9fe', 2)}
+      ${specular(40, 40, 7, 9, -24, 0.4)}
+
+      <!-- เครื่องหมายสมการลอยอยู่ในตัว บอกว่าเป็นผีของสมการ -->
+      <text x="50" y="72" text-anchor="middle" font-size="13" font-weight="bold"
+        fill="#ddd6fe" opacity=".65" filter="url(#${p}-soft)">=</text>
+
+      ${livingEye(42, 47, 7, '#4c1d95', 0.4)}
+      ${livingEye(58, 47, 7, '#4c1d95', 0.9)}
+    </g>`
+}
+
+/**
+ * อัศวินจำนวนเฉพาะ ตัวถึกที่มีโล่
+ *
+ * รูปทรงเหลี่ยมและหนัก ต่างจากตัวอื่นที่กลมและนุ่ม
+ * เด็กจึงอ่านออกตั้งแต่ยังไม่เข้าใกล้ว่าตัวนี้ตีทีเดียวไม่ล้ม
+ */
+function primeKnight(): string {
+  const p = 'pk'
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${verticalGradient(`${p}-plate`, '#cbd5e1', '#334155')}
+      ${verticalGradient(`${p}-shield`, '#fcd34d', '#b45309')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${glowFilter(`${p}-glow`, 2)}
+    </defs>
+
+    ${groundShadow(`${p}-blur`, 50, 93, 26)}
+
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -1.6; 0 0" dur="2.5s" repeatCount="indefinite"/>
+
+      <!-- ขาสองข้าง สั้นและหนา -->
+      <rect x="34" y="74" width="11" height="18" rx="3" fill="#334155"/>
+      <rect x="55" y="74" width="11" height="18" rx="3" fill="#334155"/>
+
+      <!-- ลำตัวเป็นเกราะแผ่น -->
+      <path d="M30 42 L70 42 L66 78 L34 78 Z" fill="url(#${p}-plate)"/>
+      ${rimLight('M30 42 L70 42', '#f1f5f9', 2)}
+
+      <!-- หมวกเกราะ มีช่องมองเป็นแถบ -->
+      <path d="M34 22 Q50 12 66 22 L66 40 L34 40 Z" fill="url(#${p}-plate)"/>
+      <rect x="38" y="28" width="24" height="7" rx="3" fill="#0b1220"/>
+      ${livingEye(44, 31.5, 3.2, '#7f1d1d', 0.2)}
+      ${livingEye(56, 31.5, 3.2, '#7f1d1d', 0.7)}
+
+      <!-- โล่ที่มีเลข 7 ซึ่งเป็นจำนวนเฉพาะ -->
+      <g>
+        <animateTransform attributeName="transform" type="rotate"
+          values="-4 24 60; 4 24 60; -4 24 60" dur="3.3s" repeatCount="indefinite"/>
+        <path d="M12 46 L36 46 L36 64 Q24 76 12 64 Z" fill="url(#${p}-shield)"/>
+        <text x="24" y="62" text-anchor="middle" font-size="15" font-weight="bold"
+          fill="#78350f">7</text>
+      </g>
+
+      <!--
+        แสงสะท้อนบนเกราะต้องเป็นแถบบางแนบขอบซ้าย ไม่ใช่วงรีกลางอก
+        ตอนแรกใช้วงรีขนาด 6x12 กลางลำตัว ซึ่งเรนเดอร์ออกมาเป็นก้อนขาว
+        ดูเหมือนภาพเสียมากกว่าดูเหมือนโลหะสะท้อนแสง
+      -->
+      <path d="M34 45 L34 75" stroke="#f8fafc" stroke-width="2.5" opacity=".28"
+        stroke-linecap="round" fill="none"/>
+    </g>`
+}
+
+/**
+ * ลูกบาศก์วุ่นวาย หมุนตลอดเวลาและมีเลขคนละด้าน
+ *
+ * ตัวนี้ตั้งใจให้ดูเป็นเครื่องจักรมากกว่าสิ่งมีชีวิต
+ * เพราะเป็นตัวที่ยิงระยะไกล เด็กจะได้แยกออกว่าไม่ต้องรอให้มันเข้ามาชน
+ */
+function chaosCube(): string {
+  const p = 'cc'
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${diagonalGradient(`${p}-face`, '#fda4af', '#9f1239')}
+      ${diagonalGradient(`${p}-side`, '#7f1d1d', '#450a0a')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${glowFilter(`${p}-glow`, 2.6)}
+    </defs>
+
+    ${groundShadow(`${p}-blur`, 50, 92, 24)}
+
+    <g>
+      <animateTransform attributeName="transform" type="rotate"
+        values="0 50 56; 8 50 56; -8 50 56; 0 50 56" dur="4.6s" repeatCount="indefinite"/>
+
+      <!-- หน้าบนกับหน้าข้าง ทำให้อ่านเป็นลูกบาศก์ ไม่ใช่สี่เหลี่ยมแบน -->
+      <path d="M28 36 L50 24 L72 36 L50 48 Z" fill="url(#${p}-side)"/>
+      <path d="M28 36 L50 48 L50 82 L28 70 Z" fill="url(#${p}-side)" opacity=".85"/>
+      <path d="M72 36 L50 48 L50 82 L72 70 Z" fill="url(#${p}-face)"/>
+
+      ${rimLight('M28 36 L50 24 L72 36', '#fecdd3', 1.8)}
+
+      <!-- เลขคนละด้าน หมุนมาให้เห็นทีละหน้า -->
+      <text x="61" y="62" text-anchor="middle" font-size="12" font-weight="bold"
+        fill="#fff1f2" opacity=".9">8</text>
+      <text x="39" y="62" text-anchor="middle" font-size="11" font-weight="bold"
+        fill="#fecdd3" opacity=".55">3</text>
+
+      <!-- ตาดวงเดียวตรงกลาง ทำให้ดูเป็นเครื่องจักรที่กำลังเล็ง -->
+      <circle cx="50" cy="52" r="9" fill="#0b0616" opacity=".85"/>
+      ${livingEye(50, 52, 6.5, '#b91c1c', 0.3)}
+      <circle cx="50" cy="52" r="11" fill="none" stroke="#fb7185" stroke-width="1.6"
+        opacity=".7" filter="url(#${p}-glow)">
+        <animate attributeName="r" values="11;14;11" dur="1.9s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".7;.15;.7" dur="1.9s" repeatCount="indefinite"/>
+      </circle>
+    </g>`
+}
+
+/**
+ * หนอนทศนิยม ตัวยาวที่เลื้อยเป็นปล้อง
+ *
+ * ปล้องแต่ละปล้องขยับไม่พร้อมกัน (หน่วงเวลาต่างกันทีละ 0.12 วินาที)
+ * ซึ่งเป็นสิ่งเดียวที่ทำให้การเลื้อยดูเป็นการเลื้อยจริง ไม่ใช่ทั้งตัวขยับพร้อมกัน
+ */
+function decimalWorm(): string {
+  const p = 'dw'
+  const segment = (cx: number, cy: number, r: number, delay: number, opacity: number) => `
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -3.4; 0 0" dur="1.5s" begin="${delay}s" repeatCount="indefinite"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${p}-body)" opacity="${opacity}"/>
+    </g>`
+
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#fde68a', '#f59e0b', '#92400e')}
+      ${blurFilter(`${p}-blur`, 3)}
+    </defs>
+
+    ${groundShadow(`${p}-blur`, 50, 93, 28)}
+
+    ${segment(22, 78, 8, 0.48, 0.8)}
+    ${segment(34, 74, 10, 0.36, 0.86)}
+    ${segment(48, 70, 12, 0.24, 0.92)}
+    ${segment(63, 64, 13.5, 0.12, 0.96)}
+
+    <!-- หัว ขยับก่อนปล้องอื่นเสมอ จึงดูเหมือนหัวเป็นตัวนำ -->
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -3.4; 0 0" dur="1.5s" repeatCount="indefinite"/>
+      <circle cx="76" cy="52" r="15" fill="url(#${p}-body)"/>
+      ${rimLight('M66 44 Q76 37 86 46', '#fef3c7', 2)}
+      ${specular(71, 46, 5, 7, -22, 0.4)}
+      ${livingEye(72, 50, 5, '#7c2d12', 0.2)}
+      ${livingEye(83, 52, 4.2, '#7c2d12', 0.8)}
+
+      <!-- จุดทศนิยมบนหัว เป็นที่มาของชื่อ -->
+      <circle cx="77" cy="62" r="2.6" fill="#fffbeb" opacity=".9"/>
+    </g>`
+}
+
 const MONSTER_ART: Record<string, () => string> = {
   'goblin-calculator': goblinCalculator,
   'number-slime': numberSlime,
@@ -531,6 +727,10 @@ const MONSTER_ART: Record<string, () => string> = {
   'geometry-golem': geometryGolem,
   'math-guardian': mathGuardian,
   'dragon-of-numbers': dragonOfNumbers,
+  'equation-wraith': equationWraith,
+  'prime-knight': primeKnight,
+  'chaos-cube': chaosCube,
+  'decimal-worm': decimalWorm,
 }
 
 /**

@@ -224,6 +224,31 @@ export interface CombatStats {
   magnetRange: number
   /** ตัวคูณ XP ที่ได้ */
   xpMultiplier: number
+
+  /*
+   * ค่าชุดล่างนี้เป็นสกิลที่ "เปลี่ยนวิธีเล่น" ไม่ใช่แค่เพิ่มตัวเลข
+   * ตั้งใจให้มีเยอะพอที่บิลด์สองรอบจะไม่เหมือนกัน
+   * ถ้ามีแต่สกิลเพิ่มความแรง ทุกรอบจะจบลงที่บิลด์เดียวกันเสมอ
+   */
+
+  /** ลดความเสียหายที่ได้รับ 0 ถึง 1 */
+  damageReduction: number
+  /** ฟื้นเลือดต่อวินาที */
+  regenPerSecond: number
+  /** ความเสียหายสะท้อนใส่ตัวที่ชนเรา */
+  thornsDamage: number
+  /** ฟื้นเลือดเมื่อล้มมอนหนึ่งตัว */
+  lifestealPerKill: number
+  /** ตัวคูณโอกาสที่ของจะตก */
+  luckMultiplier: number
+  /** ตัวคูณความเร็วในการชาร์จสกิลวิเศษ */
+  ultimateChargeMultiplier: number
+  /** วินาทีอมตะหลังโดนตี ยิ่งนานยิ่งรอดจากการโดนรุม */
+  graceSeconds: number
+  /** รัศมีที่ทำให้มอนรอบตัวเดินช้าลง 0 = ไม่มี */
+  frostAuraRadius: number
+  /** มอนที่ตายระเบิดใส่ตัวข้าง ๆ เท่านี้ 0 = ไม่ระเบิด */
+  bloomDamage: number
 }
 
 export type Phase = 'playing' | 'question' | 'choosing' | 'dead'

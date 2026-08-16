@@ -1524,6 +1524,281 @@ check('ใช้สกิลแล้วต้องรอชาร์จให�
 })
 
 
+
+// ---------- ช่องสกิลและการเสนอการ์ด ----------
+
+check('มีสกิลให้เลือกหลากหลายพอที่บิลด์สองรอบจะไม่เหมือนกัน', () => {
+  assert(S.SKILLS.length >= 18, `มีสกิลแค่ ${S.SKILLS.length} แบบ`)
+
+  const ids = new Set(S.SKILLS.map((skill) => skill.id))
+  assert(ids.size === S.SKILLS.length, 'มีรหัสสกิลซ้ำกัน')
+
+  for (const skill of S.SKILLS) {
+    assert(skill.name.length >= 3, `${skill.id} ชื่อสั้นเกินไป`)
+    assert(skill.description.length >= 10, `${skill.id} คำอธิบายสั้นเกินไป`)
+    assert(skill.maxStacks >= 1, `${skill.id} เลือกไม่ได้เลย`)
+  }
+})
+
+check('สกิลทุกตัวต้องมีผลจริงต่อค่าที่ใช้คำนวณ ไม่ใช่มีแต่ชื่อ', () => {
+  /*
+   * ข้อนี้ดักความผิดพลาดที่เงียบที่สุดแบบหนึ่ง
+   * คือเพิ่มสกิลใหม่ในตารางแล้วลืมต่อเข้ากับ statsFrom
+   * เด็กจะเลือกสกิลนั้นแล้วไม่มีอะไรเกิดขึ้นเลย โดยไม่มี error ให้เห็น
+   */
+  const base = S.statsFrom({})
+
+  for (const skill of S.SKILLS) {
+    const withSkill = S.statsFrom({ [skill.id]: skill.maxStacks })
+    const changed = Object.keys(base).some((key) => base[key] !== withSkill[key])
+    assert(changed, `สกิล "${skill.name}" ไม่ได้เปลี่ยนค่าอะไรเลย`)
+  }
+})
+
+check('ช่องสกิลเต็มแล้วต้องเสนอเฉพาะสกิลที่ถืออยู่', () => {
+  const base = E.createWorld('ช่องเต็ม')
+  const chosen = S.SKILLS.slice(0, S.MAX_SKILL_SLOTS).map((skill) => skill.id)
+
+  const skills = {}
+  for (const id of chosen) skills[id] = 1
+
+  // ตัดอาวุธออกให้หมดก่อน เพื่อให้เหลือแต่การ์ดสกิลให้ตรวจ
+  const world = {
+    ...base,
+    skills,
+    weapons: { sword: 5, fire: 5, lightning: 5, ice: 5 },
+  }
+
+  for (let level = 1; level <= 12; level += 1) {
+    const offers = E.offerSkills({ ...world, player: { ...world.player, level } }, 3)
+    for (const offer of offers) {
+      if (offer.kind !== 'skill') continue
+      assert(
+        chosen.includes(offer.id),
+        `ช่องเต็มแล้วแต่ยังเสนอสกิลใหม่ "${offer.name}" ซึ่งทำให้บิลด์ไม่มีทิศทาง`,
+      )
+    }
+  }
+})
+
+check('ยังไม่เต็มช่องต้องเสนอสกิลใหม่ได้อยู่', () => {
+  const world = {
+    ...E.createWorld('ยังไม่เต็ม'),
+    weapons: { sword: 5, fire: 5, lightning: 5, ice: 5 },
+  }
+
+  let sawNew = false
+  for (let level = 1; level <= 12; level += 1) {
+    const offers = E.offerSkills({ ...world, player: { ...world.player, level } }, 3)
+    if (offers.some((offer) => offer.kind === 'skill' && offer.isNew)) sawNew = true
+  }
+  assert(sawNew, 'ยังไม่มีสกิลเลยแต่ไม่เสนอสกิลใหม่ให้')
+})
+
+check('การ์ดใบแรกต้องไม่ใช่อาวุธเสมอไป', () => {
+  /*
+   * ข้อนี้จับข้อบกพร่องที่เคยเกิดขึ้นจริง
+   *
+   * กติกา "ต้องมีอาวุธอย่างน้อยหนึ่งใบ" ทำโดยใส่ใบอาวุธเข้าไปเป็นใบแรกเสมอ
+   * ผลคือผู้เล่นที่กดใบแรกตลอด ซึ่งเด็กเล็กทำแบบนี้จริง จะได้แต่อาวุธ
+   * จำลองแล้ววัดได้ว่าถือสกิลติดตัวเฉลี่ย 0.0 ใบตลอดรอบ
+   * ทั้งที่มีสกิลให้เลือกสิบเก้าแบบ ระบบสกิลทั้งระบบจึงไม่มีอยู่จริงสำหรับเด็กกลุ่มนั้น
+   */
+  let firstIsWeapon = 0
+  let rounds = 0
+
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ', 'ฉ', 'ช', 'ซ']) {
+    const base = E.createWorld(seed)
+    for (let level = 1; level <= 8; level += 1) {
+      const offers = E.offerSkills({ ...base, player: { ...base.player, level } }, 3)
+      if (offers.length === 0) continue
+      rounds += 1
+      if (offers[0].kind === 'weapon') firstIsWeapon += 1
+    }
+  }
+
+  assert(rounds > 20, 'ตัวอย่างน้อยเกินกว่าจะสรุปได้')
+  assert(
+    firstIsWeapon < rounds,
+    `การ์ดใบแรกเป็นอาวุธทั้ง ${rounds} ครั้ง เด็กที่กดใบแรกตลอดจะไม่ได้สกิลเลย`,
+  )
+})
+
+check('การันตีว่าต้องมีอาวุธอย่างน้อยหนึ่งใบยังต้องอยู่', () => {
+  // สลับตำแหน่งแล้วต้องไม่ทำให้การันตีหายไป
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    const base = E.createWorld(seed)
+    for (let level = 1; level <= 8; level += 1) {
+      const offers = E.offerSkills({ ...base, player: { ...base.player, level } }, 3)
+      assert(
+        offers.some((offer) => offer.kind === 'weapon'),
+        `เมล็ด ${seed} เลเวล ${level} ไม่มีการ์ดอาวุธเลย`,
+      )
+    }
+  }
+})
+
+// ---------- สกิลกลุ่มที่เปลี่ยนวิธีเล่น ----------
+
+check('เกราะหนาต้องลดความเสียหายจริง และไม่มีทางทำให้อมตะ', () => {
+  const hugging = (id) => ({
+    id, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
+    damage: 40, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  })
+
+  const run = (skills) => {
+    let world = { ...E.createWorld('เกราะ'), skills, enemies: [hugging(1)] }
+    world = { ...world, player: { ...world.player, pos: { x: 400, y: 300 } } }
+    for (let i = 0; i < 240; i += 1) world = E.step(world, STILL)
+    return world.player.hp
+  }
+
+  const plain = run({})
+  const armored = run({ armor: 5 })
+  assert(armored > plain, `ใส่เกราะแล้วเลือดไม่ได้เหลือมากกว่า (${armored} เทียบ ${plain})`)
+
+  // เกราะเต็มต้องยังเจ็บอยู่ ไม่ใช่อมตะ ไม่งั้นเกมจบลงตรงนั้น
+  const stats = S.statsFrom({ armor: 99 })
+  assert(stats.damageReduction < 1, `ลดความเสียหายได้ ${stats.damageReduction} ซึ่งทำให้อมตะ`)
+})
+
+check('ฟื้นฟูต้องค่อย ๆ เติมเลือดเองโดยไม่ต้องทำอะไร', () => {
+  let world = E.createWorld('ฟื้นฟู', 'warrior')
+  world = { ...world, skills: { regen: 3 }, player: { ...world.player, hp: 20 } }
+
+  for (let i = 0; i < 120; i += 1) world = E.step(world, STILL)
+  assert(world.player.hp > 20, `ผ่านไปสองวินาทีแล้วเลือดยังอยู่ที่ ${world.player.hp}`)
+})
+
+check('หนามสะท้อนต้องทำให้ตัวที่ชนเราเจ็บ', () => {
+  const enemy = {
+    id: 1, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
+    damage: 5, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  }
+
+  let world = {
+    ...E.createWorld('หนาม'),
+    skills: { thorns: 4 },
+    enemies: [enemy],
+    // ตัดอาวุธออกให้หมด เพื่อพิสูจน์ว่าเลือดที่ลดมาจากหนามจริง ไม่ใช่จากดาบ
+    weapons: {},
+  }
+  world = { ...world, player: { ...world.player, pos: { x: 400, y: 300 } } }
+  world = E.step(world, STILL)
+
+  assert(world.enemies[0].hp < 9999, 'มอนชนเราแล้วไม่เจ็บจากหนามเลย')
+})
+
+check('ไอเย็นรอบตัวต้องทำให้มอนที่เข้าใกล้เดินช้าลง', () => {
+  const enemy = () => ({
+    id: 1, pos: { x: 340, y: 300 }, hp: 9999, maxHp: 9999, speed: 150, radius: 16,
+    damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  })
+
+  const run = (skills) => {
+    let world = { ...E.createWorld('ไอเย็น'), skills, enemies: [enemy()], weapons: {} }
+    world = { ...world, player: { ...world.player, pos: { x: 400, y: 300 } } }
+    for (let i = 0; i < 20; i += 1) world = E.step(world, STILL)
+    return world.enemies[0].pos.x - 340
+  }
+
+  assert(run({ frost: 3 }) < run({}) * 0.75, 'ไอเย็นไม่ได้ทำให้มอนที่เข้าใกล้ช้าลง')
+})
+
+check('ระเบิดลูกโซ่ต้องลามไปยังตัวที่อยู่ข้าง ๆ', () => {
+  const at = (id, x, hp) => ({
+    id, pos: { x, y: 300 }, hp, maxHp: 9999, speed: 0, radius: 16,
+    damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  })
+
+  // ตัวแรกตายในเฟรมนี้ ตัวที่สองอยู่ข้าง ๆ และต้องโดนลูกหลง
+  let world = {
+    ...E.createWorld('ลูกโซ่'),
+    skills: { bloom: 4 },
+    weapons: {},
+    enemies: [at(1, 200, -1), at(2, 240, 9999)],
+  }
+  world = E.step(world, STILL)
+
+  const neighbour = world.enemies.find((enemy) => enemy.id === 2)
+  assert(neighbour && neighbour.hp < 9999, 'มอนตายแล้วไม่ระเบิดใส่ตัวข้าง ๆ')
+})
+
+check('ดูดพลังต้องฟื้นเลือดเมื่อล้มมอน', () => {
+  const dying = {
+    id: 1, pos: { x: 200, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
+    damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  }
+
+  let world = { ...E.createWorld('ดูดพลัง'), skills: { lifesteal: 4 }, enemies: [dying] }
+  world = { ...world, player: { ...world.player, hp: 50 } }
+  world = E.step(world, STILL)
+
+  assert(world.player.hp > 50, `ล้มมอนแล้วเลือดไม่ฟื้น อยู่ที่ ${world.player.hp}`)
+})
+
+check('พลังล้นต้องชาร์จสกิลวิเศษเร็วขึ้นจริง', () => {
+  const dying = (id) => ({
+    id, pos: { x: 200, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
+    damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
+    behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
+    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+  })
+
+  const run = (skills) =>
+    E.step({ ...E.createWorld('พลังล้น', 'warrior'), skills, enemies: [dying(1)] }, STILL)
+      .ultimate.charge
+
+  assert(run({ charge: 3 }) > run({}), 'พลังล้นไม่ได้ทำให้ชาร์จเร็วขึ้น')
+})
+
+// ---------- มอนสเตอร์ชุดใหม่ ----------
+
+check('มอนต้องมีหลากหลายพอ และทุกตัวต้องมีภาพที่มีอยู่จริง', () => {
+  const seen = new Map()
+
+  // ไล่เวลาไปจนสุดเพื่อให้เจอมอนทุกชนิดที่ปลดล็อกตามเวลา
+  for (let t = 0; t <= 320; t += 10) {
+    for (let i = 0; i < 60; i += 1) {
+      const enemy = E.spawnOne({ ...E.createWorld('ชนิด'), time: t, nextId: i + 1 }, `s${t}-${i}`)
+      seen.set(enemy.kind, enemy.art)
+    }
+  }
+
+  assert(seen.size >= 14, `เจอมอนแค่ ${seen.size} ชนิด ซึ่งน้อยเกินไปสำหรับรอบยาวหลายนาที`)
+
+  const ART = load('art/monsters')
+  for (const [kind, art] of seen) {
+    assert(ART.hasMonsterArt(art), `มอน "${kind}" อ้างภาพ "${art}" ที่ไม่มีอยู่จริง`)
+  }
+})
+
+check('บอสทุกตัวต้องมีชื่อและภาพที่มีอยู่จริง', () => {
+  const ART = load('art/monsters')
+  const names = new Set()
+
+  for (let index = 0; index < 6; index += 1) {
+    const name = E.bossNameAt(index)
+    assert(name && name.length >= 3, `บอสตัวที่ ${index} ไม่มีชื่อ`)
+    names.add(name)
+  }
+  assert(names.size === 6, 'ชื่อบอลซ้ำกันภายในรอบเดียว')
+
+  // วนรอบที่สองต้องมีเครื่องหมายกำกับว่าแข็งกว่าเดิม
+  assert(E.bossNameAt(6) !== E.bossNameAt(0), 'บอสวนรอบสองใช้ชื่อเดิมเป๊ะ')
+})
+
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

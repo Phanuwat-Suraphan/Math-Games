@@ -103,6 +103,78 @@ export const SKILLS: Skill[] = [
     weight: 2,
     icon: 'star',
   },
+  {
+    id: 'armor',
+    name: 'เกราะหนา',
+    description: 'ความเสียหายที่ได้รับลดลง 12%',
+    maxStacks: 5,
+    weight: 4,
+    icon: 'shield',
+  },
+  {
+    id: 'regen',
+    name: 'ฟื้นฟู',
+    description: 'ฟื้นเลือดเองเรื่อย ๆ ตลอดเวลา',
+    maxStacks: 4,
+    weight: 4,
+    icon: 'heart',
+  },
+  {
+    id: 'thorns',
+    name: 'หนามสะท้อน',
+    description: 'มอนที่ชนเราจะเจ็บกลับไปด้วย',
+    maxStacks: 4,
+    weight: 3,
+    icon: 'sword',
+  },
+  {
+    id: 'lifesteal',
+    name: 'ดูดพลัง',
+    description: 'ล้มมอนแล้วฟื้นเลือดเล็กน้อยทุกตัว',
+    maxStacks: 4,
+    weight: 3,
+    icon: 'heart',
+  },
+  {
+    id: 'luck',
+    name: 'โชคดี',
+    description: 'ของตกจากมอนบ่อยขึ้นเท่าตัว',
+    maxStacks: 3,
+    weight: 3,
+    icon: 'coin',
+  },
+  {
+    id: 'charge',
+    name: 'พลังล้น',
+    description: 'ชาร์จสกิลวิเศษเร็วขึ้น 35%',
+    maxStacks: 3,
+    weight: 3,
+    icon: 'star',
+  },
+  {
+    id: 'grace',
+    name: 'ตั้งหลัก',
+    description: 'หลังโดนตีจะไร้เทียมทานนานขึ้น หนีออกจากวงล้อมได้ง่ายขึ้น',
+    maxStacks: 3,
+    weight: 3,
+    icon: 'shield',
+  },
+  {
+    id: 'frost',
+    name: 'ไอเย็น',
+    description: 'มอนที่เข้ามาใกล้ตัวจะเดินช้าลงเอง',
+    maxStacks: 3,
+    weight: 3,
+    icon: 'shield',
+  },
+  {
+    id: 'bloom',
+    name: 'ระเบิดลูกโซ่',
+    description: 'มอนที่ถูกล้มจะระเบิดใส่ตัวที่อยู่ข้าง ๆ',
+    maxStacks: 4,
+    weight: 3,
+    icon: 'flame',
+  },
 ]
 
 const SKILL_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]))
@@ -123,6 +195,16 @@ export const BASE_STATS: CombatStats = {
   maxHp: 130,
   magnetRange: 70,
   xpMultiplier: 1,
+
+  damageReduction: 0,
+  regenPerSecond: 0,
+  thornsDamage: 0,
+  lifestealPerKill: 0,
+  luckMultiplier: 1,
+  ultimateChargeMultiplier: 1,
+  graceSeconds: 0.9,
+  frostAuraRadius: 0,
+  bloomDamage: 0,
 }
 
 /**
@@ -148,5 +230,34 @@ export function statsFrom(skills: Readonly<Record<string, number>>): CombatStats
     maxHp: BASE_STATS.maxHp + level('vitality') * 20,
     magnetRange: BASE_STATS.magnetRange * Math.pow(2, level('magnet')),
     xpMultiplier: Math.pow(1.25, level('wisdom')),
+
+    /*
+     * การลดความเสียหายใช้การคูณต่อชั้น ไม่ใช่การบวกเปอร์เซ็นต์
+     * ถ้าบวกตรง ๆ ห้าชั้นจะได้ 60% แต่ถ้าเผลอทำให้เกิน 100% เมื่อไร
+     * ผู้เล่นจะกลายเป็นอมตะถาวรและเกมจบลงทันที
+     * การคูณเข้าหาศูนย์ไปเรื่อย ๆ จึงปลอดภัยกว่าโดยธรรมชาติ
+     */
+    damageReduction: 1 - Math.pow(0.88, level('armor')),
+    regenPerSecond: level('regen') * 1.6,
+    thornsDamage: level('thorns') * 26,
+    lifestealPerKill: level('lifesteal') * 1.4,
+    luckMultiplier: Math.pow(2, level('luck')),
+    ultimateChargeMultiplier: Math.pow(1.35, level('charge')),
+    graceSeconds: 0.9 + level('grace') * 0.35,
+    frostAuraRadius: level('frost') > 0 ? 70 + level('frost') * 34 : 0,
+    bloomDamage: level('bloom') * 30,
   }
 }
+
+/**
+ * จำนวนสกิลติดตัวที่ถือพร้อมกันได้
+ *
+ * ทำไมต้องจำกัด: เดิมไม่จำกัด เด็กจึงเก็บสกิลได้ทุกใบในรอบเดียว
+ * ผลคือทุกบิลด์ลงเอยเหมือนกันหมด และการเลือกการ์ดไม่มีความหมาย
+ * เพราะยังไงก็ได้ทุกอย่างอยู่ดี แค่ช้าหรือเร็วกว่ากัน
+ *
+ * พอจำกัดช่อง การเลือกใบแรก ๆ กลายเป็นการตัดสินใจว่าจะเดินทางไหน
+ * และเมื่อช่องเต็มแล้ว การ์ดจะเสนอแต่การอัปสกิลที่เลือกไว้แล้วเท่านั้น
+ * ซึ่งเป็นวิธีที่เกมแนวนี้ใช้กันทั่วไป และทำให้บิลด์ลึกขึ้นแทนที่จะกว้างขึ้น
+ */
+export const MAX_SKILL_SLOTS = 5

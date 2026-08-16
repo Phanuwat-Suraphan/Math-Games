@@ -13,7 +13,7 @@
 
 import { createRng } from '../math/rng'
 import type { Rng } from '../math/rng'
-import { SKILLS, getSkill, statsFrom } from './skills'
+import { MAX_SKILL_SLOTS, SKILLS, getSkill, statsFrom } from './skills'
 import {
   MAX_WEAPON_LEVEL,
   MAX_WEAPON_SLOTS,
@@ -113,6 +113,26 @@ const ENEMY_KINDS: EnemyKind[] = [
     behavior: 'dash', splitInto: 0, fromTime: 215 },
   { kind: 'dragon-of-numbers', art: 'dragon-of-numbers', hp: 240, speed: 126, damage: 22, radius: 28, xpValue: 12,
     behavior: 'chase', splitInto: 0, fromTime: 250 },
+
+  /*
+   * ชุดที่สอง โผล่ตั้งแต่นาทีที่สองเป็นต้นไป
+   *
+   * เพิ่มเพราะช่วงหลังนาทีที่สามเดิมเจอมอนชุดเดิมวนซ้ำจนจำหมดแล้ว
+   * ตอนนี้รอบหนึ่งยาวขึ้นเป็นสามถึงหกนาที ช่วงท้ายจึงต้องมีของใหม่ให้เจอ
+   * ไม่งั้นช่วงที่ควรตื่นเต้นที่สุดกลับเป็นช่วงที่ซ้ำที่สุด
+   */
+  { kind: 'decimal-worm', art: 'decimal-worm', hp: 58, speed: 142, damage: 10, radius: 17, xpValue: 4,
+    behavior: 'zigzag', splitInto: 0, fromTime: 110 },
+  { kind: 'equation-wraith', art: 'equation-wraith', hp: 44, speed: 165, damage: 11, radius: 15, xpValue: 5,
+    behavior: 'chase', splitInto: 0, fromTime: 140 },
+  { kind: 'chaos-cube', art: 'chaos-cube', hp: 92, speed: 104, damage: 16, radius: 19, xpValue: 7,
+    behavior: 'ranged', splitInto: 0, fromTime: 175 },
+  { kind: 'prime-knight', art: 'prime-knight', hp: 210, speed: 86, damage: 20, radius: 24, xpValue: 9,
+    behavior: 'tank', splitInto: 0, fromTime: 205 },
+  { kind: 'wraith-swarm', art: 'equation-wraith', hp: 120, speed: 148, damage: 14, radius: 20, xpValue: 8,
+    behavior: 'dash', splitInto: 3, fromTime: 240 },
+  { kind: 'cube-sentinel', art: 'chaos-cube', hp: 300, speed: 112, damage: 24, radius: 26, xpValue: 14,
+    behavior: 'ranged', splitInto: 0, fromTime: 280 },
 ]
 
 /**
@@ -136,10 +156,21 @@ const BOSS_KINDS: EnemyKind[] = [
     radius: 46, xpValue: 62, behavior: 'tank', splitInto: 0, fromTime: 0 },
   { kind: 'boss-number-dragon', art: 'dragon-of-numbers', hp: 820, speed: 132, damage: 30,
     radius: 46, xpValue: 78, behavior: 'ranged', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-prime-knight', art: 'prime-knight', hp: 1050, speed: 92, damage: 32,
+    radius: 44, xpValue: 90, behavior: 'tank', splitInto: 0, fromTime: 0 },
+  { kind: 'boss-chaos-cube', art: 'chaos-cube', hp: 1250, speed: 120, damage: 34,
+    radius: 44, xpValue: 105, behavior: 'ranged', splitInto: 0, fromTime: 0 },
 ]
 
 /** ชื่อบอสที่แสดงตอนโผล่ ไล่ตามลำดับเดียวกับ BOSS_KINDS */
-const BOSS_NAMES = ['ราชาสไลม์', 'ผู้พิทักษ์คณิต', 'ราชาโกเลม', 'มังกรแห่งตัวเลข']
+const BOSS_NAMES = [
+  'ราชาสไลม์',
+  'ผู้พิทักษ์คณิต',
+  'ราชาโกเลม',
+  'มังกรแห่งตัวเลข',
+  'อัศวินจำนวนเฉพาะ',
+  'ลูกบาศก์วุ่นวาย',
+]
 
 /** ชื่อบอสตัวที่เท่าไร ใช้ทั้งตอนประกาศและตอนสรุปผล */
 export function bossNameAt(index: number): string {
@@ -559,7 +590,10 @@ export function step(world: WorldState, input: Input): WorldState {
     const slowed = enemy.slowFor > 0
     if (slowed) enemy.slowFor -= dt
     const frozen = ultimateOn && ultSpec.kind === 'freeze'
-    const speed = enemy.speed * (frozen ? 0.1 : slowed ? 0.45 : 1)
+    // ไอเย็นรอบตัวทำงานตลอดเวลา ไม่ต้องยิงโดน จึงช่วยตอนโดนรุมได้จริง
+    const chilled =
+      stats.frostAuraRadius > 0 && distance(enemy.pos, player.pos) <= stats.frostAuraRadius
+    const speed = enemy.speed * (frozen ? 0.1 : slowed ? 0.45 : chilled ? 0.55 : 1)
 
     // โล่พลังงานเผาทุกตัวที่เข้ามาใกล้ตลอดเวลาที่เปิดอยู่
     if (ultimateOn && ultSpec.kind === 'shield' && distance(enemy.pos, player.pos) < 96) {
@@ -879,7 +913,7 @@ export function step(world: WorldState, input: Input): WorldState {
   }
 
   // ---------- กระสุนของมอน ----------
-  let hp = player.hp
+  let hp = Math.min(stats.maxHp, player.hp + stats.regenPerSecond * dt)
   let invulnerable = player.invulnerable
   const survivingEnemyShots: EnemyShot[] = []
 
@@ -896,8 +930,8 @@ export function step(world: WorldState, input: Input): WorldState {
       !ultimateGuard &&
       distance(moved.pos, player.pos) <= player.radius + moved.radius
     ) {
-      hp -= moved.damage
-      invulnerable = 0.9
+      hp -= moved.damage * (1 - stats.damageReduction)
+      invulnerable = stats.graceSeconds
       continue
     }
 
@@ -918,6 +952,8 @@ export function step(world: WorldState, input: Input): WorldState {
     .filter((pickup) => pickup.life > 0)
   let kills = world.kills
   let bossesDown = world.bossesDown
+  /** เลือดที่ดูดได้จากการล้มมอนในก้าวนี้ รวมทีเดียวตอนท้าย */
+  let lifestealHeal = 0
 
   for (const enemy of enemies) {
     if (enemy.hp > 0) {
@@ -928,7 +964,29 @@ export function step(world: WorldState, input: Input): WorldState {
     // ชาร์จสกิลวิเศษด้วยการล้มมอน บอสกับตัวใหญ่พิเศษนับหลายตัว
     ultimate = {
       ...ultimate,
-      charge: ultimate.charge + (enemy.boss ? 10 : enemy.elite ? 5 : 1),
+      charge:
+        ultimate.charge +
+        (enemy.boss ? 10 : enemy.elite ? 5 : 1) * stats.ultimateChargeMultiplier,
+    }
+
+    lifestealHeal += stats.lifestealPerKill
+
+    // ระเบิดลูกโซ่ ทำให้ฝูงที่เบียดกันแน่นล้มต่อกันเป็นทอด ๆ
+    if (stats.bloomDamage > 0) {
+      for (const other of enemies) {
+        if (other.id === enemy.id || other.hp <= 0) continue
+        if (distance(other.pos, enemy.pos) > 96) continue
+        hurt(other, stats.bloomDamage * stats.damageMultiplier)
+      }
+      effects.push({
+        id: nextId,
+        kind: 'blast',
+        pos: { ...enemy.pos },
+        radius: 96,
+        life: 0.22,
+        maxLife: 0.22,
+      })
+      nextId += 1
     }
     gems.push({ id: nextId, pos: { ...enemy.pos }, value: enemy.xpValue })
     nextId += 1
@@ -946,7 +1004,7 @@ export function step(world: WorldState, input: Input): WorldState {
        * ถ้าตกบ่อยกว่านี้ เลือดจะเต็มตลอดเวลาจนไม่มีความกดดันเหลือเลย
        * แต่ถ้าไม่มีเลย ช่วงกลางรอบจะเงียบสนิทเพราะไม่มีอะไรเกิดขึ้น
        */
-      const roll = createRng(`${world.seed}-drop-${enemy.id}`).next()
+      const roll = createRng(`${world.seed}-drop-${enemy.id}`).next() / stats.luckMultiplier
       const kind: PickupKind | undefined =
         roll < 0.028 ? 'heart' : roll < 0.045 ? 'bomb' : roll < 0.062 ? 'magnet' : undefined
 
@@ -1006,6 +1064,7 @@ export function step(world: WorldState, input: Input): WorldState {
     remainingGems.push(gem)
   }
 
+  if (lifestealHeal > 0) hp = Math.min(stats.maxHp, hp + lifestealHeal)
   if (harvestNow) hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.5)
 
   // ---------- เก็บของที่ตกอยู่ ----------
@@ -1087,9 +1146,11 @@ export function step(world: WorldState, input: Input): WorldState {
   if (invulnerable <= 0 && !ultimateGuard) {
     for (const enemy of aliveEnemies) {
       if (distance(enemy.pos, player.pos) > enemy.radius + player.radius) continue
-      hp -= enemy.damage
+      hp -= enemy.damage * (1 - stats.damageReduction)
+      // หนามสะท้อนใส่ตัวที่ชน ทำให้การยืนสู้มีทางเล่นของตัวเอง
+      if (stats.thornsDamage > 0) hurt(enemy, stats.thornsDamage * stats.damageMultiplier)
       // ช่วงอมตะสั้น ๆ กันโดนรุมจนเลือดหมดในเสี้ยววินาทีโดยไม่มีทางหนี
-      invulnerable = 0.9
+      invulnerable = stats.graceSeconds
       break
     }
   }
@@ -1222,7 +1283,8 @@ function availableOffers(world: WorldState): { offer: Offer; weight: number }[] 
       // ถือครบช่องแล้วก็รับอาวุธชิ้นใหม่ไม่ได้
       if (owned.length >= MAX_WEAPON_SLOTS) continue
       out.push({
-        weight: 8,
+        // อาวุธชิ้นใหม่ยังสำคัญ แต่ไม่ควรแย่งที่การอัปของที่ถืออยู่แล้ว
+        weight: owned.length >= 2 ? 4 : 8,
         offer: {
           kind: 'weapon',
           id: weapon.id,
@@ -1271,18 +1333,38 @@ function availableOffers(world: WorldState): { offer: Offer; weight: number }[] 
     })
   }
 
+  /*
+   * ช่องสกิลเต็มแล้วจะเสนอเฉพาะสกิลที่ถืออยู่ ไม่เสนอสกิลใหม่อีก
+   *
+   * นี่คือกติกาที่เกมแนวนี้ใช้กันทั่วไป และเป็นสิ่งที่ทำให้บิลด์ "ลึก" ขึ้น
+   * ถ้าเสนอสกิลใหม่ได้ไม่จำกัด เด็กจะเก็บครบทุกใบในรอบเดียว
+   * ทุกรอบจะจบลงที่บิลด์เดียวกันหมด แล้วการเลือกการ์ดก็ไม่มีความหมาย
+   *
+   * พอจำกัดช่อง ใบแรก ๆ กลายเป็นการตัดสินใจว่าจะเดินทางไหน
+   * และเมื่อเลือกแล้ว การ์ดถัดไปจะช่วยดันทางนั้นให้สุด
+   */
+  const ownedSkills = Object.keys(world.skills).filter((id) => (world.skills[id] ?? 0) > 0)
+  const skillSlotsFull = ownedSkills.length >= MAX_SKILL_SLOTS
+
   for (const skill of SKILLS) {
-    if ((world.skills[skill.id] ?? 0) >= skill.maxStacks) continue
+    const stacks = world.skills[skill.id] ?? 0
+    if (stacks >= skill.maxStacks) continue
+    if (skillSlotsFull && stacks === 0) continue
+
+    /*
+     * สกิลที่ถืออยู่แล้วมีน้ำหนักสูงกว่าสกิลใหม่เสมอ
+     * ทำให้ทางที่เด็กเลือกไว้เดินหน้าต่อได้จริง ไม่ใช่ถูกของใหม่แย่งที่ตลอด
+     */
     out.push({
-      weight: skill.weight,
+      weight: stacks > 0 ? skill.weight + 4 : skill.weight,
       offer: {
         kind: 'skill',
         id: skill.id,
-        name: skill.name,
+        name: stacks > 0 ? `${skill.name} ชั้น ${stacks + 1}` : skill.name,
         description: skill.description,
         icon: skill.icon,
         color: '#a78bfa',
-        isNew: false,
+        isNew: stacks === 0,
       },
     })
   }
@@ -1336,7 +1418,18 @@ export function offerSkills(world: WorldState, count: number): Offer[] {
     if (picked.some((entry) => entry.id === offer.id)) continue
     picked.push(offer)
   }
-  return picked
+
+  /*
+   * สลับตำแหน่งก่อนคืนออกไป
+   *
+   * จำเป็นเพราะใบอาวุธที่การันตีไว้ถูกใส่เข้ามาเป็นใบแรกเสมอ
+   * จำลองแล้วพบว่าผู้เล่นที่กดใบแรกตลอด (ซึ่งเด็กเล็กทำแบบนี้จริง)
+   * จะได้แต่อาวุธ ไม่ได้สกิลติดตัวเลยสักใบตลอดทั้งรอบ
+   * วัดได้ว่าถือสกิลเฉลี่ย 0.0 ใบ ทั้งที่มีสกิลให้เลือกสิบเก้าแบบ
+   *
+   * การการันตียังอยู่ครบ เปลี่ยนแค่ว่ามันจะโผล่ตำแหน่งไหน
+   */
+  return rng.shuffle(picked)
 }
 
 /** จำนวนใบที่ได้เลือก ตอบถูกได้สาม ตอบผิดได้สอง */
