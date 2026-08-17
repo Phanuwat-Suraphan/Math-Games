@@ -36,6 +36,46 @@ function range(difficulty: Difficulty, grade: Grade): { min: number; max: number
 }
 
 /** สร้างตัวเลือกรอบ ๆ คำตอบ ไม่สุ่มมั่ว เพื่อให้ต้องคิดจริง */
+/**
+ * ช่องนี้ให้พิมพ์คำตอบเอง หรือให้เลือกจากตัวเลือก
+ *
+ * ทำไมถึงต้องมีทั้งสองแบบ ไม่ใช่เลือกอย่างใดอย่างหนึ่ง
+ *
+ * ตัวเลือกสี่ตัวมีปัญหาที่ซ่อนอยู่: เด็กที่ยังคิดไม่ออกสามารถตัดตัวเลือก
+ * ที่ดูไม่น่าใช่ทิ้งไปได้ แล้วเดาจากที่เหลือ ซึ่งได้คำตอบถูกโดยไม่ต้องคิดเลข
+ * พอทำแบบนี้ซ้ำ ๆ เด็กจะเก่งขึ้นจริงในการเดา แต่ไม่ได้เก่งขึ้นในการคิดเลข
+ * และหน้าจอจะรายงานว่าเขาทำได้ดี ซึ่งทำให้ครูมองไม่เห็นปัญหา
+ *
+ * แต่การให้พิมพ์เองทั้งหมดก็ไม่ดี เพราะเด็กที่เพิ่งเริ่มจะติดตั้งแต่ช่องแรก
+ * แล้วไม่มีอะไรช่วยให้เดาทิศทางได้เลยว่าคำตอบควรอยู่แถวไหน
+ *
+ * ทางที่เลือกคือ ช่องต้น ๆ มีตัวเลือกให้ ช่องหลัง ๆ ต้องพิมพ์เอง
+ * เด็กจึงได้เห็นรูปแบบของคำตอบจากช่องแรกก่อน แล้วค่อยลงมือเองในช่องถัดไป
+ * และระดับง่ายยังคงมีตัวเลือกให้ทุกช่อง เพราะเป็นด่านที่เด็กเพิ่งเริ่มรู้จักปริศนา
+ */
+function slotChoices(
+  answer: number,
+  rng: Rng,
+  difficulty: Difficulty,
+  index: number,
+  total: number,
+): string[] | undefined {
+  // ระดับง่ายมีตัวเลือกให้เสมอ เป็นด่านที่เด็กเพิ่งรู้จักปริศนา
+  if (difficulty === 'easy') return nearChoices(answer, rng)
+
+  /*
+   * ปริศนาช่องเดียวไม่มี "ช่องก่อนหน้า" ให้ดูเป็นตัวอย่าง
+   * จึงให้พิมพ์เองเฉพาะระดับยากที่สุดเท่านั้น
+   */
+  if (total === 1) {
+    return difficulty === 'hard' ? undefined : nearChoices(answer, rng)
+  }
+
+  // ช่องแรกมีตัวเลือกเสมอ เพื่อให้เห็นว่าคำตอบหน้าตาเป็นอย่างไร
+  if (index === 0) return nearChoices(answer, rng)
+  return undefined
+}
+
 function nearChoices(answer: number, rng: Rng, count = 4): string[] {
   const values = new Set<number>([answer])
   const spread = Math.max(1, Math.round(Math.abs(answer) * 0.2))
@@ -86,7 +126,7 @@ function numberLock(difficulty: Difficulty, grade: Grade, rng: Rng): Puzzle {
       id: `slot-${index}`,
       clue: `${clue} = ?`,
       answer: String(answer),
-      choices: nearChoices(answer, rng),
+      choices: slotChoices(answer, rng, difficulty, index, digits),
       hint: 'คิดทีละข้อ ได้คำตอบแล้วค่อยใส่ลงช่อง',
     }
   })
@@ -129,7 +169,7 @@ function missingNumber(difficulty: Difficulty, grade: Grade, rng: Rng): Puzzle {
         id: 'slot-0',
         clue: `${known} + ? = ${total}`,
         answer: String(missing),
-        choices: nearChoices(missing, rng),
+        choices: slotChoices(missing, rng, difficulty, 0, 1),
         hint: `ลองคิดกลับกัน: ${total} − ${known} เท่ากับเท่าไร`,
       },
     ],
@@ -172,7 +212,7 @@ function sequence(difficulty: Difficulty, grade: Grade, rng: Rng): Puzzle {
         id: 'slot-0',
         clue: `${shown}, ?`,
         answer: String(answer),
-        choices: nearChoices(answer, rng),
+        choices: slotChoices(answer, rng, difficulty, 0, 1),
         hint: isMultiply
           ? 'ลองดูว่าแต่ละตัวเป็นกี่เท่าของตัวก่อนหน้า'
           : `ลองดูว่าแต่ละตัวห่างกันเท่าไร`,
@@ -208,7 +248,7 @@ function balance(difficulty: Difficulty, grade: Grade, rng: Rng): Puzzle {
         id: 'slot-0',
         clue: `${item} × ${count} หนักรวม ${total} กรัม — หนึ่งชิ้นหนักเท่าไร`,
         answer: String(each),
-        choices: nearChoices(each, rng),
+        choices: slotChoices(each, rng, difficulty, 0, 1),
         hint: `แบ่งน้ำหนักรวมออกเป็น ${count} ส่วนเท่า ๆ กัน`,
       },
     ],

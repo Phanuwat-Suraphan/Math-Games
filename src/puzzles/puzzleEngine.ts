@@ -1,4 +1,5 @@
 import type { Puzzle, PuzzleProgress } from './types'
+import { isAnswerCorrect } from '../questionEngine/answerCheck'
 
 /**
  * ตรรกะการแก้ปริศนา
@@ -21,11 +22,20 @@ export function createPuzzleProgress(puzzle: Puzzle): PuzzleProgress {
   }
 }
 
-/** เทียบคำตอบแบบไม่สนช่องว่างหัวท้าย */
+/**
+ * เทียบคำตอบของช่องหนึ่ง
+ *
+ * เดิมเทียบข้อความตรง ๆ ซึ่งใช้ได้เพราะทุกช่องเป็นปุ่มให้กด
+ * ข้อความที่เทียบจึงเป็นข้อความที่เราสร้างเองทั้งสองฝั่ง
+ *
+ * ตอนนี้ช่องระดับยากให้เด็กพิมพ์เอง ข้อความจะไม่มีทางตรงกันเป๊ะ
+ * เด็กพิมพ์ 0.50 ในขณะที่เฉลยคือ 0.5 หรือพิมพ์ 2/4 ในขณะที่เฉลยคือ 1/2
+ * ทั้งสองกรณีคือคำตอบที่ถูก และการตอบว่าผิดคือความผิดของเรา ไม่ใช่ของเด็ก
+ */
 export function isSlotCorrect(puzzle: Puzzle, index: number, value: string): boolean {
   const slot = puzzle.slots[index]
   if (!slot) return false
-  return value.trim() === slot.answer.trim()
+  return isAnswerCorrect(value, slot.answer)
 }
 
 export interface FillOutcome {

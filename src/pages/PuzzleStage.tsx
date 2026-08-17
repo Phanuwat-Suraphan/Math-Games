@@ -25,6 +25,7 @@ import type { Player } from '../types/player'
 import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
 import { NotFoundNotice } from './NotFoundNotice'
+import { NumberPad } from '../components/NumberPad'
 
 /**
  * หน้าปริศนา
@@ -102,10 +103,26 @@ function PuzzleSession({
   const earnedRef = useRef({ exp: 0, coins: 0 })
   const slotStartedAtRef = useRef(Date.now())
 
+  /*
+   * สิ่งที่เด็กพิมพ์ค้างไว้ในแต่ละช่อง
+   *
+   * เก็บแยกรายช่อง ไม่ใช่ตัวเดียวรวม เพราะปริศนาบางแบบมีหลายช่อง
+   * และเด็กสลับไปพิมพ์ช่องอื่นก่อนแล้วกลับมาได้
+   * ถ้าใช้ตัวเดียวรวม การกดช่องอื่นจะลบสิ่งที่พิมพ์ค้างไว้ทิ้งโดยไม่บอก
+   */
+  const [drafts, setDrafts] = useState<Record<number, string>>({})
+
+  const setDraft = useCallback((index: number, next: string) => {
+    setDrafts((current) => ({ ...current, [index]: next }))
+  }, [])
+
   const handleChoice = useCallback(
     (index: number, value: string) => {
       const outcome = fillSlot(puzzle, progress, index, value)
       if (!outcome) return
+
+      // ตอบไปแล้วก็ล้างสิ่งที่พิมพ์ค้างของช่องนั้นทิ้ง
+      if (outcome.correct) setDrafts((current) => ({ ...current, [index]: '' }))
 
       /*
        * บันทึกผ่านระบบรางวัลและสถิติของ Part 2 เหมือนการตอบคำถามปกติ
@@ -293,6 +310,19 @@ function PuzzleSession({
                         </button>
                       ))}
                     </div>
+                  ) : null}
+
+                  {/*
+                    ช่องที่ไม่มีตัวเลือกคือช่องที่ต้องพิมพ์คำตอบเอง
+                    ก่อนหน้านี้หน้าจอไม่ได้วาดอะไรเลยในกรณีนี้
+                    ปริศนาระดับยากจึงจะกลายเป็นด่านที่ตอบไม่ได้ทั้งด่าน
+                  */}
+                  {!done && !slot.choices ? (
+                    <NumberPad
+                      value={drafts[index] ?? ''}
+                      onChange={(next) => setDraft(index, next)}
+                      onSubmit={() => handleChoice(index, drafts[index] ?? '')}
+                    />
                   ) : null}
 
                   {!done && slot.hint ? (
