@@ -165,6 +165,180 @@ export const QUESTS: Quest[] = [
   },
 ]
 
+/*
+ * ── ภารกิจของโหมดที่จบในรอบเดียว ─────────────────────────────
+ *
+ * ทุกข้อในกลุ่มนี้วัดจากสมุดสถิติ ซึ่งเก็บค่าสะสมถาวร
+ * จึงต้องเป็นภารกิจถาวรเท่านั้น ห้ามเอาไปใส่ในภารกิจประจำวันเด็ดขาด
+ *
+ * เหตุผล: ภารกิจประจำวันรีเซ็ตด้วยการล้างตัวนับของตัวเอง
+ * แต่สมุดสถิติไม่ได้รีเซ็ตตามไปด้วย เงื่อนไขที่อ่านจากสมุดสถิติ
+ * จึงจะค้างเป็น "สำเร็จแล้ว" ตลอดไปตั้งแต่วันที่ผ่านครั้งแรก
+ * และเด็กจะได้รางวัลประจำวันฟรีทุกวันโดยไม่ต้องทำอะไรเลย
+ *
+ * มีชุดทดสอบบังคับกฎข้อนี้ไว้แล้ว จะได้ไม่พลาดตอนเพิ่มภารกิจใหม่
+ */
+const ARENA_QUESTS: Quest[] = [
+  {
+    id: 'quest-arena-first',
+    title: 'ก้าวแรกในสนามรบ',
+    description: 'ลองลงสนามรบตัวเลข แล้วรอดให้ได้หนึ่งนาที',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'explorer',
+    dialogue: 'สนามรบเปิดแล้วนะ! ไม่ต้องกดยิงเลย แค่เดินหลบให้เก่งพอ',
+    requirements: [
+      { type: 'survivorTime', target: 60, label: 'รอดในสนามรบ 60 วินาที' },
+    ],
+    reward: { exp: 50, coins: 30 },
+  },
+  {
+    id: 'quest-arena-three-minutes',
+    title: 'ยืนหยัดสามนาที',
+    description: 'รอดในสนามรบให้ได้สามนาทีในรอบเดียว',
+    worldId: 'world-1',
+    type: 'challenge',
+    category: 'side',
+    npcId: 'mage',
+    dialogue: 'สามนาทีนี่ไม่ใช่เรื่องเล่น ๆ นะ เลือกสกิลให้ดี ๆ',
+    requirements: [
+      { type: 'survivorTime', target: 180, label: 'รอดในสนามรบ 180 วินาที' },
+    ],
+    reward: { exp: 90, coins: 70 },
+  },
+  {
+    id: 'quest-arena-kills',
+    title: 'กวาดสนามให้เรียบ',
+    description: 'ล้มมอนสเตอร์ในสนามรบรวมกัน 300 ตัว',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'squirrel',
+    requirements: [
+      { type: 'survivorKills', target: 300, label: 'ล้มมอนสเตอร์ 300 ตัว' },
+    ],
+    reward: { exp: 70, coins: 50 },
+  },
+  {
+    id: 'quest-arena-boss',
+    title: 'ล่าบอสห้าตัว',
+    description: 'ล้มบอสในสนามรบให้ได้ห้าตัว',
+    worldId: 'world-1',
+    type: 'challenge',
+    category: 'side',
+    npcId: 'elder',
+    dialogue: 'บอสโผล่ทุกหนึ่งนาที ล้มได้จะมีหีบสมบัติตกให้ด้วยนะ',
+    requirements: [
+      { type: 'survivorBossKills', target: 5, label: 'ล้มบอส 5 ตัว' },
+    ],
+    reward: { exp: 110, coins: 90 },
+  },
+  {
+    id: 'quest-arena-evolve',
+    title: 'ปลุกร่างสมบูรณ์',
+    description: 'ทำให้อาวุธกลายเป็นร่างสมบูรณ์ให้ได้สองแบบ',
+    worldId: 'world-1',
+    type: 'challenge',
+    category: 'side',
+    npcId: 'mage',
+    dialogue:
+      'อาวุธที่อัปจนสุดแล้ว ถ้าเจอหีบสมบัติกับสกิลที่ถูกคู่ จะกลายร่างได้',
+    requirements: [
+      { type: 'survivorEvolutions', target: 2, label: 'ปลุกร่างสมบูรณ์ 2 แบบ' },
+    ],
+    reward: { exp: 130, coins: 110 },
+  },
+  {
+    id: 'quest-duel-win',
+    title: 'ผ่าสมการให้ลงตัว',
+    description: 'ชนะศึกผ่าสมการให้ได้สามครั้ง',
+    worldId: 'world-1',
+    type: 'challenge',
+    category: 'side',
+    npcId: 'elder',
+    dialogue:
+      'เกมนี้ต้องคิดเรื่องตัวประกอบให้ขาด สมการที่หารลงตัวเท่านั้นถึงจะทำดาเมจ',
+    requirements: [
+      { type: 'duelWins', target: 3, label: 'ชนะศึกผ่าสมการ 3 ครั้ง' },
+    ],
+    reward: { exp: 100, coins: 80 },
+  },
+  {
+    id: 'quest-duel-brave',
+    title: 'ไม่ยอมแพ้ง่าย ๆ',
+    description: 'ลงศึกผ่าสมการรวม 10 ตา ไม่ว่าจะแพ้หรือชนะ',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'squirrel',
+    /*
+     * นับตาที่เล่น ไม่ใช่ตาที่ชนะ โดยตั้งใจ
+     * ภารกิจที่นับแต่ชัยชนะจะลงโทษเด็กที่กล้าลองกับคู่ต่อสู้ที่ยากกว่า
+     * ทั้งที่การกล้าลองคือสิ่งที่เราอยากให้เกิดที่สุด
+     */
+    requirements: [
+      { type: 'duelPlays', target: 10, label: 'ลงศึกผ่าสมการ 10 ตา' },
+    ],
+    reward: { exp: 60, coins: 45 },
+  },
+  {
+    id: 'quest-tower-climb',
+    title: 'ไต่หอคอยให้ถึงชั้นแปด',
+    description: 'ขึ้นหอคอยไม่รู้จบให้ถึงชั้น 8',
+    worldId: 'world-1',
+    type: 'challenge',
+    category: 'side',
+    npcId: 'explorer',
+    requirements: [
+      { type: 'towerFloor', target: 8, label: 'ขึ้นถึงชั้น 8' },
+    ],
+    reward: { exp: 85, coins: 65 },
+  },
+  {
+    id: 'quest-perk-invest',
+    title: 'ลงทุนกับพลังถาวร',
+    description: 'ซื้อพลังถาวรของสนามรบรวมกันห้าชั้น',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'mage',
+    dialogue: 'พลังถาวรซื้อครั้งเดียวติดตัวทุกรอบ คุ้มกว่าที่คิดนะ',
+    requirements: [
+      { type: 'perkLevels', target: 5, label: 'ซื้อพลังถาวรรวม 5 ชั้น' },
+    ],
+    reward: { exp: 70, coins: 40 },
+  },
+  {
+    id: 'quest-upgrade-stars',
+    title: 'ช่างตีเหล็กฝึกหัด',
+    description: 'ตีบวกของสวมใส่ให้ได้รวมกันหกดาว',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'elder',
+    dialogue: 'ของชิ้นเก่าไม่ใช่ของทิ้งนะ ตีบวกแล้วใช้ได้ยาวเลย',
+    requirements: [
+      { type: 'upgradeStars', target: 6, label: 'ตีบวกรวม 6 ดาว' },
+    ],
+    reward: { exp: 65, coins: 40 },
+  },
+  {
+    id: 'quest-avatar-team',
+    title: 'หาเพื่อนร่วมทาง',
+    description: 'ปลดล็อกตัวละครให้มีสองตัว',
+    worldId: 'world-1',
+    type: 'practice',
+    category: 'side',
+    npcId: 'squirrel',
+    requirements: [
+      { type: 'ownAvatars', target: 2, label: 'มีตัวละคร 2 ตัว' },
+    ],
+    reward: { exp: 55, coins: 35 },
+  },
+]
+
+
 /**
  * คลังภารกิจประจำวัน ระบบจะสุ่มเลือกมาให้ทุกวัน
  * เก็บแยกจาก QUESTS เพราะความคืบหน้าจะถูกรีเซ็ตเมื่อขึ้นวันใหม่
@@ -233,9 +407,17 @@ export const DAILY_QUESTS: Quest[] = [
     reward: { exp: 30, coins: 15 },
   },
   {
+    /*
+     * ชื่อเดิมคือ "ผจญภัยประจำวัน" และคำอธิบายบอกว่าให้เล่นด่านจบหนึ่งด่าน
+     * แต่เงื่อนไขที่วัดจริงคือตอบถูกห้าข้อ ซึ่งคนละอย่างกัน
+     * เด็กที่อ่านแล้วไปเล่นด่านจนจบจะเห็นภารกิจขึ้นเองตั้งแต่กลางด่าน
+     * หรือแย่กว่านั้นคือเล่นด่านที่มีน้อยข้อแล้วภารกิจไม่ขึ้น
+     * แก้ที่ชื่อกับคำอธิบายให้ตรงกับที่วัด ไม่ใช่แก้ที่การวัด
+     * เพราะ "เล่นจบหนึ่งด่านใดก็ได้" ยังไม่มีวิธีวัดในระบบตอนนี้
+     */
     id: 'daily-stage-1',
-    title: 'ผจญภัยประจำวัน',
-    description: 'เล่นด่านให้จบ 1 ด่านในวันนี้',
+    title: 'อุ่นเครื่องสั้น ๆ ประจำวัน',
+    description: 'ตอบโจทย์ให้ถูก 5 ข้อในวันนี้',
     worldId: 'world-1',
     type: 'daily',
     category: 'daily',
@@ -250,7 +432,7 @@ export const DAILY_QUESTS: Quest[] = [
 /** จำนวนภารกิจประจำวันที่แจกในแต่ละวัน */
 export const DAILY_QUEST_COUNT = 2
 
-export const ALL_QUESTS: Quest[] = [...QUESTS, ...DAILY_QUESTS]
+export const ALL_QUESTS: Quest[] = [...QUESTS, ...ARENA_QUESTS, ...DAILY_QUESTS]
 
 const QUEST_BY_ID = new Map<string, Quest>(
   ALL_QUESTS.map((quest) => [quest.id, quest]),

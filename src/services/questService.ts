@@ -16,6 +16,9 @@ import { getTotalStars } from '../utils/stageSystem'
 import { calculateAccuracy } from '../utils/statistics'
 import { addExp } from '../utils/experience'
 import { addCoins } from './rewardService'
+import { PERKS } from '../data/perks'
+import { recordsOf } from './recordService'
+import { MAX_STARS } from './upgradeService'
 
 /**
  * ระบบภารกิจ ทุกฟังก์ชันเป็น pure function เช่นเดียวกับ rewardService
@@ -80,6 +83,50 @@ export function measureRequirement(
       const stage = player.stageProgress[requirement.stageId]
       return stage?.completed ? 1 : 0
     }
+
+    /*
+     * เงื่อนไขที่อ่านจากสมุดสถิติ ไม่ต้องใช้ตัวนับของภารกิจเลย
+     *
+     * ผลพลอยได้ที่สำคัญ: ภารกิจที่เพิ่มเข้ามาทีหลังจะนับผลงานเก่าให้ด้วย
+     * เด็กที่ล้มบอสไปห้าสิบตัวก่อนภารกิจนี้จะมี ไม่ต้องเริ่มนับใหม่จากศูนย์
+     * ซึ่งถ้าต้องเริ่มใหม่จะรู้สึกเหมือนสิ่งที่ทำไปแล้วไม่ถูกนับ
+     */
+    case 'survivorTime':
+      return recordsOf(player).survivorBestSeconds
+
+    case 'survivorKills':
+      return recordsOf(player).survivorKills
+
+    case 'survivorBossKills':
+      return recordsOf(player).survivorBossKills
+
+    case 'survivorEvolutions':
+      return recordsOf(player).survivorEvolutions.length
+
+    case 'duelWins':
+      return recordsOf(player).duelWins
+
+    case 'duelPlays':
+      return recordsOf(player).duelPlays
+
+    case 'towerFloor':
+      return recordsOf(player).towerBestFloor
+
+    case 'perkLevels':
+      return PERKS.reduce(
+        (sum, perk) =>
+          sum + Math.min(perk.maxLevel, Math.max(0, player.perks?.[perk.id] ?? 0)),
+        0,
+      )
+
+    case 'upgradeStars':
+      return Object.values(player.upgrades ?? {}).reduce(
+        (sum, stars) => sum + Math.min(MAX_STARS, Math.max(0, Math.floor(stars))),
+        0,
+      )
+
+    case 'ownAvatars':
+      return (player.ownedAvatars ?? []).length
 
     default:
       return 0

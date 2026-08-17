@@ -13,6 +13,7 @@ import { useGame } from '../context/useGame'
 import type { Player } from '../types/player'
 import type { StageResult as StageResultData } from '../types/stage'
 import { playSfx } from '../services/audioService'
+import { useMusic } from '../hooks/useMusic'
 import { NotFoundNotice } from './NotFoundNotice'
 
 /** ตรวจสอบข้อมูลที่ส่งมากับ navigation state เพราะผู้เล่นอาจกดรีเฟรชหน้าได้ */
@@ -36,6 +37,18 @@ export function StageResult({ player }: { player: Player }) {
   const { settings, patchPlayer } = useGame()
 
   const result = isStageResult(location.state) ? location.state : null
+
+  /*
+   * เพลงชัยชนะเฉพาะตอนได้สามดาว
+   *
+   * ถ้าเปิดทุกครั้งที่จบด่าน เพลงนี้จะกลายเป็นเพลงธรรมดาที่ได้ยินทุกครั้ง
+   * แล้วมันจะไม่ได้แปลว่าอะไรอีกต่อไป การเก็บไว้ใช้เฉพาะตอนทำได้เต็ม
+   * ทำให้ตัวเพลงเองกลายเป็นรางวัล ไม่ใช่แค่เสียงประกอบหน้าจอ
+   *
+   * ด่านที่ได้หนึ่งหรือสองดาวใช้เพลงเดินทางตามปกติ ซึ่งสื่อว่า
+   * "ยังไปต่อได้" มากกว่าจะสื่อว่าทำได้ไม่ดี
+   */
+  useMusic(result && result.stars >= 3 ? 'victory' : 'adventure')
   const [showConfetti, setShowConfetti] = useState(false)
   const [beatDone, setBeatDone] = useState(false)
 

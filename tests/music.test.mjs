@@ -21,7 +21,9 @@
  *   node tests/music.test.mjs /tmp/logic
  */
 
+import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import { createRequire } from 'module'
 
 const OUT = process.argv[2]
@@ -30,6 +32,7 @@ if (!OUT) {
   process.exit(1)
 }
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const require = createRequire(import.meta.url)
 const THEME = require(path.resolve(OUT, 'audio/theme.js'))
 
@@ -258,6 +261,44 @@ check('scaleNote ขึ้นอ็อกเทฟให้เองเมื่
 
   const negative = THEME.scaleNote(spec, -7, 0)
   equal(low - negative, 12, 'ขั้นติดลบต้องลงอ็อกเทฟ ไม่ใช่พังหรือวนขึ้น')
+})
+
+check('เพลงทุกเพลงที่แต่งไว้ ต้องมีหน้าจอไหนสักหน้าเรียกใช้จริง', () => {
+  /*
+   * ปัญหาแบบเดียวกับคลาส CSS ที่นิยามไว้แต่ไม่มีใครใช้
+   *
+   * เพลงที่ไม่มีใครเรียกจะไม่พัง ไม่มี error ไม่มีคำเตือน
+   * มันแค่ไม่เคยดังเลยตลอดทั้งเกม และไม่มีทางรู้ได้
+   * นอกจากจะไล่เปิดทุกหน้าแล้วตั้งใจฟังว่าเพลงไหนยังไม่เคยได้ยิน
+   *
+   * เหตุการณ์จริงที่ทำให้ต้องมีข้อนี้: ผมแต่งเพลง victory ไว้
+   * แล้วต่อเพลงเข้าหน้าจอครบทุกหน้า ยกเว้นลืมหาที่ให้เพลงนี้
+   * มันจึงอยู่ในโปรเจกต์โดยไม่เคยดังเลย จนกระทั่งมาไล่ตรวจทีหลัง
+   */
+  const files = []
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.tsx?$/.test(entry.name)) files.push(full)
+    }
+  }
+  walk(path.join(ROOT, 'src'))
+
+  const source = files
+    .filter((file) => !file.endsWith(path.join('audio', 'theme.ts')))
+    .map((file) => fs.readFileSync(file, 'utf8'))
+    .join('\n')
+
+  const unused = THEME.TRACK_IDS.filter(
+    (id) => !new RegExp(`useMusic\\([^)]*'${id}'`).test(source),
+  )
+
+  assert(
+    unused.length === 0,
+    `แต่งไว้แต่ไม่มีหน้าไหนเรียกใช้: ${unused.join(', ')}` +
+      ' — เพลงเหล่านี้จะไม่เคยดังเลยตลอดทั้งเกม',
+  )
 })
 
 check('midiToFreq ตรงกับค่ามาตรฐาน', () => {

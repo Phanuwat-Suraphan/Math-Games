@@ -17,6 +17,25 @@ export type QuestRequirementType =
   | 'bestStreak'
   | 'collectCoins'
   | 'earnStars'
+  /*
+   * เงื่อนไขที่วัดจากสมุดสถิติ
+   *
+   * ต่างจากกลุ่มข้างบนตรงที่ไม่ต้องมีตัวนับของภารกิจเอง
+   * เพราะสมุดสถิติเก็บค่าสะสมไว้ให้แล้ว การวัดจึงเป็นการอ่านค่าตรง ๆ
+   * ข้อดีที่สำคัญกว่านั้นคือ ภารกิจที่เพิ่มทีหลังจะนับผลงานที่เด็กทำไว้แล้วด้วย
+   * ไม่ใช่เริ่มนับศูนย์ทั้งที่เคยล้มบอสไปห้าสิบตัวแล้ว
+   */
+  | 'survivorTime'
+  | 'survivorKills'
+  | 'survivorBossKills'
+  | 'survivorEvolutions'
+  | 'duelWins'
+  | 'duelPlays'
+  | 'towerFloor'
+  /* เงื่อนไขที่วัดจากของที่สะสมไว้ */
+  | 'perkLevels'
+  | 'upgradeStars'
+  | 'ownAvatars'
 
 export interface QuestRequirement {
   type: QuestRequirementType

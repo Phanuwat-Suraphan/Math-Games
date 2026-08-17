@@ -49,6 +49,8 @@ const PERKS = load('data/perks')
 const WEAPONS = load('survivor/weapons')
 const ITEMS = load('data/items')
 const UP = load('services/upgradeService')
+const QUESTS = load('data/quests')
+const QS = load('services/questService')
 
 let passed = 0
 const failures = []
@@ -214,9 +216,16 @@ function maxedPlayer() {
     statistics[key] = { attempts: 50, correct: 50, accuracy: 100 }
   }
 
+  /*
+   * ตีบวกของทุกชิ้นจนเต็ม ไม่ใช่แค่ชิ้นเดียว
+   *
+   * ตอนแรกผมใส่แค่ชิ้นเดียวแล้วเงื่อนไข "ตีบวกรวมหกดาว" ก็แตะไม่ถึง
+   * ซึ่งชุดทดสอบรายงานว่าเป็นภารกิจที่ทำไม่ได้ ทั้งที่ของจริงทำได้สบาย
+   * ตัวอย่างผู้เล่นที่ควรแปลว่า "ทำทุกอย่างจนสุดแล้ว" ต้องสุดจริงทุกช่อง
+   * ไม่งั้นมันจะรายงานว่าของที่ใช้ได้จริงนั้นใช้ไม่ได้
+   */
   const upgrades = {}
-  const firstItem = ITEMS.ITEMS[0]
-  upgrades[firstItem.id] = UP.MAX_STARS
+  for (const item of ITEMS.ITEMS) upgrades[item.id] = UP.MAX_STARS
 
   const perks = {}
   for (const perk of PERKS.PERKS) perks[perk.id] = perk.maxLevel
@@ -335,7 +344,122 @@ check('ถ้วยของสนามรบต้องตอบสนอง�
   equal(moved, before.length, 'ถ้วยสนามรบทุกใบต้องขยับหลังเล่นจบหนึ่งรอบ')
 })
 
-console.log(`ผ่าน ${passed} ข้อ · ถ้วยรางวัล ${ACH.ACHIEVEMENTS.length} ใบ ใน ${ACH.CATEGORY_INFO.length} หมวด`)
+/* ── ภารกิจที่วัดจากสมุดสถิติ ─────────────────────────────── */
+
+/**
+ * เงื่อนไขที่อ่านค่าสะสมจากสมุดสถิติหรือของที่สะสมไว้
+ * ค่าพวกนี้ไม่เคยลดลง และไม่รีเซ็ตตอนขึ้นวันใหม่
+ */
+const CUMULATIVE_TYPES = [
+  'survivorTime',
+  'survivorKills',
+  'survivorBossKills',
+  'survivorEvolutions',
+  'duelWins',
+  'duelPlays',
+  'towerFloor',
+  'perkLevels',
+  'upgradeStars',
+  'ownAvatars',
+]
+
+check('ภารกิจประจำวันต้องไม่ใช้เงื่อนไขที่วัดจากค่าสะสม', () => {
+  /*
+   * กับดักที่ข้อนี้ดักไว้
+   *
+   * ภารกิจประจำวันรีเซ็ตด้วยการลบตัวนับของตัวเองทิ้งตอนขึ้นวันใหม่
+   * แต่สมุดสถิติไม่ได้ถูกลบตามไปด้วย เพราะเป็นสถิติถาวรของผู้เล่น
+   *
+   * ถ้าเอาเงื่อนไขที่อ่านจากสมุดสถิติมาใส่ในภารกิจประจำวัน
+   * มันจะค้างเป็น "สำเร็จแล้ว" ตลอดไปตั้งแต่วันที่ผ่านครั้งแรก
+   * แล้วเด็กจะกดรับรางวัลประจำวันฟรีทุกวันโดยไม่ต้องทำอะไรเลย
+   * ซึ่งไม่มีอะไรฟ้อง เพราะบนหน้าจอมันดูเหมือนภารกิจที่สำเร็จตามปกติ
+   */
+  const offenders = []
+  for (const quest of QUESTS.DAILY_QUESTS) {
+    for (const requirement of quest.requirements) {
+      if (CUMULATIVE_TYPES.includes(requirement.type)) {
+        offenders.push(`${quest.id} ใช้ ${requirement.type}`)
+      }
+    }
+  }
+  equal(
+    offenders.length,
+    0,
+    `ภารกิจประจำวันใช้เงื่อนไขค่าสะสม: ${offenders.join(', ')}` +
+      ' — ภารกิจแบบนี้จะสำเร็จค้างตลอดไปและแจกรางวัลฟรีทุกวัน',
+  )
+})
+
+check('เงื่อนไขทุกชนิดที่ภารกิจใช้ ต้องมีวิธีวัดจริง', () => {
+  /*
+   * ชนิดที่ไม่มีวิธีวัดจะตกไปที่ default แล้วคืนศูนย์เสมอ
+   * ภารกิจนั้นจะไม่มีวันสำเร็จ และไม่มี error ให้เห็นเลยแม้แต่นิดเดียว
+   */
+  const player = maxedPlayer()
+  const broken = []
+
+  for (const quest of QUESTS.ALL_QUESTS) {
+    quest.requirements.forEach((requirement, index) => {
+      if (!CUMULATIVE_TYPES.includes(requirement.type)) return
+      const progress = { questId: quest.id, counters: [], completed: false, claimed: false }
+      const value = QS.measureRequirement(player, progress, requirement, index)
+      if (!(value > 0)) broken.push(`${quest.id} · ${requirement.type} วัดได้ ${value}`)
+    })
+  }
+
+  equal(
+    broken.length,
+    0,
+    `เงื่อนไขที่วัดไม่ได้: ${broken.join(', ')}` +
+      ' — เงื่อนไขที่ไม่มีวิธีวัดจะคืนศูนย์เสมอ ภารกิจจึงไม่มีวันสำเร็จ',
+  )
+})
+
+check('ภารกิจของโหมดใหม่เริ่มจากยังไม่สำเร็จ และสำเร็จได้เมื่อเล่นจริง', () => {
+  const newPlayer = fresh()
+  const maxed = maxedPlayer()
+
+  const cumulative = QUESTS.ALL_QUESTS.filter((quest) =>
+    quest.requirements.some((r) => CUMULATIVE_TYPES.includes(r.type)),
+  )
+  assert(cumulative.length >= 8, `ควรมีภารกิจของโหมดใหม่หลายข้อ แต่มีแค่ ${cumulative.length}`)
+
+  for (const quest of cumulative) {
+    const empty = { questId: quest.id, counters: [], completed: false, claimed: false }
+    assert(
+      !QS.isQuestComplete(newPlayer, quest, empty),
+      `${quest.id} สำเร็จตั้งแต่ผู้เล่นยังไม่ได้เล่นอะไรเลย`,
+    )
+    assert(
+      QS.isQuestComplete(maxed, quest, empty),
+      `${quest.id} ยังไม่สำเร็จแม้ผู้เล่นทำทุกอย่างจนสุดแล้ว ซึ่งแปลว่าแตะไม่ถึง`,
+    )
+  }
+})
+
+check('รหัสภารกิจต้องไม่ซ้ำกัน', () => {
+  const ids = QUESTS.ALL_QUESTS.map((quest) => quest.id)
+  equal(new Set(ids).size, ids.length, `มีรหัสภารกิจซ้ำ: ${ids.filter((id, i) => ids.indexOf(id) !== i)}`)
+})
+
+check('ภารกิจทุกข้อมีชื่อ คำอธิบาย เงื่อนไข และรางวัล', () => {
+  for (const quest of QUESTS.ALL_QUESTS) {
+    assert(quest.title && quest.title.length > 0, `${quest.id} ไม่มีชื่อ`)
+    assert(quest.description && quest.description.length > 0, `${quest.id} ไม่มีคำอธิบาย`)
+    assert(quest.requirements.length > 0, `${quest.id} ไม่มีเงื่อนไขเลย จะสำเร็จทันที`)
+    assert(quest.reward.exp > 0 || quest.reward.coins > 0, `${quest.id} ไม่มีรางวัล`)
+    for (const requirement of quest.requirements) {
+      assert(requirement.target > 0, `${quest.id} มีเงื่อนไขที่เป้าหมายเป็นศูนย์`)
+      assert(requirement.label.length > 0, `${quest.id} มีเงื่อนไขที่ไม่มีคำอธิบาย`)
+    }
+  }
+})
+
+console.log(
+  `ผ่าน ${passed} ข้อ · ถ้วยรางวัล ${ACH.ACHIEVEMENTS.length} ใบ ใน ${ACH.CATEGORY_INFO.length} หมวด` +
+    ` · ภารกิจ ${QUESTS.ALL_QUESTS.length} ข้อ`,
+)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
   failures.forEach((line, i) => console.log(`  ${i + 1}. ${line}`))
