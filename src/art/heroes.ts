@@ -468,6 +468,240 @@ function adventurer(): string {
   )
 }
 
+/** นักกีฬา — ผ้าคาดหัวและเหรียญรางวัล */
+function athlete(): string {
+  const p = 'hat'
+  return hero(
+    p,
+    '#f43f5e',
+    '#9f1239',
+    `
+    ${verticalGradient(`${p}-band`, '#fb7185', '#be123c')}
+    ${sphereGradient(`${p}-hair`, '#3f3f46', '#27272a', '#111113')}
+    ${sphereGradient(`${p}-medal`, '#fef08a', '#facc15', '#a16207')}`,
+    `
+    ${body(p, '#9f1239')}
+    ${face()}
+
+    <!-- แถบสีขาวพาดเสื้อ เป็นลายของชุดกีฬาที่อ่านออกทันทีแม้ภาพเล็ก -->
+    <path d="M38 64 L44 63 L36 96 L30 96 Z" fill="#fff" opacity=".85"/>
+    <path d="M56 63 L62 64 L70 96 L64 96 Z" fill="#fff" opacity=".55"/>
+
+    <!-- เหรียญห้อยคอ แกว่งช้ากว่าลำตัว จึงดูมีน้ำหนักจริง -->
+    ${sway(
+      `<path d="M44 62 L50 76 L56 62" stroke="#fbbf24" stroke-width="1.8" fill="none"/>
+       <circle cx="50" cy="79" r="5.5" fill="url(#${p}-medal)"/>
+       ${specular(48, 77, 1.8, 1.2, -25, 0.7)}`,
+      3.4,
+      3.2,
+      50,
+      62,
+    )}
+
+    ${sway(
+      `<path d="M29 24 Q34 11 50 11 Q66 11 71 24 Q60 17 50 19 Q40 17 29 24 Z"
+         fill="url(#${p}-hair)"/>
+       <!-- ผ้าคาดหัวมีปลายสะบัด บอกว่าตัวละครนี้กำลังเคลื่อนไหวตลอด -->
+       <!-- คาดต่ำลงมาชิดหน้าผาก เพื่อให้เห็นผมด้านบนชัดว่าเป็นผม ไม่ใช่หมวก -->
+       <path d="M28 29 Q50 22 72 29 L72 33 Q50 26 28 33 Z" fill="url(#${p}-band)"/>
+       <path d="M27 28 Q20 32 17 40 Q25 36 29 31 Z" fill="#be123c">
+         <animate attributeName="d"
+           values="M27 28 Q20 32 17 40 Q25 36 29 31 Z;
+                   M27 28 Q18 30 13 36 Q23 35 29 31 Z;
+                   M27 28 Q20 32 17 40 Q25 36 29 31 Z"
+           dur="2.6s" repeatCount="indefinite"/>
+       </path>
+       ${specular(40, 15, 5, 2.4, -28, 0.3)}`,
+      5.2,
+      2.6,
+      50,
+      58,
+    )}`,
+  )
+}
+
+/** นักดนตรี — หมวกเบเรต์และตัวโน้ตลอย */
+function musician(): string {
+  const p = 'hmu'
+  return hero(
+    p,
+    '#0ea5e9',
+    '#075985',
+    `
+    ${sphereGradient(`${p}-beret`, '#38bdf8', '#0284c7', '#0c4a6e')}
+    ${sphereGradient(`${p}-hair`, '#7c2d12', '#5b2410', '#2c1207')}
+    <filter id="${p}-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`,
+    `
+    ${body(p, '#075985')}
+    ${face()}
+
+    <!-- ขลุ่ยถือเฉียง แกว่งเบา ๆ เหมือนกำลังจะยกขึ้นเป่า -->
+    ${sway(
+      `<path d="M30 84 L64 70" stroke="#a16207" stroke-width="4.5" stroke-linecap="round"/>
+       <path d="M31 83 L63 70" stroke="#d97706" stroke-width="1.4" opacity=".7"/>
+       <circle cx="40" cy="80" r="1.3" fill="#3b1a06"/>
+       <circle cx="47" cy="77" r="1.3" fill="#3b1a06"/>
+       <circle cx="54" cy="74" r="1.3" fill="#3b1a06"/>`,
+      3.2,
+      3,
+      30,
+      84,
+    )}
+
+    <!--
+      ตัวโน้ตลอยขึ้นข้างตัว ไม่ใช่ทับลำตัว
+      ครั้งแรกวางไว้ที่หน้าอกซึ่งเป็นสีฟ้าเหมือนกัน เรนเดอร์ออกมาแล้วมองไม่เห็นเลย
+      ต้องย้ายออกมาอยู่บนพื้นหลังเข้ม และเพิ่มขนาดจึงจะอ่านออกว่าเป็นเสียงเพลง
+    -->
+    ${mote(84, 66, 3.4, '#7dd3fc', 3.6, 0)}
+    ${mote(90, 56, 2.7, '#bae6fd', 4.2, 1.1)}
+    ${mote(85, 46, 2.1, '#e0f2fe', 4.8, 2.2)}
+
+    ${sway(
+      `<path d="M30 25 Q34 12 50 12 Q66 12 70 25 Q60 18 50 20 Q40 18 30 25 Z"
+         fill="url(#${p}-hair)"/>
+       <!-- หมวกเบเรต์เอียงข้างหนึ่ง มีจุกเล็กที่ปลาย -->
+       <path d="M26 24 Q30 10 52 10 Q74 10 72 22 Q50 16 26 24 Z"
+         fill="url(#${p}-beret)"/>
+       <circle cx="70" cy="12" r="3" fill="#0369a1"/>
+       ${flicker(
+         `<circle cx="70" cy="12" r="1.6" fill="#e0f2fe" filter="url(#${p}-glow)"/>`,
+         2.8,
+         0.5,
+       )}
+       ${specular(40, 15, 5, 2.6, -28, 0.34)}`,
+      5.2,
+      3.2,
+      50,
+      58,
+    )}`,
+  )
+}
+
+/** หมอยา — หม้อยาและใบไม้ */
+function healer(): string {
+  const p = 'hh'
+  return hero(
+    p,
+    '#16a34a',
+    '#14532d',
+    `
+    ${sphereGradient(`${p}-pot`, '#a3a3a3', '#57534e', '#292524')}
+    ${sphereGradient(`${p}-hair`, '#166534', '#14532d', '#052e16')}
+    ${verticalGradient(`${p}-leaf`, '#86efac', '#16a34a')}
+    <filter id="${p}-glow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur stdDeviation="2.4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`,
+    `
+    ${body(p, '#14532d')}
+    ${face()}
+
+    <!-- หม้อยาอุ้มไว้หน้าลำตัว จึงทอดเงาลงบนเสื้อ -->
+    <ellipse cx="70" cy="86" rx="11" ry="7" fill="#000" opacity=".26"
+      filter="url(#heroSoft)"/>
+    ${sway(
+      `<path d="M60 78 Q60 92 70 92 Q80 92 80 78 Z" fill="url(#${p}-pot)"/>
+       <ellipse cx="70" cy="78" rx="10" ry="3.4" fill="#78716c"/>
+       <ellipse cx="70" cy="78" rx="7.5" ry="2.2" fill="#4ade80" opacity=".85"/>
+       ${specular(65, 83, 2, 3.4, -22, 0.42)}
+       <!-- ไอยาลอยขึ้นจากปากหม้อ เป็นสัญญาณว่ายากำลังเดือด -->
+       ${mote(68, 72, 1.7, '#bbf7d0', 3.4, 0)}
+       ${mote(73, 68, 1.3, '#86efac', 4, 1.3)}`,
+      3.4,
+      3.4,
+      70,
+      80,
+    )}
+
+    ${sway(
+      `<path d="M28 26 Q32 11 50 11 Q68 11 72 26 Q60 17 50 19 Q40 17 28 26 Z"
+         fill="url(#${p}-hair)"/>
+       <!-- ใบไม้ทัดหู เรืองแสงอ่อน ๆ บอกว่าเป็นสมุนไพรวิเศษ -->
+       <path d="M68 22 Q78 14 82 22 Q76 30 68 22 Z" fill="url(#${p}-leaf)"
+         filter="url(#${p}-glow)"/>
+       <path d="M69 22 Q76 20 81 22" stroke="#14532d" stroke-width="1"
+         fill="none" opacity=".7"/>
+       ${specular(40, 15, 5, 2.6, -28, 0.32)}`,
+      5.2,
+      2.6,
+      50,
+      58,
+    )}`,
+  )
+}
+
+/** นักดาราศาสตร์ — กล้องส่องดาวและดาวลอยรอบตัว */
+function astronomer(): string {
+  const p = 'has'
+  return hero(
+    p,
+    '#6d28d9',
+    '#3b0764',
+    `
+    ${verticalGradient(`${p}-tube`, '#e2e8f0', '#475569')}
+    ${sphereGradient(`${p}-hair`, '#1e1b4b', '#171436', '#0b0a1c')}
+    ${sphereGradient(`${p}-lens`, '#c7d2fe', '#818cf8', '#3730a3')}
+    <filter id="${p}-glow" x="-90%" y="-90%" width="280%" height="280%">
+      <feGaussianBlur stdDeviation="2.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`,
+    `
+    ${body(p, '#3b0764')}
+    ${face()}
+
+    <!-- ดาวบนเสื้อคลุม บอกอาชีพได้แม้ตอนภาพย่อจนเห็นแค่ลำตัว -->
+    ${flicker(`<circle cx="38" cy="74" r="1.7" fill="#fde68a"/>`, 3.2, 0.45)}
+    ${flicker(`<circle cx="60" cy="82" r="1.3" fill="#fde68a"/>`, 4.1, 0.4)}
+    ${flicker(`<circle cx="47" cy="88" r="1.1" fill="#fde68a"/>`, 2.7, 0.5)}
+
+    <!-- กล้องส่องดาวเงยขึ้นฟ้า แกว่งช้าเพราะเป็นของหนัก -->
+    ${sway(
+      `<!--
+         ถือด้วยมือ ไม่มีขาตั้ง
+         ตอนแรกใส่ขาตั้งสามขาไว้ แต่พอเรนเดอร์ออกมาดู มันอ่านเป็นไม้สองอัน
+         วางเกะกะอยู่ข้างตัว ไม่ได้อ่านเป็นขาตั้งกล้องเลย
+         ของที่อธิบายตัวเองไม่ได้ในภาพขนาดนี้ ตัดออกดีกว่าเก็บไว้
+       -->
+       <g transform="rotate(-32 26 74)">
+         <rect x="14" y="70" width="30" height="9" rx="4.5" fill="url(#${p}-tube)"/>
+         <rect x="14" y="72" width="30" height="2" rx="1" fill="#fff" opacity=".45"/>
+         <circle cx="45" cy="74" r="5.5" fill="url(#${p}-lens)" filter="url(#${p}-glow)">
+           <animate attributeName="r" values="5.5;6.5;5.5" dur="2.6s" repeatCount="indefinite"/>
+         </circle>
+         ${specular(43, 72, 1.7, 1.2, -25, 0.7)}
+       </g>`,
+      2.6,
+      4.6,
+      26,
+      86,
+    )}
+
+    ${sway(
+      `<path d="M28 26 Q32 11 50 11 Q68 11 72 26 Q60 17 50 19 Q40 17 28 26 Z"
+         fill="url(#${p}-hair)"/>
+       <!-- ดาวดวงเล็กโคจรรอบหัว เป็นของประจำตัวที่ไม่มีใครมี -->
+       ${motes(
+         [
+           [30, 18, 1.5],
+           [72, 20, 1.2],
+           [50, 6, 1.7],
+         ],
+         '#fde68a',
+         4.4,
+       )}
+       ${specular(40, 15, 5, 2.6, -28, 0.32)}`,
+      5.2,
+      2.6,
+      50,
+      58,
+    )}`,
+  )
+}
+
 const HERO_ART: Record<string, () => string> = {
   warrior,
   mage,
@@ -475,6 +709,10 @@ const HERO_ART: Record<string, () => string> = {
   inventor,
   scientist,
   adventurer,
+  athlete,
+  musician,
+  healer,
+  astronomer,
 }
 
 /** ภาพของอวตารหนึ่งตัว คืนภาพสำรองถ้ายังไม่มีของตัวนั้น */

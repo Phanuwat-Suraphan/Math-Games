@@ -16,7 +16,17 @@
  * ซึ่งขัดกับทิศทางของเกมทั้งเกมที่พยายามให้รางวัลกับการกล้าเข้าไปสู้
  */
 
-export type UltimateKind = 'sweep' | 'meteor' | 'dash' | 'shield' | 'freeze' | 'harvest'
+export type UltimateKind =
+  | 'sweep'
+  | 'meteor'
+  | 'dash'
+  | 'shield'
+  | 'freeze'
+  | 'harvest'
+  | 'echo'
+  | 'gravity'
+  | 'mend'
+  | 'blitz'
 
 export interface Ultimate {
   id: string
@@ -102,6 +112,61 @@ export const ULTIMATES: Record<string, Ultimate> = {
     icon: 'coin',
     cost: BASE_COST,
     duration: 0,
+  },
+
+  /*
+   * สี่ตัวล่างนี้เพิ่มทีหลัง เพื่อให้มีวิธีเล่นให้ลองมากขึ้น
+   *
+   * ยึดหลักเดิมทุกข้อ: ต้องช่วยตอนกำลังจะแย่ได้จริง
+   * และต้องไม่ซ้ำกับของที่มีอยู่แล้วในแง่ของ "แก้ปัญหาอะไร"
+   *   คลื่นเสียง  แผ่ไปไกลกว่าตวัดพายุมาก แต่แรงน้อยกว่า
+   *   แรงโน้มถ่วง รวบมอนที่กระจายอยู่มาไว้ที่เดียวแล้วเก็บทีเดียว
+   *   ยาฟื้นฟู    ตัวเดียวที่ซื้อ "เวลา" ตรง ๆ ไม่ได้ซื้อด้วยการฆ่า
+   *   รัวดาบ     เก็บตัวที่ประชิดที่สุดทีละตัว เหมาะกับตอนโดนไล่ติดหลัง
+   */
+  musician: {
+    id: 'musician',
+    name: 'คลื่นเสียงกัมปนาท',
+    description: 'ปล่อยคลื่นเสียงเป็นวงขยายออกไปเรื่อย ๆ ตีทุกตัวที่คลื่นผ่าน',
+    short: 'กวาดได้ไกลทั้งสนาม',
+    kind: 'echo',
+    color: '#38bdf8',
+    icon: 'note',
+    cost: BASE_COST,
+    duration: 2.4,
+  },
+  astronomer: {
+    id: 'astronomer',
+    name: 'แรงโน้มถ่วง',
+    description: 'ดูดมอนทั้งสนามเข้ามารวมกัน แล้วระเบิดใส่ทีเดียว',
+    short: 'รวบทั้งฝูงมาเก็บทีเดียว',
+    kind: 'gravity',
+    color: '#a78bfa',
+    icon: 'star',
+    cost: BASE_COST + 6,
+    duration: 2,
+  },
+  healer: {
+    id: 'healer',
+    name: 'ยาฟื้นฟู',
+    description: 'ฟื้นเลือดจนเต็ม ผลักมอนรอบตัวออกไป และอยู่ยงสักพัก',
+    short: 'ฟื้นเลือดเต็มและรอดจากวงล้อม',
+    kind: 'mend',
+    color: '#4ade80',
+    icon: 'heart',
+    cost: BASE_COST + 4,
+    duration: 0,
+  },
+  athlete: {
+    id: 'athlete',
+    name: 'รัวหมัดสายฟ้า',
+    description: 'พุ่งเข้าใส่ตัวที่ใกล้ที่สุดรัว ๆ ตีแรงมากทุกครั้ง',
+    short: 'เก็บตัวที่ประชิดทีละตัว',
+    kind: 'blitz',
+    color: '#fb7185',
+    icon: 'bolt',
+    cost: BASE_COST - 4,
+    duration: 1.8,
   },
 }
 

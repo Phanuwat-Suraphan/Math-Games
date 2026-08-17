@@ -817,6 +817,160 @@ export function step(world: WorldState, input: Input): WorldState {
     }
 
     if (ultSpec.kind === 'harvest' && justActivated) harvestNow = true
+
+    /*
+     * คลื่นเสียง — วงขยายออกไปเรื่อย ๆ ตีเฉพาะตัวที่อยู่ในขอบวงตอนนั้น
+     *
+     * ตีเฉพาะขอบวง ไม่ใช่ทั้งวงเต็ม เพราะถ้าตีทั้งวงเต็มทุกจังหวะ
+     * ตัวที่อยู่ใกล้จะโดนซ้ำทุกระลอก ซึ่งกลายเป็นตวัดพายุที่แรงกว่าเดิม
+     * การตีเฉพาะขอบทำให้มันเป็น "คลื่นที่วิ่งผ่าน" จริง ๆ
+     * และเป็นเหตุผลว่าทำไมมันแผ่ไกลได้แต่แรงต่อตัวน้อยกว่า
+     */
+    if (ultSpec.kind === 'echo' && ultPulse(0.28)) {
+      const progress = Math.min(1, ultElapsedAfter / Math.max(0.1, ultSpec.duration))
+      const outer = (110 + progress * 520) * stats.rangeMultiplier
+      const inner = Math.max(0, outer - 130)
+
+      for (const enemy of enemies) {
+        if (enemy.hp <= 0) continue
+        const gap = distance(enemy.pos, player.pos)
+        if (gap > outer + enemy.radius || gap < inner) continue
+        hurt(enemy, 72 * stats.damageMultiplier, hits)
+        enemy.slowFor = Math.max(enemy.slowFor, 1.2)
+      }
+
+      effects.push({
+        id: nextId,
+        kind: 'blast',
+        pos: { ...player.pos },
+        radius: outer,
+        life: 0.32,
+        maxLife: 0.32,
+      })
+      nextId += 1
+      sounds.push('zap')
+    }
+
+    /*
+     * แรงโน้มถ่วง — ดูดมอนเข้าหาตัวตลอดเวลาที่ออกฤทธิ์ แล้วระเบิดตอนจบ
+     *
+     * ระหว่างดูดไม่ทำความเสียหายเลย ตั้งใจให้เป็นแบบนั้น
+     * เพราะพลังของมันคือการ "จัดตำแหน่ง" ไม่ใช่การตี
+     * เด็กที่กดตอนมอนกระจายอยู่ทั่วสนามจะได้ผลมากกว่าเด็กที่กดตอนโดนรุมอยู่แล้ว
+     * ซึ่งเป็นการตัดสินใจที่ต้องคิด ไม่ใช่กดทันทีที่ชาร์จเต็ม
+     *
+     * ตอนดูดผู้เล่นยังโดนตีได้ตามปกติ จึงมีความเสี่ยงจริงถ้ากดผิดจังหวะ
+     */
+    if (ultSpec.kind === 'gravity') {
+      if (ultimateOn) {
+        for (const enemy of enemies) {
+          if (enemy.hp <= 0) continue
+          const away = normalize({
+            x: player.pos.x - enemy.pos.x,
+            y: player.pos.y - enemy.pos.y,
+          })
+          const pull = 240 * dt
+          enemy.pos = {
+            x: clamp(enemy.pos.x + away.x * pull, 0, ARENA_WIDTH),
+            y: clamp(enemy.pos.y + away.y * pull, 0, ARENA_HEIGHT),
+          }
+        }
+      }
+
+      // ระเบิดครั้งเดียวตอนหมดเวลา ซึ่งเป็นตอนที่มอนกองรวมกันแน่นที่สุดพอดี
+      if (previousActive > 0 && ultimate.activeFor <= 0) {
+        const radius = 260
+        for (const enemy of enemies) {
+          if (enemy.hp <= 0) continue
+          if (distance(enemy.pos, player.pos) > radius + enemy.radius) continue
+          hurt(enemy, 260 * stats.damageMultiplier, hits)
+        }
+        effects.push({
+          id: nextId,
+          kind: 'blast',
+          pos: { ...player.pos },
+          radius,
+          life: 0.5,
+          maxLife: 0.5,
+        })
+        nextId += 1
+        sounds.push('explode')
+        addShake(0.8)
+      }
+    }
+
+    /*
+     * ยาฟื้นฟู — ออกฤทธิ์ครั้งเดียวตอนกด
+     *
+     * เป็นสกิลเดียวที่ซื้อ "เวลา" ตรง ๆ ไม่ได้ซื้อด้วยการฆ่ามอน
+     * จึงต้องผลักมอนออกด้วย ไม่ใช่เติมเลือดอย่างเดียว
+     * เพราะจังหวะที่เลือดจะหมดคือจังหวะที่ถูกรุมอยู่เสมอ
+     * ถ้าเติมเลือดแล้วยังยืนอยู่กลางวงเดิม เลือดที่เพิ่งเติมจะหายไปในไม่กี่วินาที
+     * ซึ่งเท่ากับกดสกิลทิ้งเปล่า ๆ (บทเรียนเดียวกับขนนกฟีนิกซ์)
+     */
+    if (ultSpec.kind === 'mend' && justActivated) {
+      const PUSH = 200
+      for (const enemy of enemies) {
+        if (enemy.hp <= 0) continue
+        if (distance(enemy.pos, player.pos) > PUSH) continue
+        const away = normalize({
+          x: enemy.pos.x - player.pos.x,
+          y: enemy.pos.y - player.pos.y,
+        })
+        const dirX = away.x === 0 && away.y === 0 ? 0 : away.x
+        const dirY = away.x === 0 && away.y === 0 ? -1 : away.y
+        enemy.pos = {
+          x: clamp(player.pos.x + dirX * PUSH, 0, ARENA_WIDTH),
+          y: clamp(player.pos.y + dirY * PUSH, 0, ARENA_HEIGHT),
+        }
+        enemy.slowFor = Math.max(enemy.slowFor, 1.5)
+      }
+
+      effects.push({
+        id: nextId,
+        kind: 'blast',
+        pos: { ...player.pos },
+        radius: PUSH,
+        life: 0.5,
+        maxLife: 0.5,
+      })
+      nextId += 1
+      sounds.push('heal')
+    }
+
+    /*
+     * รัวหมัดสายฟ้า — ตีตัวที่ใกล้ที่สุดซ้ำ ๆ ทีละตัว
+     *
+     * เล็งตัวที่ใกล้ที่สุดใหม่ทุกจังหวะ ไม่ใช่ล็อกตัวเดียวตั้งแต่แรก
+     * เพราะตัวที่อันตรายที่สุดคือตัวที่ประชิดอยู่ตอนนี้ ไม่ใช่ตัวที่ประชิดเมื่อวินาทีก่อน
+     * ผลคือมันเก็บตัวที่ไล่ติดหลังได้ทีละตัว ซึ่งเป็นสถานการณ์ที่สกิลอื่นแก้ไม่ตรงจุด
+     */
+    if (ultSpec.kind === 'blitz' && ultPulse(0.22)) {
+      let target: EnemyEntity | undefined
+      let best = Infinity
+      for (const enemy of enemies) {
+        if (enemy.hp <= 0) continue
+        const gap = distance(enemy.pos, player.pos)
+        if (gap < best) {
+          best = gap
+          target = enemy
+        }
+      }
+
+      if (target) {
+        hurt(target, 300 * stats.damageMultiplier, hits)
+        effects.push({
+          id: nextId,
+          kind: 'slash',
+          pos: { ...target.pos },
+          radius: 70,
+          life: 0.22,
+          maxLife: 0.22,
+        })
+        nextId += 1
+        sounds.push('crit')
+      }
+    }
   }
 
   if (justActivated) {
