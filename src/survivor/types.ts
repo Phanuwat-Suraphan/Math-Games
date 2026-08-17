@@ -118,13 +118,21 @@ export interface EnemyShot {
  */
 export interface Effect {
   id: number
-  kind: 'slash' | 'blast' | 'bolt'
+  kind: 'slash' | 'blast' | 'bolt' | 'spark'
   pos: Vec
   /** ปลายทางของสายฟ้า ใช้เฉพาะ bolt */
   to?: Vec
   radius: number
   life: number
   maxLife: number
+  /**
+   * สีของเอฟเฟกต์ ใช้กับประกายตอนตีโดน
+   *
+   * ต้องมีสี เพราะประกายต้องเป็นสีของอาวุธที่ตี
+   * ถ้าประกายของทุกอาวุธเป็นสีเดียวกัน เด็กที่ถืออาวุธสี่ชิ้นพร้อมกัน
+   * จะแยกไม่ออกว่าชิ้นไหนกำลังทำงานอยู่ ซึ่งเป็นข้อมูลที่ใช้เลือกสกิลได้
+   */
+  color?: string
 }
 
 export interface ProjectileEntity {
@@ -389,6 +397,14 @@ export interface WorldState {
   shake: number
   /** เสียงที่ต้องเล่นในก้าวนี้ หน้าจออ่านแล้วทิ้ง */
   sounds: SoundCue[]
+  /**
+   * แสงวาบเต็มจอ ใช้กับเหตุการณ์ใหญ่อย่างสกิลวิเศษและบอสล้ม
+   *
+   * เก็บความเข้มกับสีไว้ในสถานะเกม ด้วยเหตุผลเดียวกับแรงสั่นของจอ
+   * คือเหตุการณ์ที่ทำให้เกิดมันอยู่ในเครื่องยนต์ทั้งหมด
+   * และเกิดขึ้นในเฟรมเดียว ถ้าไม่บันทึกไว้ หน้าจอจะไม่มีทางรู้
+   */
+  flash: { color: string; power: number }
   gems: GemEntity[]
   pickups: PickupEntity[]
   notices: Notice[]

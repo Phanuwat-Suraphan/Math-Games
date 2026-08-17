@@ -61,6 +61,23 @@ export const MAX_STEPS_PER_FRAME = 5
  * ส่วนตอนมอนตายพร้อมกันสิบตัว จะได้เศษราว 60 ชิ้น จึงไม่เคยชนเพดานจริง
  * เพดานมีไว้กันกรณีสุดขั้ว เช่นระเบิดทั้งสนามตอนมอนแน่นที่สุด
  */
+/**
+ * สีประกายตอนตีโดน แยกตามอาวุธ
+ *
+ * ต้องตรงกับสีที่หน้าจอใช้วาดกระสุนของอาวุธนั้น
+ * ถ้าไม่ตรง เด็กจะเห็นกระสุนสีหนึ่งแต่ประกายอีกสีหนึ่ง
+ * แล้วอ่านไม่ออกว่าเป็นของชิ้นเดียวกัน
+ */
+const SPARK_COLORS: Record<string, string> = {
+  sword: '#e9d5ff',
+  fire: '#fb923c',
+  ice: '#7dd3fc',
+  lightning: '#38bdf8',
+  orbit: '#38bdf8',
+  poison: '#4ade80',
+  boomerang: '#fbbf24',
+}
+
 const MAX_PARTICLES = 240
 
 /** ตัวเลขความเสียหายที่แสดงพร้อมกันได้มากที่สุด */
@@ -271,6 +288,7 @@ export function createWorld(
     particles: [],
     shake: 0,
     sounds: [],
+    flash: { color: '#ffffff', power: 0 },
     gems: [],
     pickups: [],
     notices: [],
@@ -567,6 +585,22 @@ export function step(world: WorldState, input: Input): WorldState {
   let shake = Math.max(0, world.shake - dt * 2.6)
   const addShake = (amount: number) => {
     shake = Math.min(1, Math.max(shake, amount))
+  }
+
+  /*
+   * แสงวาบเต็มจอ จางเร็วกว่าแรงสั่นมาก
+   *
+   * แสงที่ค้างนานจะบังภาพจนเล่นไม่ได้ ต่างจากแรงสั่นที่ค้างได้นานกว่า
+   * เพราะการสั่นไม่ได้บังอะไร หน้าที่ของแสงวาบคือบอกว่า
+   * "เพิ่งเกิดอะไรใหญ่ ๆ ขึ้น" แล้วต้องหลบไปให้เร็วที่สุด
+   */
+  let flash = {
+    color: world.flash.color,
+    power: Math.max(0, world.flash.power - dt * 3.4),
+  }
+  const addFlash = (color: string, power: number) => {
+    if (power <= flash.power) return
+    flash = { color, power: Math.min(1, power) }
   }
   const time = world.time + dt
   let nextId = world.nextId
@@ -1004,6 +1038,7 @@ export function step(world: WorldState, input: Input): WorldState {
     notices.push({ id: nextId, text: `${ultSpec.name}!`, life: 1.8, maxLife: 1.8 })
     sounds.push('ultimate')
     addShake(0.75)
+    addFlash(ultSpec.color, 0.85)
     nextId += 1
   }
 
@@ -1309,6 +1344,27 @@ export function step(world: WorldState, input: Input): WorldState {
       hitIds.push(enemy.id)
       hitsLeft -= 1
 
+      /*
+       * ประกายตรงจุดที่โดน สีตามอาวุธที่ตี
+       *
+       * ก่อนหน้านี้ตอนกระสุนโดนมอน สิ่งเดียวที่เกิดขึ้นคือมอนกะพริบขาวหนึ่งเฟรม
+       * ซึ่งจับตาแทบไม่ทันเมื่อมีมอนหลายสิบตัว เด็กจึงไม่รู้ว่าอาวุธชิ้นไหน
+       * กำลังทำงานอยู่ ทั้งที่ถืออยู่พร้อมกันสี่ชิ้น
+       *
+       * ประกายเป็นสีของอาวุธ จึงบอกได้ทันทีว่าอะไรกำลังยิงโดน
+       * ซึ่งเป็นข้อมูลที่เด็กใช้ตัดสินใจตอนเลือกสกิลได้จริง
+       */
+      effects.push({
+        id: nextId,
+        kind: 'spark',
+        pos: { ...enemy.pos },
+        radius: 16 + moved.radius,
+        life: 0.18,
+        maxLife: 0.18,
+        color: SPARK_COLORS[moved.weapon] ?? '#fcd34d',
+      })
+      nextId += 1
+
       if (moved.slowFor > 0) enemy.slowFor = Math.max(enemy.slowFor, moved.slowFor)
       if (moved.burnFor > 0) {
         enemy.burnFor = Math.max(enemy.burnFor, moved.burnFor)
@@ -1417,7 +1473,10 @@ export function step(world: WorldState, input: Input): WorldState {
       nextId += 1
     }
     sounds.push(enemy.boss ? 'explode' : 'kill')
-    if (enemy.boss) addShake(0.85)
+    if (enemy.boss) {
+      addShake(0.85)
+      addFlash('#fef08a', 0.7)
+    }
 
     // ชาร์จสกิลวิเศษด้วยการล้มมอน บอสกับตัวใหญ่พิเศษนับหลายตัว
     ultimate = {
@@ -1724,6 +1783,7 @@ export function step(world: WorldState, input: Input): WorldState {
     projectiles: survivingProjectiles,
     enemyShots: survivingEnemyShots,
     effects,
+    flash,
     pools,
     damageNumbers: trimmedNumbers,
     particles,

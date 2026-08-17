@@ -2501,6 +2501,51 @@ check('โล่หมุนต้องติดตามผู้เล่น�
   }
 })
 
+check('ตีโดนแล้วต้องมีประกายขึ้นตรงจุดที่โดน และเป็นสีของอาวุธนั้น', () => {
+  /*
+   * ก่อนหน้านี้ตอนกระสุนโดนมอน สิ่งเดียวที่เกิดขึ้นคือมอนกะพริบขาวหนึ่งเฟรม
+   * ซึ่งจับตาแทบไม่ทันเมื่อมีมอนหลายสิบตัว
+   *
+   * ประกายต้องเป็นสีของอาวุธ ไม่ใช่สีเดียวกันหมด
+   * เพราะเด็กถืออาวุธพร้อมกันได้สี่ชิ้น ถ้าประกายสีเดียวกันหมด
+   * จะแยกไม่ออกว่าชิ้นไหนกำลังทำงานอยู่
+   */
+  let world = { ...ringAround('ประกาย', 6, 120), weapons: { ice: 5 } }
+
+  let seen = null
+  for (let i = 0; i < 300 && !seen; i += 1) {
+    world = E.step(world, STILL)
+    seen = world.effects.find((effect) => effect.kind === 'spark')
+  }
+
+  assert(seen, 'ยิงโดนมอนแล้วแต่ไม่มีประกายขึ้นเลย')
+  assert(seen.color, 'ประกายไม่มีสี จะวาดออกมาเป็นสีปริยายเหมือนกันหมด')
+  assert(seen.life > 0 && seen.life <= 0.5, `ประกายอยู่นาน ${seen.life} วินาที ซึ่งนานเกินไปจนจอเลอะ`)
+})
+
+check('แสงวาบเต็มจอต้องเกิดตอนใช้สกิลวิเศษ และจางหายเองเร็ว', () => {
+  /*
+   * แสงที่ค้างนานจะบังมอนในจังหวะที่มอนกำลังเข้ามาหา
+   * ซึ่งเป็นการลงโทษเด็กสำหรับเหตุการณ์ที่ตัวเองเป็นคนทำให้เกิด
+   */
+  const spec = U.ultimateFor('warrior')
+  let world = {
+    ...ringAround('แสงวาบ', 6, 90),
+    ultimate: { ...E.createWorld('x', 'warrior').ultimate, id: 'warrior', charge: spec.cost },
+  }
+  assert(world.flash.power === 0, 'ยังไม่ได้กดอะไรแต่จอวาบอยู่แล้ว')
+
+  world = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
+  assert(world.flash.power > 0.3, `กดสกิลวิเศษแล้วแสงวาบแค่ ${world.flash.power}`)
+
+  // เดินต่อหนึ่งวินาที แสงต้องหายไปหมดแล้ว
+  for (let i = 0; i < 60; i += 1) world = E.step(world, STILL)
+  assert(
+    world.flash.power === 0,
+    `แสงวาบยังค้างอยู่ที่ ${world.flash.power.toFixed(2)} หลังผ่านไปหนึ่งวินาที`,
+  )
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

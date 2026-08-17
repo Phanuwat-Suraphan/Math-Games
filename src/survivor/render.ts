@@ -324,6 +324,43 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     }
 
     /*
+     * หางตามหลังกระสุน
+     *
+     * ลากย้อนไปตามทิศที่มันบินมา ทำให้ตาอ่านทิศทางและความเร็วได้ทันที
+     * โดยไม่ต้องเก็บตำแหน่งเก่าไว้ในสถานะเกม ซึ่งจะทำให้ข้อมูลบวมขึ้นมาก
+     * เพราะกระสุนมีหลายสิบลูกพร้อมกัน
+     *
+     * โล่หมุนไม่มีหาง เพราะมันวนอยู่กับที่ หางจะกลายเป็นวงเลอะ ๆ รอบตัว
+     */
+    const speed = Math.hypot(shot.vel.x, shot.vel.y)
+    if (!shot.orbit && speed > 40) {
+      const tail = Math.min(46, speed * 0.09)
+      const trail = ctx.createLinearGradient(
+        shot.pos.x,
+        shot.pos.y,
+        shot.pos.x - (shot.vel.x / speed) * tail,
+        shot.pos.y - (shot.vel.y / speed) * tail,
+      )
+      trail.addColorStop(0, color)
+      trail.addColorStop(1, 'rgba(255,255,255,0)')
+
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.globalAlpha = 0.6
+      ctx.strokeStyle = trail
+      ctx.lineCap = 'round'
+      ctx.lineWidth = shot.radius * 1.5
+      ctx.beginPath()
+      ctx.moveTo(shot.pos.x, shot.pos.y)
+      ctx.lineTo(
+        shot.pos.x - (shot.vel.x / speed) * tail,
+        shot.pos.y - (shot.vel.y / speed) * tail,
+      )
+      ctx.stroke()
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.globalAlpha = 1
+    }
+
+    /*
      * กระสุนวาดสามชั้น: แสงเรืองรอบ ตัวกระสุน แล้วไส้ขาวตรงกลาง
      *
      * ชั้นเดียวอ่านเป็น "จุดสี" ธรรมดา ไม่ได้อ่านเป็นพลังงาน
@@ -415,6 +452,45 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
       ctx.beginPath()
       ctx.arc(effect.pos.x, effect.pos.y, grow, 0, Math.PI * 2)
       ctx.stroke()
+    } else if (effect.kind === 'spark') {
+      /*
+       * ประกายตอนตีโดน วาดเป็นเส้นแฉกสั้น ๆ ไม่ใช่วงกลม
+       *
+       * วงกลมอ่านเป็น "แสงเรือง" ส่วนแฉกอ่านเป็น "การกระแทก"
+       * ซึ่งเป็นสิ่งที่เราอยากบอก คือของสองชิ้นเพิ่งชนกันตรงนี้
+       *
+       * มุมของแฉกคำนวณจากไอดี ไม่ได้สุ่มใหม่ทุกเฟรม
+       * ไม่งั้นประกายชิ้นเดิมจะหมุนกระตุกตลอดอายุของมัน
+       */
+      const spikes = 6
+      const grow = effect.radius * (1.5 - fade * 0.5)
+      const color = effect.color ?? '#fcd34d'
+
+      ctx.globalCompositeOperation = 'lighter'
+      ctx.strokeStyle = color
+      ctx.lineCap = 'round'
+      ctx.lineWidth = 3 * fade + 1
+
+      for (let i = 0; i < spikes; i += 1) {
+        const angle = (i / spikes) * Math.PI * 2 + effect.id * 0.7
+        const inner = grow * 0.35
+        ctx.beginPath()
+        ctx.moveTo(
+          effect.pos.x + Math.cos(angle) * inner,
+          effect.pos.y + Math.sin(angle) * inner,
+        )
+        ctx.lineTo(
+          effect.pos.x + Math.cos(angle) * grow,
+          effect.pos.y + Math.sin(angle) * grow,
+        )
+        ctx.stroke()
+      }
+
+      ctx.fillStyle = `rgba(255,255,255,${fade})`
+      ctx.beginPath()
+      ctx.arc(effect.pos.x, effect.pos.y, grow * 0.28, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalCompositeOperation = 'source-over'
     } else if (effect.kind === 'bolt' && effect.to) {
       /*
        * สายฟ้าเป็นเส้นหักซิกแซก ไม่ใช่เส้นตรง
@@ -606,6 +682,30 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     ctx.fillText(notice.text, ARENA_WIDTH / 2, y)
   })
   ctx.textAlign = 'start'
+
+  /*
+   * แสงวาบเต็มจอ วาดท้ายสุดจึงคลุมทุกอย่าง
+   *
+   * ตั้งไว้ที่ 0.34 ตอนแรกแล้วเรนเดอร์ดู ปรากฏว่าทั้งจอซีดจนมอนแทบหายไป
+   * ซึ่งคือปัญหาที่คอมเมนต์บรรทัดถัดไปเขียนเตือนตัวเองไว้พอดี
+   * แต่ตัวเลขที่ตั้งยังสูงเกินอยู่ดี — เห็นได้เพราะถ่ายภาพเฟรมจริงออกมาดู
+   *
+   * สาเหตุคือพื้นสนามสว่างอยู่แล้ว การบวกแสงขาวทับเข้าไปอีก
+   * จึงทะลุเพดานความสว่างเร็วกว่าตอนพื้นมืดมาก
+   *
+   * แสงวาบที่ขาวโพลนทั้งจอทำให้เด็กบางคนตกใจ และที่สำคัญกว่านั้น
+   * คือมันบังมอนในจังหวะที่มอนกำลังเข้ามาหา ซึ่งเป็นการลงโทษ
+   * เด็กสำหรับเหตุการณ์ที่ตัวเองเป็นคนทำให้เกิด (กดสกิลวิเศษ)
+   */
+  const flashPower = Math.max(0, Math.min(1, world.flash.power))
+  if (flashPower > 0.01) {
+    ctx.globalCompositeOperation = 'lighter'
+    ctx.globalAlpha = flashPower * 0.15
+    ctx.fillStyle = world.flash.color
+    ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
+    ctx.globalCompositeOperation = 'source-over'
+    ctx.globalAlpha = 1
+  }
 
   ctx.restore()
 }
