@@ -1103,7 +1103,25 @@ check('สรุปผลตอนจบต้องให้รางวัล�
 // ---------- บอส หีบ และร่างสมบูรณ์ ----------
 
 check('บอสต้องโผล่ที่นาทีแรก และเป็นคนละอย่างกับตัวใหญ่พิเศษ', () => {
-  const { world } = simulate(62, { input: { move: { x: 0.4, y: 0.3 } } })
+  /*
+   * เติมเลือดให้เต็มทุกเฟรม เพราะข้อนี้ตรวจ "จังหวะที่บอสโผล่"
+   * ไม่ได้ตรวจว่าผู้เล่นรอดถึงนาทีแรกไหม
+   *
+   * เดิมเขียนไว้ว่าเดินไปหกสิบสองวินาทีแล้วต้องเจอบอส ซึ่งผูกอยู่กับ
+   * ความสามารถในการรอดของผู้เล่นจำลองด้วยเมล็ดสุ่มตัวเดียว
+   * พอเพิ่มอาวุธใหม่เข้ามา ไพ่ที่จั่วได้เปลี่ยนไป ผู้เล่นเมล็ดนั้นตายที่ 52 วินาที
+   * ข้อนี้จึงไม่ผ่าน ทั้งที่เรื่องบอสไม่ได้เปลี่ยนอะไรเลยสักนิด
+   *
+   * (วัดค่ากลางของเวลารอดจาก 25 เมล็ดแล้ว ขึ้นจาก 143 เป็น 160 วินาที
+   *  จึงยืนยันได้ว่าไม่ใช่การถอยหลังของสมดุล แต่เป็นความแปรปรวนรายเมล็ด)
+   */
+  let world = E.createWorld('บอสนาทีแรก')
+  for (let i = 0; i < 62 * 60; i += 1) {
+    world = E.step(world, { move: { x: 0.4, y: 0.3 } })
+    if (world.phase === 'question') world = E.skipSkill(E.resolveQuestion(world, true))
+    world = { ...world, player: { ...world.player, hp: world.player.maxHp } }
+    if (world.enemies.some((enemy) => enemy.boss)) break
+  }
   const bosses = world.enemies.filter((enemy) => enemy.boss)
 
   assert(bosses.length > 0 || world.bossesDown > 0, 'เล่นไปเกินหนึ่งนาทีแล้วยังไม่เจอบอสเลย')
@@ -2328,6 +2346,159 @@ check('ราคาตัวละครต้องไม่ซ้ำกัน 
     new Set(starterKinds).size === starterKinds.length,
     `ตัวเริ่มต้นมีสกิลซ้ำแบบกัน: ${starterKinds.join(', ')}`,
   )
+})
+
+/* ── อาวุธสามชิ้นใหม่ ────────────────────────────────────── */
+
+/** วางมอนเป็นวงรอบผู้เล่นจริง ที่ระยะที่กำหนด */
+function ringAround(seed, count, spread, hp = 9_000_000) {
+  const base = E.createWorld(seed)
+  const at = base.player.pos
+  const enemies = []
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2
+    enemies.push({
+      id: 200 + i,
+      pos: { x: at.x + Math.cos(angle) * spread, y: at.y + Math.sin(angle) * spread },
+      hp, maxHp: hp, speed: 0, radius: 14, damage: 0, kind: 'number-slime',
+      behavior: 'chase', hitFlash: 0, xpValue: 1, slowFor: 0, burnFor: 0,
+      burnDps: 0, elite: false, boss: false, shootCooldown: 99, clock: 0,
+    })
+  }
+  return { ...base, spawnCooldown: 999, eliteCooldown: 999, bossCooldown: 999, enemies }
+}
+
+/** ความเสียหายต่อวินาทีของอาวุธหนึ่งชิ้น ที่ระยะหนึ่ง */
+function weaponDps(weaponId, spread, seconds = 10) {
+  let world = { ...ringAround(`วัด-${weaponId}-${spread}`, 8, spread), weapons: { [weaponId]: 5 } }
+  const before = world.enemies.reduce((sum, e) => sum + e.hp, 0)
+  for (let i = 0; i < seconds * 60; i += 1) world = E.step(world, STILL)
+  return (before - world.enemies.reduce((sum, e) => sum + e.hp, 0)) / seconds
+}
+
+check('อาวุธทุกชิ้นต้องทำความเสียหายได้จริงในระยะที่ตัวเองถนัด', () => {
+  /*
+   * อาวุธที่ทำความเสียหายเป็นศูนย์ทุกระยะคืออาวุธที่เสีย
+   * แต่จะไม่มีอะไรฟ้อง เพราะเด็กจะเห็นแค่ว่า "มอนตายช้า"
+   * ซึ่งแยกไม่ออกจากการที่ตัวเองเลือกอาวุธไม่เก่ง
+   */
+  for (const weapon of W.WEAPONS) {
+    const best = Math.max(
+      weaponDps(weapon.id, 30),
+      weaponDps(weapon.id, 90),
+      weaponDps(weapon.id, 200),
+    )
+    assert(best > 0, `${weapon.name} ทำความเสียหายเป็นศูนย์ทุกระยะ`)
+  }
+})
+
+check('โล่หมุนต้องกันตัวได้ตอนมอนประชิด ซึ่งเป็นเหตุผลเดียวที่มันมีอยู่', () => {
+  /*
+   * ข้อนี้เกิดจากบั๊กจริงที่วัดเจอตอนเพิ่มอาวุธชิ้นนี้
+   *
+   * ครั้งแรกตั้งรัศมีวงโคจรไว้ที่ 72–96 ซึ่งกว้างกว่าระยะที่มอนมากองอยู่
+   * ผลคือมอนที่ไล่ทันจนประชิดตัวจะอยู่ "ข้างใน" วง ส่วนโล่หมุนอยู่ข้างนอก
+   * ทั้งสองไม่เคยแตะกันเลย ความเสียหายตอนโดนรุมจึงเป็นศูนย์เป๊ะ
+   *
+   * แปลว่ามันใช้ไม่ได้เลยในจังหวะที่คำอธิบายของมันเองบอกว่าเหมาะที่สุด
+   * และไม่มีชุดทดสอบไหนตอนนั้นจับได้ เพราะทุกข้อวัดที่ระยะกลาง
+   */
+  const close = weaponDps('orbit', 30)
+  assert(
+    close > 0,
+    'โล่หมุนทำความเสียหายเป็นศูนย์ตอนมอนประชิดตัว ' +
+      'ซึ่งเป็นสถานการณ์เดียวที่อาวุธชิ้นนี้ควรเก่งที่สุด',
+  )
+
+  // และต้องเก่งตอนประชิดมากกว่าตอนมอนอยู่ไกล ตามที่โฆษณาไว้
+  assert(
+    close > weaponDps('orbit', 200),
+    'โล่หมุนทำความเสียหายตอนมอนอยู่ไกลได้มากกว่าตอนประชิด ซึ่งกลับด้านกับที่ควรเป็น',
+  )
+})
+
+check('อาวุธใหม่ต้องไม่แรงกว่าอาวุธเดิมอย่างเห็นได้ชัด', () => {
+  /*
+   * ดาบเป็นอาวุธประชิดที่ต้องเข้าไปยืนสู้จริง จึงใช้เป็นเส้นเทียบ
+   * อาวุธที่แค่โยนทิ้งไว้แล้วเดินหนีไม่ควรแรงกว่ามันมาก
+   *
+   * ตอนตั้งค่าครั้งแรก แอ่งพิษทำได้ 1,709 ต่อวินาทีเทียบกับดาบ 915
+   * ซึ่งแปลว่าไม่มีเหตุผลอะไรที่จะเลือกอาวุธอื่นอีกเลย
+   */
+  const swordClose = weaponDps('sword', 30)
+  for (const id of ['orbit', 'poison', 'boomerang']) {
+    const close = weaponDps(id, 30)
+    assert(
+      close <= swordClose * 1.25,
+      `${id} ทำได้ ${close.toFixed(0)} ต่อวินาทีตอนประชิด เทียบกับดาบ ${swordClose.toFixed(0)} ` +
+        'ซึ่งแรงเกินไปจนอาวุธอื่นไม่มีเหตุผลให้เลือก',
+    )
+  }
+})
+
+check('แอ่งพิษต้องหายไปเองและไม่สะสมไม่รู้จบ', () => {
+  let world = { ...ringAround('แอ่ง', 4, 60), weapons: { poison: 5 } }
+  let peak = 0
+  for (let i = 0; i < 900; i += 1) {
+    world = E.step(world, STILL)
+    peak = Math.max(peak, world.pools.length)
+  }
+  assert(peak > 0, 'เล่นไป 15 วินาทีแล้วไม่มีแอ่งเกิดขึ้นเลย')
+
+  // หยุดวางแล้วแอ่งต้องหายหมด
+  let quiet = { ...world, weapons: {} }
+  for (let i = 0; i < 600; i += 1) quiet = E.step(quiet, STILL)
+  assert(
+    quiet.pools.length === 0,
+    `แอ่ง ${quiet.pools.length} วงยังค้างอยู่หลังหยุดวางไปสิบวินาที`,
+  )
+})
+
+check('บูมเมอแรงต้องวนกลับมาหาผู้เล่น ไม่ใช่บินหายไปเลย', () => {
+  /*
+   * ถ้าลืมเขียนส่วนวนกลับ มันจะกลายเป็นกระสุนธรรมดาที่ยิงช้ากว่าชาวบ้าน
+   * และไม่มีอะไรฟ้อง เพราะมันยังทำความเสียหายได้อยู่
+   */
+  let world = { ...ringAround('บูม', 1, 260), weapons: { boomerang: 5 } }
+
+  let launched = null
+  for (let i = 0; i < 240 && !launched; i += 1) {
+    world = E.step(world, STILL)
+    const shot = world.projectiles.find((p) => p.weapon === 'boomerang')
+    if (shot) launched = shot
+  }
+  assert(launched, 'ยิงบูมเมอแรงไปแล้วแต่ไม่พบลูกไหนบนสนามเลย')
+
+  let farthest = 0
+  let cameBack = false
+  for (let i = 0; i < 240; i += 1) {
+    world = E.step(world, STILL)
+    const shot = world.projectiles.find((p) => p.id === launched.id)
+    if (!shot) break
+    const gap = Math.hypot(shot.pos.x - world.player.pos.x, shot.pos.y - world.player.pos.y)
+    farthest = Math.max(farthest, gap)
+    if (farthest > 80 && gap < farthest - 40) cameBack = true
+  }
+  assert(cameBack, `บูมเมอแรงบินออกไปไกลสุด ${farthest.toFixed(0)} แล้วไม่วนกลับมาเลย`)
+})
+
+check('โล่หมุนต้องติดตามผู้เล่นไปด้วย ไม่ใช่ค้างอยู่ที่เดิม', () => {
+  let world = { ...ringAround('ตามตัว', 1, 400), weapons: { orbit: 5 } }
+  for (let i = 0; i < 60; i += 1) world = E.step(world, STILL)
+
+  const shots = world.projectiles.filter((p) => p.orbit)
+  assert(shots.length > 0, 'ไม่มีโล่เกิดขึ้นเลย')
+
+  // เดินไปทางขวาสักพัก โล่ต้องยังอยู่รอบตัว ไม่ใช่ทิ้งไว้ข้างหลัง
+  for (let i = 0; i < 120; i += 1) world = E.step(world, { move: { x: 1, y: 0 } })
+
+  for (const shot of world.projectiles.filter((p) => p.orbit)) {
+    const gap = Math.hypot(shot.pos.x - world.player.pos.x, shot.pos.y - world.player.pos.y)
+    assert(
+      gap < 120,
+      `โล่ห่างจากผู้เล่น ${gap.toFixed(0)} หลังเดินไปไกล ซึ่งแปลว่ามันไม่ได้ตามตัวมาด้วย`,
+    )
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

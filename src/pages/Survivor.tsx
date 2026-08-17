@@ -863,10 +863,51 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     ctx.fill()
   }
 
+  /*
+   * แอ่งบนพื้น วาดก่อนทุกอย่าง เพราะมันอยู่บนพื้นจริง ๆ
+   * ถ้าวาดทีหลังจะทับตัวมอนที่ยืนอยู่ในแอ่ง แล้วดูเหมือนหมอกลอยแทนที่จะเป็นแอ่ง
+   */
+  for (const pool of world.pools) {
+    const fade = Math.max(0, pool.life / pool.maxLife)
+    ctx.globalAlpha = 0.16 + fade * 0.2
+    ctx.fillStyle = pool.color
+    ctx.beginPath()
+    ctx.arc(pool.pos.x, pool.pos.y, pool.radius, 0, Math.PI * 2)
+    ctx.fill()
+
+    // ขอบเข้มขึ้นอีกนิด เพื่อให้เห็นชัดว่าขอบแอ่งอยู่ตรงไหน จะได้เดินเลี่ยงถูก
+    ctx.globalAlpha = 0.3 + fade * 0.3
+    ctx.lineWidth = 2
+    ctx.strokeStyle = pool.color
+    ctx.stroke()
+  }
+  ctx.globalAlpha = 1
+
   // กระสุนของเรา สีตามอาวุธที่ยิง
-  const SHOT_COLORS: Record<string, string> = { fire: '#f97316', ice: '#67e8f9' }
+  const SHOT_COLORS: Record<string, string> = {
+    fire: '#f97316',
+    ice: '#67e8f9',
+    orbit: '#38bdf8',
+    boomerang: '#fbbf24',
+  }
   for (const shot of world.projectiles) {
-    ctx.fillStyle = SHOT_COLORS[shot.weapon] ?? '#fcd34d'
+    const color = SHOT_COLORS[shot.weapon] ?? '#fcd34d'
+
+    // โล่หมุนวาดเป็นวงแหวนโปร่ง ไม่ใช่ลูกกลมทึบ จะได้ไม่บังมอนที่อยู่ข้างหลัง
+    if (shot.orbit) {
+      ctx.strokeStyle = color
+      ctx.lineWidth = 3.5
+      ctx.beginPath()
+      ctx.arc(shot.pos.x, shot.pos.y, shot.radius, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 0.28
+      ctx.fillStyle = color
+      ctx.fill()
+      ctx.globalAlpha = 1
+      continue
+    }
+
+    ctx.fillStyle = color
     ctx.beginPath()
     ctx.arc(shot.pos.x, shot.pos.y, shot.radius, 0, Math.PI * 2)
     ctx.fill()

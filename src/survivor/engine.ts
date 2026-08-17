@@ -34,6 +34,7 @@ import {
   type EnemyShot,
   type GemEntity,
   type Particle,
+  type PoolEntity,
   type SoundCue,
   type Input,
   type Notice,
@@ -265,6 +266,7 @@ export function createWorld(
     projectiles: [],
     enemyShots: [],
     effects: [],
+    pools: [],
     damageNumbers: [],
     particles: [],
     shake: 0,
@@ -755,6 +757,31 @@ export function step(world: WorldState, input: Input): WorldState {
     enemy.pos = { x: enemy.pos.x + vx * dt, y: enemy.pos.y + vy * dt }
   }
 
+  /*
+   * ---------- แอ่งบนพื้น ----------
+   *
+   * ตีเป็นความเสียหายต่อวินาที ไม่ใช่ต่อครั้งที่โดน
+   * จึงคูณด้วย dt ทุกก้าว ไม่ใช่ตีเต็มจำนวนทุกก้าว
+   * ถ้าลืมคูณ dt ความแรงจะขึ้นกับจำนวนเฟรมต่อวินาทีของเครื่องเด็ก
+   * ซึ่งแปลว่าเครื่องแรงจะเล่นง่ายกว่าเครื่องช้าโดยไม่มีใครตั้งใจ
+   *
+   * ไม่ขึ้นตัวเลขความเสียหายให้ เพราะมันตีทุกเสี้ยววินาที
+   * ตัวเลขจะพรั่งพรูจนบังทั้งจอ และแต่ละตัวเป็นเลขเล็กมากจนไม่มีความหมาย
+   */
+  const pools: PoolEntity[] = []
+  for (const pool of world.pools) {
+    const life = pool.life - dt
+    if (life <= 0) continue
+    pools.push({ ...pool, life })
+
+    for (const enemy of enemies) {
+      if (enemy.hp <= 0) continue
+      if (distance(enemy.pos, pool.pos) > pool.radius + enemy.radius) continue
+      enemy.hp -= pool.dps * stats.damageMultiplier * dt
+      enemy.hitFlash = Math.max(enemy.hitFlash, 0.06)
+    }
+  }
+
   // ---------- อาวุธ ----------
   const projectiles: ProjectileEntity[] = world.projectiles.map((shot) => ({ ...shot }))
   const effects: Effect[] = world.effects
@@ -1071,6 +1098,79 @@ export function step(world: WorldState, input: Input): WorldState {
       continue
     }
 
+    /*
+     * โล่หมุน — เติมโล่ให้ครบจำนวน แล้วปล่อยให้มันหมุนอยู่อย่างนั้น
+     *
+     * ไม่ต้องมีเป้าหมาย และไม่มีจังหวะรอเหมือนอาวุธอื่น
+     * interval จึงไม่ได้แปลว่า "รอนานเท่าไรจึงยิงอีกครั้ง"
+     * แต่แปลว่า "รอนานเท่าไรจึงเช็คว่าโล่ครบหรือยัง" ซึ่งถูกกว่ามาก
+     */
+    if (weaponId === 'orbit') {
+      const want = spec.count + stats.extraProjectiles
+      const alive = projectiles.filter((shot) => shot.weapon === 'orbit')
+
+      for (let i = alive.length; i < want; i += 1) {
+        projectiles.push({
+          id: nextId,
+          weapon: 'orbit',
+          pos: { ...player.pos },
+          vel: { x: 0, y: 0 },
+          damage,
+          // โล่ตัวใหญ่กว่ากระสุนทั่วไป เพื่อให้กวาดโดนได้จริงตอนมอนกองแน่น
+          radius: 18,
+          blastRadius: 0,
+          slowFor: 0,
+          burnFor: 0,
+          // ตีได้ไม่จำกัดตัว เพราะมันคือกำแพงที่หมุนอยู่ ไม่ใช่ลูกกระสุน
+          hitsLeft: 9999,
+          life: 9999,
+          hitIds: [],
+          orbit: {
+            angle: (i / Math.max(1, want)) * Math.PI * 2,
+            radius: range,
+            spin: evolved ? 3.4 : 2.2,
+          },
+          hitReset: 0.5,
+        })
+        nextId += 1
+      }
+
+      weaponCooldowns[weaponId] = spec.interval * stats.cooldownMultiplier
+      continue
+    }
+
+    /*
+     * แอ่งพิษ — วางลงบนพื้นรอบตัว ไม่ต้องมีเป้าหมายเช่นกัน
+     *
+     * วางรอบตัวไม่ใช่วางที่ตัวมอน เพราะจุดแข็งของมันคือการดักทาง
+     * ถ้าวางทับตัวมอนที่เล็งไว้ มันจะกลายเป็นอาวุธยิงใส่ที่ช้ากว่าชาวบ้าน
+     */
+    if (weaponId === 'poison') {
+      const drops = spec.count
+      for (let i = 0; i < drops; i += 1) {
+        const rng = createRng(`${world.seed}-pool-${nextId}`)
+        const angle = rng.next() * Math.PI * 2
+        const away = 40 + rng.next() * 90
+
+        pools.push({
+          id: nextId,
+          pos: {
+            x: clamp(player.pos.x + Math.cos(angle) * away, 0, ARENA_WIDTH),
+            y: clamp(player.pos.y + Math.sin(angle) * away, 0, ARENA_HEIGHT),
+          },
+          radius: range,
+          dps: spec.damage,
+          life: evolved ? 6.5 : 4,
+          maxLife: evolved ? 6.5 : 4,
+          color: evolved ? '#22c55e' : '#4ade80',
+        })
+        nextId += 1
+      }
+
+      weaponCooldowns[weaponId] = spec.interval * stats.cooldownMultiplier
+      continue
+    }
+
     // เวทไฟกับเวทน้ำแข็งยิงกระสุนออกไป จึงต้องมีเป้าหมายก่อน
     if (!target) {
       weaponCooldowns[weaponId] = 0
@@ -1083,7 +1183,9 @@ export function step(world: WorldState, input: Input): WorldState {
 
     for (let i = 0; i < shots; i += 1) {
       const angle = base + (i - (shots - 1) / 2) * spread
-      const speed = (weaponId === 'fire' ? 320 : 460) * stats.projectileSpeed
+      const boomerang = weaponId === 'boomerang'
+      const speed =
+        (weaponId === 'fire' ? 320 : boomerang ? 380 : 460) * stats.projectileSpeed
 
       projectiles.push({
         id: nextId,
@@ -1091,14 +1193,22 @@ export function step(world: WorldState, input: Input): WorldState {
         pos: { ...player.pos },
         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
         damage,
-        radius: weaponId === 'fire' ? 9 : 6,
+        radius: weaponId === 'fire' ? 9 : boomerang ? 11 : 6,
         blastRadius: weaponId === 'fire' ? range : 0,
         // ร่างสมบูรณ์ของน้ำแข็งแช่ได้นานเท่าตัว และของไฟไหม้นานกว่าเดิม
         slowFor: weaponId === 'ice' ? (evolved ? 4.4 : 2.2) : 0,
         burnFor: weaponId === 'fire' ? (evolved ? 5.5 : 3) : 0,
-        hitsLeft: 1 + stats.pierce,
-        life: 1.8,
+        /*
+         * บูมเมอแรงทะลุได้เยอะกว่าชาวบ้านมาก เพราะจุดขายของมันคือ
+         * การเก็บมอนที่เรียงเป็นแถวได้ทั้งแถวในการขว้างครั้งเดียว
+         * ร่างสมบูรณ์ทะลุไม่จำกัด จึงกวาดได้ทั้งแนวจริง ๆ
+         */
+        hitsLeft: boomerang ? (evolved ? 9999 : 4 + stats.pierce) : 1 + stats.pierce,
+        life: boomerang ? 3.2 : 1.8,
         hitIds: [],
+        // ขาไปครึ่งหนึ่งของอายุ แล้วค่อยวนกลับ ทำให้ระยะที่บินได้ตรงกับ range
+        returnIn: boomerang ? range / Math.max(1, speed) : undefined,
+        hitReset: boomerang ? 0.45 : undefined,
       })
       nextId += 1
     }
@@ -1110,18 +1220,76 @@ export function step(world: WorldState, input: Input): WorldState {
   const survivingProjectiles: ProjectileEntity[] = []
 
   for (const shot of projectiles) {
-    const moved: ProjectileEntity = {
-      ...shot,
-      pos: { x: shot.pos.x + shot.vel.x * dt, y: shot.pos.y + shot.vel.y * dt },
-      life: shot.life - dt,
+    let moved: ProjectileEntity
+
+    if (shot.orbit) {
+      /*
+       * โล่หมุนไม่ได้บินไปไหน ตำแหน่งคำนวณจากมุมบนวงโคจรทุกเฟรม
+       * จึงติดตามผู้เล่นไปเองโดยไม่ต้องเขียนโค้ดตามตัวเพิ่ม
+       */
+      const angle = shot.orbit.angle + shot.orbit.spin * dt
+      moved = {
+        ...shot,
+        orbit: { ...shot.orbit, angle },
+        pos: {
+          x: player.pos.x + Math.cos(angle) * shot.orbit.radius,
+          y: player.pos.y + Math.sin(angle) * shot.orbit.radius,
+        },
+        life: shot.life - dt,
+      }
+    } else {
+      moved = {
+        ...shot,
+        pos: { x: shot.pos.x + shot.vel.x * dt, y: shot.pos.y + shot.vel.y * dt },
+        life: shot.life - dt,
+      }
+
+      /*
+       * บูมเมอแรงถึงเวลาวนกลับ เปลี่ยนทิศไปหาผู้เล่น
+       *
+       * เล็งไปที่ผู้เล่น "ตอนนี้" ทุกเฟรมหลังจากนั้น ไม่ใช่ล็อกทิศไว้ครั้งเดียว
+       * เพราะเด็กเดินตลอดเวลา ถ้าล็อกทิศไว้ มันจะบินไปที่ที่เด็กเคยยืน
+       * แล้วหายไปเฉย ๆ ซึ่งอ่านไม่ออกว่าเป็นบูมเมอแรง
+       */
+      if (moved.returnIn !== undefined) {
+        const left = moved.returnIn - dt
+        moved.returnIn = left
+        if (left <= 0) {
+          const speed = Math.hypot(moved.vel.x, moved.vel.y) || 380
+          const back = normalize({
+            x: player.pos.x - moved.pos.x,
+            y: player.pos.y - moved.pos.y,
+          })
+          moved.vel = { x: back.x * speed, y: back.y * speed }
+        }
+      }
     }
 
+    /*
+     * ล้างรายชื่อตัวที่โดนไปแล้วเป็นระยะ
+     *
+     * ใช้กับของที่อยู่นาน (โล่หมุน บูมเมอแรงขากลับ)
+     * ถ้าไม่ล้าง ของพวกนี้จะตีมอนแต่ละตัวได้ครั้งเดียวตลอดอายุของมัน
+     * โล่ที่หมุนผ่านมอนตัวเดิมสิบรอบจะตีแค่รอบแรกรอบเดียว
+     */
+    if (moved.hitReset !== undefined) {
+      const left = moved.hitReset - dt
+      if (left <= 0) {
+        moved.hitIds = []
+        moved.hitReset = shot.orbit ? 0.5 : 0.45
+      } else {
+        moved.hitReset = left
+      }
+    }
+
+    // โล่หมุนไม่หลุดออกนอกจอ เพราะมันผูกกับตัวผู้เล่นเสมอ
     if (
       moved.life <= 0 ||
-      moved.pos.x < -40 ||
-      moved.pos.x > ARENA_WIDTH + 40 ||
-      moved.pos.y < -40 ||
-      moved.pos.y > ARENA_HEIGHT + 40
+      (!moved.orbit &&
+        (moved.pos.x < -40 ||
+          moved.pos.x > ARENA_WIDTH + 40 ||
+          moved.pos.y < -40 ||
+          moved.pos.y > ARENA_HEIGHT + 40))
     ) {
       continue
     }
@@ -1556,6 +1724,7 @@ export function step(world: WorldState, input: Input): WorldState {
     projectiles: survivingProjectiles,
     enemyShots: survivingEnemyShots,
     effects,
+    pools,
     damageNumbers: trimmedNumbers,
     particles,
     shake,
