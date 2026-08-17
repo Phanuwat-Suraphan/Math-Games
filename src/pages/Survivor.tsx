@@ -655,10 +655,24 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     )
   }
 
-  // พื้นสนามพร้อมตารางจาง ๆ ช่วยให้รู้สึกว่าตัวเองกำลังเคลื่อนที่
-  ctx.fillStyle = '#0f0a1e'
+  /*
+   * พื้นสนามสีสว่างแบบทุ่งขนมหวาน
+   *
+   * เดิมเป็นสีม่วงเกือบดำ (#0f0a1e) ซึ่งสวยดีในแบบของมัน
+   * แต่พอเปลี่ยนตัวละครกับมอนเป็นสไตล์เส้นขอบหนา เส้นขอบสีเข้ม
+   * จะจมหายไปกับพื้นมืดจนมองไม่เห็นเลยแม้แต่นิดเดียว
+   * เรนเดอร์เทียบสองพื้นหลังแล้วเห็นชัดมากว่าสไตล์นี้ต้องการพื้นสว่าง
+   *
+   * ไล่สีจากฟ้าอ่อนด้านบนลงมาเขียวอ่อนด้านล่าง อ่านเป็นท้องฟ้ากับพื้นหญ้า
+   * ซึ่งทำให้สนามรู้สึกเป็น "ที่" จริง ๆ ไม่ใช่กระดานสีเดียว
+   */
+  const ground = ctx.createLinearGradient(0, 0, 0, ARENA_HEIGHT)
+  ground.addColorStop(0, '#bfe8ff')
+  ground.addColorStop(0.55, '#d9f2c9')
+  ground.addColorStop(1, '#a8dd8f')
+  ctx.fillStyle = ground
   ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
-  ctx.strokeStyle = 'rgba(148,163,184,.08)'
+  ctx.strokeStyle = 'rgba(30,64,40,.10)'
   ctx.lineWidth = 1
   for (let x = 0; x <= ARENA_WIDTH; x += 50) {
     ctx.beginPath()
@@ -1041,11 +1055,15 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     ctx.font = entry.big
       ? 'bold 21px system-ui, sans-serif'
       : 'bold 14px system-ui, sans-serif'
-    ctx.fillStyle = `rgba(15,10,30,${fade * 0.85})`
+    /*
+     * พื้นสนามสว่างแล้ว ตัวเลขสีขาวจึงอ่านไม่ออกอีกต่อไป
+     * สลับเป็นตัวเข้มบนเงาขาว ซึ่งอ่านออกทั้งบนพื้นสว่างและบนตัวมอนสีเข้ม
+     */
+    ctx.fillStyle = `rgba(255,255,255,${fade * 0.9})`
     ctx.fillText(`${entry.amount}`, x + 1.5, y + 1.5)
     ctx.fillStyle = entry.big
-      ? `rgba(253,224,71,${fade})`
-      : `rgba(248,250,252,${fade * 0.92})`
+      ? `rgba(180,60,10,${fade})`
+      : `rgba(40,20,60,${fade * 0.95})`
     ctx.fillText(`${entry.amount}`, x, y)
   }
   ctx.textAlign = 'start'
@@ -1061,9 +1079,9 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     const y = 96 + index * 30 - rise
 
     ctx.font = 'bold 22px system-ui, sans-serif'
-    ctx.fillStyle = `rgba(15,10,30,${fade * 0.7})`
+    ctx.fillStyle = `rgba(255,255,255,${fade * 0.85})`
     ctx.fillText(notice.text, ARENA_WIDTH / 2 + 2, y + 2)
-    ctx.fillStyle = `rgba(253,224,71,${fade})`
+    ctx.fillStyle = `rgba(180,60,10,${fade})`
     ctx.fillText(notice.text, ARENA_WIDTH / 2, y)
   })
   ctx.textAlign = 'start'

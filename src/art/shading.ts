@@ -186,3 +186,37 @@ export const EYE_SHADE_DEF = `
     <stop offset="0%" stop-color="#000" stop-opacity="0"/>
     <stop offset="100%" stop-color="#1e1b4b" stop-opacity="1"/>
   </radialGradient>`
+
+/**
+ * สไตล์ "ขนมหวาน" — เส้นขอบหนาและสีจัดจ้าน
+ *
+ * ทำไมทำเป็นฟิลเตอร์ตัวเดียว แทนที่จะไปตีเส้นขอบทีละรูปทรง
+ *
+ * ภาพแต่ละตัวประกอบด้วยรูปทรงหลายสิบชิ้นซ้อนกัน ทั้งลำตัว หัว ผม ของประจำตัว
+ * ถ้าตีเส้นขอบทีละชิ้น จะได้เส้นขอบ "ภายใน" เต็มไปหมด คือมีเส้นคาดกลางตัว
+ * ตรงรอยต่อของทุกชิ้น ซึ่งไม่ใช่สไตล์นี้เลย
+ *
+ * สไตล์นี้ต้องการเส้นขอบรอบ "เงาของทั้งตัว" เส้นเดียว
+ * feMorphology ขยายรูปเงาของภาพทั้งภาพออกไป แล้วเอาสีเข้มทาบข้างหลัง
+ * จึงได้เส้นขอบรอบนอกเส้นเดียวพอดีตามที่ต้องการ
+ *
+ * แถมยังเพิ่มความอิ่มสีในฟิลเตอร์เดียวกันได้เลย
+ * ทำให้เปลี่ยนสไตล์ของภาพทั้ง 28 ตัวได้ด้วยการแก้ที่เดียว
+ * โดยไม่ต้องไปไล่แก้สีทีละค่าในทุกไฟล์ ซึ่งจะพลาดแน่นอน
+ *
+ * ข้อควรระวัง: กรอบของฟิลเตอร์ต้องเผื่อไว้กว้างกว่าภาพ
+ * ไม่งั้นเส้นขอบด้านที่ชนขอบกรอบจะโดนตัดหายไปครึ่งเส้น
+ */
+export function candyStyle(id: string, width = 2.4, ink = '#2a1533'): string {
+  return `<filter id="${id}" x="-45%" y="-45%" width="190%" height="190%"
+      color-interpolation-filters="sRGB">
+      <feMorphology in="SourceAlpha" operator="dilate" radius="${width}" result="fat"/>
+      <feFlood flood-color="${ink}" result="ink"/>
+      <feComposite in="ink" in2="fat" operator="in" result="outline"/>
+      <feColorMatrix in="SourceGraphic" type="saturate" values="1.3" result="vivid"/>
+      <feMerge>
+        <feMergeNode in="outline"/>
+        <feMergeNode in="vivid"/>
+      </feMerge>
+    </filter>`
+}

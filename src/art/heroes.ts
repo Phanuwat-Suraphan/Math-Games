@@ -15,6 +15,7 @@
 
 import {
   EYE_SHADE_DEF,
+  candyStyle,
   blurFilter,
   edgeClip,
   edgeLight,
@@ -147,6 +148,7 @@ function hero(p: string, main: string, dark: string, extraDefs: string, gear: st
   return `
     <defs>
       ${SHARED_DEFS}
+      ${candyStyle('heroInk')}
       ${verticalGradient(`${p}-cloth`, main, dark)}
       ${extraDefs}
     </defs>
@@ -158,7 +160,7 @@ function hero(p: string, main: string, dark: string, extraDefs: string, gear: st
         keySplines="0.4 0 0.6 1; 0.4 0 0.6 1"/>
       ${groundShadow('heroBlur', 50, 97, 26, 4.2)}
     </g>
-    ${breathe(gear)}`
+    <g filter="url(#heroInk)">${breathe(gear)}</g>`
 }
 
 /** นักรบ — หมวกเหล็กและโล่ */

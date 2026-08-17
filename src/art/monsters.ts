@@ -1,4 +1,5 @@
 import {
+  candyStyle,
   blurFilter,
   diagonalGradient,
   EYE_SHADE_DEF,
@@ -737,11 +738,23 @@ const MONSTER_ART: Record<string, () => string> = {
  * ภาพของมอนสเตอร์ตัวหนึ่ง
  * ถ้าไม่มีภาพของตัวนั้นจะคืนภาพสำรองที่ยังดูดี ไม่ใช่กรอบว่าง
  */
+/**
+ * ห่อภาพด้วยสไตล์ขนมหวาน เส้นขอบหนาและสีอิ่ม
+ *
+ * ห่อที่ทางออกทางเดียว แทนการไปแก้ทุกฟังก์ชันวาดทีละตัว
+ * เพราะมีมอนสิบแปดตัว การไปเติมทีละตัวจะลืมสักตัวแน่นอน
+ * และตัวที่ลืมจะเป็นตัวเดียวที่ไม่มีเส้นขอบ ซึ่งดูเหมือนภาพหลุดชุด
+ */
+function candied(inner: string): string {
+  return `<defs>${candyStyle('monsterInk')}</defs>
+    <g filter="url(#monsterInk)">${inner}</g>`
+}
+
 export function monsterArt(monsterId: string): string {
   const draw = MONSTER_ART[monsterId]
-  if (draw) return draw()
+  if (draw) return candied(draw())
 
-  return `
+  return candied(`
     <defs>
       ${EYE_SHADE_DEF}
       ${sphereGradient('fb-x', '#cbd5e1', '#64748b', '#1e293b')}
@@ -753,7 +766,7 @@ export function monsterArt(monsterId: string): string {
     ${livingEye(41, 52, 7, '#1e293b')}
     ${livingEye(59, 52, 7, '#1e293b', 0.3)}
     <path d="M42 68 Q50 75 58 68" stroke="#0f172a" stroke-width="3"
-      fill="none" stroke-linecap="round"/>`
+      fill="none" stroke-linecap="round"/>`)
 }
 
 export function hasMonsterArt(monsterId: string): boolean {
