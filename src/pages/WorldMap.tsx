@@ -4,8 +4,12 @@ import { TopBar } from '../components/TopBar'
 import { WorldCard } from '../components/WorldCard'
 import { useProgression } from '../hooks/useProgression'
 import type { Player } from '../types/player'
+import { useMusic } from '../hooks/useMusic'
 
 export function WorldMap({ player }: { player: Player }) {
+  /* แผนที่ใช้เพลงเดียวกับเมนู เพื่อไม่ให้สะดุดตอนเดินไปมาระหว่างสองหน้า */
+  useMusic('menu')
+
   const navigate = useNavigate()
   const { worlds, overall } = useProgression(player)
 

@@ -24,6 +24,7 @@ import { recordTowerRun } from '../services/recordService'
 import type { Floor, RunState } from '../roguelike/types'
 import type { Question } from '../questionEngine/types'
 import type { Player } from '../types/player'
+import { useMusic } from '../hooks/useMusic'
 
 type Phase = 'intro' | 'floor' | 'boon' | 'over'
 
@@ -38,6 +39,9 @@ type Phase = 'intro' | 'floor' | 'boon' | 'over'
  * ซึ่งบันทึกทันทีทุกข้อ ไม่รอจบรอบ
  */
 export function Tower({ player }: { player: Player }) {
+  /* หอคอยเป็นการไต่ขึ้นไปเรื่อย ๆ ใช้เพลงเดินทางที่สดใส */
+  useMusic('adventure')
+
   const { answerQuestion, patchPlayer } = useGame()
 
   const [phase, setPhase] = useState<Phase>('intro')

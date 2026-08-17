@@ -49,7 +49,7 @@ export function Settings() {
         <ToggleRow
           id="setting-music"
           label="ดนตรีประกอบ"
-          description="เพลงพื้นหลังระหว่างผจญภัย (จะเพิ่มเพลงในตอนต่อไป)"
+          description="เพลงประกอบที่เปลี่ยนไปตามหน้าและตามสถานการณ์ในเกม"
           emoji="🎵"
           checked={settings.musicEnabled}
           onChange={toggleMusic}

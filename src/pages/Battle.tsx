@@ -30,6 +30,7 @@ import type { Player } from '../types/player'
 import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
 import { NotFoundNotice } from './NotFoundNotice'
+import { useMusic } from '../hooks/useMusic'
 
 /**
  * หน้าต่อสู้
@@ -40,6 +41,9 @@ import { NotFoundNotice } from './NotFoundNotice'
  */
 
 export function Battle({ player }: { player: Player }) {
+  /* การต่อสู้ในด่านเนื้อเรื่องใช้เพลงเดินทาง เพราะเป็นส่วนหนึ่งของการผจญภัย */
+  useMusic('adventure')
+
   const { worldId, stageId } = useParams<{ worldId: string; stageId: string }>()
 
   const stage = stageId ? getStage(stageId) : undefined

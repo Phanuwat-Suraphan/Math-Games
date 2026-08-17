@@ -38,6 +38,7 @@ import {
 import type { GameState, TargetOption } from '../divisorDuel/engine/game'
 import type { AiLevel } from '../divisorDuel/engine/ai'
 import type { Player } from '../types/player'
+import { useMusic } from '../hooks/useMusic'
 
 /**
  * เกมการ์ด Divisor Duel ในแอปหลัก
@@ -55,6 +56,9 @@ import type { Player } from '../types/player'
  * เด็กจึงต้องคิดเรื่องตัวประกอบและการหารจริง ๆ เพื่อจะเล่นให้เก่ง
  */
 export function DivisorDuel({ player }: { player: Player }) {
+  /* ศึกผ่าสมการเป็นการดวลตัวต่อตัว ใช้เพลงตึงเครียดเหมือนเจอบอส */
+  useMusic('boss')
+
   const [state, setState] = useState<GameState | null>(null)
   const [heroId, setHeroId] = useState(HEROES[0].id)
   const [level, setLevel] = useState<AiLevel>('normal')

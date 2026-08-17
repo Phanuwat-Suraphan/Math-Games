@@ -8,6 +8,7 @@ import { useGame } from '../context/useGame'
 import { useProgression } from '../hooks/useProgression'
 import { getOverallAccuracy } from '../utils/statistics'
 import type { Player } from '../types/player'
+import { useMusic } from '../hooks/useMusic'
 
 interface MenuItem {
   to: string
@@ -111,6 +112,9 @@ const MENU_ITEMS: MenuItem[] = [
 ]
 
 export function MainMenu({ player }: { player: Player }) {
+  /* เมนูหลักคือหน้าที่เด็กกลับมาบ่อยที่สุด ใช้เพลงช้าที่ไม่เร่งให้รีบเลือก */
+  useMusic('menu')
+
   const navigate = useNavigate()
   const { storageWarning, dismissStorageWarning } = useGame()
   const progress = useProgression(player)

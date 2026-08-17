@@ -37,11 +37,8 @@ import {
   type ClaimResult,
 } from '../services/questService'
 import { emit } from '../services/eventBus'
-import {
-  playSfx,
-  setMusicEnabled,
-  setSoundEnabled,
-} from '../services/audioService'
+import { playSfx, setSoundEnabled } from '../services/audioService'
+import { setMusicEnabled } from '../services/musicService'
 
 export interface GameContextValue {
   player: Player | null

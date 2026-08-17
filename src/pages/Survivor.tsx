@@ -10,6 +10,7 @@ import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
 import { allPerkLevels, buyPerk, perkBlockedReason, perkLevel } from '../services/perkService'
 import { recordSurvivorRun } from '../services/recordService'
+import { useMusic } from '../hooks/useMusic'
 import { PERKS, perkCost } from '../data/perks'
 import {
   advance,
@@ -176,6 +177,13 @@ export function Survivor({ player }: { player: Player }) {
   >([])
   const [chests, setChests] = useState(0)
   const [ultBar, setUltBar] = useState({ progress: 0, ready: false })
+  /*
+   * มีบอสอยู่บนสนามไหม ใช้เปลี่ยนเพลงอย่างเดียว ไม่ได้ใช้วาดอะไร
+   *
+   * เก็บเป็น state ทั้งที่ข้อมูลอยู่ในเวิลด์อยู่แล้ว เพราะเพลงเป็นเรื่องของ React
+   * แต่เวิลด์อยู่ใน ref ที่ React ไม่รู้ว่าเปลี่ยน จึงต้องมีสะพานให้หนึ่งเส้น
+   */
+  const [bossActive, setBossActive] = useState(false)
   const ultimateRequestRef = useRef(false)
 
   /*
@@ -280,6 +288,7 @@ export function Survivor({ player }: { player: Player }) {
       })
       setChests(after.chests)
       setUltBar({ progress: ultimateProgress(after), ready: ultimateReady(after) })
+      setBossActive(after.enemies.some((enemy) => enemy.boss))
 
       /*
        * แถบอาวุธเปลี่ยนเฉพาะตอนเลเวลอัป ไม่ใช่ทุกเฟรม
@@ -419,6 +428,15 @@ export function Survivor({ player }: { player: Player }) {
     })
   }, [patchPlayer, phase, player, summary])
 
+  /*
+   * เพลงของหน้านี้
+   *
+   * ระหว่างเล่นใช้เพลงสนามรบ และสลับเป็นเพลงบอสทันทีที่บอสโผล่
+   * ตั้งใจให้เด็กได้ยินก่อนจะทันเห็นตัว เพราะบอสเดินเข้ามาจากขอบจอ
+   * เสียงที่เปลี่ยนคือคำเตือนที่มาถึงก่อนภาพเสมอ
+   */
+  useMusic(phase === 'playing' ? (bossActive ? 'boss' : 'arena') : 'menu')
+
   const start = useCallback(() => {
     paidRef.current = false
     worldRef.current = createWorld(`${Date.now()}`, player.avatar, allPerkLevels(player))
@@ -428,6 +446,7 @@ export function Survivor({ player }: { player: Player }) {
     setWeaponBar([])
     setChests(0)
     setUltBar({ progress: 0, ready: false })
+    setBossActive(false)
     ultimateRequestRef.current = false
     setPhase('playing')
   }, [])
