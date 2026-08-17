@@ -24,6 +24,7 @@ import type {
   QuestionType,
 } from './types'
 import { validateQuestion } from './validators'
+import { isAnswerCorrect } from './answerCheck'
 
 export * from './types'
 export { validateQuestion } from './validators'
@@ -223,6 +224,13 @@ export function generateUniqueQuestions(
 }
 
 /** ตรวจคำตอบ เทียบแบบข้อความเพื่อให้เศษส่วนกับทศนิยมใช้กติกาเดียวกัน */
+/**
+ * คำตอบที่ส่งมา ถูกต้องหรือไม่
+ *
+ * เดิมเทียบข้อความตรง ๆ ซึ่งใช้ได้เพราะคำตอบมาจากปุ่มที่เราสร้างเองทั้งหมด
+ * ตอนนี้ด่านระดับยากให้เด็กพิมพ์คำตอบเอง ข้อความจะไม่มีทางตรงกันเป๊ะ
+ * จึงต้องเทียบด้วยค่าที่โจทย์ถามจริง ๆ ไม่ใช่เทียบตัวอักษร
+ */
 export function checkAnswer(question: Question, selected: string): boolean {
-  return selected.trim() === question.correctAnswer.trim()
+  return isAnswerCorrect(selected, question.correctAnswer)
 }

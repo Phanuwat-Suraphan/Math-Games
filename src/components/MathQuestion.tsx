@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { Calculator } from './Calculator'
+import { NumberPad } from './NumberPad'
 import { SolutionSteps } from './SolutionSteps'
 import type { Question } from '../questionEngine/types'
 
@@ -17,6 +18,13 @@ interface MathQuestionProps {
   hintShown: boolean
   onAnswer: (choiceText: string) => void
   onRequestHint: () => void
+  /**
+   * ข้อนี้ให้พิมพ์คำตอบเองแทนการเลือกจากตัวเลือก
+   *
+   * เหตุผลเดียวกับช่องปริศนาระดับยาก: ตัวเลือกสี่ตัวทำให้เด็กที่คิดไม่ออก
+   * ตัดตัวที่ดูไม่น่าใช่ทิ้งแล้วเดาจากที่เหลือ ซึ่งได้คำตอบถูกโดยไม่ต้องคิดเลข
+   */
+  typed?: boolean
 }
 
 const CHOICE_LABELS = ['ก', 'ข', 'ค', 'ง']
@@ -35,6 +43,7 @@ export function MathQuestion({
   hintShown,
   onAnswer,
   onRequestHint,
+  typed = false,
 }: MathQuestionProps) {
   const isLocked = answerState === 'correct'
 
@@ -46,10 +55,30 @@ export function MathQuestion({
   const [showCalculator, setShowCalculator] = useState(false)
   const [showSteps, setShowSteps] = useState(false)
 
+  /*
+   * สิ่งที่พิมพ์ค้างอยู่ และการขอดูตัวเลือกช่วย
+   *
+   * ทำไมต้องมีทางขอดูตัวเลือก
+   *
+   * ถ้าให้พิมพ์อย่างเดียวโดยไม่มีทางออก เด็กที่คิดไม่ออกจริง ๆ จะติดค้าง
+   * อยู่ตรงนั้นไปเรื่อย ๆ ไม่มีทางผ่านด่านและไม่มีทางเรียนรู้อะไรเพิ่ม
+   * ซึ่งแย่กว่าการได้เห็นตัวเลือกแล้วคิดต่อจากตรงนั้น
+   *
+   * ตั้งเป็นการกดเปิดเอง ด้วยเหตุผลเดียวกับเครื่องคิดเลข
+   * คือให้เด็กเป็นคนตัดสินใจว่าข้อนี้ขอตัวช่วย ไม่ใช่ระบบยัดเยียดให้
+   */
+  const [draft, setDraft] = useState('')
+  const [revealChoices, setRevealChoices] = useState(false)
+
   useEffect(() => {
     setShowCalculator(false)
     setShowSteps(false)
+    setDraft('')
+    setRevealChoices(false)
   }, [question.id])
+
+  /* พิมพ์เองอยู่ ก็ต่อเมื่อข้อนี้เป็นแบบพิมพ์ และยังไม่ได้ขอดูตัวเลือก */
+  const typingNow = typed && !revealChoices && !isLocked
 
   return (
     <div className="w-full">
@@ -58,7 +87,7 @@ export function MathQuestion({
           ข้อที่ {questionNumber} จาก {totalQuestions}
         </span>
         <span className="rounded-full bg-night-700/70 px-3 py-1 text-slate-300">
-          เลือกคำตอบที่ถูกต้อง
+          {typingNow ? 'พิมพ์คำตอบเอง' : 'เลือกคำตอบที่ถูกต้อง'}
         </span>
       </div>
 
@@ -74,7 +103,34 @@ export function MathQuestion({
         </p>
       </motion.div>
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {typingNow ? (
+        <>
+          <NumberPad
+            value={draft}
+            onChange={setDraft}
+            onSubmit={() => {
+              const value = draft.trim()
+              if (value.length === 0) return
+              onAnswer(value)
+              setDraft('')
+            }}
+          />
+
+          <button
+            type="button"
+            onClick={() => setRevealChoices(true)}
+            className="mt-3 w-full rounded-xl border border-arcane-400/40 bg-arcane-600/15 px-4 py-3 text-sm font-bold text-arcane-400 transition hover:bg-arcane-600/25"
+          >
+            🅰️ ขอดูตัวเลือกช่วย
+          </button>
+        </>
+      ) : null}
+
+      <div
+        className={`mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+          typingNow ? 'hidden' : ''
+        }`}
+      >
         {question.choices.map((choice, index) => {
           const isWrongChoice = wrongChoices.includes(choice.text)
           const isCorrectChoice =

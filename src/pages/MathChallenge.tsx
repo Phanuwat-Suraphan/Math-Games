@@ -235,6 +235,7 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
           wrongChoices={wrongChoices}
           hintShown={hintShown}
           onAnswer={handleAnswer}
+          typed={stage.typedAnswers === true}
           onRequestHint={() => setHintShown(true)}
         />
 

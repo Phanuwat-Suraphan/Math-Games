@@ -25,6 +25,7 @@ const STAGES = load('data/stages')
 const QS = load('services/questionService')
 const S = load('questionEngine/session')
 const V = load('questionEngine/validators')
+const QE = load('questionEngine/index')
 
 let passed = 0
 const failures = []
@@ -175,6 +176,78 @@ check('ความยากปรับตามผลการตอบผ่�
 
   const mixed = [{ correct: true }, { correct: false }, { correct: true }]
   equal(QS.difficultyForNextQuestion(stage, mixed), base, 'ถูกบ้างผิดบ้างต้องไม่เปลี่ยน')
+})
+
+/* ── ด่านที่ให้พิมพ์คำตอบเอง ─────────────────────────────── */
+
+check('ด่านพิมพ์คำตอบต้องมีอยู่จริง และกระจายอยู่หลายโลก', () => {
+  /*
+   * ถ้าธงนี้หายไปทั้งหมด เกมจะกลับไปเป็นเลือกตอบล้วนอีกครั้ง
+   * โดยไม่มีอะไรพัง ไม่มี error และไม่มีใครรู้จนกว่าจะมานั่งไล่ดูเอง
+   */
+  const typed = STAGES.STAGES.filter((stage) => stage.typedAnswers)
+  assert(typed.length >= 4, `ควรมีด่านพิมพ์คำตอบหลายด่าน แต่มีแค่ ${typed.length}`)
+
+  const worlds = new Set(typed.map((stage) => stage.worldId))
+  assert(
+    worlds.size >= 3,
+    `ด่านพิมพ์คำตอบกระจุกอยู่แค่ ${worlds.size} โลก ควรกระจายให้เด็กเจอเรื่อย ๆ`,
+  )
+})
+
+check('ด่านพิมพ์คำตอบต้องเป็นด่านตอบคำถาม ไม่ใช่ด่านกิจกรรมอื่น', () => {
+  /*
+   * ธงนี้มีผลเฉพาะหน้าตอบคำถาม ถ้าไปติดบนด่านมินิเกมหรือด่านต่อสู้
+   * มันจะไม่ทำอะไรเลยและไม่มีอะไรเตือน กลายเป็นธงที่ดูเหมือนทำงานแต่ไม่ทำ
+   */
+  for (const stage of STAGES.STAGES) {
+    if (!stage.typedAnswers) continue
+    assert(
+      !stage.activity && !stage.isBoss,
+      `${stage.id} ติดธงพิมพ์คำตอบ แต่เป็นด่าน ${stage.activity ?? 'บอส'} ซึ่งธงนี้ไม่มีผล`,
+    )
+  }
+})
+
+check('ด่านพิมพ์คำตอบยังต้องมีตัวเลือกไว้ให้กดขอดู', () => {
+  /*
+   * หน้าจอมีปุ่ม "ขอดูตัวเลือกช่วย" ให้เด็กที่คิดไม่ออกกดได้
+   * ถ้าโจทย์ของด่านนี้ไม่มีตัวเลือกมาด้วย ปุ่มนั้นจะกดแล้วไม่มีอะไรขึ้น
+   * แล้วเด็กที่ติดจริง ๆ จะไม่มีทางออกเลย
+   */
+  for (const stage of STAGES.STAGES) {
+    if (!stage.typedAnswers) continue
+    const questions = QS.createStageSession(stage, `พิมพ์-${stage.id}`).questions
+    for (const question of questions) {
+      assert(
+        question.choices.length >= 2,
+        `${stage.id} มีโจทย์ที่ไม่มีตัวเลือกสำรอง ปุ่มขอตัวช่วยจะกดแล้วว่างเปล่า`,
+      )
+    }
+  }
+})
+
+check('การตรวจคำตอบของด่านปกติ ต้องรับสิ่งที่เด็กพิมพ์ได้หลายรูปแบบ', () => {
+  /*
+   * ก่อนหน้านี้ตรวจด้วยการเทียบข้อความตรง ๆ ซึ่งใช้ได้ตอนทุกคำตอบมาจากปุ่ม
+   * พอด่านระดับยากให้พิมพ์เอง การเทียบตัวอักษรจะทำให้เด็กที่คิดถูก
+   * โดนบอกว่าผิดเพราะพิมพ์คนละรูปแบบ
+   */
+  for (const stage of STAGES.STAGES.filter((st) => st.typedAnswers)) {
+    for (const question of QS.createStageSession(stage, `ตรวจ-${stage.id}`).questions) {
+      const answer = question.correctAnswer
+
+      assert(QE.checkAnswer(question, answer), `${stage.id}: เฉลยของตัวเองยังตอบไม่ผ่าน`)
+      assert(
+        QE.checkAnswer(question, ` ${answer} `),
+        `${stage.id}: เว้นวรรคหน้าหลังแล้วกลายเป็นผิด`,
+      )
+      assert(
+        !QE.checkAnswer(question, `${answer}7`),
+        `${stage.id}: คำตอบที่ผิดกลับนับว่าถูก`,
+      )
+    }
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
