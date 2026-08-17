@@ -1973,6 +1973,188 @@ check('พลังถาวรครบชุดต้องทำให้อ�
 })
 
 
+/* ── ความรู้สึกของเกม: ตัวเลข เศษ เสียง และจอสั่น ────────── */
+
+check('โลกใหม่เริ่มจากไม่มีตัวเลข ไม่มีเศษ ไม่มีเสียง และจอไม่สั่น', () => {
+  const world = E.createWorld('ความรู้สึก')
+  assert(world.damageNumbers.length === 0, 'ต้องเริ่มจากไม่มีตัวเลขความเสียหาย')
+  assert(world.particles.length === 0, 'ต้องเริ่มจากไม่มีเศษ')
+  assert(world.sounds.length === 0, 'ต้องเริ่มจากไม่มีเสียงค้าง')
+  assert(world.shake === 0, 'ต้องเริ่มจากจอไม่สั่น')
+})
+
+check('ตีโดนแล้วต้องมีตัวเลขความเสียหายขึ้น พร้อมเสียงตี', () => {
+  /*
+   * จุดนี้คือหัวใจของทั้งเรื่อง ถ้าตีโดนแล้วไม่มีตัวเลขขึ้น
+   * เด็กจะไม่มีทางรู้เลยว่าสกิลเพิ่มพลังที่เพิ่งเลือกไปได้ผลจริงหรือเปล่า
+   */
+  let world = withEnemiesAt('ตัวเลข', [{ x: 470, y: 300 }])
+  let seen = null
+  for (let i = 0; i < 240 && !seen; i += 1) {
+    world = E.step(world, STILL)
+    if (world.damageNumbers.length > 0) seen = world
+  }
+
+  assert(seen, 'ตีโดนมาสี่วินาทีแล้วยังไม่มีตัวเลขความเสียหายขึ้นเลย')
+  const entry = seen.damageNumbers[0]
+  assert(entry.amount > 0, `ตัวเลขความเสียหายต้องมากกว่าศูนย์ แต่ได้ ${entry.amount}`)
+  assert(Number.isInteger(entry.amount), 'ตัวเลขต้องเป็นจำนวนเต็ม เด็กอ่านทศนิยมกลางสนามไม่ทัน')
+  assert(seen.sounds.includes('hit'), 'ตีโดนแล้วต้องมีเสียงตี')
+})
+
+check('ตัวเลขความเสียหายหมดอายุเองและไม่สะสมไม่รู้จบ', () => {
+  let world = withEnemiesAt('หมดอายุ', [{ x: 470, y: 300 }])
+  let peak = 0
+  for (let i = 0; i < 900; i += 1) {
+    world = E.step(world, STILL)
+    peak = Math.max(peak, world.damageNumbers.length)
+  }
+  assert(peak > 0, 'ตลอดสิบห้าวินาทีควรมีตัวเลขขึ้นบ้าง')
+  assert(
+    world.damageNumbers.length <= 40,
+    `ตัวเลขค้างอยู่ ${world.damageNumbers.length} ตัว ซึ่งเกินเพดานที่ตั้งไว้`,
+  )
+})
+
+check('มอนตายแล้วต้องมีเศษกระเด็นและเสียง', () => {
+  let world = withEnemiesAt('เศษ', [{ x: 470, y: 300 }], 1)
+  let burst = null
+  for (let i = 0; i < 300 && !burst; i += 1) {
+    world = E.step(world, STILL)
+    if (world.particles.length > 0) burst = world
+  }
+  assert(burst, 'มอนตายแล้วแต่ไม่มีเศษกระเด็นออกมาเลย')
+  assert(
+    burst.sounds.includes('kill') || burst.sounds.includes('explode'),
+    'มอนตายแล้วต้องมีเสียง',
+  )
+})
+
+check('เศษหายไปเองและไม่เกินเพดาน แม้มอนตายพร้อมกันทั้งสนาม', () => {
+  /*
+   * กรณีที่ต้องกันจริง ๆ คือตอนมอนแน่นแล้วตายพร้อมกันหมด
+   * ถ้าเศษไม่มีเพดาน เฟรมจะตกในจังหวะที่มันส์ที่สุดของรอบพอดี
+   */
+  const positions = []
+  for (let i = 0; i < 60; i += 1) {
+    positions.push({ x: 440 + (i % 10) * 12, y: 280 + Math.floor(i / 10) * 12 })
+  }
+  let world = withEnemiesAt('ล้นสนาม', positions, 1)
+
+  /*
+   * ต้องปลดเฟสถามโจทย์ทุกครั้ง ไม่งั้นการทดสอบจะหยุดนิ่งตั้งแต่เลเวลอัปแรก
+   *
+   * ล้มมอนหกสิบตัวรวดเดียวทำให้เลเวลอัปทันที แล้ว step จะคืนโลกเดิมกลับมาเฉย ๆ
+   * ครั้งแรกที่เขียนข้อนี้ผมไม่ได้ปลด แล้วสรุปผิดว่าเศษไม่ยอมหายไปเอง
+   * ทั้งที่จริงคือเวลาในเกมหยุดเดินไปตั้งนานแล้ว
+   */
+  const keepPlaying = (state) =>
+    state.phase === 'question'
+      ? E.skipSkill(E.resolveQuestion(state, true))
+      : state
+
+  let peak = 0
+  for (let i = 0; i < 600; i += 1) {
+    world = keepPlaying(E.step(world, STILL))
+    peak = Math.max(peak, world.particles.length)
+  }
+  assert(peak > 0, 'ควรมีเศษเกิดขึ้นบ้าง')
+  assert(peak <= 240, `เศษขึ้นไปถึง ${peak} ชิ้น ซึ่งเกินเพดานที่ตั้งไว้`)
+
+  /*
+   * ตรวจว่าเศษหายไปเอง ต้องหยุดไม่ให้มีมอนตายเพิ่มก่อน
+   *
+   * ครั้งแรกที่เขียนข้อนี้ ผมนับเศษที่เหลือหลังเดินต่อสิบวินาทีแล้วคาดว่าเป็นศูนย์
+   * ซึ่งผิด เพราะเครื่องยนต์ปล่อยมอนใหม่มาตลอดและมันก็ตายตลอด
+   * เศษที่เห็นตอนท้ายจึงเป็นเศษชุดใหม่ ไม่ใช่ชุดเดิมที่ไม่ยอมหาย
+   */
+  let quiet = {
+    ...world,
+    phase: 'playing',
+    enemies: [],
+    spawnCooldown: 9999,
+    bossCooldown: 9999,
+    eliteCooldown: 9999,
+  }
+  const before = quiet.particles.length
+  for (let i = 0; i < 90; i += 1) quiet = E.step(quiet, STILL)
+  assert(
+    quiet.particles.length === 0,
+    `เศษ ${before} ชิ้นยังเหลืออยู่ ${quiet.particles.length} ชิ้น` +
+      ' หลังผ่านไปหนึ่งวินาทีครึ่งโดยไม่มีมอนตายเพิ่ม ซึ่งแปลว่ามันไม่หายไปเอง',
+  )
+})
+
+check('จอสั่นแล้วต้องนิ่งลงเอง และไม่มีทางสั่นเกินหนึ่ง', () => {
+  /*
+   * ถ้าแรงสั่นบวกสะสมกันได้ ตอนมอนตายพร้อมกันสิบตัวจอจะสั่นจนอ่านอะไรไม่ออก
+   * เครื่องยนต์จึงใช้ค่าที่แรงที่สุดในก้าวนั้น ไม่ใช่ผลรวม
+   */
+  const positions = []
+  for (let i = 0; i < 40; i += 1) positions.push({ x: 450 + i, y: 300 })
+  let world = withEnemiesAt('สั่น', positions, 1)
+
+  let peak = 0
+  for (let i = 0; i < 300; i += 1) {
+    world = E.step(world, STILL)
+    peak = Math.max(peak, world.shake)
+  }
+  assert(peak > 0, 'มอนตายเยอะขนาดนี้จอควรสั่นบ้าง')
+  assert(peak <= 1, `จอสั่นแรงถึง ${peak.toFixed(2)} ซึ่งเกินหนึ่ง แปลว่าค่าถูกบวกสะสม`)
+
+  for (let i = 0; i < 200; i += 1) world = E.step(world, STILL)
+  assert(
+    world.shake === 0,
+    `จอยังสั่นอยู่ที่ ${world.shake.toFixed(3)} หลังไม่มีอะไรเกิดขึ้นสามวินาที`,
+  )
+})
+
+check('รายการเสียงล้างใหม่ทุกก้าว ไม่ค้างข้ามก้าว', () => {
+  /*
+   * ถ้าไม่ล้าง เสียงเดียวจะดังซ้ำทุกเฟรมจนกลายเป็นเสียงหึ่งต่อเนื่อง
+   */
+  let world = withEnemiesAt('ล้างเสียง', [{ x: 470, y: 300 }], 1)
+  for (let i = 0; i < 400; i += 1) {
+    world = E.step(world, STILL)
+    assert(
+      world.sounds.length <= 8,
+      `ก้าวเดียวมีเสียง ${world.sounds.length} เสียง ซึ่งแปลว่าเสียงค้างสะสมข้ามก้าว`,
+    )
+  }
+})
+
+check('advance รวมเสียงจากทุกก้าวย่อย ไม่ใช่เอาแค่ก้าวสุดท้าย', () => {
+  /*
+   * หนึ่งเฟรมของหน้าจอกินหลายก้าวของเครื่องยนต์
+   * ถ้าเอาแค่ก้าวสุดท้าย เสียงจะหายมากขึ้นบนเครื่องที่เฟรมตก
+   * ซึ่งเป็นข้อผิดพลาดที่เกิดเฉพาะบนเครื่องช้าและหาสาเหตุยากที่สุด
+   */
+  let world = withEnemiesAt('รวมเสียง', [{ x: 470, y: 300 }], 1)
+
+  let heard = false
+  for (let i = 0; i < 80 && !heard; i += 1) {
+    // เดินทีละหนึ่งในสิบวินาที ซึ่งเท่ากับหกก้าวของเครื่องยนต์
+    world = E.advance(world, 0.1, STILL)
+    if (world.sounds.length > 0) heard = true
+  }
+  assert(heard, 'เดินผ่าน advance แล้วไม่ได้ยินเสียงอะไรเลย')
+})
+
+check('บอสโผล่แล้วต้องมีเสียงคำรามและจอสั่น', () => {
+  let world = E.createWorld('บอสมา')
+  let roar = null
+  // บอสตัวแรกโผล่ที่หกสิบวินาที เดินให้เลยไปหน่อย
+  for (let i = 0; i < 60 * 70 && !roar; i += 1) {
+    world = E.step(world, STILL)
+    if (world.sounds.includes('bossRoar')) roar = world
+    if (world.phase !== 'playing') {
+      world = { ...world, phase: 'playing', player: { ...world.player, hp: world.player.maxHp } }
+    }
+  }
+  assert(roar, 'ผ่านไปเจ็ดสิบวินาทีแล้วยังไม่ได้ยินเสียงบอสเลย')
+  assert(roar.shake > 0, 'บอสโผล่แล้วจอควรสั่น')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

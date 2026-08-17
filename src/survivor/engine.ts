@@ -27,11 +27,14 @@ import {
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
+  type DamageNumber,
   type Effect,
   type EnemyBehavior,
   type EnemyEntity,
   type EnemyShot,
   type GemEntity,
+  type Particle,
+  type SoundCue,
   type Input,
   type Notice,
   type PickupEntity,
@@ -48,6 +51,19 @@ export const FIXED_STEP = 1 / 60
 
 /** ก้าวสูงสุดที่ยอมประมวลผลในหนึ่งเฟรม กันการค้างยาวแล้วคำนวณย้อนหลังเป็นพันก้าว */
 export const MAX_STEPS_PER_FRAME = 5
+
+/**
+ * เศษที่มีอยู่พร้อมกันได้มากที่สุด
+ *
+ * เลือกจากงบเวลาวาดต่อเฟรม ไม่ใช่จากความสวย
+ * ที่ 240 ชิ้น การวาดยังใช้เวลาน้อยกว่าการวาดมอนเต็มจอมาก
+ * ส่วนตอนมอนตายพร้อมกันสิบตัว จะได้เศษราว 60 ชิ้น จึงไม่เคยชนเพดานจริง
+ * เพดานมีไว้กันกรณีสุดขั้ว เช่นระเบิดทั้งสนามตอนมอนแน่นที่สุด
+ */
+const MAX_PARTICLES = 240
+
+/** ตัวเลขความเสียหายที่แสดงพร้อมกันได้มากที่สุด */
+const MAX_DAMAGE_NUMBERS = 40
 
 const XP_BASE = 5
 const XP_GROWTH = 1.2
@@ -249,6 +265,10 @@ export function createWorld(
     projectiles: [],
     enemyShots: [],
     effects: [],
+    damageNumbers: [],
+    particles: [],
+    shake: 0,
+    sounds: [],
     gems: [],
     pickups: [],
     notices: [],
@@ -460,10 +480,40 @@ export function nearestEnemy(world: WorldState): EnemyEntity | undefined {
   return best
 }
 
-/** ความเสียหายที่มอนได้รับ พร้อมเอฟเฟกต์กระพริบ */
-function hurt(enemy: EnemyEntity, amount: number): void {
+/**
+ * บันทึกความเสียหายหนึ่งครั้ง ก่อนจะแปลงเป็นตัวเลขลอยตอนท้ายก้าว
+ *
+ * แยกเป็นชนิดของตัวเองแทนการสร้าง DamageNumber ตรงนี้เลย
+ * เพราะ DamageNumber ต้องมี id ที่ไม่ซ้ำ ซึ่งตัวนับ id อยู่ที่ระดับ step
+ * การส่งตัวนับ id ลงมาถึงทุกจุดที่ตีโดนคือการลากสถานะไปทั่วโดยไม่จำเป็น
+ */
+interface HitRecord {
+  pos: Vec
+  amount: number
+  big: boolean
+}
+
+/**
+ * ความเสียหายที่มอนได้รับ พร้อมเอฟเฟกต์กระพริบ
+ *
+ * log เป็นตัวเลือก เพราะบางจุดที่ตีโดน (เช่นระเบิดลูกโซ่ที่ตีพร้อมกันสิบตัว)
+ * ไม่ควรขึ้นตัวเลขทุกตัว ไม่งั้นจอจะเต็มไปด้วยตัวเลขจนมองไม่เห็นมอน
+ */
+function hurt(
+  enemy: EnemyEntity,
+  amount: number,
+  log?: HitRecord[],
+): void {
   enemy.hp -= amount
   enemy.hitFlash = 0.12
+  if (log) {
+    log.push({
+      pos: { x: enemy.pos.x, y: enemy.pos.y - enemy.radius },
+      amount,
+      // ตีแรงคือตีทีเดียวหายเกินหนึ่งในสี่ของเลือดเต็ม
+      big: amount >= enemy.maxHp * 0.25,
+    })
+  }
 }
 
 /**
@@ -478,6 +528,44 @@ export function step(world: WorldState, input: Input): WorldState {
 
   const dt = FIXED_STEP
   const stats = statsFrom(world.skills, world.perks)
+
+  /*
+   * สมุดบันทึกของก้าวนี้
+   *
+   * ทั้งสองอย่างเริ่มจากว่างทุกก้าว ไม่สะสมข้ามก้าว
+   * เสียงที่ค้างจากก้าวก่อนจะดังซ้ำ และตัวเลขที่ค้างจะถูกสร้าง id ซ้ำ
+   */
+  const hits: HitRecord[] = []
+  const sounds: SoundCue[] = []
+
+  /*
+   * เศษเดินต่อด้วยแรงต้านและแรงโน้มถ่วงลง
+   * ทำให้มันตกลงและช้าลงแทนที่จะพุ่งเป็นเส้นตรงตลอด
+   * ซึ่งอ่านออกเป็น "ของแตก" มากกว่า "จุดที่วิ่งหนี"
+   */
+  const particles: Particle[] = []
+  for (const particle of world.particles) {
+    const life = particle.life - dt
+    if (life <= 0) continue
+    const drag = Math.pow(0.12, dt)
+    particles.push({
+      ...particle,
+      life,
+      pos: {
+        x: particle.pos.x + particle.vel.x * dt,
+        y: particle.pos.y + particle.vel.y * dt,
+      },
+      vel: {
+        x: particle.vel.x * drag,
+        y: particle.vel.y * drag + 320 * dt,
+      },
+    })
+  }
+  /** สั่งจอสั่น ใช้ค่าที่แรงที่สุดในก้าวนี้ ไม่ใช่บวกกัน ไม่งั้นจะสั่นจนอ่านจอไม่ออก */
+  let shake = Math.max(0, world.shake - dt * 2.6)
+  const addShake = (amount: number) => {
+    shake = Math.min(1, Math.max(shake, amount))
+  }
   const time = world.time + dt
   let nextId = world.nextId
 
@@ -575,6 +663,9 @@ export function step(world: WorldState, input: Input): WorldState {
   if (bossCooldown <= 0) {
     const index = Math.max(0, Math.round((time - 60) / 60))
     enemies.push(makeBoss(nextId, index, time, createRng(`${world.seed}-boss-${nextId}`)))
+    /* บอสเดินเข้ามาจากขอบจอ เสียงกับแรงสั่นจึงมาถึงก่อนภาพเสมอ */
+    sounds.push('bossRoar')
+    addShake(0.55)
     nextId += 1
     bossCooldown = 60
     notices.push({
@@ -696,7 +787,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, player.pos) > radius + enemy.radius) continue
-        hurt(enemy, 130 * stats.damageMultiplier)
+        hurt(enemy, 130 * stats.damageMultiplier, hits)
       }
       effects.push({
         id: nextId,
@@ -717,7 +808,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, at) > radius + enemy.radius) continue
-        hurt(enemy, 120 * stats.damageMultiplier)
+        hurt(enemy, 120 * stats.damageMultiplier, hits)
         enemy.burnFor = Math.max(enemy.burnFor, 3)
         enemy.burnDps = Math.max(enemy.burnDps, 30)
       }
@@ -730,6 +821,8 @@ export function step(world: WorldState, input: Input): WorldState {
 
   if (justActivated) {
     notices.push({ id: nextId, text: `${ultSpec.name}!`, life: 1.8, maxLife: 1.8 })
+    sounds.push('ultimate')
+    addShake(0.75)
     nextId += 1
   }
 
@@ -758,7 +851,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, player.pos) > range + enemy.radius) continue
-        hurt(enemy, damage)
+        hurt(enemy, damage, hits)
         hitAny = true
       }
       if (hitAny || enemies.length > 0) {
@@ -792,7 +885,7 @@ export function step(world: WorldState, input: Input): WorldState {
       let current: EnemyEntity | undefined = target
 
       for (let jump = 0; jump < spec.count && current; jump += 1) {
-        hurt(current, damage)
+        hurt(current, damage, hits)
         hitIds.add(current.id)
         effects.push({
           id: nextId,
@@ -890,7 +983,7 @@ export function step(world: WorldState, input: Input): WorldState {
       if (hitIds.includes(enemy.id)) continue
       if (distance(moved.pos, enemy.pos) > enemy.radius + moved.radius) continue
 
-      hurt(enemy, moved.damage)
+      hurt(enemy, moved.damage, hits)
       hitIds.push(enemy.id)
       hitsLeft -= 1
 
@@ -905,7 +998,7 @@ export function step(world: WorldState, input: Input): WorldState {
         for (const other of enemies) {
           if (other.id === enemy.id || other.hp <= 0) continue
           if (distance(other.pos, moved.pos) > moved.blastRadius + other.radius) continue
-          hurt(other, moved.damage * 0.6)
+          hurt(other, moved.damage * 0.6, hits)
           other.burnFor = Math.max(other.burnFor, moved.burnFor)
           other.burnDps = Math.max(other.burnDps, moved.damage * 0.25)
         }
@@ -944,6 +1037,8 @@ export function step(world: WorldState, input: Input): WorldState {
       distance(moved.pos, player.pos) <= player.radius + moved.radius
     ) {
       hp -= moved.damage * (1 - stats.damageReduction)
+      sounds.push('hurt')
+      addShake(0.35)
       invulnerable = stats.graceSeconds
       continue
     }
@@ -974,6 +1069,34 @@ export function step(world: WorldState, input: Input): WorldState {
       continue
     }
     kills += 1
+
+    /*
+     * เศษที่กระเด็นตอนแตก
+     *
+     * บอสให้เศษเยอะกว่าและกระเด็นแรงกว่ามาก เพราะการล้มบอสได้
+     * คือเหตุการณ์ที่ใหญ่ที่สุดในรอบ ควรดูต่างจากการล้มสไลม์ตัวหนึ่งอย่างชัดเจน
+     *
+     * ตรวจเพดานก่อนสร้างทุกครั้ง ไม่ใช่ตัดทีหลัง เพราะจุดที่ต้องกันคือ
+     * ตอนมอนตายพร้อมกันสิบตัว ซึ่งเป็นตอนที่สร้างของแพงที่สุดพอดี
+     */
+    const burst = enemy.boss ? 26 : enemy.elite ? 12 : 6
+    for (let i = 0; i < burst && particles.length < MAX_PARTICLES; i += 1) {
+      const angle = (i / burst) * Math.PI * 2 + world.time
+      const speed = (enemy.boss ? 200 : 120) * (0.45 + ((i * 37) % 100) / 100)
+      particles.push({
+        id: nextId,
+        pos: { ...enemy.pos },
+        vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+        life: enemy.boss ? 0.9 : 0.5,
+        maxLife: enemy.boss ? 0.9 : 0.5,
+        color: enemy.boss ? '#fbbf24' : enemy.elite ? '#a78bfa' : '#f87171',
+        size: enemy.boss ? 5 : 3,
+      })
+      nextId += 1
+    }
+    sounds.push(enemy.boss ? 'explode' : 'kill')
+    if (enemy.boss) addShake(0.85)
+
     // ชาร์จสกิลวิเศษด้วยการล้มมอน บอสกับตัวใหญ่พิเศษนับหลายตัว
     ultimate = {
       ...ultimate,
@@ -1095,6 +1218,7 @@ export function step(world: WorldState, input: Input): WorldState {
     if (pickup.kind === 'heart') {
       hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.25)
       notices.push({ id: nextId, text: 'ฟื้นเลือด!', life: 1.4, maxLife: 1.4 })
+      sounds.push('heal')
       nextId += 1
     } else if (pickup.kind === 'bomb') {
       // ระเบิดทั้งสนาม เป็นปุ่มหนีตายที่ได้มาจากโชค ไม่ใช่จากการกดปุ่ม
@@ -1109,11 +1233,14 @@ export function step(world: WorldState, input: Input): WorldState {
       })
       nextId += 1
       notices.push({ id: nextId, text: 'ระเบิดทั้งสนาม!', life: 1.4, maxLife: 1.4 })
+      sounds.push('explode')
+      addShake(0.7)
       nextId += 1
     } else if (pickup.kind === 'magnet') {
       for (const gem of gemsAfterPickups) xp += gem.value * stats.xpMultiplier
       gemsAfterPickups = []
       notices.push({ id: nextId, text: 'ดูดคริสตัลทั้งสนาม!', life: 1.4, maxLife: 1.4 })
+      sounds.push('pickup')
       nextId += 1
     } else {
       /*
@@ -1128,6 +1255,7 @@ export function step(world: WorldState, input: Input): WorldState {
       // ได้ XP ด้วยเสมอ หีบจึงคุ้มค่าทันทีแม้ยังไม่มีอาวุธไหนพร้อม
       xp += player.xpToNext * 0.5
       notices.push({ id: nextId, text: 'ได้หีบสมบัติ!', life: 2, maxLife: 2 })
+      sounds.push('chest')
       nextId += 1
     }
   }
@@ -1145,6 +1273,8 @@ export function step(world: WorldState, input: Input): WorldState {
 
     const weaponId = ready[0]
     evolved.push(weaponId)
+    sounds.push('evolve')
+    addShake(0.5)
     chests -= 1
     notices.push({
       id: nextId,
@@ -1160,6 +1290,8 @@ export function step(world: WorldState, input: Input): WorldState {
     for (const enemy of aliveEnemies) {
       if (distance(enemy.pos, player.pos) > enemy.radius + player.radius) continue
       hp -= enemy.damage * (1 - stats.damageReduction)
+      sounds.push('hurt')
+      addShake(0.4)
       // หนามสะท้อนใส่ตัวที่ชน ทำให้การยืนสู้มีทางเล่นของตัวเอง
       if (stats.thornsDamage > 0) hurt(enemy, stats.thornsDamage * stats.damageMultiplier)
       // ช่วงอมตะสั้น ๆ กันโดนรุมจนเลือดหมดในเสี้ยววินาทีโดยไม่มีทางหนี
@@ -1224,6 +1356,39 @@ export function step(world: WorldState, input: Input): WorldState {
 
   const dead = hp <= 0
 
+  /*
+   * ตัวเลขความเสียหาย: ของเดิมที่ยังไม่หมดอายุ บวกของใหม่ในก้าวนี้
+   *
+   * จำกัดจำนวนไว้ เพราะตอนอาวุธครบและมอนแน่น จะมีการตีโดนหลายสิบครั้งต่อก้าว
+   * ตัวเลขที่ซ้อนกันหนาขนาดนั้นอ่านไม่ออกอยู่ดี และบังมอนจนเล่นไม่ได้
+   * เลือกทิ้งของเก่าก่อน เพราะของใหม่คือสิ่งที่เด็กกำลังมองอยู่
+   */
+  const agedNumbers = world.damageNumbers
+    .map((entry) => ({ ...entry, life: entry.life - dt }))
+    .filter((entry) => entry.life > 0)
+
+  const damageNumbers: DamageNumber[] = [...agedNumbers]
+  for (const hit of hits) {
+    damageNumbers.push({
+      id: nextId,
+      pos: { ...hit.pos },
+      amount: Math.max(1, Math.round(hit.amount)),
+      big: hit.big,
+      life: hit.big ? 0.85 : 0.6,
+      maxLife: hit.big ? 0.85 : 0.6,
+      // กระจายซ้ายขวาเล็กน้อย ไม่งั้นการตีรัวจะเห็นเป็นตัวเลขทับกันตัวเดียว
+      drift: ((nextId % 7) - 3) * 11,
+    })
+    nextId += 1
+    if (hit.big) addShake(0.12)
+  }
+  if (hits.length > 0) sounds.push('hit')
+
+  const trimmedNumbers =
+    damageNumbers.length > MAX_DAMAGE_NUMBERS
+      ? damageNumbers.slice(damageNumbers.length - MAX_DAMAGE_NUMBERS)
+      : damageNumbers
+
   return {
     ...world,
     time,
@@ -1237,6 +1402,10 @@ export function step(world: WorldState, input: Input): WorldState {
     projectiles: survivingProjectiles,
     enemyShots: survivingEnemyShots,
     effects,
+    damageNumbers: trimmedNumbers,
+    particles,
+    shake,
+    sounds,
     gems: gemsAfterPickups,
     pickups: remainingPickups,
     notices,
@@ -1266,11 +1435,23 @@ export function step(world: WorldState, input: Input): WorldState {
 export function advance(world: WorldState, elapsedSeconds: number, input: Input): WorldState {
   const steps = Math.min(MAX_STEPS_PER_FRAME, Math.floor(elapsedSeconds / FIXED_STEP))
   let next = world
+  /*
+   * เสียงต้องรวมจากทุกก้าวย่อย ไม่ใช่เอาแค่ก้าวสุดท้าย
+   *
+   * หนึ่งเฟรมของหน้าจอกินเวลาหลายก้าวของเครื่องยนต์
+   * ถ้าเอาแค่ก้าวสุดท้าย เสียงของก้าวก่อนหน้าจะหายไปเงียบ ๆ
+   * ซึ่งแปลว่าบนเครื่องที่เฟรมตก เสียงจะหายไปมากกว่าเครื่องที่ลื่น
+   * เป็นข้อผิดพลาดที่หาสาเหตุยากมาก เพราะเกิดเฉพาะบนเครื่องช้า
+   */
+  const collected: SoundCue[] = []
   for (let i = 0; i < steps; i += 1) {
     next = step(next, input)
+    for (const cue of next.sounds) {
+      if (!collected.includes(cue)) collected.push(cue)
+    }
     if (next.phase !== 'playing') break
   }
-  return next
+  return steps > 0 ? { ...next, sounds: collected } : next
 }
 
 /**

@@ -275,6 +275,17 @@ export function Survivor({ player }: { player: Player }) {
       else if (move.x < -0.06) view.facing = -1
       view.glow = after.ultimate.activeFor > 0 ? ultimate.color : null
 
+      /*
+       * เล่นเสียงที่เครื่องยนต์สั่งไว้ในเฟรมนี้
+       *
+       * เครื่องยนต์เล่นเสียงเองไม่ได้ เพราะต้องเป็นฟังก์ชันบริสุทธิ์
+       * ที่รันในชุดทดสอบโดยไม่มีเบราว์เซอร์ได้ จึงบอกเป็นชื่อไว้ให้ตรงนี้มาอ่าน
+       *
+       * ตัวกันเสียงถี่เกินอยู่ใน audioService แล้ว ตรงนี้จึงส่งไปตรง ๆ ได้
+       * ไม่ต้องกรองซ้ำ ซึ่งถ้ากรองสองที่จะเดาไม่ออกว่าเสียงหายเพราะตัวไหน
+       */
+      for (const cue of after.sounds) playSfx(cue)
+
       draw(canvasRef.current, after, view)
 
       setHud({
@@ -329,7 +340,9 @@ export function Survivor({ player }: { player: Player }) {
         return
       }
       if (after.phase === 'dead') {
-        playSfx('wrong')
+        // เสียงจบรอบของตัวเอง เดิมใช้เสียง "ตอบผิด" ซึ่งสื่อผิดเรื่อง
+        // รอดมาได้ห้านาทีแล้วตายไม่ใช่การตอบผิด และไม่ควรฟังเหมือนกัน
+        playSfx('gameOver')
         setSummary(summarize(after))
         setPhase('dead')
         return
@@ -621,6 +634,26 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
   if (!ctx) return
 
   ctx.clearRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
+
+  /*
+   * กล้องสั่น
+   *
+   * เลื่อนทั้งฉากแทนการเลื่อนของทีละชิ้น เพราะถ้าเลื่อนบางชิ้น
+   * สายตาจะอ่านเป็น "ของชิ้นนั้นขยับ" ไม่ใช่ "จอสั่น" ซึ่งคนละความรู้สึกกัน
+   *
+   * ขนาดสูงสุดจงใจให้เล็ก (สิบพิกเซล) เพราะจอที่สั่นแรงกว่านี้
+   * ทำให้เด็กบางคนเวียนหัว และทำให้เล็งการหลบมอนยากขึ้นจริง ๆ
+   * ซึ่งเป็นการลงโทษเด็กสำหรับเหตุการณ์ที่เขาไม่ได้ทำอะไรผิด
+   */
+  const shake = Math.max(0, Math.min(1, world.shake))
+  ctx.save()
+  if (shake > 0.01) {
+    const power = shake * 10
+    ctx.translate(
+      (Math.random() - 0.5) * power,
+      (Math.random() - 0.5) * power,
+    )
+  }
 
   // พื้นสนามพร้อมตารางจาง ๆ ช่วยให้รู้สึกว่าตัวเองกำลังเคลื่อนที่
   ctx.fillStyle = '#0f0a1e'
@@ -938,6 +971,45 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
   }
 
   /*
+   * เศษที่กระเด็นจากมอนที่แตก
+   * วาดหลังตัวละคร เพราะเป็นของที่ควรพุ่งผ่านหน้าทุกอย่าง
+   */
+  for (const particle of world.particles) {
+    const fade = Math.max(0, particle.life / particle.maxLife)
+    ctx.globalAlpha = fade
+    ctx.fillStyle = particle.color
+    const size = particle.size * (0.4 + fade * 0.6)
+    ctx.fillRect(particle.pos.x - size / 2, particle.pos.y - size / 2, size, size)
+  }
+  ctx.globalAlpha = 1
+
+  /*
+   * ตัวเลขความเสียหาย
+   *
+   * ลอยขึ้นและจางลงพร้อมกัน มีเงาดำรองข้างหลังทุกตัว
+   * เพราะพื้นสนามมีทั้งส่วนมืดและส่วนที่มีมอนสีสว่างทับอยู่
+   * ตัวเลขสีเดียวล้วนจะอ่านไม่ออกบนพื้นบางแบบ ซึ่งเท่ากับไม่ได้ใส่มา
+   */
+  ctx.textAlign = 'center'
+  for (const entry of world.damageNumbers) {
+    const fade = Math.max(0, entry.life / entry.maxLife)
+    const rise = (1 - fade) * 30
+    const x = entry.pos.x + entry.drift * (1 - fade)
+    const y = entry.pos.y - rise
+
+    ctx.font = entry.big
+      ? 'bold 21px system-ui, sans-serif'
+      : 'bold 14px system-ui, sans-serif'
+    ctx.fillStyle = `rgba(15,10,30,${fade * 0.85})`
+    ctx.fillText(`${entry.amount}`, x + 1.5, y + 1.5)
+    ctx.fillStyle = entry.big
+      ? `rgba(253,224,71,${fade})`
+      : `rgba(248,250,252,${fade * 0.92})`
+    ctx.fillText(`${entry.amount}`, x, y)
+  }
+  ctx.textAlign = 'start'
+
+  /*
    * ข้อความแจ้งเหตุการณ์สำคัญ วาดท้ายสุดให้อยู่บนสุดเสมอ
    * ลอยขึ้นและจางลงพร้อมกัน ตาจึงจับได้แม้กำลังโฟกัสที่การหลบมอนอยู่
    */
@@ -954,6 +1026,8 @@ function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: HeroVie
     ctx.fillText(notice.text, ARENA_WIDTH / 2, y)
   })
   ctx.textAlign = 'start'
+
+  ctx.restore()
 }
 
 /* ---------- ส่วนประกอบหน้าจอ ---------- */
