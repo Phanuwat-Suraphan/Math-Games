@@ -44,6 +44,7 @@
     "src/services/upgradeService.ts",
     "src/services/avatarService.ts",
     "src/services/perkService.ts",
+    "src/services/recordService.ts",
     "src/services/storyService.ts",
     "src/battle/**/*.ts"
   ]

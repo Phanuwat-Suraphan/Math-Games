@@ -1589,8 +1589,16 @@ export interface RunSummary {
   level: number
   coins: number
   bossesDown: number
-  /** ชื่อร่างสมบูรณ์ที่ทำได้ในรอบนี้ */
+  /** ชื่อร่างสมบูรณ์ที่ทำได้ในรอบนี้ ใช้แสดงบนหน้าจอสรุป */
   evolvedNames: string[]
+  /**
+   * รหัสอาวุธที่ปลุกร่างสมบูรณ์ได้ในรอบนี้
+   *
+   * แยกจาก evolvedNames เพราะสมุดสถิติต้องเก็บรหัสที่ไม่เปลี่ยน
+   * ถ้าเก็บชื่อที่แปลแล้ว วันไหนแก้ชื่อร่างสมบูรณ์ให้เพราะขึ้น
+   * ของที่เด็กเคยเก็บได้จะกลายเป็นของคนละใบทันที
+   */
+  evolvedIds: string[]
   /** ใช้สกิลวิเศษไปกี่ครั้ง */
   ultimatesUsed: number
 }
@@ -1608,6 +1616,7 @@ export function summarize(world: WorldState): RunSummary {
     coins: Math.floor(world.time / 3) + world.kills * 2 + world.bossesDown * 25,
     bossesDown: world.bossesDown,
     evolvedNames: world.evolved.map((id) => weaponDisplayName(id, true)),
+    evolvedIds: [...world.evolved],
     ultimatesUsed: world.ultimate.used,
   }
 }

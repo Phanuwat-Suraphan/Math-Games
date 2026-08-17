@@ -9,6 +9,7 @@ import { generateQuestion } from '../questionEngine'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
 import { allPerkLevels, buyPerk, perkBlockedReason, perkLevel } from '../services/perkService'
+import { recordSurvivorRun } from '../services/recordService'
 import { PERKS, perkCost } from '../data/perks'
 import {
   advance,
@@ -398,8 +399,24 @@ export function Survivor({ player }: { player: Player }) {
     if (phase !== 'dead' || !summary || paidRef.current) return
     paidRef.current = true
 
+    /*
+     * บันทึกสถิติพร้อมกับจ่ายเหรียญในจังหวะเดียวกัน
+     *
+     * ทำที่เดียวกันโดยตั้งใจ เพราะสองอย่างนี้ต้องเกิดหรือไม่เกิดพร้อมกันเสมอ
+     * ถ้าแยกเป็นสอง effect จะมีทางที่รอบหนึ่งได้เหรียญแต่ไม่ถูกนับสถิติ
+     * ซึ่งเด็กจะเห็นว่า "เล่นแล้วแต่จำนวนรอบไม่ขึ้น" โดยไม่มีอะไรอธิบายได้
+     */
     const gained = applyBonusPercent(summary.coins, totalStats(player).coinBonusPercent)
-    if (gained > 0) patchPlayer({ coins: player.coins + gained })
+    patchPlayer({
+      coins: player.coins + Math.max(0, gained),
+      records: recordSurvivorRun(player, {
+        survivedSeconds: summary.survivedSeconds,
+        kills: summary.kills,
+        bossesDown: summary.bossesDown,
+        evolvedIds: summary.evolvedIds,
+        ultimatesUsed: summary.ultimatesUsed,
+      }),
+    })
   }, [patchPlayer, phase, player, summary])
 
   const start = useCallback(() => {

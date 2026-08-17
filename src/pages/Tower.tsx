@@ -20,6 +20,7 @@ import {
 } from '../roguelike/engine'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
+import { recordTowerRun } from '../services/recordService'
 import type { Floor, RunState } from '../roguelike/types'
 import type { Question } from '../questionEngine/types'
 import type { Player } from '../types/player'
@@ -176,7 +177,10 @@ export function Tower({ player }: { player: Player }) {
       payout(runRef.current),
       totalStats(player).coinBonusPercent,
     )
-    if (gained > 0) patchPlayer({ coins: player.coins + gained })
+    patchPlayer({
+      coins: player.coins + Math.max(0, gained),
+      records: recordTowerRun(player, runRef.current.reachedFloor),
+    })
   }, [patchPlayer, phase, player])
 
   const restart = useCallback(() => {

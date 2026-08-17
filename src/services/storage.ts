@@ -7,10 +7,12 @@ import { STORY_BEATS } from '../data/story'
 import { STAGES, getStage } from '../data/stages'
 import { EQUIP_SLOTS } from './inventoryService'
 import { MAX_STARS } from './upgradeService'
+import { createEmptyRecords } from './recordService'
 import { getPerk } from '../data/perks'
 import type { Equipment } from '../types/item'
 import type { GameSettings, Player } from '../types/player'
 import type { DailyQuestState, QuestProgress } from '../types/quest'
+import type { PlayerRecords } from '../types/records'
 import type { StageProgress } from '../types/stage'
 import type {
   PlayerStatistics,
@@ -33,7 +35,7 @@ const PLAYER_KEY = 'math-adventure:player:v1'
 const SETTINGS_KEY = 'math-adventure:settings:v1'
 
 /** เวอร์ชันโครงสร้างข้อมูลปัจจุบัน เพิ่มเลขนี้เมื่อรูปแบบข้อมูลเปลี่ยน แล้วเขียน migration รองรับ */
-export const CURRENT_SAVE_VERSION = 7
+export const CURRENT_SAVE_VERSION = 8
 
 export const DEFAULT_SETTINGS: GameSettings = {
   soundEnabled: true,
@@ -161,6 +163,7 @@ export function createPlayer(name: string, avatar: string): Player {
     equipped: {},
     upgrades: {},
     perks: {},
+    records: createEmptyRecords(),
     // ตัวละครที่เลือกตอนสร้างผู้เล่นถือว่าเป็นของตัวเองทันที
     ownedAvatars: [isValidAvatarId(avatar) ? avatar : DEFAULT_AVATAR_ID],
 
@@ -374,6 +377,7 @@ function parsePlayer(raw: unknown): Player | null {
     equipped: parseEquipped(raw.equipped),
     upgrades: parseUpgrades(raw.upgrades),
     perks: parsePerks(raw.perks),
+    records: parseRecords(raw.records),
     ownedAvatars: parseOwnedAvatars(raw.ownedAvatars, avatar),
 
     statistics: parseStatistics(raw.statistics),
@@ -446,6 +450,37 @@ function parsePerks(raw: unknown): Record<string, number> {
  * ตัวที่ใช้อยู่ต้องอยู่ในรายการเสมอ ไม่ว่าไฟล์บันทึกจะเขียนว่าอย่างไร
  * ไม่งั้นจะเกิดสภาพที่เด็กใช้ตัวละครที่ระบบบอกว่าไม่มี ซึ่งออกจากไม่ได้
  */
+/**
+ * อ่านสมุดสถิติ
+ *
+ * ทุกช่องเป็นตัวนับที่ต้องไม่ติดลบและต้องเป็นจำนวนเต็ม
+ * ถ้าค่าไหนพัง ให้ช่องนั้นกลับไปเป็นศูนย์ ไม่ทิ้งทั้งก้อน
+ * เพราะสถิติช่องอื่นที่ยังดีอยู่ไม่ควรหายไปด้วย
+ */
+function parseRecords(raw: unknown): PlayerRecords {
+  const empty = createEmptyRecords()
+  if (!isRecord(raw)) return empty
+
+  const count = (value: unknown) => toSafeInt(value, 0, 0, 9_999_999)
+  const evolutions = Array.isArray(raw.survivorEvolutions)
+    ? raw.survivorEvolutions.filter(
+        (id): id is string => typeof id === 'string' && id.length > 0 && id.length <= 40,
+      )
+    : []
+
+  return {
+    survivorRuns: count(raw.survivorRuns),
+    survivorBestSeconds: count(raw.survivorBestSeconds),
+    survivorKills: count(raw.survivorKills),
+    survivorBossKills: count(raw.survivorBossKills),
+    survivorEvolutions: [...new Set(evolutions)].slice(0, 40),
+    survivorUltimates: count(raw.survivorUltimates),
+    duelPlays: count(raw.duelPlays),
+    duelWins: count(raw.duelWins),
+    towerBestFloor: count(raw.towerBestFloor),
+  }
+}
+
 function parseOwnedAvatars(raw: unknown, currentAvatarId: string): string[] {
   const owned = new Set<string>()
   if (Array.isArray(raw)) {
@@ -501,6 +536,20 @@ function parseStoryFlags(raw: unknown): string[] {
     flags.push(value)
   }
   return flags
+}
+
+/**
+ * เวอร์ชัน 7 → เวอร์ชัน 8
+ *
+ * เพิ่มสมุดสถิติของสนามรบ ศึกผ่าสมการ และหอคอย
+ *
+ * ผู้เล่นเดิมเริ่มจากศูนย์ทุกช่อง ทั้งที่บางคนเล่นสนามรบมาแล้วหลายรอบ
+ * ตั้งใจเป็นแบบนี้ เพราะไม่มีข้อมูลเก่าให้กู้คืนได้จริง
+ * การเดาตัวเลขให้จะแย่กว่าการเริ่มนับใหม่อย่างตรงไปตรงมา
+ */
+function migrateV7ToV8(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw
+  return { ...raw, records: createEmptyRecords() }
 }
 
 /**
@@ -640,11 +689,24 @@ function migrateV2ToV3(raw: unknown): unknown {
 
 /** อ่านซองข้อมูลและแปลงให้เป็นเวอร์ชันปัจจุบันทีละขั้น */
 function migrateToCurrent(parsed: unknown): unknown {
-  // เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
+  /*
+   * เวอร์ชัน 1 บันทึก Player ไว้ตรง ๆ โดยไม่มีซองครอบ
+   *
+   * เขียนเป็นลูปแทนการเรียกซ้อนกัน เพราะการเรียกซ้อนอ่านย้อนจากในออกนอก
+   * ซึ่งกลับทิศกับลำดับที่มันทำงานจริง และทุกครั้งที่เพิ่มเวอร์ชันใหม่
+   * ต้องหาให้เจอว่าชั้นนอกสุดอยู่ตรงไหน ซึ่งเป็นจุดที่พลาดง่ายมาก
+   */
   if (isRecord(parsed) && !('version' in parsed)) {
-    return migrateV6ToV7(
-      migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(parsed))))),
-    )
+    const steps = [
+      migrateV1ToV2,
+      migrateV2ToV3,
+      migrateV3ToV4,
+      migrateV4ToV5,
+      migrateV5ToV6,
+      migrateV6ToV7,
+      migrateV7ToV8,
+    ]
+    return steps.reduce<unknown>((data, step) => step(data), parsed)
   }
 
   if (!isRecord(parsed)) return null
@@ -658,6 +720,7 @@ function migrateToCurrent(parsed: unknown): unknown {
   if (version <= 4) player = migrateV4ToV5(player)
   if (version <= 5) player = migrateV5ToV6(player)
   if (version <= 6) player = migrateV6ToV7(player)
+  if (version <= 7) player = migrateV7ToV8(player)
 
   return player
 }

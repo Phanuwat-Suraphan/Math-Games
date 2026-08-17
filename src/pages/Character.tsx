@@ -10,6 +10,7 @@ import { StreakBadge } from '../components/StreakBadge'
 import { TopBar } from '../components/TopBar'
 import { getAvatar } from '../data/avatars'
 import { useProgression } from '../hooks/useProgression'
+import { recordsOf } from '../services/recordService'
 import type { Player } from '../types/player'
 import { getExpProgress, getTotalExp } from '../utils/experience'
 import { getOverallAccuracy } from '../utils/statistics'
@@ -149,6 +150,8 @@ export function Character({ player }: { player: Player }) {
           )}
         </section>
 
+        <HallOfRecords player={player} />
+
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           {progression.nextStage ? (
             <Button
@@ -182,6 +185,85 @@ export function Character({ player }: { player: Player }) {
         </p>
       </ScreenLayout>
     </>
+  )
+}
+
+/**
+ * หอเกียรติยศ: สถิติของโหมดที่จบในรอบเดียว
+ *
+ * โหมดพวกนี้ไม่ทิ้งร่องรอยไว้บนแผนที่เหมือนด่านเนื้อเรื่อง
+ * จบรอบแล้วหน้าจอสรุปก็หายไปพร้อมกับตัวเลขทั้งหมด
+ * แผงนี้คือที่เดียวที่เด็กย้อนกลับมาดูได้ว่าตัวเองเคยทำอะไรไว้บ้าง
+ *
+ * ซ่อนทั้งแผงถ้ายังไม่เคยเล่นโหมดไหนเลย เพราะแผงที่เป็นศูนย์ทั้งแถว
+ * ไม่ได้บอกอะไรนอกจากทำให้หน้าจอยาวขึ้น
+ */
+function HallOfRecords({ player }: { player: Player }) {
+  const records = recordsOf(player)
+  const played =
+    records.survivorRuns > 0 || records.duelPlays > 0 || records.towerBestFloor > 0
+  if (!played) return null
+
+  const minutes = Math.floor(records.survivorBestSeconds / 60)
+  const seconds = records.survivorBestSeconds % 60
+
+  return (
+    <section aria-label="หอเกียรติยศ" className="panel panel-corners mt-5 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-lg font-bold text-white">🏛️ หอเกียรติยศ</h3>
+        <p className="text-sm text-slate-400">สถิติจากสนามรบ ศึกผ่าสมการ และหอคอย</p>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {records.survivorRuns > 0 ? (
+          <>
+            <StatBox
+              label="รอดนานที่สุด"
+              value={`${minutes}:${String(seconds).padStart(2, '0')}`}
+              tone="text-gold-300"
+            />
+            <StatBox
+              label="ลงสนามรบ"
+              value={`${records.survivorRuns.toLocaleString('th-TH')} รอบ`}
+            />
+            <StatBox
+              label="ล้มมอนสเตอร์"
+              value={records.survivorKills.toLocaleString('th-TH')}
+            />
+            <StatBox
+              label="ล้มบอส"
+              value={records.survivorBossKills.toLocaleString('th-TH')}
+              tone="text-ember-400"
+            />
+            <StatBox
+              label="ร่างสมบูรณ์"
+              value={`${records.survivorEvolutions.length} แบบ`}
+              tone="text-arcane-400"
+            />
+            <StatBox
+              label="ใช้สกิลวิเศษ"
+              value={`${records.survivorUltimates.toLocaleString('th-TH')} ครั้ง`}
+            />
+          </>
+        ) : null}
+
+        {records.duelPlays > 0 ? (
+          <StatBox
+            label="ชนะศึกผ่าสมการ"
+            value={`${records.duelWins} / ${records.duelPlays} ตา`}
+            tone="text-gold-300"
+          />
+        ) : null}
+
+        {records.towerBestFloor > 0 ? (
+          <StatBox
+            label="ชั้นหอคอยสูงสุด"
+            value={`ชั้น ${records.towerBestFloor}`}
+            tone="text-gold-300"
+          />
+        ) : null}
+      </dl>
+    </section>
   )
 }
 

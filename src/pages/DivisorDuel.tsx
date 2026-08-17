@@ -2,7 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
+import { useGame } from '../context/useGame'
 import { playSfx } from '../services/audioService'
+import { applyBonusPercent, totalStats } from '../services/inventoryService'
+import { recordDuel } from '../services/recordService'
 import { HeroArt, ItemArt, MonsterArt } from '../components/art/GameArt'
 import {
   duelHeroArt,
@@ -57,6 +60,8 @@ export function DivisorDuel({ player }: { player: Player }) {
   const [level, setLevel] = useState<AiLevel>('normal')
   const [target, setTarget] = useState<TargetOption | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  /** เหรียญที่ได้จากตาที่เพิ่งจบ เก็บไว้เพื่อบอกเด็กบนหน้าจอสรุป */
+  const [reward, setReward] = useState(0)
 
   /*
    * ธงกันคอมพิวเตอร์เดินซ้อนกัน
@@ -67,6 +72,16 @@ export function DivisorDuel({ player }: { player: Player }) {
    */
   const aiBusyRef = useRef(false)
 
+  /*
+   * ธงกันจ่ายรางวัลซ้ำ
+   *
+   * เหตุผลเดียวกับสนามรบและหอคอย: React เรียก effect ซ้ำได้
+   * และการที่ผู้เล่นเปลี่ยนไปหลังจ่ายเหรียญก็ทำให้ effect ทำงานอีกรอบด้วย
+   * ถ้าไม่กันไว้ ตาเดียวจะจ่ายเหรียญไม่รู้จบ
+   */
+  const paidRef = useRef(false)
+  const { patchPlayer } = useGame()
+
   const say = useCallback((message: string) => {
     setNotice(message)
     window.setTimeout(() => setNotice(null), 2400)
@@ -74,6 +89,8 @@ export function DivisorDuel({ player }: { player: Player }) {
 
   const start = useCallback(() => {
     aiBusyRef.current = false
+    paidRef.current = false
+    setReward(0)
     setTarget(null)
     setState(
       createGame({
@@ -85,6 +102,28 @@ export function DivisorDuel({ player }: { player: Player }) {
       }),
     )
   }, [heroId, player.name])
+
+  /*
+   * จ่ายรางวัลและบันทึกสถิติเมื่อตาจบ
+   *
+   * แพ้ก็ยังได้เหรียญ แค่น้อยกว่าชนะมาก
+   * เพราะเกมนี้ยากกว่าโหมดอื่นอย่างชัดเจน เด็กต้องคิดสมการให้หารลงตัว
+   * ถ้าแพ้แล้วได้ศูนย์ เด็กที่ยังคิดไม่คล่องจะเลิกเล่นตั้งแต่ตาที่สอง
+   * ทั้งที่เป็นกลุ่มที่ได้ประโยชน์จากเกมนี้มากที่สุด
+   */
+  useEffect(() => {
+    if (!state?.winner || paidRef.current) return
+    paidRef.current = true
+
+    const won = state.winner === 'p1'
+    const base = won ? 70 : 18
+    const gained = applyBonusPercent(base, totalStats(player).coinBonusPercent)
+    setReward(gained)
+    patchPlayer({
+      coins: player.coins + Math.max(0, gained),
+      records: recordDuel(player, won),
+    })
+  }, [patchPlayer, player, state?.winner])
 
   /* ตาของคอมพิวเตอร์ เดินเองทั้งหมด */
   useEffect(() => {
@@ -543,6 +582,11 @@ export function DivisorDuel({ player }: { player: Player }) {
             <h2 className="title-gold text-2xl font-black">
               {state.winner === 'p1' ? 'ชนะแล้ว!' : 'แพ้แล้ว ลองใหม่นะ'}
             </h2>
+            <p className="mt-2 text-sm text-slate-300">
+              ได้รับ{' '}
+              <span className="font-black tabular-nums text-gold-300">{reward}</span>{' '}
+              เหรียญ
+            </p>
             <Button size="lg" fullWidth className="mt-4" onClick={start}>
               ดวลอีกรอบ
             </Button>

@@ -1,5 +1,6 @@
 import type { Equipment } from './item'
 import type { DailyQuestState, QuestProgress } from './quest'
+import type { PlayerRecords } from './records'
 import type { StageProgress } from './stage'
 import type { PlayerStatistics, QuestionAttempt } from './stats'
 
@@ -63,6 +64,14 @@ export interface Player {
    * upgrades ผูกกับของที่ต้องมีและต้องสวม ส่วนพลังถาวรไม่ต้องมีอะไรก่อน
    */
   perks: Record<string, number>
+
+  /**
+   * สถิติของโหมดที่จบในรอบเดียว (สนามรบ ศึกผ่าสมการ หอคอย)
+   *
+   * โหมดเหล่านี้ไม่ทิ้งร่องรอยไว้ที่อื่นเลย ต่างจากด่านเนื้อเรื่อง
+   * ที่มี completedStages กับ stageProgress เก็บให้อยู่แล้ว
+   */
+  records: PlayerRecords
 
   statistics: PlayerStatistics
   /** ประวัติการตอบล่าสุด เก็บจำกัดจำนวนตาม MAX_RECENT_ATTEMPTS */
