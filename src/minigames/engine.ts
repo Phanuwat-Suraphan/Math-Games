@@ -14,6 +14,7 @@ import type {
   DragDropGame,
   MatchingGame,
   MinigameResult,
+  PathGame,
 } from './types'
 
 /** สองใบนี้เป็นคู่กันไหม */
@@ -47,6 +48,51 @@ export function isConnectComplete(
 ): boolean {
   const expected = Object.keys(game.solution)
   return expected.every((leftId) => links[leftId] === game.solution[leftId])
+}
+
+/**
+ * ก้าวจากช่องหนึ่งไปอีกช่องหนึ่งถูกกฎไหม
+ *
+ * กฎมีสองข้อและต้องผ่านทั้งคู่
+ *   1. ต้องลงแถวถัดไปพอดี และเลื่อนซ้ายขวาได้ไม่เกินหนึ่งช่อง
+ *   2. ค่าต้องมากกว่าช่องที่ยืนอยู่เท่ากับ step พอดี
+ *
+ * ตรวจทั้งสองข้อที่นี่ที่เดียว ไม่ให้หน้าจอตรวจข้อใดข้อหนึ่งเอง
+ * เพราะถ้าหน้าจอตรวจเรื่องตำแหน่งด้วยการดูว่าปุ่มไหนกดได้
+ * แล้ววันหนึ่งมีคนเปลี่ยนวิธีวางปุ่ม กฎการเดินจะเปลี่ยนตามไปโดยไม่ตั้งใจ
+ */
+export function isPathStepValid(
+  game: PathGame,
+  fromCellId: string,
+  toCellId: string,
+): boolean {
+  const from = game.cells.find((cell) => cell.id === fromCellId)
+  const to = game.cells.find((cell) => cell.id === toCellId)
+  if (!from || !to) return false
+
+  if (to.row !== from.row + 1) return false
+  if (Math.abs(to.col - from.col) > 1) return false
+  return to.value === from.value + game.step
+}
+
+/** เดินถึงแถวล่างสุดแล้วหรือยัง */
+export function isPathComplete(game: PathGame, walked: readonly string[]): boolean {
+  if (walked.length !== game.rows) return false
+
+  const last = game.cells.find((cell) => cell.id === walked[walked.length - 1])
+  if (!last || last.row !== game.rows - 1) return false
+
+  /*
+   * ตรวจทุกก้าวซ้ำอีกครั้งตอนจบ ไม่เชื่อว่าหน้าจอตรวจมาแล้ว
+   *
+   * เพราะถ้าวันหนึ่งหน้าจอมีทางที่ใส่ช่องเข้ามาโดยไม่ผ่านการตรวจ
+   * (เช่นปุ่มย้อนกลับที่เขียนผิด) ด่านจะผ่านได้ทั้งที่เดินผิดกฎ
+   */
+  if (walked[0] !== game.startCellId) return false
+  for (let i = 1; i < walked.length; i += 1) {
+    if (!isPathStepValid(game, walked[i - 1], walked[i])) return false
+  }
+  return true
 }
 
 /** แผ่นที่วางในช่องนี้ถูกไหม */

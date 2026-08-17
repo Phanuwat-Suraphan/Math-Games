@@ -6,6 +6,7 @@ import { CatchBoard } from '../components/minigames/CatchBoard'
 import { ConnectBoard } from '../components/minigames/ConnectBoard'
 import { DragDropBoard } from '../components/minigames/DragDropBoard'
 import { MatchingBoard } from '../components/minigames/MatchingBoard'
+import { PathBoard } from '../components/minigames/PathBoard'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { useGame } from '../context/useGame'
@@ -239,6 +240,14 @@ function MinigameSession({
           )}
           {game.kind === 'catch' && (
             <CatchBoard game={game} onAnswer={handleAnswer} onFinished={finish} />
+          )}
+          {game.kind === 'path' && (
+            <PathBoard
+              game={game}
+              onAnswer={handleAnswer}
+              onSolved={() => finish(true)}
+              onFailed={() => finish(false)}
+            />
           )}
         </motion.div>
 

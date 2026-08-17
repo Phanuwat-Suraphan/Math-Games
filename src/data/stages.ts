@@ -74,7 +74,7 @@ export const STAGES: Stage[] = [
   {
     id: 'world-1-stage-4',
     activity: 'minigame',
-    minigameKind: 'matching',
+    minigameKind: 'path',
     worldId: 'world-1',
     regionId: 'w1-deep',
     name: 'ป่าการคูณ',
@@ -553,7 +553,7 @@ export const STAGES: Stage[] = [
   {
     id: 'world-3-stage-5',
     activity: 'minigame',
-    minigameKind: 'connect',
+    minigameKind: 'path',
     worldId: 'world-3',
     regionId: 'w3-desert',
     name: 'บ่อน้ำวัดระดับ',
@@ -1040,7 +1040,7 @@ export const STAGES: Stage[] = [
   {
     id: 'world-5-stage-7',
     activity: 'minigame',
-    minigameKind: 'connect',
+    minigameKind: 'path',
     worldId: 'world-5',
     regionId: 'w5-mountain',
     name: 'หน้าผาเส้นขนาน',
@@ -1194,7 +1194,7 @@ export const STAGES: Stage[] = [
   {
     id: 'world-6-stage-4',
     activity: 'minigame',
-    minigameKind: 'connect',
+    minigameKind: 'path',
     worldId: 'world-6',
     regionId: 'w6-cave',
     name: 'เส้นทางลับในถ้ำ',

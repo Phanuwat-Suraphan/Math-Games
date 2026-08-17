@@ -75,7 +75,19 @@ function everyGame(seedCount = 6) {
 const ALL = everyGame()
 
 check('สร้างได้ครบทุกชนิด ทุกทักษะ ทุกชั้น', () => {
-  assert(ALL.length === 4 * 9 * 3 * 6, `สร้างได้ ${ALL.length} เกม`)
+  /*
+   * นับจากรายการชนิดจริง ไม่ใช้เลขตายตัว
+   *
+   * เดิมเขียนไว้ว่า 4 ชนิด พอเพิ่มชนิดที่ห้าเข้ามา ข้อนี้ก็ไม่ผ่านทันที
+   * ทั้งที่ไม่มีอะไรเสียหายเลย เป็นเพียงตัวเลขในชุดทดสอบที่ล้าสมัย
+   * การนับจากรายการจริงทำให้ข้อนี้ยังตรวจสิ่งที่ตั้งใจตรวจ
+   * คือ "สร้างได้ครบทุกส่วนผสม" โดยไม่ต้องมาแก้เลขทุกครั้งที่เพิ่มเกม
+   */
+  const expected = GEN.MINIGAME_KINDS.length * 9 * 3 * 6
+  assert(
+    ALL.length === expected,
+    `สร้างได้ ${ALL.length} เกม คาดว่า ${expected}`,
+  )
   assert(
     ALL.every((game) => game && typeof game.id === 'string' && game.id.length > 0),
     'มีเกมที่ไม่มี id',
@@ -535,6 +547,179 @@ check('ด่านในโลกหนึ่งต้องมีกิจก�
   )
   assert(kinds.size >= 3, `โลก 1 มีกิจกรรมแค่ ${kinds.size} แบบ`)
   assert(kinds.has('minigame'), 'โลก 1 ยังไม่มีด่านมินิเกมเลย')
+})
+
+/* ── เส้นทางลับ ──────────────────────────────────────────── */
+
+const PATH_BOARDS = []
+for (const grade of [4, 5, 6]) {
+  for (let i = 0; i < 120; i += 1) {
+    PATH_BOARDS.push(
+      GEN.generateMinigame({ kind: 'path', skill: 'multiplication', grade, seed: `เส้นทาง-${i}` }),
+    )
+  }
+}
+
+check('ทุกกระดานเส้นทางลับต้องเดินจนจบได้จริง', () => {
+  /*
+   * กระดานที่เดินไม่ได้คือด่านที่เด็กเล่นยังไงก็ไม่ผ่าน
+   * และจะเกิดเฉพาะบางเมล็ดสุ่มเท่านั้น ซึ่งเป็นบั๊กที่หาเจอยากที่สุด
+   * เพราะเปิดทดสอบสิบครั้งอาจไม่เจอสักครั้ง แต่เด็กในห้องสามสิบคนเจอแน่
+   */
+  for (const game of PATH_BOARDS) {
+    assert(
+      ENGINE.isPathComplete(game, game.solution),
+      `${game.id} เฉลยของตัวเองยังเดินไม่ผ่าน`,
+    )
+  }
+})
+
+check('เส้นทางที่ถูกต้องต้องมีเส้นเดียว ไม่มีทางลัดที่ไม่ได้ตั้งใจ', () => {
+  /*
+   * ถ้ามีเส้นทางที่สองที่เราไม่ได้ตั้งใจสร้าง เด็กที่เดินทางนั้น
+   * จะเดินตามกฎทุกข้อแต่ไปไม่ถึงปลายทาง แล้วโดนบอกว่าเหยียบผิด
+   * ซึ่งไม่ยุติธรรมอย่างยิ่ง และเด็กจะไม่มีทางเข้าใจว่าตัวเองผิดตรงไหน
+   */
+  for (const game of PATH_BOARDS) {
+    const byRow = {}
+    for (const cell of game.cells) {
+      byRow[cell.row] = byRow[cell.row] ?? []
+      byRow[cell.row].push(cell)
+    }
+
+    let frontier = [game.cells.find((cell) => cell.id === game.startCellId)]
+    for (let row = 1; row < game.rows; row += 1) {
+      const next = []
+      for (const from of frontier) {
+        for (const to of byRow[row]) {
+          if (ENGINE.isPathStepValid(game, from.id, to.id)) next.push(to)
+        }
+      }
+      frontier = next
+    }
+
+    assert(frontier.length === 1, `${game.id} มีเส้นทางที่เดินได้ ${frontier.length} เส้น` + ` (ได้ ${frontier.length})`)
+  }
+})
+
+check('กฎการเดินต้องตรวจทั้งตำแหน่งและค่า', () => {
+  const game = PATH_BOARDS[0]
+  const start = game.cells.find((cell) => cell.id === game.startCellId)
+  const correct = game.cells.find((cell) => cell.id === game.solution[1])
+
+  assert(ENGINE.isPathStepValid(game, start.id, correct.id), 'ก้าวที่ถูกต้องกลับไม่ผ่าน')
+
+  // ข้ามแถวไม่ได้ แม้ค่าจะพอดี
+  const twoRowsDown = game.cells.find(
+    (cell) => cell.row === 2 && cell.value === start.value + game.step,
+  )
+  if (twoRowsDown) {
+    assert(
+      !ENGINE.isPathStepValid(game, start.id, twoRowsDown.id),
+      'ข้ามแถวได้ ทั้งที่กฎบอกว่าต้องลงทีละแถว',
+    )
+  }
+
+  // เยื้องเกินหนึ่งช่องไม่ได้
+  const farColumn = game.cells.find(
+    (cell) => cell.row === 1 && Math.abs(cell.col - start.col) > 1,
+  )
+  if (farColumn) {
+    assert(
+      !ENGINE.isPathStepValid(game, start.id, farColumn.id),
+      'เยื้องเกินหนึ่งช่องได้ ทั้งที่กฎห้ามไว้',
+    )
+  }
+})
+
+check('เดินไม่ครบทุกแถว ต้องยังไม่นับว่าจบ', () => {
+  /*
+   * ถ้านับว่าจบตั้งแต่ยังไม่ถึงแถวล่างสุด เด็กจะผ่านด่านโดยเดินแค่สองก้าว
+   */
+  for (const game of PATH_BOARDS.slice(0, 40)) {
+    assert(
+      !ENGINE.isPathComplete(game, game.solution.slice(0, -1)),
+      `${game.id} นับว่าจบทั้งที่ยังเดินไม่ถึงแถวล่างสุด`,
+    )
+    assert(
+      !ENGINE.isPathComplete(game, [game.startCellId]),
+      `${game.id} นับว่าจบตั้งแต่ยังไม่ได้เดินเลย`,
+    )
+  }
+})
+
+check('เส้นทางที่ผิดกฎต้องไม่ถูกนับว่าจบ แม้จะยาวครบแถว', () => {
+  /*
+   * ตัวตรวจตอนจบต้องไล่ตรวจทุกก้าวซ้ำอีกครั้ง ไม่เชื่อว่าหน้าจอตรวจมาแล้ว
+   * เพราะถ้าวันหนึ่งหน้าจอมีทางใส่ช่องเข้ามาโดยไม่ผ่านการตรวจ
+   * ด่านจะผ่านได้ทั้งที่เดินผิดกฎ
+   */
+  for (const game of PATH_BOARDS.slice(0, 40)) {
+    const fake = game.solution.slice()
+    const wrongCell = game.cells.find(
+      (cell) => cell.row === game.rows - 1 && cell.id !== fake[fake.length - 1],
+    )
+    if (!wrongCell) continue
+    fake[fake.length - 1] = wrongCell.id
+
+    assert(
+      !ENGINE.isPathComplete(game, fake),
+      `${game.id} ยอมรับเส้นทางที่ก้าวสุดท้ายผิดกฎ`,
+    )
+  }
+})
+
+check('ขนาดก้าวและกระดานเหมาะกับชั้นของเด็ก', () => {
+  for (const game of PATH_BOARDS) {
+    assert(game.step >= 2, `${game.id} ก้าวเล็กเกินไปจนไม่ต้องคิด`)
+    assert(game.step <= 12, `${game.id} ก้าว ${game.step} ใหญ่เกินกว่าจะคิดในใจ`)
+    assert(game.rows >= 5, `${game.id} เตี้ยเกินไป จบเร็วจนไม่รู้สึกว่าได้ข้ามอะไร`)
+    assert(
+      game.cells.length === game.rows * game.cols,
+      `${game.id} จำนวนช่องไม่ตรงกับขนาดกระดาน (ได้ ${game.cells.length})`,
+    )
+    assert(game.solution.length === game.rows, `${game.id} เฉลยไม่ครบทุกแถว` + ` (ได้ ${game.solution.length})`)
+    assert(
+      game.cells.every((cell) => cell.value > 0),
+      `${game.id} มีช่องที่ค่าติดลบหรือเป็นศูนย์`,
+    )
+  }
+})
+
+check('มินิเกมทุกชนิดต้องมีด่านที่เรียกใช้จริง', () => {
+  /*
+   * ปัญหาแบบเดียวกับเพลงที่แต่งไว้แต่ไม่มีหน้าไหนเปิด
+   *
+   * ชนิดเกมที่ไม่มีด่านไหนเรียกใช้จะไม่พัง ไม่มี error ไม่มีคำเตือน
+   * มันแค่ไม่เคยถูกเล่นเลยตลอดทั้งเกม และไม่มีทางรู้ได้
+   * นอกจากจะไล่เปิดทุกด่านแล้วจำว่าเจอชนิดไหนไปแล้วบ้าง
+   *
+   * ตอนเพิ่ม "เส้นทางลับ" เข้ามา ผมเขียนตัวสร้างและหน้าจอเสร็จหมดแล้ว
+   * แต่ยังไม่มีด่านไหนตั้งค่าให้ใช้มัน มันจึงพร้อมเล่นแต่ไปไม่ถึงมือเด็ก
+   */
+  const used = new Set(
+    STAGES.STAGES.map((stage) => stage.minigameKind).filter(Boolean),
+  )
+  const unused = GEN.MINIGAME_KINDS.filter((kind) => !used.has(kind))
+
+  assert(
+    unused.length === 0,
+    `มีชนิดที่ไม่มีด่านไหนเรียกใช้: ${unused.join(', ')} — จะไม่เคยถูกเล่นเลย`,
+  )
+})
+
+check('ด่านมินิเกมทุกด่านต้องระบุชนิดที่มีอยู่จริง', () => {
+  /*
+   * ถ้าระบุชนิดที่สะกดผิด หน้าจอจะตกไปใช้ค่าสำรองคือเกมจับคู่
+   * ด่านนั้นจะเล่นได้ตามปกติ แต่เป็นคนละเกมกับที่ตั้งใจ โดยไม่มีอะไรบอก
+   */
+  for (const stage of STAGES.STAGES) {
+    if (stage.activity !== 'minigame') continue
+    assert(
+      stage.minigameKind && GEN.MINIGAME_KINDS.includes(stage.minigameKind),
+      `${stage.id} ระบุชนิดมินิเกมว่า "${stage.minigameKind}" ซึ่งไม่มีอยู่จริง`,
+    )
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

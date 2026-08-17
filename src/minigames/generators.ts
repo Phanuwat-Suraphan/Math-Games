@@ -22,6 +22,7 @@ import type {
   Minigame,
   MinigameKind,
   MatchingGame,
+  PathCell,
 } from './types'
 
 export interface MinigameRequest {
@@ -283,11 +284,125 @@ function buildCatch(rng: Rng, req: MinigameRequest): CatchGame {
   }
 }
 
+/**
+ * เส้นทางลับ — เดินจากบนลงล่าง ทุกก้าวต้องเพิ่มขึ้นเท่ากันเสมอ
+ *
+ * วิธีสร้าง: วางเส้นทางที่ถูกต้องลงไปก่อน แล้วค่อยเติมช่องที่เหลือ
+ *
+ * ทำไมต้องทำตามลำดับนี้ ไม่ใช่สุ่มทั้งกระดานแล้วค่อยหาเส้นทาง
+ * เพราะการสุ่มทั้งกระดานไม่รับประกันว่าจะมีเส้นทางอยู่จริง
+ * กระดานที่เดินไม่ได้คือด่านที่เด็กเล่นยังไงก็ไม่ผ่าน
+ * และจะเกิดเป็นบางเมล็ดสุ่มเท่านั้น ซึ่งเป็นบั๊กที่หาเจอยากที่สุด
+ *
+ * ช่องที่ไม่ได้อยู่บนเส้นทางต้องไม่บังเอิญเป็นก้าวที่ถูกด้วย
+ * ไม่งั้นจะมีเส้นทางที่สองที่เราไม่ได้ตั้งใจ แล้วเด็กที่เดินทางนั้น
+ * จะโดนบอกว่าผิดทั้งที่เดินตามกฎทุกอย่าง ซึ่งไม่ยุติธรรมอย่างยิ่ง
+ */
+function buildPath(rng: Rng, req: MinigameRequest): Minigame {
+  const hard = req.grade >= 6
+  const rows = hard ? 6 : 5
+  const cols = hard ? 5 : 4
+
+  // ขนาดก้าวเลือกจากชั้น ตัวเลขที่นับเพิ่มในใจได้แต่ไม่ง่ายจนไม่ต้องคิด
+  const stepChoices = req.grade <= 4 ? [3, 4, 5] : hard ? [7, 8, 9, 12] : [6, 7, 8]
+  const step = rng.pick(stepChoices)
+  const start = rng.int(2, 9) * (req.grade <= 4 ? 2 : 3)
+
+  // 1. วางเส้นทาง: แถวละหนึ่งช่อง เลื่อนซ้ายขวาได้ไม่เกินหนึ่งช่อง
+  const pathCols: number[] = [rng.int(0, cols - 1)]
+  for (let row = 1; row < rows; row += 1) {
+    const previous = pathCols[row - 1]
+    const options = [previous - 1, previous, previous + 1].filter(
+      (col) => col >= 0 && col < cols,
+    )
+    pathCols.push(rng.pick(options))
+  }
+
+  const pathValues = pathCols.map((_, row) => start + row * step)
+
+  /*
+   * 2. เติมช่องที่เหลือ
+   *
+   * ค่าที่ห้ามใช้คือค่าที่ทำให้เกิดก้าวที่ถูกต้องโดยไม่ได้ตั้งใจ
+   * นั่นคือ (ค่าของช่องข้างบนที่เดินถึงได้) + step
+   * และห้ามซ้ำกับค่าบนเส้นทางในแถวเดียวกันด้วย เพื่อไม่ให้สับสน
+   */
+  const cells: PathCell[] = []
+  const valueAt = new Map<string, number>()
+  const key = (row: number, col: number) => `${row}:${col}`
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      if (col === pathCols[row]) {
+        valueAt.set(key(row, col), pathValues[row])
+        continue
+      }
+
+      const banned = new Set<number>([pathValues[row]])
+      if (row > 0) {
+        for (const above of [col - 1, col, col + 1]) {
+          if (above < 0 || above >= cols) continue
+          const value = valueAt.get(key(row - 1, above))
+          if (value !== undefined) banned.add(value + step)
+        }
+      }
+
+      let candidate = 0
+      let guard = 0
+      do {
+        guard += 1
+        candidate = pathValues[row] + rng.int(1, step * 3) * (rng.chance(0.5) ? 1 : -1)
+      } while ((banned.has(candidate) || candidate < 1) && guard < 60)
+
+      // ถ้าสุ่มไม่ผ่านจริง ๆ ให้เลือกค่าที่ปลอดภัยแน่นอนแทนการยอมให้ผิดกฎ
+      if (banned.has(candidate) || candidate < 1) {
+        candidate = pathValues[row] + 1
+        while (banned.has(candidate)) candidate += 1
+      }
+      valueAt.set(key(row, col), candidate)
+    }
+  }
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let col = 0; col < cols; col += 1) {
+      cells.push({
+        id: `c${row}-${col}`,
+        value: valueAt.get(key(row, col)) ?? 0,
+        row,
+        col,
+      })
+    }
+  }
+
+  const solution = pathCols.map((col, row) => `c${row}-${col}`)
+
+  return {
+    id: `path-${req.seed}`,
+    kind: 'path',
+    grade: req.grade,
+    skill: req.skill,
+    title: 'สะพานหินลอยฟ้า',
+    story:
+      'หุบเหวเบื้องล่างลึกจนมองไม่เห็นก้น มีแผ่นหินลอยอยู่เป็นชั้น ๆ ' +
+      'แผ่นที่เหยียบได้จะเรืองแสงขึ้นมาเอง แต่ต้องเหยียบให้ถูกลำดับเท่านั้น',
+    step,
+    rows,
+    cols,
+    cells,
+    startCellId: solution[0],
+    solution,
+    instruction: `เริ่มจากแผ่นที่มีดาว แล้วเดินลงทีละแถว แผ่นถัดไปต้องมากกว่าเดิม ${step}`,
+    successText: 'ข้ามหุบเหวมาได้แล้ว แผ่นหินเรืองแสงเป็นทางยาวข้างหลัง',
+    allowedMistakes: 3,
+  }
+}
+
 const BUILDERS: Record<MinigameKind, (rng: Rng, req: MinigameRequest) => Minigame> = {
   matching: buildMatching,
   connect: buildConnect,
   dragdrop: buildDragDrop,
   catch: buildCatch,
+  path: buildPath,
 }
 
 export const MINIGAME_KINDS: MinigameKind[] = [
@@ -295,6 +410,7 @@ export const MINIGAME_KINDS: MinigameKind[] = [
   'connect',
   'dragdrop',
   'catch',
+  'path',
 ]
 
 /** ชื่อชนิดเกมที่แสดงให้เด็กและครูเห็น */
@@ -303,6 +419,7 @@ export const MINIGAME_LABEL: Record<MinigameKind, string> = {
   connect: 'โยงเส้น',
   dragdrop: 'ลากวาง',
   catch: 'รับของที่ตกลงมา',
+  path: 'เส้นทางลับ',
 }
 
 /** สร้างมินิเกมหนึ่งกระดาน */
