@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
-import { AVATARS, DEFAULT_AVATAR_ID } from '../data/avatars'
+import { AVATARS, DEFAULT_AVATAR_ID, STARTER_AVATAR_IDS } from '../data/avatars'
 import { useGame } from '../context/useGame'
 import { sanitizeName } from '../services/storage'
 
@@ -106,13 +106,13 @@ export function CreatePlayer() {
           </legend>
 
           {/*
-            แสดงเฉพาะอาชีพที่เลือกได้ฟรี
-            ตัวที่ต้องซื้อไม่เอามาโชว์ตรงนี้ เพราะเด็กที่เพิ่งเปิดเกมยังไม่มีเหรียญเลย
-            การโชว์ของที่กดไม่ได้ตั้งแต่หน้าจอแรกทำให้รู้สึกว่าถูกกันไว้ก่อนจะได้เริ่มด้วยซ้ำ
-            ตัวที่เหลือไปเจอในร้านค้าตอนมีเหรียญแล้ว ซึ่งเป็นจังหวะที่ซื้อได้จริง
+            อ่านรายชื่อตัวที่เลือกได้จาก STARTER_AVATAR_IDS ที่เดียว
+            เดิมหน้านี้กรอง price === 0 เอง ซึ่งเป็นการตัดสินใจเรื่องเดียวกัน
+            ที่เขียนไว้สองที่ วันไหนเปลี่ยนกติกาแล้วแก้ไม่ครบ สองที่จะไม่ตรงกัน
+            โดยไม่มีอะไรฟ้อง
           */}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {AVATARS.filter((avatar) => avatar.price === 0).map((avatar) => {
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {AVATARS.filter((avatar) => STARTER_AVATAR_IDS.includes(avatar.id)).map((avatar) => {
               const isSelected = avatar.id === avatarId
 
               return (
@@ -147,6 +147,50 @@ export function CreatePlayer() {
                 </motion.button>
               )
             })}
+          </div>
+
+          {/*
+            แถวพรีวิวตัวที่ยังไม่ได้ปลดล็อก
+
+            คอมเมนต์เดิมตรงนี้เขียนไว้ว่าไม่ควรโชว์ตัวที่ซื้อไม่ได้ เพราะจะรู้สึก
+            เหมือนถูกกันไว้ตั้งแต่ยังไม่ได้เริ่ม ซึ่งเป็นเหตุผลที่ถูกต้อง
+            แต่มันใช้กับกรณี "เอามาปนในตัวเลือกแล้วกดไม่ได้" เท่านั้น
+
+            ตอนมีตัวละครหกตัว การไม่โชว์เลยก็ไม่เสียอะไร
+            แต่ตอนนี้มีสิบตัว เด็กที่เห็นแค่สี่ตัวจะไม่มีทางรู้เลยว่ามีอีกหกตัวรออยู่
+            ครูเองก็ทักมาว่า "ตอนสร้างตัวละคร มีสองอาชีพเหรอ"
+
+            จึงแยกออกมาเป็นแถวเล็กต่างหาก ที่อ่านได้ชัดว่าเป็น "ของที่จะได้ทีหลัง"
+            ไม่ใช่ "ตัวเลือกที่กดไม่ได้" — เป็นคำสัญญา ไม่ใช่กำแพง
+          */}
+          <div className="mt-5 rounded-xl2 border border-white/10 bg-night-900/40 p-4">
+            <p className="text-sm font-bold text-slate-300">
+              ✨ ยังมีอีก {AVATARS.length - STARTER_AVATAR_IDS.length} อาชีพรอให้ปลดล็อก
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              เก็บเหรียญจากการเล่นแล้วไปปลดล็อกได้ที่ร้านค้า แต่ละอาชีพมีสกิลวิเศษของตัวเอง
+            </p>
+
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {AVATARS.filter((avatar) => !STARTER_AVATAR_IDS.includes(avatar.id)).map(
+                (avatar) => (
+                  <li
+                    key={avatar.id}
+                    className="flex items-center gap-1.5 rounded-full border border-white/10 bg-night-800/70 px-3 py-1.5"
+                  >
+                    <span aria-hidden="true" className="text-lg opacity-70 grayscale">
+                      {avatar.emoji}
+                    </span>
+                    <span className="text-xs font-bold text-slate-400">
+                      {avatar.name}
+                    </span>
+                    <span className="text-xs tabular-nums text-gold-300/70">
+                      {avatar.price.toLocaleString('th-TH')}
+                    </span>
+                  </li>
+                ),
+              )}
+            </ul>
           </div>
         </fieldset>
 
