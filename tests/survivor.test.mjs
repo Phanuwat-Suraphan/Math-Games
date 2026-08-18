@@ -2546,6 +2546,201 @@ check('แสงวาบเต็มจอต้องเกิดตอนใ�
   )
 })
 
+const PARTICLE_SHAPES = ['star', 'shard', 'ring', 'dot']
+
+/** ตรวจว่าเศษชิ้นหนึ่งมีของครบทุกอย่างที่หน้าจอต้องใช้วาด */
+function assertParticleIsDrawable(particle, where) {
+  assert(
+    PARTICLE_SHAPES.includes(particle.shape),
+    `${where}: เศษมีรูปร่าง "${particle.shape}" ซึ่งหน้าจอไม่รู้จัก`,
+  )
+  assert(typeof particle.angle === 'number', `${where}: เศษไม่มีมุม จะหมุนไม่ได้`)
+  assert(typeof particle.spin === 'number', `${where}: เศษไม่มีความเร็วหมุน`)
+  assert(typeof particle.gravity === 'number', `${where}: เศษไม่มีค่าแรงโน้มถ่วง`)
+  assert(typeof particle.glow === 'boolean', `${where}: เศษไม่ได้บอกว่าเป็นแสงหรือไม่`)
+  assert(particle.size > 0, `${where}: เศษขนาด ${particle.size} จะมองไม่เห็น`)
+}
+
+check('เศษทุกชิ้นที่เครื่องยนต์สร้าง ต้องมีของครบพอให้หน้าจอวาดได้', () => {
+  /*
+   * ข้อนี้กันความผิดพลาดที่หาสาเหตุยากที่สุดชนิดหนึ่ง
+   *
+   * ทุกครั้งที่มีคนเพิ่มจุดที่สร้างเศษใหม่ในเครื่องยนต์ แล้วลืมใส่ shape
+   * TypeScript จะจับได้ตอนคอมไพล์จริง แต่ค่าที่ "ใส่มาแล้วแต่ผิด"
+   * เช่นสะกด shape ผิดเป็นชื่อที่ไม่มีอยู่ จะรอดไปถึงหน้าจอ
+   * แล้วเศษชิ้นนั้นจะถูกวาดเป็นจุดกลมเงียบ ๆ โดยไม่มีใครรู้ว่าผิด
+   *
+   * เล่นยาวพอให้มีทั้งมอนธรรมดาตาย ตัวใหญ่พิเศษตาย และคริสตัลถูกเก็บ
+   */
+  let world = E.createWorld('ตรวจเศษ')
+  let seen = 0
+
+  // เล่นสองนาทีเต็ม ผ่านทั้งมอนธรรมดา ตัวใหญ่พิเศษ บอส และการเลเวลอัปหลายรอบ
+  for (let i = 0; i < 120 * 60; i += 1) {
+    if (world.phase === 'question') {
+      world = E.resolveQuestion(world, true)
+      continue
+    }
+    if (world.phase === 'choosing') {
+      const offer = E.offerSkills(world, E.offerCount(world.lastAnswerCorrect))
+      world = offer.length > 0 ? E.takeSkill(world, offer[0].id) : E.skipSkill(world)
+      continue
+    }
+    if (world.phase === 'dead') break
+    world = E.step(world, { move: { x: i % 120 < 60 ? 1 : -1, y: 0 } })
+
+    for (const particle of world.particles) {
+      assertParticleIsDrawable(particle, 'ระหว่างเล่น')
+      seen += 1
+    }
+  }
+
+  assert(seen > 0, 'เล่นไปสองนาทีแล้วไม่มีเศษเกิดขึ้นเลยแม้แต่ชิ้นเดียว')
+})
+
+check('มอนที่แตกต้องกระเด็นเป็นเศษแหลม ส่วนบอสต้องแตกเป็นดาว', () => {
+  /*
+   * แยกที่รูป ไม่ใช่แค่ที่สี เพราะตอนจอแน่นสีจะกลืนกันหมด
+   * แต่รูปดาวยังอ่านออกจากหางตาว่าเพิ่งล้มอะไรตัวใหญ่ไป
+   */
+  const shapesFrom = (label, tweak) => {
+    let world = withEnemiesAt(label, [{ x: 400, y: 300 }], 1)
+    world = { ...world, enemies: world.enemies.map((e) => ({ ...e, ...tweak })) }
+    world = { ...world, weapons: { sword: 5 } }
+    for (let i = 0; i < 120 && world.particles.length === 0; i += 1) {
+      world = E.step(world, STILL)
+    }
+    return world.particles.map((p) => p.shape)
+  }
+
+  const normal = shapesFrom('เศษมอนธรรมดา', {})
+  assert(normal.includes('shard'), 'มอนธรรมดาตายแล้วไม่มีเศษแหลมกระเด็นเลย')
+  // ดาวกับคลื่นสงวนไว้ให้เหตุการณ์ใหญ่ ถ้ามอนธรรมดาก็มีด้วย มันจะไม่เหลือความหมาย
+  assert(!normal.includes('star'), 'มอนธรรมดาแตกเป็นดาว ซึ่งควรเป็นของบอสเท่านั้น')
+  assert(!normal.includes('ring'), 'มอนธรรมดามีคลื่นกระแทก ซึ่งควรเป็นของตัวใหญ่ขึ้นไป')
+
+  const boss = shapesFrom('เศษบอส', { boss: true })
+  assert(boss.includes('star'), 'บอสล้มแล้วไม่มีดาวสักดวง')
+  assert(boss.includes('ring'), 'บอสล้มแล้วไม่มีคลื่นกระแทกแผ่ออกมา')
+})
+
+check('เก็บคริสตัลแล้วต้องมีทั้งประกายและเสียง', () => {
+  /*
+   * การเก็บคริสตัลคือสิ่งที่เด็กทำบ่อยที่สุดในเกม นับได้เป็นร้อยครั้งต่อรอบ
+   * ถ้าการกระทำที่ทำบ่อยที่สุดไม่มีอะไรตอบกลับเลย
+   * ครึ่งหนึ่งของเวลาที่เด็กใช้ในสนามจะรู้สึกเหมือนเดินเก็บของเปล่า ๆ
+   */
+  const base = E.createWorld('เก็บคริสตัล')
+  const world = {
+    ...base,
+    spawnCooldown: 999,
+    eliteCooldown: 999,
+    bossCooldown: 999,
+    // วางไว้บนตัวเด็กพอดี จะได้ถูกเก็บในก้าวเดียว
+    gems: [{ id: 1, pos: { ...base.player.pos }, value: 1 }],
+  }
+
+  const after = E.step(world, STILL)
+  assert(after.gems.length === 0, 'คริสตัลอยู่บนตัวแล้วแต่ยังไม่ถูกเก็บ')
+  assert(after.player.xp > world.player.xp, 'เก็บคริสตัลแล้วแต่ XP ไม่เพิ่ม')
+  assert(after.particles.length > 0, 'เก็บคริสตัลแล้วไม่มีประกายขึ้นเลย')
+  assert(after.sounds.includes('pickup'), 'เก็บคริสตัลแล้วไม่มีเสียง')
+  for (const particle of after.particles) assertParticleIsDrawable(particle, 'ประกายคริสตัล')
+  assert(
+    after.particles.every((p) => p.gravity < 0),
+    'ประกายคริสตัลตกลงพื้น ทำให้อ่านเป็นของที่ร่วง แทนที่จะเป็นของที่เพิ่งได้มา',
+  )
+})
+
+check('เก็บคริสตัลพร้อมกันหลายเม็ด เสียงต้องดังครั้งเดียว', () => {
+  /*
+   * ตอนแม่เหล็กดูดเข้ามาพร้อมกันยี่สิบเม็ด เสียงยี่สิบครั้งที่ซ้อนกันสนิท
+   * จะไม่ได้ยินเป็นเสียงเก็บของ แต่ได้ยินเป็นเสียงแตกพร่าครั้งเดียว
+   */
+  const base = E.createWorld('คริสตัลหลายเม็ด')
+  const gems = []
+  for (let i = 0; i < 20; i += 1) {
+    gems.push({ id: i + 1, pos: { ...base.player.pos }, value: 1 })
+  }
+
+  const after = E.step(
+    { ...base, spawnCooldown: 999, eliteCooldown: 999, bossCooldown: 999, gems },
+    STILL,
+  )
+  const times = after.sounds.filter((cue) => cue === 'pickup').length
+  assert(times === 1, `เก็บยี่สิบเม็ดพร้อมกันแล้วเสียงดัง ${times} ครั้ง`)
+
+  /*
+   * ประกายก็ต้องมีเพดานเหมือนกัน
+   *
+   * คริสตัลถูกเก็บตรงตัวเด็กพอดีเสมอ ประกายทั้งหมดจึงกองอยู่จุดเดียว
+   * เรนเดอร์ดูแล้วเห็นว่ายี่สิบเม็ดกลายเป็นก้อนม่วงทึบที่บังตัวเด็กมิด
+   * ในเกมที่มอนวิ่งเข้าหาตลอดเวลา การมองไม่เห็นตัวเองคือเรื่องใหญ่
+   */
+  assert(
+    after.particles.length <= 16,
+    `เก็บยี่สิบเม็ดพร้อมกันแล้วมีประกาย ${after.particles.length} จุดกองทับตัวเด็ก`,
+  )
+  assert(after.particles.length > 0, 'ดูดทีเดียวยี่สิบเม็ดแล้วไม่มีประกายเลย')
+})
+
+check('ขึ้นเลเวลแล้วต้องมีดาวฉลอง ทั้งตอนรับสกิลและตอนข้ามสกิล', () => {
+  /*
+   * ตอนข้ามสกิลเกิดขึ้นกับเด็กที่เก็บสกิลครบทุกใบแล้ว ซึ่งคือเด็กที่เล่นได้ดีที่สุด
+   * ถ้าทางนั้นไม่มีการฉลอง เด็กที่เก่งที่สุดจะเป็นคนเดียวที่ไม่ได้เห็นดาว
+   */
+  const base = E.createWorld('ฉลองเลเวล')
+
+  for (const [label, next] of [
+    ['รับสกิล', (w) => E.takeSkill(w, 'sword')],
+    ['ข้ามสกิล', (w) => E.skipSkill(w)],
+  ]) {
+    const before = { ...base, phase: 'choosing' }
+    const after = next(before)
+
+    assert(after.player.level === before.player.level + 1, `${label}: เลเวลไม่ขึ้น`)
+    assert(after.phase === 'playing', `${label}: ไม่ได้กลับลงสนาม`)
+
+    const stars = after.particles.filter((p) => p.shape === 'star')
+    assert(stars.length > 0, `${label}: ขึ้นเลเวลแล้วไม่มีดาวสักดวง`)
+    assert(
+      stars.every((p) => p.gravity < 0),
+      `${label}: ดาวฉลองร่วงลงพื้น ซึ่งอ่านเป็นของพัง ไม่ใช่รางวัล`,
+    )
+    assert(
+      after.particles.some((p) => p.shape === 'ring'),
+      `${label}: ไม่มีคลื่นแผ่ออกจากตัวเด็ก`,
+    )
+    assert(after.flash.power > 0, `${label}: จอไม่วาบเลย`)
+    assert(
+      after.notices.some((notice) => notice.text.includes('เลเวล')),
+      `${label}: ไม่มีข้อความบอกว่าขึ้นเลเวลแล้ว`,
+    )
+    for (const particle of after.particles) assertParticleIsDrawable(particle, label)
+  }
+})
+
+check('ดาวฉลองเลเวลต้องหายไปเอง ไม่ค้างบังจอ', () => {
+  /*
+   * ของที่ค้างอยู่กลางจอในเกมที่มอนวิ่งเข้าหาตลอดเวลา
+   * แปลว่าเด็กมองไม่เห็นสิ่งที่กำลังจะฆ่าตัวเอง
+   */
+  let world = E.takeSkill({ ...E.createWorld('ดาวไม่ค้าง'), phase: 'choosing' }, 'sword')
+  const born = world.particles.length
+  assert(born > 0, 'ไม่มีดาวตั้งแต่แรก')
+
+  // เดินต่อสองวินาที ดาวชุดนี้ต้องหมดอายุไปแล้ว
+  for (let i = 0; i < 120; i += 1) world = E.step(world, STILL)
+  assert(
+    world.flash.power === 0,
+    `แสงฉลองยังค้างอยู่ที่ ${world.flash.power.toFixed(2)} หลังผ่านไปสองวินาที`,
+  )
+  assert(
+    world.particles.filter((p) => p.shape === 'star').length === 0,
+    'ดาวฉลองยังค้างอยู่บนจอหลังผ่านไปสองวินาที',
+  )
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

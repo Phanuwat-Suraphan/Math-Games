@@ -571,13 +571,15 @@ export function step(world: WorldState, input: Input): WorldState {
     particles.push({
       ...particle,
       life,
+      // หมุนไปเรื่อย ๆ ทำให้เศษแหลมกับดาวดูเป็นของแข็งที่ปลิว ไม่ใช่ภาพนิ่งที่ไถลไป
+      angle: particle.angle + particle.spin * dt,
       pos: {
         x: particle.pos.x + particle.vel.x * dt,
         y: particle.pos.y + particle.vel.y * dt,
       },
       vel: {
         x: particle.vel.x * drag,
-        y: particle.vel.y * drag + 320 * dt,
+        y: particle.vel.y * drag + 320 * particle.gravity * dt,
       },
     })
   }
@@ -1458,6 +1460,8 @@ export function step(world: WorldState, input: Input): WorldState {
      * ตอนมอนตายพร้อมกันสิบตัว ซึ่งเป็นตอนที่สร้างของแพงที่สุดพอดี
      */
     const burst = enemy.boss ? 26 : enemy.elite ? 12 : 6
+    // สีอิ่มตัว ไม่ใช่สีพาสเทล เพราะพื้นสนามสว่าง สีอ่อนจะจมหายไปกับพื้น
+    const burstColor = enemy.boss ? '#f59e0b' : enemy.elite ? '#8b5cf6' : '#ef4444'
     for (let i = 0; i < burst && particles.length < MAX_PARTICLES; i += 1) {
       const angle = (i / burst) * Math.PI * 2 + world.time
       const speed = (enemy.boss ? 200 : 120) * (0.45 + ((i * 37) % 100) / 100)
@@ -1467,8 +1471,47 @@ export function step(world: WorldState, input: Input): WorldState {
         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
         life: enemy.boss ? 0.9 : 0.5,
         maxLife: enemy.boss ? 0.9 : 0.5,
-        color: enemy.boss ? '#fbbf24' : enemy.elite ? '#a78bfa' : '#f87171',
+        color: burstColor,
         size: enemy.boss ? 5 : 3,
+        /*
+         * บอสแตกเป็นดาวทอง มอนอื่นแตกเป็นเศษแหลม
+         *
+         * ตั้งใจให้ต่างกันที่ "รูป" ไม่ใช่ต่างกันแค่ที่สี
+         * เพราะตอนจอแน่นไปด้วยเศษหลายสิบชิ้น สีจะกลืนกันหมด
+         * แต่รูปดาวยังอ่านออกจากหางตาว่าเพิ่งมีอะไรใหญ่เกิดขึ้น
+         */
+        shape: enemy.boss ? 'star' : 'shard',
+        angle,
+        // เศษแหลมหมุนสลับทิศตามคู่คี่ ไม่งั้นทั้งกำจะหมุนพร้อมกันจนดูเป็นฟันเฟือง
+        spin: (i % 2 === 0 ? 1 : -1) * (enemy.boss ? 5 : 9),
+        gravity: 1,
+        // เฉพาะบอสเท่านั้นที่เป็นแสง เศษมอนธรรมดาตายพร้อมกันได้สิบตัว
+        glow: enemy.boss,
+      })
+      nextId += 1
+    }
+
+    /*
+     * คลื่นกระแทกของบอสกับตัวใหญ่พิเศษ
+     *
+     * ใช้วงแหวนหนึ่งวงแทนการเพิ่มจำนวนเศษ เพราะสิ่งที่ต้องสื่อคือ "ใหญ่"
+     * ซึ่งวงที่ขยายออกจากจุดเดียวบอกได้ดีกว่าเศษที่เยอะขึ้นอีกเท่าตัว
+     * และถูกกว่ามากในจังหวะที่มีของบนจอเยอะที่สุดอยู่แล้ว
+     */
+    if ((enemy.boss || enemy.elite) && particles.length < MAX_PARTICLES) {
+      particles.push({
+        id: nextId,
+        pos: { ...enemy.pos },
+        vel: { x: 0, y: 0 },
+        life: enemy.boss ? 0.6 : 0.4,
+        maxLife: enemy.boss ? 0.6 : 0.4,
+        color: enemy.boss ? '#fb923c' : '#a78bfa',
+        size: enemy.boss ? 96 : 54,
+        shape: 'ring',
+        angle: 0,
+        spin: 0,
+        gravity: 0,
+        glow: true,
       })
       nextId += 1
     }
@@ -1553,6 +1596,58 @@ export function step(world: WorldState, input: Input): WorldState {
   // ---------- คริสตัลถูกดูดเข้าหาตัว ----------
   const remainingGems: GemEntity[] = []
   let xp = player.xp
+  /** เก็บคริสตัลได้กี่เม็ดในก้าวนี้ ใช้ตัดสินว่าจะให้เสียงดังไหม */
+  let gemsTaken = 0
+
+  /**
+   * ประกายตอนคริสตัลหายเข้าตัว
+   *
+   * ทำไมต้องมี ทั้งที่คริสตัลเป็นของเล็กที่สุดในเกม
+   *
+   * การเก็บคริสตัลคือสิ่งที่เด็กทำบ่อยที่สุดตลอดทั้งรอบ นับได้เป็นร้อยครั้ง
+   * แต่เดิมมันหายไปเฉย ๆ ไม่มีเสียง ไม่มีภาพ เหลือแค่แถบ XP ที่ขยับทีละนิด
+   * ซึ่งแปลว่าการกระทำที่ทำบ่อยที่สุดในเกม เป็นการกระทำที่ให้ผลตอบกลับน้อยที่สุด
+   *
+   * ประกายสองจุดที่ลอยขึ้นราคาถูกมาก แต่เปลี่ยนการเดินเก็บของ
+   * จากงานที่ต้องทำ ให้กลายเป็นจังหวะที่รู้สึกดีทุกครั้ง
+   *
+   * ทำไมแค่สองจุดต่อเม็ด ไม่ใช่สามหรือห้า
+   *
+   * เรนเดอร์ดูตอนแม่เหล็กดูดเข้ามาพร้อมกันสิบสี่เม็ด แล้วเห็นชัดว่า
+   * สามจุดต่อเม็ดกลายเป็นก้อนม่วงทึบที่บังตัวเด็กจนมองไม่เห็นตัวเอง
+   * ซึ่งอันตรายจริง ๆ ในเกมที่มอนวิ่งเข้าหาตลอดเวลา
+   * สองจุดยังอ่านออกว่าเป็นประกาย แต่ไม่ทับกันจนตัน
+   */
+  const sparkleAt = (pos: Vec) => {
+    /*
+     * ประกายมีเพดานต่อหนึ่งก้าว
+     *
+     * สกิลกวาดคริสตัลทั้งสนามเก็บได้ทีเดียวหลายสิบเม็ด
+     * และคริสตัลถูกเก็บตรงตัวเด็กพอดีเสมอ ประกายทั้งหมดจึงกองอยู่จุดเดียว
+     * เรนเดอร์ดูแล้วเห็นว่ามันกลายเป็นก้อนม่วงทึบที่บังตัวเด็กมิด
+     * ซึ่งแปลว่ารางวัลของการเล่นได้ดี กลายเป็นสิ่งที่ทำให้มองไม่เห็นตัวเอง
+     */
+    if (gemsTaken > 6) return
+    for (let i = 0; i < 2 && particles.length < MAX_PARTICLES; i += 1) {
+      const angle = -Math.PI / 2 + (i === 0 ? -0.6 : 0.6)
+      particles.push({
+        id: nextId,
+        pos: { ...pos },
+        vel: { x: Math.cos(angle) * 80, y: Math.sin(angle) * 80 },
+        life: 0.32,
+        maxLife: 0.32,
+        color: '#8b5cf6',
+        size: 5,
+        shape: 'dot',
+        angle: 0,
+        spin: 0,
+        // ลอยขึ้นเบา ๆ ไม่ตกลงพื้น เพราะเป็นของที่เพิ่ง "ได้" ไม่ใช่ของที่ร่วง
+        gravity: -0.25,
+        glow: true,
+      })
+      nextId += 1
+    }
+  }
 
   for (const gem of gems) {
     const dist = distance(gem.pos, player.pos)
@@ -1560,11 +1655,15 @@ export function step(world: WorldState, input: Input): WorldState {
     // สกิลขุมทรัพย์กวาดคริสตัลทั้งสนามเข้ามาในเฟรมเดียว ไม่ต้องเดินไปเก็บ
     if (harvestNow) {
       xp += gem.value * stats.xpMultiplier
+      gemsTaken += 1
+      sparkleAt(gem.pos)
       continue
     }
 
     if (dist <= player.radius + 8) {
       xp += gem.value * stats.xpMultiplier
+      gemsTaken += 1
+      sparkleAt(gem.pos)
       continue
     }
 
@@ -1580,6 +1679,15 @@ export function step(world: WorldState, input: Input): WorldState {
 
     remainingGems.push(gem)
   }
+
+  /*
+   * เสียงเก็บคริสตัลดังครั้งเดียวต่อก้าว ไม่ใช่ครั้งเดียวต่อเม็ด
+   *
+   * ตอนแม่เหล็กดูดเข้ามาพร้อมกันยี่สิบเม็ด เสียงยี่สิบครั้งที่ซ้อนกันสนิท
+   * จะไม่ได้ยินเป็นเสียงเก็บของ แต่ได้ยินเป็นเสียงแตกพร่าครั้งเดียว
+   * ซึ่งแย่กว่าไม่มีเสียงเลย
+   */
+  if (gemsTaken > 0) sounds.push('pickup')
 
   if (lifestealHeal > 0) hp = Math.min(stats.maxHp, hp + lifestealHeal)
   if (harvestNow) hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.5)
@@ -2105,6 +2213,7 @@ export function takeSkill(world: WorldState, id: string): WorldState {
 
   return {
     ...world,
+    ...levelUpFanfare(world, level),
     skills,
     weapons,
     player: {
@@ -2117,6 +2226,105 @@ export function takeSkill(world: WorldState, id: string): WorldState {
       hp: Math.min(statsAfter.maxHp, world.player.hp + (id === 'vitality' ? 20 : 0)),
     },
     phase: 'playing',
+  }
+}
+
+/**
+ * เอฟเฟกต์ฉลองตอนขึ้นเลเวล
+ *
+ * ทำไมถึงยิงตอนนี้ ไม่ใช่ตอน XP เต็ม
+ *
+ * จังหวะที่ XP เต็มคือจังหวะที่เกมหยุดแล้วเด้งโจทย์ขึ้นมาทับจอทันที
+ * ถ้ายิงเอฟเฟกต์ตรงนั้น มันจะค้างนิ่งอยู่หลังหน้าต่างโจทย์
+ * เพราะเครื่องยนต์ไม่เดินต่อระหว่างที่เด็กกำลังคิดเลข
+ * เด็กจะกลับมาเจอดาวแช่แข็งกลางจอ ซึ่งดูเหมือนภาพค้างมากกว่าการฉลอง
+ *
+ * จังหวะที่ถูกคือตอนเด็กเลือกการ์ดเสร็จแล้วกลับลงสนาม
+ * เพราะนั่นคือวินาทีแรกที่เด็กเห็นสนามอีกครั้ง และเป็นวินาทีที่พลังใหม่เริ่มทำงาน
+ * เอฟเฟกต์จึงกลายเป็นคำตอบของ "ที่เพิ่งเลือกไปมีผลจริงไหม" พอดี
+ *
+ * ใช้ร่วมกันทั้งตอนรับสกิลและตอนข้ามสกิล เพราะทั้งสองทางคือการขึ้นเลเวลเหมือนกัน
+ * เด็กที่เก็บสกิลครบทุกใบแล้วไม่ควรได้การฉลองที่จืดกว่าคนอื่น
+ */
+function levelUpFanfare(
+  world: WorldState,
+  level: number,
+): Pick<WorldState, 'particles' | 'effects' | 'notices' | 'shake' | 'flash' | 'nextId'> {
+  let nextId = world.nextId
+  const particles = [...world.particles]
+  const effects = [...world.effects]
+
+  effects.push({
+    id: nextId,
+    kind: 'blast',
+    pos: { ...world.player.pos },
+    radius: 130,
+    life: 0.55,
+    maxLife: 0.55,
+  })
+  nextId += 1
+
+  // คลื่นที่แผ่ออกจากตัวเด็ก บอกว่าจุดศูนย์กลางของเรื่องนี้คือตัวเขาเอง
+  particles.push({
+    id: nextId,
+    pos: { ...world.player.pos },
+    vel: { x: 0, y: 0 },
+    life: 0.7,
+    maxLife: 0.7,
+    color: '#fbbf24',
+    size: 124,
+    shape: 'ring',
+    angle: 0,
+    spin: 0,
+    gravity: 0,
+    glow: true,
+  })
+  nextId += 1
+
+  /*
+   * ดาวที่พุ่งออกรอบตัวแล้วลอยขึ้น
+   *
+   * ให้แรงโน้มถ่วงติดลบ ดาวจึงลอยขึ้นแทนที่จะร่วงลง
+   * เป็นรายละเอียดเล็ก ๆ ที่ตัดสินว่าภาพนี้อ่านเป็น "ได้รางวัล" หรือ "ของพัง"
+   */
+  const STARS = 18
+  for (let i = 0; i < STARS && particles.length < MAX_PARTICLES; i += 1) {
+    const angle = (i / STARS) * Math.PI * 2
+    particles.push({
+      id: nextId,
+      pos: {
+        x: world.player.pos.x + Math.cos(angle) * 14,
+        y: world.player.pos.y + Math.sin(angle) * 14,
+      },
+      vel: { x: Math.cos(angle) * 165, y: Math.sin(angle) * 165 - 70 },
+      life: 0.95,
+      maxLife: 0.95,
+      // สลับทองกับฟ้า ทำให้กลุ่มดาวมีมิติ แทนที่จะเป็นก้อนสีเดียว
+      color: i % 2 === 0 ? '#fbbf24' : '#22d3ee',
+      size: 7,
+      shape: 'star',
+      angle,
+      spin: i % 2 === 0 ? 6.5 : -6.5,
+      gravity: -0.4,
+      glow: true,
+    })
+    nextId += 1
+  }
+
+  const notices = [
+    ...world.notices,
+    { id: nextId, text: `เลเวล ${level}!`, life: 1.6, maxLife: 1.6 },
+  ]
+  nextId += 1
+
+  return {
+    particles,
+    effects,
+    notices,
+    // สั่นเบา ๆ พอให้รู้สึกว่ามีอะไรเกิดขึ้น ไม่ใช่แรงเท่าตอนบอสล้ม
+    shake: Math.max(world.shake, 0.3),
+    flash: { color: '#fef9c3', power: 0.5 },
+    nextId,
   }
 }
 
@@ -2136,6 +2344,7 @@ export function skipSkill(world: WorldState): WorldState {
 
   return {
     ...world,
+    ...levelUpFanfare(world, level),
     player: {
       ...world.player,
       level,

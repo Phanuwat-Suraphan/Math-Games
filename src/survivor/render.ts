@@ -19,6 +19,14 @@
 import { ARENA_HEIGHT, ARENA_WIDTH } from './types'
 import type { WorldState } from './types'
 
+/**
+ * สีหมึกของเส้นขอบเศษ
+ *
+ * ใช้ค่าเดียวกับเส้นขอบของตัวละครและมอน (ดู art/shading.ts)
+ * เพื่อให้ของทุกชิ้นในฉากดูเหมือนวาดด้วยปากกาด้ามเดียวกัน
+ */
+const PARTICLE_INK = '#2a1533'
+
 export interface HeroView {
   image: HTMLImageElement | null
   /** ภาพมอนสเตอร์ทุกชนิด แยกตามไอดีภาพ */
@@ -616,10 +624,111 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
    */
   for (const particle of world.particles) {
     const fade = Math.max(0, particle.life / particle.maxLife)
+
+    /*
+     * วงแหวนคิดคนละแบบกับเศษชิ้นอื่นทั้งหมด
+     *
+     * เศษชิ้นอื่นเล็กลงตอนจาง แต่วงแหวนต้อง "ขยายออก" ตอนจาง
+     * เพราะสิ่งที่มันเล่าคือคลื่นที่แผ่ออกจากจุดระเบิด
+     * ถ้าให้มันหดลงเหมือนชิ้นอื่น จะอ่านเป็นของที่ถูกดูดเข้าไปแทน
+     * ซึ่งเป็นความหมายตรงข้ามกับที่ต้องการพอดี
+     */
+    if (particle.shape === 'ring') {
+      const grow = particle.size * (1.15 - fade * 0.85)
+      ctx.globalAlpha = fade
+      ctx.lineCap = 'butt'
+
+      // เส้นขอบสีหมึกรองข้างหลังก่อน ทำให้วงอ่านออกบนพื้นสว่างเหมือนภาพทั้งเกม
+      ctx.strokeStyle = PARTICLE_INK
+      ctx.lineWidth = 4 + fade * 8
+      ctx.beginPath()
+      ctx.arc(particle.pos.x, particle.pos.y, Math.max(1, grow), 0, Math.PI * 2)
+      ctx.stroke()
+
+      ctx.strokeStyle = particle.color
+      ctx.lineWidth = 2 + fade * 6
+      ctx.beginPath()
+      ctx.arc(particle.pos.x, particle.pos.y, Math.max(1, grow), 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.globalAlpha = 1
+      continue
+    }
+
+    const size = particle.size * (0.4 + fade * 0.6)
+    ctx.save()
+    ctx.translate(particle.pos.x, particle.pos.y)
+    ctx.rotate(particle.angle)
     ctx.globalAlpha = fade
     ctx.fillStyle = particle.color
-    const size = particle.size * (0.4 + fade * 0.6)
-    ctx.fillRect(particle.pos.x - size / 2, particle.pos.y - size / 2, size, size)
+    /*
+     * เส้นขอบสีหมึกรอบเศษทุกชิ้น
+     *
+     * เป็นเรื่องเดียวกับที่ตัวละครและมอนทุกตัวมีเส้นขอบหนา
+     * ถ้าเศษไม่มีเส้นขอบ มันจะเป็นของชิ้นเดียวในฉากที่ไม่มี
+     * แล้วจะดูเหมือนหลุดมาจากเกมอื่น ทั้งที่ยังเห็นได้ก็จริง
+     */
+    ctx.strokeStyle = PARTICLE_INK
+    ctx.lineWidth = 1.6
+    ctx.lineJoin = 'round'
+
+    if (particle.shape === 'star') {
+      /*
+       * ดาวห้าแฉก วาดจากสิบจุดสลับรัศมีนอกกับใน
+       *
+       * ห้าแฉกไม่ใช่หกหรือแปด เพราะห้าแฉกคือรูปที่เด็กวาดเองในสมุด
+       * มันจึงอ่านออกว่า "ดาว" ทันทีแม้จะเล็กแค่ไม่กี่พิกเซล
+       * ส่วนหกแฉกอ่านเป็นเกล็ดหิมะ และแปดแฉกอ่านเป็นประกายแสง
+       */
+      ctx.beginPath()
+      for (let i = 0; i < 10; i += 1) {
+        const reach = i % 2 === 0 ? size : size * 0.44
+        const angle = (i / 10) * Math.PI * 2 - Math.PI / 2
+        const x = Math.cos(angle) * reach
+        const y = Math.sin(angle) * reach
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else if (particle.shape === 'shard') {
+      /*
+       * เศษแหลม เป็นสี่เหลี่ยมข้าวหลามตัดที่ยืดยาวไปตามทิศที่หมุนอยู่
+       *
+       * ยืดยาวสองเท่าครึ่ง ไม่ใช่จัตุรัส เพราะของที่ยาวบอกทิศได้
+       * เศษที่บอกทิศทำให้ทั้งกำอ่านเป็น "ระเบิดออกจากตรงกลาง"
+       * ส่วนจัตุรัสที่ไม่มีทิศ อ่านเป็นแค่จุดสีที่ลอยอยู่เฉย ๆ
+       */
+      ctx.beginPath()
+      ctx.moveTo(size * 1.25, 0)
+      ctx.lineTo(0, size * 0.42)
+      ctx.lineTo(-size * 0.9, 0)
+      ctx.lineTo(0, -size * 0.42)
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+    } else {
+      ctx.beginPath()
+      ctx.arc(0, 0, size * 0.6, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.stroke()
+    }
+
+    /*
+     * แกนขาวตรงกลางของชิ้นที่ควรดูเปล่งแสง
+     *
+     * วาดทับลงไปตรง ๆ ไม่ใช่บวกแสง เพราะบนพื้นสนามที่สว่างอยู่แล้ว
+     * การบวกแสงแทบไม่ทำให้อะไรเปลี่ยน (เรนเดอร์ดูแล้วหายไปทั้งหมดจริง ๆ)
+     * ส่วนจุดขาวทึบเห็นชัดบนพื้นทุกสี เพราะไม่ได้พึ่งค่าสีของพื้นเลย
+     */
+    if (particle.glow) {
+      ctx.fillStyle = 'rgba(255,255,255,.92)'
+      ctx.beginPath()
+      ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2)
+      ctx.fill()
+    }
+
+    ctx.restore()
   }
   ctx.globalAlpha = 1
 

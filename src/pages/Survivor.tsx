@@ -493,7 +493,9 @@ export function Survivor({ player }: { player: Player }) {
     worldRef.current = skillId
       ? takeSkill(worldRef.current, skillId)
       : skipSkill(worldRef.current)
-    playSfx('coin')
+    // เสียงเลเวลอัป ไม่ใช่เสียงเหรียญ เพราะสิ่งที่เพิ่งเกิดคือการขึ้นเลเวล
+    // และภาพที่กำลังจะเห็นตอนกลับลงสนามคือดาวฉลองเลเวลอัปพอดี
+    playSfx('levelUp')
     setPhase('playing')
   }, [])
 
