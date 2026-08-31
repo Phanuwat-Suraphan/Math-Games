@@ -22,6 +22,7 @@ import { Settings } from './pages/Settings'
 import { Shop } from './pages/Shop'
 import { Journal } from './pages/Journal'
 import { Tower } from './pages/Tower'
+import { SafeZone } from './pages/SafeZone'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
 import { StageResult } from './pages/StageResult'
@@ -79,6 +80,12 @@ function GameRoutes() {
         <Route
           path="/arena"
           element={<RequirePlayer render={(player) => <Survivor player={player} />} />}
+        />
+        <Route
+          path="/safezone"
+          element={
+            <RequirePlayer render={(player) => <SafeZone player={player} />} />
+          }
         />
         <Route
           path="/duel"

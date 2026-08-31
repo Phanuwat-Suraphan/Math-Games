@@ -72,6 +72,9 @@ jobs:
       - name: ทดสอบโหมดเอาชีวิตรอด (สนามรบตัวเลข)
         run: node tests/survivor.test.mjs /tmp/logic
 
+      - name: ทดสอบ Safe Zone Guardians (เขาวงกตสามมิติและภารกิจ ป.4)
+        run: node tests/safezone.test.mjs /tmp/logic
+
       - name: ทดสอบภาพประกอบ
         run: node tests/art.test.mjs /tmp/logic
 

@@ -34,6 +34,7 @@
     "src/puzzles/**/*.ts",
     "src/roguelike/**/*.ts",
     "src/survivor/**/*.ts",
+    "src/safezone/**/*.ts",
     "src/minigames/**/*.ts",
     "src/questionEngine/**/*.ts",
     "src/services/storage.ts",

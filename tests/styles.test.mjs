@@ -102,6 +102,17 @@ const REQUIRED_CLASSES = [
   'card-legendary',
   'card-void',
   'card-operator',
+
+  // Safe Zone Guardians
+  'sz-stage',
+  'sz-terminal',
+  'sz-scanline',
+  'sz-slot',
+  'sz-slot-filled',
+  'sz-heat',
+  'sz-heat-critical',
+  'sz-pad',
+  'sz-hologram',
 ]
 
 /** คลาสนี้ถูกนิยามไว้ในไฟล์ไหม */

@@ -647,6 +647,121 @@ html[data-animations='off'] *::after {
     0 14px 30px -20px rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(12px) saturate(120%);
 }
+
+/* ---------- Safe Zone Guardians ---------- */
+
+/*
+ * กรอบของฉากสามมิติ
+ *
+ * ขอบด้านในเรืองแสงฟ้าเพื่อให้อ่านเป็น "จอของชุดกันความร้อน"
+ * ไม่ใช่ผืนผ้าใบที่วางอยู่บนหน้าเว็บเฉย ๆ
+ * เป็นวิธีเล่าเรื่องที่ถูกกว่าการวาดกรอบหมวกลงในฉากสามมิติจริง ๆ มาก
+ */
+.sz-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  background: #1a0f14;
+  box-shadow:
+    inset 0 0 60px -10px rgba(8, 145, 178, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 60px -30px rgba(0, 0, 0, 0.95);
+}
+
+/*
+ * แผงคำสั่งแบบเทอร์มินัล
+ *
+ * โจทย์คณิตศาสตร์ในเกมนี้ไม่ได้ขึ้นบนการ์ดสีขาวเหมือนแบบฝึกหัด
+ * แต่ขึ้นบนจอของเครื่องจักร ซึ่งเปลี่ยนความรู้สึกของการตอบผิดไปทั้งหมด
+ * ตอบผิดบนกระดาษคือ "เราทำไม่ได้" ตอบผิดบนจอเครื่องคือ "เครื่องยังไม่ผ่าน"
+ */
+.sz-terminal {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(8, 145, 178, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(4, 17, 32, 0.96), rgba(2, 8, 20, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(165, 243, 252, 0.18),
+    0 0 32px -12px rgba(34, 211, 238, 0.7),
+    0 26px 60px -32px rgba(0, 0, 0, 0.95);
+}
+
+/* เส้นสแกนที่ไหลลง ทำให้จอดูเหมือนกำลังทำงานอยู่ ไม่ใช่ภาพนิ่ง */
+.sz-scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(103, 232, 249, 0.07) 0px,
+    rgba(103, 232, 249, 0.07) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  animation: sz-scan 7s linear infinite;
+}
+
+/* ช่องเก็บไอเทมสามช่อง ว่างอยู่ก็ต้องเห็นว่ามีกี่ช่องที่ยังต้องเติม */
+.sz-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  background: rgba(2, 8, 20, 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.sz-slot-filled {
+  border-style: solid;
+  border-color: rgba(74, 222, 128, 0.75);
+  background: rgba(6, 78, 59, 0.5);
+  box-shadow: 0 0 18px -4px rgba(74, 222, 128, 0.8);
+}
+
+/* หลอดความร้อน ยิ่งเต็มยิ่งแดง และเต้นเมื่อใกล้อันตราย */
+.sz-heat {
+  background: linear-gradient(90deg, #fbbf24, #f97316 55%, #dc2626);
+  box-shadow: 0 0 16px -2px rgba(249, 115, 22, 0.9);
+}
+
+.sz-heat-critical {
+  animation: sz-alarm 0.9s ease-in-out infinite;
+}
+
+/* ปุ่มทิศทางบนจอ สำหรับแท็บเล็ตที่ไม่มีคีย์บอร์ด */
+.sz-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  border: 1px solid rgba(103, 232, 249, 0.45);
+  background: rgba(8, 25, 45, 0.72);
+  color: #e0f2fe;
+  font-size: 1.5rem;
+  font-weight: 700;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sz-pad:active {
+  background: rgba(34, 211, 238, 0.35);
+}
+
+/* ตัวเลขบนจอโฮโลแกรม ต้องอ่านง่ายกว่าสวย เพราะเด็กต้องอ่านหลักให้ถูก */
+.sz-hologram {
+  color: #a5f3fc;
+  text-shadow:
+    0 0 12px rgba(34, 211, 238, 0.75),
+    0 0 30px rgba(34, 211, 238, 0.35);
+  letter-spacing: 0.04em;
+}
 }
 
 @keyframes drift-a {
@@ -698,4 +813,20 @@ html[data-animations='off'] *::after {
 @keyframes cta {
   0%, 100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.55), 0 10px 30px -10px rgba(0,0,0,.8); }
   50%      { box-shadow: 0 0 0 14px rgba(252, 211, 77, 0), 0 10px 30px -10px rgba(0,0,0,.8); }
+}
+
+@keyframes sz-scan {
+  from { transform: translateY(-25%); }
+  to   { transform: translateY(25%); }
+}
+
+/*
+ * สัญญาณเตือนความร้อน
+ *
+ * เปลี่ยนความสว่างอย่างเดียว ไม่ขยับตำแหน่งและไม่กะพริบดับสนิท
+ * แถบที่กะพริบดับหายไปทำให้อ่านค่าไม่ได้ในจังหวะที่ต้องอ่านมากที่สุดพอดี
+ */
+@keyframes sz-alarm {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.55); }
 }
