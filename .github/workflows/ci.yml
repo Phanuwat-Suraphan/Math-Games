@@ -75,6 +75,9 @@ jobs:
       - name: ทดสอบ Safe Zone Guardians (เขาวงกตสามมิติและภารกิจ ป.4)
         run: node tests/safezone.test.mjs /tmp/logic
 
+      - name: ทดสอบโดมสีเขียว (ฟาร์ม สมุดบัญชี รหัสฟาร์ม และสมดุลเกม)
+        run: node tests/farm.test.mjs /tmp/logic
+
       - name: ทดสอบภาพประกอบ
         run: node tests/art.test.mjs /tmp/logic
 

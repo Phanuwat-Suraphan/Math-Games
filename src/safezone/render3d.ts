@@ -29,17 +29,13 @@ import {
   wallAt,
 } from './types'
 import type { MazeWorld } from './types'
-import {
-  clipNearPlane,
-  faceBrightness,
-  mixHex,
-  parseHex,
-  projectionScale,
-  scaleHex,
-  toView,
-  vec3,
-} from './vector3'
-import type { Camera, Face, Vec3, Viewport } from './vector3'
+import { emitBox, emitFloorTile, paintScene } from '../render3d/scene'
+import type { SceneFace } from '../render3d/scene'
+import { mixHex, projectionScale, scaleHex, toView, vec3 } from './vector3'
+import type { Camera, Viewport } from './vector3'
+
+export { emitBox } from '../render3d/scene'
+export type { BoxOptions } from '../render3d/scene'
 
 /** สีของฝุ่นที่ขอบฟ้า ทุกอย่างที่อยู่ไกลจะค่อย ๆ กลายเป็นสีนี้ */
 const FOG_COLOR = '#c8703a'
@@ -69,170 +65,6 @@ const FIELD_OF_VIEW = 1.15
 
 /** ระยะที่ยังสร้างของในฉาก ไกลกว่านี้หมอกกลืนจนหมดอยู่แล้ว */
 const DRAW_RADIUS = FOG_END + CELL_SIZE
-
-/** ด้านทั้งหกของกล่องหนึ่งใบ พิกัดเป็นสัดส่วนของครึ่งขนาด */
-const BOX_FACES: readonly {
-  normal: readonly [number, number, number]
-  corners: readonly (readonly [number, number, number])[]
-}[] = [
-  {
-    normal: [0, 1, 0],
-    corners: [
-      [-1, 1, -1],
-      [1, 1, -1],
-      [1, 1, 1],
-      [-1, 1, 1],
-    ],
-  },
-  {
-    normal: [0, -1, 0],
-    corners: [
-      [-1, -1, 1],
-      [1, -1, 1],
-      [1, -1, -1],
-      [-1, -1, -1],
-    ],
-  },
-  {
-    normal: [0, 0, -1],
-    corners: [
-      [-1, 1, -1],
-      [-1, -1, -1],
-      [1, -1, -1],
-      [1, 1, -1],
-    ],
-  },
-  {
-    normal: [0, 0, 1],
-    corners: [
-      [1, 1, 1],
-      [1, -1, 1],
-      [-1, -1, 1],
-      [-1, 1, 1],
-    ],
-  },
-  {
-    normal: [-1, 0, 0],
-    corners: [
-      [-1, 1, 1],
-      [-1, -1, 1],
-      [-1, -1, -1],
-      [-1, 1, -1],
-    ],
-  },
-  {
-    normal: [1, 0, 0],
-    corners: [
-      [1, 1, -1],
-      [1, -1, -1],
-      [1, -1, 1],
-      [1, 1, 1],
-    ],
-  },
-]
-
-export interface BoxOptions {
-  center: Vec3
-  size: Vec3
-  /** หมุนรอบแกนตั้ง หน่วยเรเดียน */
-  yaw?: number
-  color: string
-  /** สีของหน้าบน ใส่เมื่ออยากให้หลังคาต่างจากผนัง */
-  topColor?: string
-  outline?: string | null
-  emissive?: boolean
-  alpha?: number
-  /** ข้ามหน้าล่าง ใช้กับของที่ตั้งอยู่บนพื้นซึ่งไม่มีวันเห็นก้น */
-  skipBottom?: boolean
-}
-
-/**
- * หน้าหนึ่งหน้าในฉาก
- *
- * เพิ่มจาก Face ของ vector3 สองอย่าง คือความโปร่งใส และชั้นการวาด
- *
- * เรื่องชั้นการวาดมีที่มา วิธีจิตรกรเรียงหน้าตามความลึกของจุดกึ่งกลาง
- * ซึ่งใช้ได้กับของขนาดใกล้เคียงกัน แต่พื้นหนึ่งแผ่นกว้างสี่หน่วยวางราบ
- * มีจุดกึ่งกลางเดียวแต่กินความลึกยาวมาก จึงสลับหน้าหลังกับตัวละครได้ง่าย
- * อาการคือพื้นแผ่นที่อยู่ข้างหลังโผล่มาทับตัวละครเป็นสามเหลี่ยม
- *
- * แต่กล้องของเกมนี้อยู่สูงกว่ากำแพงเสมอและก้มลงเสมอ
- * แปลว่าพื้นที่ y ใกล้ศูนย์ไม่มีวันบังอะไรได้เลย เพราะไม่มีอะไรอยู่ต่ำกว่าพื้น
- * จึงวาดพื้นให้จบก่อนแล้วค่อยวาดของที่ตั้งอยู่บนพื้น ซึ่งถูกต้องเสมอ
- * โดยไม่ต้องแบ่งพื้นเป็นชิ้นเล็ก ๆ ให้ต้องวาดเพิ่มอีกหลายเท่า
- */
-interface SceneFace extends Face {
-  alpha: number
-  /** 0 = แผ่นพื้นที่วางราบ, 1 = ของที่ตั้งอยู่บนพื้น */
-  layer: 0 | 1
-}
-
-/** แตกกล่องหนึ่งใบออกเป็นหน้า แล้วต่อท้ายรายการที่ส่งเข้ามา */
-export function emitBox(out: SceneFace[], options: BoxOptions): void {
-  const yaw = options.yaw ?? 0
-  const cos = Math.cos(yaw)
-  const sin = Math.sin(yaw)
-  const half = {
-    x: options.size.x / 2,
-    y: options.size.y / 2,
-    z: options.size.z / 2,
-  }
-
-  for (const face of BOX_FACES) {
-    if (options.skipBottom && face.normal[1] === -1) continue
-
-    const rotate = (x: number, z: number): { x: number; z: number } => ({
-      x: x * cos + z * sin,
-      z: -x * sin + z * cos,
-    })
-
-    const rotatedNormal = rotate(face.normal[0], face.normal[2])
-    const points = face.corners.map((corner) => {
-      const spun = rotate(corner[0] * half.x, corner[2] * half.z)
-      return vec3(
-        options.center.x + spun.x,
-        options.center.y + corner[1] * half.y,
-        options.center.z + spun.z,
-      )
-    })
-
-    out.push({
-      points,
-      normal: vec3(rotatedNormal.x, face.normal[1], rotatedNormal.z),
-      color: face.normal[1] === 1 ? (options.topColor ?? options.color) : options.color,
-      outline: options.outline ?? null,
-      emissive: options.emissive,
-      alpha: options.alpha ?? 1,
-      layer: 1,
-    })
-  }
-}
-
-/** แผ่นราบวางบนพื้น ใช้กับพื้นทราย แผ่นทำความเย็น และเงาใต้ตัวละคร */
-function emitFloorTile(
-  out: SceneFace[],
-  x: number,
-  z: number,
-  size: number,
-  y: number,
-  color: string,
-  alpha = 1,
-): void {
-  const half = size / 2
-  out.push({
-    points: [
-      vec3(x - half, y, z - half),
-      vec3(x + half, y, z - half),
-      vec3(x + half, y, z + half),
-      vec3(x - half, y, z + half),
-    ],
-    normal: vec3(0, 1, 0),
-    color,
-    outline: null,
-    alpha,
-    layer: 0,
-  })
-}
 
 /**
  * ตัวเลขสุ่มที่ผูกกับช่อง
@@ -761,33 +593,6 @@ function drawHeatVignette(
   ctx.fillRect(0, 0, viewport.width, viewport.height)
 }
 
-/**
- * ค่าสีของหมอกที่แยกช่องไว้ล่วงหน้า
- *
- * แปลงครั้งเดียวตอนโหลดไฟล์ ไม่ใช่ทุกครั้งที่ระบายสีหนึ่งหน้า
- * ในหนึ่งเฟรมมีหลายร้อยหน้า การแยกข้อความ '#c8703a' ซ้ำหลายร้อยครั้ง
- * ต่อเฟรมคืองานที่ให้คำตอบเดิมทุกครั้งอย่างแน่นอน
- */
-const FOG_RGB = parseHex(FOG_COLOR)
-
-function clampChannel(value: number): number {
-  return Math.round(Math.max(0, Math.min(255, value)))
-}
-
-/** สีสุดท้ายของหน้าหนึ่งหน้า หลังคิดแสงอาทิตย์และหมอกฝุ่นแล้ว */
-function shadeFace(face: SceneFace, depth: number): string {
-  const base = parseHex(face.color)
-  const light = face.emissive ? 1.05 : faceBrightness(face.normal)
-  const fog = face.emissive
-    ? 0
-    : Math.max(0, Math.min(1, (depth - FOG_START) / (FOG_END - FOG_START))) * 0.92
-
-  const r = clampChannel(base.r * light + (FOG_RGB.r - base.r * light) * fog)
-  const g = clampChannel(base.g * light + (FOG_RGB.g - base.g * light) * fog)
-  const b = clampChannel(base.b * light + (FOG_RGB.b - base.b * light) * fog)
-  return `rgb(${r}, ${g}, ${b})`
-}
-
 export interface DrawOptions {
   /** เวลาตั้งแต่เปิดเกม หน่วยมิลลิวินาที ใช้ทำของที่ขยับเอง */
   time: number
@@ -818,106 +623,12 @@ export function drawScene(
   emitDrone(faces, world, options.time)
   emitPlayer(faces, world)
 
-  /*
-   * เตรียมหน้าทั้งหมดก่อนวาด
-   *
-   * ทำสามอย่างในรอบเดียว คือทิ้งหน้าที่หันหลังให้กล้อง ตัดส่วนที่อยู่หลังกล้อง
-   * แล้วแปลงเป็นพิกัดจอ การรวมไว้รอบเดียวสำคัญกว่าที่คิด เพราะสามงานนี้
-   * ต้องทำกับทุกหน้าในทุกเฟรม การแยกเป็นสามรอบคือการวนสามพันครั้งต่อวินาที
-   */
-  const scale = projectionScale(viewport, camera.fov)
-  const ready: {
-    face: SceneFace
-    screen: { x: number; y: number }[]
-    depth: number
-    height: number
-  }[] = []
-
-  for (const face of faces) {
-    const first = face.points[0] as Vec3
-    const toFace = {
-      x: first.x - camera.position.x,
-      y: first.y - camera.position.y,
-      z: first.z - camera.position.z,
-    }
-    if (
-      !face.emissive &&
-      face.normal.x * toFace.x + face.normal.y * toFace.y + face.normal.z * toFace.z >= 0
-    ) {
-      continue
-    }
-
-    const viewPoints = face.points.map((point) => toView(point, camera))
-    const clipped = clipNearPlane(viewPoints)
-    if (clipped.length < 3) continue
-
-    let depth = 0
-    const screen = clipped.map((point) => {
-      depth += point.z
-      return {
-        x: viewport.width / 2 + (point.x * scale) / point.z,
-        y: viewport.height / 2 - (point.y * scale) / point.z,
-      }
-    })
-    depth /= clipped.length
-    if (depth > FOG_END + CELL_SIZE * 2) continue
-
-    // ทิ้งหน้าที่อยู่นอกจอทั้งหน้า ประหยัดการเรียก fill ที่ไม่มีผลกับภาพ
-    let minX = Infinity
-    let maxX = -Infinity
-    let minY = Infinity
-    let maxY = -Infinity
-    for (const point of screen) {
-      if (point.x < minX) minX = point.x
-      if (point.x > maxX) maxX = point.x
-      if (point.y < minY) minY = point.y
-      if (point.y > maxY) maxY = point.y
-    }
-    if (maxX < 0 || minX > viewport.width || maxY < 0 || minY > viewport.height) continue
-
-    ready.push({ face, screen, depth, height: (face.points[0] as Vec3).y })
-  }
-
-  /*
-   * พื้นก่อน แล้วค่อยของที่ตั้งบนพื้น
-   *
-   * ในกลุ่มพื้นด้วยกันเรียงตามความสูง ไม่ใช่ความลึก เพราะแผ่นพื้นคนละช่อง
-   * ไม่มีทางซ้อนกันบนจอเมื่อมองจากด้านบน ที่ซ้อนกันจริงคือแผ่นที่วางทับกัน
-   * ในช่องเดียวกัน เช่นแผ่นทำความเย็นที่วางบนพื้นทราย ซึ่งต่างกันที่ความสูง
-   */
-  ready.sort((a, b) => {
-    if (a.face.layer !== b.face.layer) return a.face.layer - b.face.layer
-    if (a.face.layer === 0) return a.height - b.height
-    return b.depth - a.depth
+  paintScene(ctx, faces, camera, viewport, {
+    fogColor: FOG_COLOR,
+    fogStart: FOG_START,
+    fogEnd: FOG_END,
+    cullDistance: FOG_END + CELL_SIZE * 2,
   })
-
-  for (const item of ready) {
-    ctx.globalAlpha = item.face.alpha
-    ctx.fillStyle = shadeFace(item.face, item.depth)
-    ctx.beginPath()
-    const first = item.screen[0] as { x: number; y: number }
-    ctx.moveTo(first.x, first.y)
-    for (let index = 1; index < item.screen.length; index += 1) {
-      const point = item.screen[index] as { x: number; y: number }
-      ctx.lineTo(point.x, point.y)
-    }
-    ctx.closePath()
-    ctx.fill()
-
-    if (item.face.outline && item.depth < FOG_START * 2) {
-      /*
-       * เส้นขอบจางลงตามระยะ ไม่ใช่เข้มเท่ากันทุกระยะ
-       * เส้นที่เข้มเท่ากันหมดทำให้ตึกไกล ๆ กลายเป็นตาข่ายสีดำทึบ
-       * เพราะเส้นมีความหนาคงที่ แต่ตัวตึกเล็กลงเรื่อย ๆ จนเหลือแต่เส้น
-       */
-      ctx.globalAlpha = item.face.alpha * Math.max(0, 1 - item.depth / (FOG_START * 2))
-      ctx.strokeStyle = item.face.outline
-      ctx.lineWidth = 1.2
-      ctx.lineJoin = 'round'
-      ctx.stroke()
-    }
-  }
-  ctx.globalAlpha = 1
 
   if (!options.reduceMotion) drawDust(ctx, viewport, options.time)
   drawHeatVignette(ctx, viewport, world.heat)
