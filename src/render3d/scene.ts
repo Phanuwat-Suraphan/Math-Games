@@ -240,6 +240,15 @@ export interface PaintOptions {
   orthographic?: number
   /** ระยะที่เส้นขอบจางหายไปหมด ไม่ใส่ = ใช้สองเท่าของ fogStart */
   outlineFade?: number
+  /**
+   * เลื่อนภาพทั้งฉากบนจอ หน่วยพิกเซล
+   *
+   * จำเป็นกับกล้องออร์โทกราฟิก เพราะจุดที่ฉายไปตรงกลางจอคือจุดกำเนิดของโลก
+   * ซึ่งไม่ใช่จุดกึ่งกลางของ "ภาพที่ออกมา" เลย พอฉากไม่ได้สมมาตรรอบจุดกำเนิด
+   * ในสายตาของกล้องเอียง ภาพจะเบี้ยวไปมุมใดมุมหนึ่งแล้วเหลือที่ว่างอีกมุม
+   */
+  offsetX?: number
+  offsetY?: number
 }
 
 function clampChannel(value: number): number {
@@ -321,8 +330,8 @@ export function paintScene(
        */
       const inverse = options.orthographic === undefined ? scale / point.z : scale
       return {
-        x: viewport.width / 2 + point.x * inverse,
-        y: viewport.height / 2 - point.y * inverse,
+        x: viewport.width / 2 + point.x * inverse + (options.offsetX ?? 0),
+        y: viewport.height / 2 - point.y * inverse + (options.offsetY ?? 0),
       }
     })
     depth /= clipped.length

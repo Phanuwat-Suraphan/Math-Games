@@ -113,6 +113,22 @@ const REQUIRED_CLASSES = [
   'sz-heat-critical',
   'sz-pad',
   'sz-hologram',
+
+  // โดมสีเขียว
+  'farm-stage',
+  'farm-chip',
+  'farm-hotspot',
+  'farm-tab',
+  'farm-tab-active',
+  'farm-pill',
+  'farm-pill-active',
+  'farm-option',
+  'farm-terminal',
+  'farm-grow',
+  'farm-alarm',
+  'farm-ledger-row',
+  'farm-ledger-done',
+  'farm-ledger-num',
 ]
 
 /** คลาสนี้ถูกนิยามไว้ในไฟล์ไหม */

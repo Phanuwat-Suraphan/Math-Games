@@ -75,6 +75,15 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-sky-500/30 to-leaf-600/10',
   },
   {
+    to: '/farm',
+    emoji: '🌱',
+    art: { kind: 'scene', id: 'world-1' },
+    glow: '#4ade80',
+    label: 'โดมสีเขียว',
+    description: 'ปลูกผัก เลี้ยงสัตว์ และดูแลทรัพยากรของโดมให้พอเลี้ยงทุกคน',
+    accent: 'from-leaf-500/30 to-sky-600/10',
+  },
+  {
     to: '/tower',
     emoji: '🗼',
     art: { kind: 'monster', id: 'geometry-golem' },
