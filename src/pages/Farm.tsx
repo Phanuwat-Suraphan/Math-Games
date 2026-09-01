@@ -35,6 +35,9 @@ import {
   waterPlot,
 } from '../farm/engine'
 import { basePrice, marketPrice, priceChangePercent } from '../farm/market'
+import { LEDGER_INDICATOR } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
+import { ResultCodeCard } from '../components/ResultCodeCard'
 import { buildLedger, closeDay, eventForDay, planDay } from '../farm/ledger'
 import { decodeFarm, encodeFarm } from '../farm/save'
 import { clearFarm, loadFarm, saveFarm } from '../farm/storage'
@@ -105,6 +108,7 @@ function readNumber(text: string): number | null {
 export function Farm({ player }: { player: Player }) {
   const navigate = useNavigate()
   const { settings, answerQuestion } = useGame()
+  const { logIndicator, currentCode } = useIndicatorLog(player.name)
   useMusic('adventure')
 
   const [phase, setPhase] = useState<Phase>('intro')
@@ -238,12 +242,15 @@ export function Farm({ player }: { player: Player }) {
         timeMs: 0,
         isReplay: true,
       })
+      // แถวที่ยังไม่ได้โยงกับตัวชี้วัด ไม่บันทึก ดีกว่าบันทึกผิดช่อง
+      const indicator = LEDGER_INDICATOR[row.kind]
+      if (indicator) logIndicator(indicator, isCorrect)
       mutate((draft) => {
         draft.ledgerAnswered += 1
         if (isCorrect) draft.ledgerCorrect += 1
       })
     },
-    [answerQuestion, farm, mutate],
+    [answerQuestion, farm, logIndicator, mutate],
   )
 
   /* ---------------- หน้าเริ่มต้น ---------------- */
@@ -276,6 +283,7 @@ export function Farm({ player }: { player: Player }) {
             farm={farm}
             plan={plan}
             rows={rows}
+            resultCode={currentCode()}
             onRecord={record}
             onFinish={finishLedger}
           />
@@ -1140,12 +1148,15 @@ function LedgerScreen({
   farm,
   plan,
   rows,
+  resultCode,
   onRecord,
   onFinish,
 }: {
   farm: FarmState
   plan: DayPlan
   rows: LedgerRow[]
+  /** รหัสผลการเรียนที่รวมข้อของวันนี้แล้ว ใช้ให้เด็กส่งครูตอนหมดคาบ */
+  resultCode: string
   onRecord: (row: LedgerRow, isCorrect: boolean) => void
   onFinish: (perfect: boolean) => void
 }) {
@@ -1227,6 +1238,15 @@ function LedgerScreen({
           <Button className="mt-4" size="lg" fullWidth icon="🌅" onClick={() => onFinish(perfect)}>
             เริ่มวันที่ {farm.day + 1}
           </Button>
+        </div>
+      ) : null}
+
+      {allSolved ? (
+        <div className="mt-4">
+          <ResultCodeCard
+            code={resultCode}
+            hint="ถ้าหมดคาบแล้ว ส่งรหัสบรรทัดนี้ให้คุณครู · คนละรหัสกับรหัสฟาร์ม รหัสนี้บอกคุณครูว่าหนูทำตัวชี้วัดไหนได้แล้ว ส่วนรหัสฟาร์มไว้ย้ายฟาร์มข้ามเครื่อง"
+          />
         </div>
       ) : null}
     </>
