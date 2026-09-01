@@ -38,7 +38,7 @@ import { basePrice, marketPrice, priceChangePercent } from '../farm/market'
 import { LEDGER_INDICATOR } from '../teacher/indicators'
 import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { ResultCodeCard } from '../components/ResultCodeCard'
-import { buildLedger, closeDay, eventForDay, planDay } from '../farm/ledger'
+import { buildLedger, builderAnswer, closeDay, eventForDay, planDay } from '../farm/ledger'
 import { decodeFarm, encodeFarm } from '../farm/save'
 import { clearFarm, loadFarm, saveFarm } from '../farm/storage'
 import {
@@ -64,7 +64,7 @@ import {
   findResource,
 } from '../farm/types'
 import type { AnimalId, FarmState, Grade, ResourceId } from '../farm/types'
-import type { DayPlan, LedgerRow } from '../farm/ledger'
+import type { BuilderSpec, DayPlan, LedgerRow } from '../farm/ledger'
 import type { SkillId } from '../types/stats'
 import type { Player } from '../types/player'
 
@@ -92,6 +92,7 @@ const LEDGER_SKILL: Record<LedgerRow['kind'], SkillId> = {
   forecast: 'division',
   percent: 'percentages',
   average: 'wordProblems',
+  build: 'wordProblems',
 }
 
 function withCommas(value: number): string {
@@ -1163,21 +1164,30 @@ function LedgerScreen({
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [solved, setSolved] = useState<Record<string, boolean>>({})
   const [missed, setMissed] = useState<Record<string, boolean>>({})
+  const [picks, setPicks] = useState<Record<string, BuilderPick>>({})
 
   const allSolved = rows.every((row) => solved[row.id])
   const perfect = allSolved && rows.every((row) => !missed[row.id])
 
   const checkRow = useCallback(
     (row: LedgerRow) => {
-      const correct = row.fields.every(
-        (field) => readNumber(answers[`${row.id}:${field.key}`] ?? '') === field.answer,
-      )
+      /*
+       * แถวสร้างโจทย์เองไม่มีคำตอบตายตัวใน fields
+       * เพราะคำตอบขึ้นกับโจทย์ที่เด็กประกอบขึ้นเอง จึงต้องคิดตอนนี้
+       */
+      const expected = builderExpected(row, picks[row.id])
+      const correct =
+        expected !== null
+          ? readNumber(answers[`${row.id}:answer`] ?? '') === expected
+          : row.fields.every(
+              (field) => readNumber(answers[`${row.id}:${field.key}`] ?? '') === field.answer,
+            )
       onRecord(row, correct && !missed[row.id])
       playSfx(correct ? 'correct' : 'wrong')
       if (correct) setSolved((current) => ({ ...current, [row.id]: true }))
       else setMissed((current) => ({ ...current, [row.id]: true }))
     },
-    [answers, missed, onRecord],
+    [answers, missed, onRecord, picks],
   )
 
   return (
@@ -1209,6 +1219,13 @@ function LedgerScreen({
             answers={answers}
             solved={solved[row.id] === true}
             missed={missed[row.id] === true}
+            pick={picks[row.id]}
+            onPick={(slot, key) =>
+              setPicks((current) => ({
+                ...current,
+                [row.id]: { ...current[row.id], [slot]: key },
+              }))
+            }
             onChange={(key, value) =>
               setAnswers((current) => ({ ...current, [key]: value }))
             }
@@ -1253,12 +1270,43 @@ function LedgerScreen({
   )
 }
 
+/** ตัวเลือกที่เด็กเลือกไว้ในแถวสร้างโจทย์เอง ยังไม่เลือกคือ undefined */
+interface BuilderPick {
+  sell?: string
+  spend?: string
+}
+
+/** หาตัวเลือกที่เด็กเลือกไว้จริง คืน null เมื่อยังเลือกไม่ครบ */
+function pickedOptions(
+  builder: BuilderSpec,
+  pick: BuilderPick | undefined,
+): { sell: BuilderSpec['sell'][number]; spend: BuilderSpec['spend'][number] } | null {
+  const sell = builder.sell.find((option) => option.key === pick?.sell)
+  const spend = builder.spend.find((option) => option.key === pick?.spend)
+  return sell && spend ? { sell, spend } : null
+}
+
+/**
+ * คำตอบที่ถูกต้องของแถวสร้างโจทย์เอง
+ *
+ * คืน null เมื่อไม่ใช่แถวชนิดนี้ หรือเมื่อเด็กยังเลือกไม่ครบ
+ * ผู้เรียกใช้ null เป็นสัญญาณว่าให้กลับไปตรวจแบบแถวธรรมดาแทน
+ */
+function builderExpected(row: LedgerRow, pick: BuilderPick | undefined): number | null {
+  if (!row.builder) return null
+  const chosen = pickedOptions(row.builder, pick)
+  if (!chosen) return null
+  return builderAnswer(row.builder, chosen.sell.value, chosen.spend.value)
+}
+
 function LedgerRowCard({
   row,
   index,
   answers,
   solved,
   missed,
+  pick,
+  onPick,
   onChange,
   onCheck,
 }: {
@@ -1267,12 +1315,17 @@ function LedgerRowCard({
   answers: Record<string, string>
   solved: boolean
   missed: boolean
+  pick: BuilderPick | undefined
+  onPick: (slot: keyof BuilderPick, key: string) => void
   onChange: (key: string, value: string) => void
   onCheck: () => void
 }) {
-  const ready = row.fields.every(
-    (field) => readNumber(answers[`${row.id}:${field.key}`] ?? '') !== null,
-  )
+  const chosen = row.builder ? pickedOptions(row.builder, pick) : null
+  const ready = row.builder
+    ? chosen !== null && readNumber(answers[`${row.id}:answer`] ?? '') !== null
+    : row.fields.every(
+        (field) => readNumber(answers[`${row.id}:${field.key}`] ?? '') !== null,
+      )
 
   return (
     <div className={`farm-ledger-row ${solved ? 'farm-ledger-done' : ''}`}>
@@ -1285,6 +1338,17 @@ function LedgerRowCard({
           <p className="mt-1 text-sm leading-relaxed text-white sm:text-base">{row.prompt}</p>
         </div>
       </div>
+
+      {row.builder ? (
+        <BuilderPanel
+          builder={row.builder}
+          pick={pick}
+          disabled={solved}
+          answer={answers[`${row.id}:answer`] ?? ''}
+          onPick={onPick}
+          onChange={(value) => onChange(`${row.id}:answer`, value)}
+        />
+      ) : null}
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {row.fields.map((field) => {
@@ -1327,11 +1391,123 @@ function LedgerRowCard({
       {missed ? (
         <div className="mt-3 space-y-1 rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-3 text-sm text-slate-200">
           <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">วิธีคิด</p>
-          {row.working.map((line) => (
+          {/*
+            แถวสร้างโจทย์เองต้องแสดงวิธีคิดด้วยตัวเลขที่เด็กเลือกเอง
+            ไม่ใช่ข้อความกลาง ๆ ที่เขียนไว้ล่วงหน้า เพราะโจทย์ของเด็กแต่ละคนไม่เหมือนกัน
+            และประโยชน์ทั้งหมดของการเฉลย อยู่ที่การได้เห็นตัวเลขของตัวเองเดินทีละขั้น
+          */}
+          {(row.builder && chosen
+            ? [
+                `ขั้นที่ 1 · ${withCommas(row.builder.coins)} + ${withCommas(chosen.sell.value)} = ${withCommas(row.builder.coins + chosen.sell.value)}`,
+                `ขั้นที่ 2 · ${withCommas(row.builder.coins + chosen.sell.value)} − ${withCommas(chosen.spend.value)} = ${withCommas(builderAnswer(row.builder, chosen.sell.value, chosen.spend.value))}`,
+              ]
+            : row.working
+          ).map((line) => (
             <p key={line}>{line}</p>
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * แผงเลือกตัวเลือกสำหรับแถวสร้างโจทย์เอง ตามตัวชี้วัด ป.4/12
+ *
+ * ตัวเลือกแสดงเป็นเรื่องราวพร้อมตัวเลขกำกับ ไม่ใช่ตัวเลขเปล่า ๆ
+ * เพราะตัวชี้วัดข้อนี้คือการสร้าง "โจทย์ปัญหา" ไม่ใช่การสร้างประโยคคำนวณ
+ * เด็กที่เลือกว่าจะขายไข่แล้วเอาเงินไปเปิดแปลงใหม่ กำลังแต่งเรื่องของตัวเอง
+ * ซึ่งเป็นสิ่งที่ตัวชี้วัดต้องการ ส่วนการบวกลบเป็นขั้นถัดไป
+ *
+ * เมื่อเลือกครบทั้งสองช่อง โจทย์ที่เด็กแต่งจะถูกเขียนกลับมาเป็นประโยคเต็ม
+ * ให้เด็กได้อ่านโจทย์ของตัวเองก่อนตอบ ซึ่งเป็นครึ่งหนึ่งของตัวชี้วัดข้อนี้
+ */
+function BuilderPanel({
+  builder,
+  pick,
+  disabled,
+  answer,
+  onPick,
+  onChange,
+}: {
+  builder: BuilderSpec
+  pick: BuilderPick | undefined
+  disabled: boolean
+  answer: string
+  onPick: (slot: keyof BuilderPick, key: string) => void
+  onChange: (value: string) => void
+}) {
+  const chosen = pickedOptions(builder, pick)
+
+  const slots: { slot: keyof BuilderPick; title: string; options: BuilderSpec['sell'] }[] = [
+    { slot: 'sell', title: 'ช่องที่ 1 · วันนี้จะขายอะไร', options: builder.sell },
+    { slot: 'spend', title: 'ช่องที่ 2 · จะเอาเงินไปซื้ออะไร', options: builder.spend },
+  ]
+
+  return (
+    <div className="mt-3 space-y-3">
+      {slots.map((group) => (
+        <div key={group.slot}>
+          <p className="text-xs font-bold text-slate-400">{group.title}</p>
+          <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
+            {group.options.map((option) => {
+              const picked = pick?.[group.slot] === option.key
+              return (
+                <button
+                  key={option.key}
+                  type="button"
+                  disabled={disabled}
+                  aria-pressed={picked}
+                  onClick={() => onPick(group.slot, option.key)}
+                  className={`btn-3d rounded-xl border p-2.5 text-left text-sm font-semibold transition-colors disabled:opacity-70 ${
+                    picked
+                      ? 'border-leaf-400/70 bg-leaf-500/20 text-leaf-300'
+                      : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+                  }`}
+                >
+                  <span className="block">{option.label}</span>
+                  <span className="block text-xs font-black tabular-nums text-gold-300">
+                    {withCommas(option.value)} บาท
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
+
+      {chosen ? (
+        <div className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-3">
+          <p className="text-xs font-bold uppercase tracking-widest text-cyan-300">
+            โจทย์ที่หนูสร้างเอง
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-white">
+            โดมมีเงิน {withCommas(builder.coins)} บาท แล้ว{chosen.sell.label} ได้เงินเพิ่ม{' '}
+            {withCommas(chosen.sell.value)} บาท จากนั้น{chosen.spend.label} ราคา{' '}
+            {withCommas(chosen.spend.value)} บาท สุดท้ายจะเหลือเงินกี่บาท
+          </p>
+          <label className="mt-2 block">
+            <span className="text-xs font-bold text-slate-400">คำตอบของโจทย์ที่หนูสร้าง</span>
+            <span className="mt-1 flex items-center gap-2">
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                disabled={disabled}
+                value={answer}
+                onChange={(event) => onChange(event.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="พิมพ์ตัวเลข"
+                className="min-w-0 flex-1 rounded-xl border border-leaf-400/40 bg-night-900/80 px-3 py-2.5 text-center text-xl font-black tabular-nums text-white placeholder:text-sm placeholder:font-normal placeholder:text-slate-600 disabled:opacity-70"
+              />
+              <span className="text-sm text-slate-400">บาท</span>
+            </span>
+          </label>
+        </div>
+      ) : (
+        <p className="text-sm text-slate-400">
+          เลือกให้ครบทั้งสองช่อง แล้วโจทย์ของหนูจะขึ้นมาให้อ่าน
+        </p>
+      )}
     </div>
   )
 }

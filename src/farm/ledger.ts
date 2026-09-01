@@ -24,8 +24,11 @@
 
 import { createRng } from '../math/rng'
 import {
+  BUILDINGS,
   ENERGY_BONUS_PERFECT_LEDGER,
   ENERGY_PER_DAY,
+  FEED_PRICE,
+  KITCHEN_COST,
   RESOURCES,
   craftKey,
   findAnimal,
@@ -40,6 +43,7 @@ import {
   dailyConsumption,
   dailyProduction,
   isReady,
+  nextPlotCost,
   plotCells,
   productKey,
   tightestResource,
@@ -241,6 +245,47 @@ export type LedgerKind =
   | 'forecast'
   | 'percent'
   | 'average'
+  | 'build'
+
+/** ตัวเลือกหนึ่งอันในแถวสร้างโจทย์เอง ป้ายกำกับคือเรื่องราว ค่าคือตัวเลขจริง */
+export interface BuilderOption {
+  key: string
+  label: string
+  value: number
+}
+
+/**
+ * แถวที่เด็กสร้างโจทย์ของตัวเอง ตามตัวชี้วัด ป.4/12
+ *
+ * ทำไมต้องมีแถวแบบนี้ในฟาร์มด้วย ทั้งที่ Safe Zone มีภารกิจสร้างโจทย์อยู่แล้ว
+ *
+ * เพราะภารกิจนั้นตอบได้ครั้งเดียวต่อการเล่นหนึ่งรอบ
+ * แผงคุณครูต้องเห็นอย่างน้อยสามข้อถึงจะตัดสินได้ว่าเด็กผ่านตัวชี้วัดหรือยัง
+ * แปลว่าครูต้องให้เด็กเล่น Safe Zone จบสามรอบ เพื่อวัดตัวชี้วัดเดียว
+ * ซึ่งไม่มีคาบเรียนไหนทำได้ ตัวชี้วัดข้อนี้จึงกลายเป็นข้อที่วัดไม่ได้จริง
+ *
+ * ที่นี่เด็กสร้างโจทย์ใหม่ได้ทุกวันที่เก็บเกี่ยว จากตัวเลขของฟาร์มตัวเอง
+ * และเป็นตัวเลขจริงทั้งหมด ไม่ใช่ตัวเลขที่แต่งขึ้นมาให้เลือก
+ */
+export interface BuilderSpec {
+  /** เงินที่โดมมีอยู่จริงตอนนี้ ใช้เป็นตัวตั้งของโจทย์ */
+  coins: number
+  /** เลือกว่าจะขายอะไร ค่าคือเงินที่จะได้จริงตามราคาตลาดวันนี้ */
+  sell: BuilderOption[]
+  /** เลือกว่าจะเอาเงินไปซื้ออะไร ค่าคือราคาจริงของสิ่งนั้น */
+  spend: BuilderOption[]
+}
+
+/**
+ * คำตอบของโจทย์ที่เด็กสร้างเอง
+ *
+ * บวกก่อนลบเสมอ และตัวเลือกฝั่งจ่ายทุกอันถูกคัดมาให้ไม่เกินเงินตั้งต้นบวกรายรับที่น้อยที่สุด
+ * จึงไม่มีทางที่เด็กจะเลือกชุดที่ได้คำตอบติดลบ ซึ่งเป็นจำนวนที่ ป.4 ยังไม่เรียน
+ * และเป็นความผิดของคนออกแบบโจทย์ ไม่ใช่ของเด็กที่เลือก
+ */
+export function builderAnswer(spec: BuilderSpec, sell: number, spend: number): number {
+  return spec.coins + sell - spend
+}
 
 export interface LedgerRow {
   id: string
@@ -251,6 +296,13 @@ export interface LedgerRow {
   fields: LedgerField[]
   /** วิธีคิดทีละขั้น แสดงเมื่อตอบผิด */
   working: string[]
+  /**
+   * มีเฉพาะแถวชนิด build
+   *
+   * แถวนี้ไม่มีคำตอบตายตัวใน fields เพราะคำตอบขึ้นกับสิ่งที่เด็กเลือก
+   * หน้าจอจึงต้องคิดคำตอบเองด้วย builderAnswer หลังเด็กเลือกครบ
+   */
+  builder?: BuilderSpec
 }
 
 function withCommas(value: number): string {
@@ -477,7 +529,93 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
     })
   }
 
+  // ---- ป.4/12 เด็กสร้างโจทย์สองขั้นตอนของตัวเอง ----
+  const builder = buildBuilderSpec(farm, plan)
+  if (builder) {
+    rows.push({
+      id: 'build-own',
+      kind: 'build',
+      skill: 'สร้างโจทย์ปัญหาสองขั้นตอนพร้อมหาคำตอบ',
+      prompt: `วันนี้โดมมีเงิน ${withCommas(builder.coins)} บาท เลือกว่าจะขายอะไรและจะเอาเงินไปซื้ออะไร นั่นคือโจทย์ของหนูเอง แล้วหาคำตอบว่าสุดท้ายจะเหลือเงินกี่บาท`,
+      // แถวนี้ไม่มีคำตอบตายตัว หน้าจอคิดเองจาก builder หลังเด็กเลือกครบ
+      fields: [],
+      working: [
+        'ขั้นที่ 1 · เงินที่มี บวก เงินที่ขายได้',
+        'ขั้นที่ 2 · เอาผลลัพธ์ ลบ ราคาของที่ซื้อ',
+      ],
+      builder,
+    })
+  }
+
   return rows
+}
+
+/**
+ * สร้างตัวเลือกให้เด็กประกอบเป็นโจทย์ของตัวเอง
+ *
+ * คืน null เมื่อวันนั้นไม่มีอะไรให้ขาย หรือไม่มีอะไรที่ซื้อไหว
+ * ซึ่งถูกต้องตามความจริง ดีกว่าแต่งตัวเลือกปลอมขึ้นมาให้ครบ
+ * เพราะทั้งแถวนี้มีค่าก็เพราะตัวเลขในนั้นเป็นของฟาร์มเด็กจริง ๆ
+ */
+function buildBuilderSpec(farm: FarmState, plan: DayPlan): BuilderSpec | null {
+  const sell: BuilderOption[] = []
+
+  for (const entry of plan.cropYield) {
+    const crop = findCrop(entry.crop)
+    const value = entry.count * marketPrice(farm, entry.crop)
+    if (value > 0) {
+      sell.push({
+        key: `crop-${entry.crop}`,
+        label: `ขาย${crop.name}ที่เก็บได้วันนี้ ${withCommas(entry.count)} ต้น`,
+        value,
+      })
+    }
+  }
+
+  for (const entry of plan.feeding) {
+    if (entry.produced <= 0) continue
+    const animal = findAnimal(entry.animal)
+    const value = entry.produced * animal.productPrice
+    sell.push({
+      key: `animal-${entry.animal}`,
+      label: `ขาย${animal.productName}ที่ได้วันนี้ ${withCommas(entry.produced)} ชิ้น`,
+      value,
+    })
+  }
+
+  // ต้องมีอย่างน้อยสองทางเลือก ไม่งั้นไม่ใช่การสร้างโจทย์ เป็นการอ่านโจทย์ที่เกมเขียนไว้
+  if (sell.length < 2) return null
+
+  const cheapestSale = Math.min(...sell.map((option) => option.value))
+  const budget = farm.coins + cheapestSale
+
+  /*
+   * ราคาทุกอันในฝั่งจ่ายเป็นราคาจริงที่กดซื้อได้ในเกม
+   *
+   * ที่ต้องเป็นราคาจริง เพราะโจทย์ข้อนี้ไม่ได้จบที่คำตอบ
+   * เด็กที่คิดออกว่าขายอันไหนแล้วซื้ออาคารได้พอดี จะเดินไปกดซื้อจริงในวันรุ่งขึ้น
+   * ถ้าราคาในโจทย์กับราคาในร้านไม่ตรงกัน สิ่งที่เด็กคิดถูกจะกลายเป็นสิ่งที่ใช้ไม่ได้
+   */
+  const candidates: BuilderOption[] = [
+    { key: 'feed', label: `ซื้ออาหารสัตว์ 20 กิโลกรัม`, value: 20 * FEED_PRICE },
+    { key: 'feed-big', label: `ซื้ออาหารสัตว์ 60 กิโลกรัม`, value: 60 * FEED_PRICE },
+  ]
+
+  const plotCost = nextPlotCost(farm)
+  if (plotCost !== null && plotCost > 0) {
+    candidates.push({ key: 'plot', label: 'เปิดแปลงปลูกใหม่อีกหนึ่งแปลง', value: plotCost })
+  }
+  if (farm.kitchens === 0) {
+    candidates.push({ key: 'kitchen', label: 'สร้างโรงแปรรูป', value: KITCHEN_COST })
+  }
+  for (const building of BUILDINGS) {
+    candidates.push({ key: `building-${building.id}`, label: `สร้าง${building.name}`, value: building.cost })
+  }
+
+  const spend = candidates.filter((option) => option.value <= budget).slice(0, 4)
+  if (spend.length < 2) return null
+
+  return { coins: farm.coins, sell: sell.slice(0, 4), spend }
 }
 
 /* ------------------------------------------------------------------ *

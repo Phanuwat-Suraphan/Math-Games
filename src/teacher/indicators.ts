@@ -180,6 +180,7 @@ export const LEDGER_INDICATOR: Record<string, IndicatorId> = {
   forecast: 'estimate',
   percent: 'percent',
   average: 'average',
+  build: 'buildProblem',
 }
 
 /** โจทย์ของโดรนตรวจการณ์ระหว่างเดินในเขาวงกต */

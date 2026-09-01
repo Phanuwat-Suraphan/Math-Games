@@ -115,6 +115,18 @@ check('ทุกแถวของสมุดบัญชีโดมสีเ�
   }
 })
 
+check('แถวสร้างโจทย์เองของฟาร์มนับเป็นตัวชี้วัดเดียวกับภารกิจสร้างโจทย์ของ Safe Zone', () => {
+  /*
+   * สองที่นี้ต้องลงช่องเดียวกัน เพราะเหตุผลทั้งหมดที่เพิ่มแถวในฟาร์ม
+   * คือเพื่อให้ตัวชี้วัดข้อนี้มีข้อมากพอจะตัดสินได้ในคาบเดียว
+   * ถ้าไปลงคนละช่อง ทั้งสองช่องก็จะยังมีข้อไม่พอเหมือนเดิม
+   */
+  assert(
+    I.LEDGER_INDICATOR.build === I.MISSION_INDICATOR.supply,
+    `แถว build ลงช่อง ${I.LEDGER_INDICATOR.build} แต่ภารกิจ supply ลงช่อง ${I.MISSION_INDICATOR.supply}`,
+  )
+})
+
 check('โจทย์ของโดรนไม่ถูกนับเป็นตัวชี้วัดของ ป.4', () => {
   const meta = I.findIndicator(I.DRONE_INDICATOR)
   assert(meta !== null, 'ตัวชี้วัดของโดรนไม่มีอยู่จริง')
@@ -440,7 +452,16 @@ check('การจำลองต้องเห็นแถวสมุดบ�
       }
     }
   }
-  const expected = ['harvest', 'feed', 'craft', 'resource', 'forecast', 'percent', 'average']
+  const expected = [
+    'harvest',
+    'feed',
+    'craft',
+    'resource',
+    'forecast',
+    'percent',
+    'average',
+    'build',
+  ]
   const unseen = expected.filter((kind) => !kinds.has(kind))
   assert(unseen.length === 0, `จำลองแล้วไม่เคยเห็นแถวชนิด ${unseen.join(' ')}`)
 })

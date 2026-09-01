@@ -939,6 +939,155 @@ function simulate(days, options = {}) {
   return { farm, shortages }
 }
 
+/* ------------------------------------------------------------------ *
+ * แถวสร้างโจทย์เอง ตัวชี้วัด ป.4/12
+ * ------------------------------------------------------------------ */
+
+/** เก็บแถวสร้างโจทย์เองที่เกิดขึ้นจริงจากการเล่น พร้อมฟาร์มของวันนั้น */
+function collectBuilderRows(seeds, days) {
+  const found = []
+  for (let index = 0; index < seeds; index += 1) {
+    const farm = E.createFarm(`สร้างโจทย์-${index}`, 4)
+    E.buyAnimal(farm, 'chicken', 2)
+    E.buyFeed(farm, 20)
+    for (let step = 0; step < days; step += 1) {
+      farm.plots.forEach((plot, plotIndex) => {
+        if (plot.planting && !E.isReady(plot)) E.waterPlot(farm, plotIndex)
+      })
+      farm.plots.forEach((plot, plotIndex) => {
+        if (plot.planting) return
+        for (const crop of T.CROPS) {
+          if (E.plantPlot(farm, plotIndex, crop.id).ok) break
+        }
+      })
+      for (const [key, amount] of Object.entries(farm.stock)) {
+        if (amount > 0) E.sellStock(farm, key, amount)
+      }
+      if (farm.feed < 20 && farm.coins > 200) E.buyFeed(farm, 40)
+
+      const plan = L.planDay(farm)
+      const row = L.buildLedger(farm, plan).find((entry) => entry.kind === 'build')
+      if (row) found.push({ row, coins: farm.coins, day: farm.day, farm: clone(farm) })
+      L.closeDay(farm, plan, true)
+    }
+  }
+  return found
+}
+
+check('แถวสร้างโจทย์เองต้องเกิดขึ้นบ่อยพอที่ครูจะวัดตัวชี้วัดได้ในคาบเดียว', () => {
+  /*
+   * ตัวชี้วัด ป.4/12 เดิมมาจากภารกิจเดียวใน Safe Zone ซึ่งตอบได้ครั้งเดียวต่อรอบ
+   * แผงคุณครูต้องเห็นสามข้อถึงจะตัดสินได้ แปลว่าต้องเล่นจบสามรอบเพื่อวัดข้อเดียว
+   * แถวนี้จึงต้องเกิดอย่างน้อยสามครั้งในหนึ่งคาบ ซึ่งจำลองไว้ที่สิบวัน
+   */
+  const found = collectBuilderRows(6, 10)
+  const perSeed = found.length / 6
+  assert(
+    perSeed >= 3,
+    `หนึ่งคาบสิบวันเจอแถวนี้เฉลี่ย ${perSeed.toFixed(1)} ครั้ง ซึ่งน้อยกว่าสามข้อที่ครูต้องใช้ตัดสิน`,
+  )
+})
+
+check('ทุกชุดที่เด็กเลือกได้ ต้องได้คำตอบเป็นจำนวนนับ ไม่ติดลบ', () => {
+  /*
+   * ข้อเดียวกับที่ภารกิจสร้างโจทย์ของ Safe Zone ต้องระวัง
+   * เด็กเลือกชุดที่ทำให้คำตอบติดลบไม่ได้ เพราะ ป.4 ยังไม่เรียนจำนวนเต็มลบ
+   * และช่องกรอกรับเฉพาะตัวเลข เด็กจึงพิมพ์คำตอบที่ถูกไม่ได้เลย แล้วปิดวันไม่ได้
+   * ซึ่งเป็นความผิดของคนออกแบบโจทย์ ไม่ใช่ของเด็กที่เลือก
+   */
+  const found = collectBuilderRows(6, 25)
+  assert(found.length > 0, 'ไม่เจอแถวสร้างโจทย์เองเลย ข้อนี้จึงไม่ได้ตรวจอะไร')
+  for (const { row } of found) {
+    for (const sell of row.builder.sell) {
+      for (const spend of row.builder.spend) {
+        const answer = L.builderAnswer(row.builder, sell.value, spend.value)
+        assert(
+          answer >= 0,
+          `เลือก "${sell.label}" กับ "${spend.label}" แล้วได้ ${answer} ซึ่งติดลบ`,
+        )
+        assert(Number.isInteger(answer), `คำตอบ ${answer} ไม่ใช่จำนวนเต็ม`)
+      }
+    }
+  }
+})
+
+check('ต้องมีอย่างน้อยสองทางเลือกทั้งสองช่อง ไม่งั้นไม่ใช่การสร้างโจทย์', () => {
+  const found = collectBuilderRows(6, 25)
+  for (const { row } of found) {
+    assert(row.builder.sell.length >= 2, 'ช่องขายมีทางเลือกเดียว เด็กไม่ได้เลือกอะไร')
+    assert(row.builder.spend.length >= 2, 'ช่องซื้อมีทางเลือกเดียว เด็กไม่ได้เลือกอะไร')
+  }
+})
+
+check('เงินตั้งต้นในโจทย์ต้องเป็นเงินที่โดมมีอยู่จริง', () => {
+  const found = collectBuilderRows(6, 25)
+  for (const { row, coins } of found) {
+    assert(
+      row.builder.coins === coins,
+      `โจทย์บอกว่ามีเงิน ${row.builder.coins} แต่ฟาร์มมี ${coins}`,
+    )
+  }
+})
+
+check('ราคาของที่ให้เลือกซื้อ ต้องเป็นราคาจริงที่กดซื้อได้ในเกม', () => {
+  /*
+   * เรื่องนี้สำคัญกว่าที่ดู
+   *
+   * โจทย์ข้อนี้ไม่ได้จบที่คำตอบ เด็กที่คิดออกว่าขายอันไหนแล้วซื้ออาคารได้พอดี
+   * จะเดินไปกดซื้อจริงในวันรุ่งขึ้น ถ้าราคาในโจทย์ไม่ตรงกับราคาในร้าน
+   * สิ่งที่เด็กคิดถูกจะกลายเป็นสิ่งที่ใช้ไม่ได้ และเด็กจะเลิกเชื่อตัวเลขในเกม
+   */
+  const realPrices = new Map()
+  realPrices.set('feed', 20 * T.FEED_PRICE)
+  realPrices.set('feed-big', 60 * T.FEED_PRICE)
+  realPrices.set('kitchen', T.KITCHEN_COST)
+  for (const building of T.BUILDINGS) realPrices.set(`building-${building.id}`, building.cost)
+
+  const found = collectBuilderRows(6, 25)
+  for (const { row, farm } of found) {
+    for (const option of row.builder.spend) {
+      if (option.key === 'plot') {
+        assert(
+          option.value === E.nextPlotCost(farm),
+          `ราคาเปิดแปลงในโจทย์คือ ${option.value} แต่ราคาจริงคือ ${E.nextPlotCost(farm)}`,
+        )
+        continue
+      }
+      assert(
+        realPrices.get(option.key) === option.value,
+        `ราคาของ ${option.key} ในโจทย์คือ ${option.value} แต่ราคาจริงคือ ${realPrices.get(option.key)}`,
+      )
+    }
+  }
+})
+
+check('เงินที่ขายได้ในโจทย์ ต้องตรงกับราคาตลาดของวันนั้น', () => {
+  const found = collectBuilderRows(6, 25)
+  let checkedCrops = 0
+  for (const { row, farm } of found) {
+    for (const option of row.builder.sell) {
+      if (!option.key.startsWith('crop-')) continue
+      const cropId = option.key.slice('crop-'.length)
+      const price = M.marketPrice(farm, cropId)
+      assert(
+        option.value % price === 0,
+        `${option.label} ราคารวม ${option.value} หารด้วยราคาตลาด ${price} ไม่ลงตัว`,
+      )
+      checkedCrops += 1
+    }
+  }
+  assert(checkedCrops > 0, 'ไม่มีตัวเลือกขายพืชเลย ข้อนี้จึงไม่ได้ตรวจอะไร')
+})
+
+check('แถวสร้างโจทย์เองต้องไม่มีคำตอบตายตัว เพราะคำตอบขึ้นกับสิ่งที่เด็กเลือก', () => {
+  const found = collectBuilderRows(6, 25)
+  assert(found.length > 0, 'ไม่เจอแถวสร้างโจทย์เองเลย')
+  for (const { row } of found) {
+    assert(row.fields.length === 0, 'แถวนี้ไม่ควรมีช่องคำตอบตายตัวใน fields')
+    assert(row.builder !== undefined, 'แถวชนิด build ต้องมีข้อมูล builder เสมอ')
+  }
+})
+
 check('เล่นแบบตั้งใจสามสิบวัน ต้องไม่มีทรัพยากรไหนหมด และฟาร์มต้องโตขึ้น', () => {
   const { farm, shortages } = simulate(30)
   assert(
