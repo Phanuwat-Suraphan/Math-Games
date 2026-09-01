@@ -229,6 +229,69 @@ check('ต้องไม่มีคลาสของระบบดีไซ�
   )
 })
 
+check('ทุกเฉดสีของโปรเจกต์ที่หน้าจอใช้ ต้องมีนิยามใน tailwind.config.js', () => {
+  /*
+   * บั๊กชนิดเดียวกับที่ทำให้ต้องมีไฟล์นี้ แต่คนละที่
+   *
+   * ชื่อสีอย่าง gold leaf ember night arcane ไม่ใช่ชื่อของ Tailwind
+   * เป็นชื่อที่โปรเจกต์ตั้งเอง Tailwind จึงสร้างคลาสให้เฉพาะเฉดที่เขียนไว้ในคอนฟิก
+   * เขียน text-gold-200 ทั้งที่คอนฟิกมีแต่ 300 ขึ้นไป จะไม่มีคลาสนั้นเกิดขึ้นเลย
+   * ไม่มี error ไม่มีคำเตือน build ผ่าน หน้าเปิดได้ ตัวหนังสือแค่ได้สีที่สืบทอดมา
+   * ซึ่งบางทีก็ดูใกล้เคียงพอจนไม่มีใครสังเกต
+   *
+   * ตอนเขียนข้อนี้ครั้งแรก เจอของแบบนี้ค้างอยู่ราวสามสิบจุด
+   * แก้ด้วยการเติมเฉดที่ขาดในคอนฟิก แล้วเก็บข้อนี้ไว้กันไม่ให้กลับมาอีก
+   */
+  const config = fs.readFileSync(path.join(ROOT, 'tailwind.config.js'), 'utf8')
+
+  // อ่านเฉพาะบล็อก colors ของคอนฟิก เก็บเป็นชุดของ "ชื่อ-เฉด" ที่มีจริง
+  const colorsBlock = config.slice(config.indexOf('colors: {'))
+  const defined = new Set()
+  let family = null
+  for (const line of colorsBlock.split('\n')) {
+    const open = line.match(/^\s*([a-z]+):\s*\{\s*$/)
+    if (open) {
+      family = open[1]
+      continue
+    }
+    const shade = line.match(/^\s*(\d{2,3}):\s*'/)
+    if (shade && family) defined.add(`${family}-${shade[1]}`)
+  }
+  assert(defined.size > 0, 'อ่านชุดสีจาก tailwind.config.js ไม่ได้เลย')
+
+  // ตรวจเฉพาะชื่อที่โปรเจกต์ตั้งเอง ชื่อของ Tailwind อย่าง slate มีครบทุกเฉดอยู่แล้ว
+  const families = [...new Set([...defined].map((key) => key.split('-')[0]))].filter(
+    (name) => name !== 'sky',
+  )
+
+  const files = []
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/\.tsx?$/.test(entry.name)) files.push(full)
+    }
+  }
+  walk(path.join(ROOT, 'src'))
+
+  const pattern = new RegExp(`\\b(?:${families.join('|')})-(\\d{2,3})\\b`, 'g')
+  const missing = new Map()
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8')
+    for (const match of text.matchAll(pattern)) {
+      if (defined.has(match[0])) continue
+      const where = missing.get(match[0]) ?? new Set()
+      where.add(path.relative(ROOT, file))
+      missing.set(match[0], where)
+    }
+  }
+
+  const report = [...missing.entries()]
+    .map(([key, where]) => `${key} (${[...where].slice(0, 3).join(', ')})`)
+    .join(' · ')
+  assert(missing.size === 0, `เฉดที่ไม่มีนิยาม ${missing.size} แบบ: ${report}`)
+})
+
 console.log(`ผ่าน ${passed} ข้อ · ตรวจ ${REQUIRED_CLASSES.length} คลาส`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

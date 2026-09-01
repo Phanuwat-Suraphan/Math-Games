@@ -3,9 +3,11 @@ import type { ReactNode } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
+import { ResultCodeCard } from '../components/ResultCodeCard'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { useGame } from '../context/useGame'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { useMusic } from '../hooks/useMusic'
 import { playSfx } from '../services/audioService'
 import {
@@ -38,6 +40,7 @@ import type {
   SafeZonePhase,
   SurvivalItemId,
 } from '../safezone/types'
+import { DRONE_INDICATOR, MISSION_INDICATOR } from '../teacher/indicators'
 import type { SkillId } from '../types/stats'
 import type { Player } from '../types/player'
 
@@ -178,6 +181,8 @@ export function SafeZone({ player }: { player: Player }) {
 
   const startedAtRef = useRef(0)
   const [clearedSeconds, setClearedSeconds] = useState(0)
+
+  const { logIndicator, currentCode } = useIndicatorLog(player.name)
 
   /** บันทึกผลการตอบหนึ่งข้อเข้าสถิติชุดเดียวกับโหมดอื่นของเกม */
   const record = useCallback(
@@ -347,6 +352,7 @@ export function SafeZone({ player }: { player: Player }) {
 
       const isCorrect = choice === puzzle.answer
       record(`drone-${puzzle.itemId}-${droneAttemptsRef.current}`, 'addition', isCorrect)
+      logIndicator(DRONE_INDICATOR, isCorrect)
       playSfx(isCorrect ? 'correct' : 'wrong')
 
       resolveChallenge(world, isCorrect)
@@ -365,7 +371,7 @@ export function SafeZone({ player }: { player: Player }) {
         }
       }, 900)
     },
-    [puzzle, puzzlePick, record, world],
+    [logIndicator, puzzle, puzzlePick, record, world],
   )
 
   /** ตอบผิดแล้วขอถอยไปพักก่อน โดรนยังเฝ้าของชิ้นนั้นอยู่ กลับมาใหม่ได้เสมอ */
@@ -388,8 +394,11 @@ export function SafeZone({ player }: { player: Player }) {
   const finishMission = useCallback(
     (mission: Mission, isCorrect: boolean) => {
       record(`mission-${mission.id}`, MISSION_SKILL[mission.id], isCorrect)
+      // ภารกิจที่ยังไม่ได้โยงกับตัวชี้วัด ไม่บันทึก ดีกว่าบันทึกผิดช่อง
+      const indicator = MISSION_INDICATOR[mission.id]
+      if (indicator) logIndicator(indicator, isCorrect)
     },
-    [record],
+    [logIndicator, record],
   )
 
   /*
@@ -773,6 +782,10 @@ export function SafeZone({ player }: { player: Player }) {
               หนูสัญญาไว้ {pledges.length} ข้อ · เอาไปเล่าให้ที่บ้านฟังด้วยนะ
             </p>
           ) : null}
+        </div>
+
+        <div className="mt-5">
+          <ResultCodeCard code={currentCode()} />
         </div>
 
         <div className="mt-5 flex flex-wrap justify-center gap-3">

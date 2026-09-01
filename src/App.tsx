@@ -24,6 +24,7 @@ import { Journal } from './pages/Journal'
 import { Tower } from './pages/Tower'
 import { Farm } from './pages/Farm'
 import { SafeZone } from './pages/SafeZone'
+import { Teacher } from './pages/Teacher'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
 import { StageResult } from './pages/StageResult'
@@ -91,6 +92,10 @@ function GameRoutes() {
           element={
             <RequirePlayer render={(player) => <SafeZone player={player} />} />
           }
+        />
+        <Route
+          path="/teacher"
+          element={<RequirePlayer render={(player) => <Teacher player={player} />} />}
         />
         <Route
           path="/duel"

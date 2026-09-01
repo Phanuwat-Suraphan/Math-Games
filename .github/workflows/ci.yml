@@ -78,6 +78,9 @@ jobs:
       - name: ทดสอบโดมสีเขียว (ฟาร์ม สมุดบัญชี รหัสฟาร์ม และสมดุลเกม)
         run: node tests/farm.test.mjs /tmp/logic
 
+      - name: ทดสอบแผงคุณครู (ตัวชี้วัด รหัสผลการเรียน และสรุปทั้งห้อง)
+        run: node tests/teacher.test.mjs /tmp/logic
+
       - name: ทดสอบภาพประกอบ
         run: node tests/art.test.mjs /tmp/logic
 
