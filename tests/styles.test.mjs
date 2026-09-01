@@ -102,6 +102,35 @@ const REQUIRED_CLASSES = [
   'card-legendary',
   'card-void',
   'card-operator',
+
+  // Safe Zone Guardians
+  'sz-stage',
+  'sz-terminal',
+  'sz-scanline',
+  'sz-slot',
+  'sz-slot-filled',
+  'sz-heat',
+  'sz-heat-critical',
+  'sz-pad',
+  'sz-hologram',
+
+  // โดมสีเขียว
+  'farm-stage',
+  'farm-chip',
+  'farm-hotspot',
+  'farm-tab',
+  'farm-tab-active',
+  'farm-pill',
+  'farm-pill-active',
+  'farm-pill-up',
+  'farm-pill-down',
+  'farm-option',
+  'farm-terminal',
+  'farm-grow',
+  'farm-alarm',
+  'farm-ledger-row',
+  'farm-ledger-done',
+  'farm-ledger-num',
 ]
 
 /** คลาสนี้ถูกนิยามไว้ในไฟล์ไหม */

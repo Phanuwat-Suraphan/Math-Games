@@ -647,6 +647,328 @@ html[data-animations='off'] *::after {
     0 14px 30px -20px rgba(0, 0, 0, 0.95);
   backdrop-filter: blur(12px) saturate(120%);
 }
+
+/* ---------- Safe Zone Guardians ---------- */
+
+/*
+ * กรอบของฉากสามมิติ
+ *
+ * ขอบด้านในเรืองแสงฟ้าเพื่อให้อ่านเป็น "จอของชุดกันความร้อน"
+ * ไม่ใช่ผืนผ้าใบที่วางอยู่บนหน้าเว็บเฉย ๆ
+ * เป็นวิธีเล่าเรื่องที่ถูกกว่าการวาดกรอบหมวกลงในฉากสามมิติจริง ๆ มาก
+ */
+.sz-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(103, 232, 249, 0.35);
+  background: #1a0f14;
+  box-shadow:
+    inset 0 0 60px -10px rgba(8, 145, 178, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 60px -30px rgba(0, 0, 0, 0.95);
+}
+
+/*
+ * แผงคำสั่งแบบเทอร์มินัล
+ *
+ * โจทย์คณิตศาสตร์ในเกมนี้ไม่ได้ขึ้นบนการ์ดสีขาวเหมือนแบบฝึกหัด
+ * แต่ขึ้นบนจอของเครื่องจักร ซึ่งเปลี่ยนความรู้สึกของการตอบผิดไปทั้งหมด
+ * ตอบผิดบนกระดาษคือ "เราทำไม่ได้" ตอบผิดบนจอเครื่องคือ "เครื่องยังไม่ผ่าน"
+ */
+.sz-terminal {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(8, 145, 178, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(4, 17, 32, 0.96), rgba(2, 8, 20, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(165, 243, 252, 0.18),
+    0 0 32px -12px rgba(34, 211, 238, 0.7),
+    0 26px 60px -32px rgba(0, 0, 0, 0.95);
+}
+
+/* เส้นสแกนที่ไหลลง ทำให้จอดูเหมือนกำลังทำงานอยู่ ไม่ใช่ภาพนิ่ง */
+.sz-scanline::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(103, 232, 249, 0.07) 0px,
+    rgba(103, 232, 249, 0.07) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  animation: sz-scan 7s linear infinite;
+}
+
+/* ช่องเก็บไอเทมสามช่อง ว่างอยู่ก็ต้องเห็นว่ามีกี่ช่องที่ยังต้องเติม */
+.sz-slot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  border: 1px dashed rgba(148, 163, 184, 0.5);
+  background: rgba(2, 8, 20, 0.55);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.sz-slot-filled {
+  border-style: solid;
+  border-color: rgba(74, 222, 128, 0.75);
+  background: rgba(6, 78, 59, 0.5);
+  box-shadow: 0 0 18px -4px rgba(74, 222, 128, 0.8);
+}
+
+/* หลอดความร้อน ยิ่งเต็มยิ่งแดง และเต้นเมื่อใกล้อันตราย */
+.sz-heat {
+  background: linear-gradient(90deg, #fbbf24, #f97316 55%, #dc2626);
+  box-shadow: 0 0 16px -2px rgba(249, 115, 22, 0.9);
+}
+
+.sz-heat-critical {
+  animation: sz-alarm 0.9s ease-in-out infinite;
+}
+
+/* ปุ่มทิศทางบนจอ สำหรับแท็บเล็ตที่ไม่มีคีย์บอร์ด */
+.sz-pad {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  border: 1px solid rgba(103, 232, 249, 0.45);
+  background: rgba(8, 25, 45, 0.72);
+  color: #e0f2fe;
+  font-size: 1.5rem;
+  font-weight: 700;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sz-pad:active {
+  background: rgba(34, 211, 238, 0.35);
+}
+
+/* ตัวเลขบนจอโฮโลแกรม ต้องอ่านง่ายกว่าสวย เพราะเด็กต้องอ่านหลักให้ถูก */
+.sz-hologram {
+  color: #a5f3fc;
+  text-shadow:
+    0 0 12px rgba(34, 211, 238, 0.75),
+    0 0 30px rgba(34, 211, 238, 0.35);
+  letter-spacing: 0.04em;
+}
+
+/* ---------- โดมสีเขียว ---------- */
+
+/*
+ * กรอบของฉากฟาร์ม
+ *
+ * ใช้เขียวแทนฟ้าของ Safe Zone โดยตั้งใจ ทั้งสองโหมดอยู่ในเรื่องเดียวกัน
+ * แต่คนละที่ ข้างนอกคือทะเลทรายกับจอเครื่องมือสีฟ้า ข้างในโดมคือของที่ยังมีชีวิต
+ * ความต่างของสีคือสิ่งที่ทำให้เด็กรู้สึกว่า "เข้ามาถึงแล้ว" โดยไม่ต้องบอกเป็นคำ
+ */
+.farm-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(74, 222, 128, 0.32);
+  background: #0c1a14;
+  box-shadow:
+    inset 0 0 70px -14px rgba(34, 197, 94, 0.4),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 24px 60px -30px rgba(0, 0, 0, 0.95);
+}
+
+/* ป้ายสถานะที่ลอยทับฉาก ต้องอ่านออกบนพื้นหลังทุกสี จึงมีพื้นทึบของตัวเอง */
+.farm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 22, 16, 0.78);
+  padding: 0.25rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #ecfdf5;
+  backdrop-filter: blur(8px);
+}
+
+/*
+ * ปุ่มโปร่งใสที่วางทับแปลงในภาพ
+ *
+ * ต้องมองเห็นพอที่จะรู้ว่ากดได้ แต่ต้องไม่บังต้นพืชจนนับไม่ได้
+ * เพราะการนับต้นจากภาพคือสิ่งที่โจทย์การคูณในสมุดบัญชีอ้างอิงถึงโดยตรง
+ */
+.farm-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: 2px solid rgba(253, 224, 71, 0.65);
+  background: rgba(12, 26, 20, 0.55);
+  color: #fde047;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.farm-hotspot:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+  background: rgba(253, 224, 71, 0.3);
+}
+
+/* แถบเลือกแผงควบคุม สี่ปุ่มเท่ากันเพื่อให้นิ้วโป้งกดถูกบนจอเล็ก */
+.farm-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-height: 56px;
+  padding: 0.4rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #cbd5e1;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.farm-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.farm-tab-active {
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+}
+
+/* ปุ่มเล็กแบบเม็ดยา ใช้กับตัวเลือกที่มีหลายอันในแถวเดียว */
+.farm-pill {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.farm-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.farm-pill-active {
+  border-color: rgba(74, 222, 128, 0.7);
+  background: rgba(34, 197, 94, 0.22);
+  color: #bbf7d0;
+}
+
+/*
+ * ราคาขึ้นและราคาลง
+ *
+ * ใช้สีคู่กับลูกศรและตัวเลขเปอร์เซ็นต์เสมอ ไม่ใช้สีอย่างเดียว
+ * เพราะเด็กที่แยกสีแดงเขียวไม่ออกต้องอ่านข้อมูลเดียวกันนี้ได้ครบเท่ากัน
+ */
+.farm-pill-up {
+  border-color: rgba(74, 222, 128, 0.7);
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+}
+
+.farm-pill-down {
+  border-color: rgba(251, 146, 60, 0.6);
+  background: rgba(249, 115, 22, 0.16);
+  color: #fed7aa;
+}
+
+/* ตัวเลือกที่มีรายละเอียดสองบรรทัด เช่นพืชที่จะปลูก */
+.farm-option {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
+  min-height: 60px;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.farm-option:hover {
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(34, 197, 94, 0.14);
+}
+
+/* แผงที่ใช้เล่าเรื่อง ใช้เขียวแทนฟ้าเพื่อให้เป็นคนละที่กับข้างนอกโดม */
+.farm-terminal {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(22, 163, 74, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(6, 26, 18, 0.96), rgba(3, 14, 10, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(187, 247, 208, 0.16),
+    0 0 32px -14px rgba(74, 222, 128, 0.6),
+    0 26px 60px -32px rgba(0, 0, 0, 0.95);
+}
+
+/* แถบความคืบหน้าของสิ่งที่กำลังโต */
+.farm-grow {
+  background: linear-gradient(90deg, #86efac, #22c55e 60%, #15803d);
+  box-shadow: 0 0 14px -2px rgba(34, 197, 94, 0.8);
+}
+
+/* แถบของทรัพยากรที่ใกล้หมด ใช้สีและการเต้นคู่กัน ไม่ใช้สีอย่างเดียว */
+.farm-alarm {
+  background: linear-gradient(90deg, #fbbf24, #f97316 55%, #dc2626);
+  box-shadow: 0 0 16px -2px rgba(249, 115, 22, 0.9);
+  animation: sz-alarm 0.9s ease-in-out infinite;
+}
+
+/* แถวหนึ่งแถวในสมุดบัญชี */
+.farm-ledger-row {
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 1rem 1.1rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.farm-ledger-done {
+  border-color: rgba(74, 222, 128, 0.45);
+  background: rgba(34, 197, 94, 0.1);
+}
+
+/* เลขลำดับของแถว บอกว่าเหลืออีกกี่ช่องกว่าจะปิดวันได้ */
+.farm-ledger-num {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(74, 222, 128, 0.5);
+  background: rgba(34, 197, 94, 0.15);
+  color: #bbf7d0;
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
 }
 
 @keyframes drift-a {
@@ -698,4 +1020,20 @@ html[data-animations='off'] *::after {
 @keyframes cta {
   0%, 100% { box-shadow: 0 0 0 0 rgba(252, 211, 77, 0.55), 0 10px 30px -10px rgba(0,0,0,.8); }
   50%      { box-shadow: 0 0 0 14px rgba(252, 211, 77, 0), 0 10px 30px -10px rgba(0,0,0,.8); }
+}
+
+@keyframes sz-scan {
+  from { transform: translateY(-25%); }
+  to   { transform: translateY(25%); }
+}
+
+/*
+ * สัญญาณเตือนความร้อน
+ *
+ * เปลี่ยนความสว่างอย่างเดียว ไม่ขยับตำแหน่งและไม่กะพริบดับสนิท
+ * แถบที่กะพริบดับหายไปทำให้อ่านค่าไม่ได้ในจังหวะที่ต้องอ่านมากที่สุดพอดี
+ */
+@keyframes sz-alarm {
+  0%, 100% { filter: brightness(1); }
+  50%      { filter: brightness(1.55); }
 }
