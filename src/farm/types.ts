@@ -33,6 +33,7 @@ export const ENERGY_COST = {
   water: 1,
   feed: 1,
   harvest: 0,
+  craft: 1,
 } as const
 
 /** ขนาดตารางของแปลงหนึ่งแปลง คิดเป็นช่องปลูก */
@@ -219,6 +220,110 @@ export function findAnimal(id: AnimalId): Animal {
   const found = ANIMALS.find((animal) => animal.id === id)
   if (!found) throw new Error(`ไม่รู้จักสัตว์: ${id}`)
   return found
+}
+
+/**
+ * สูตรแปรรูป
+ *
+ * ราคาตั้งไว้ที่ราวหนึ่งเท่าแปดของราคาวัตถุดิบสด ไม่ใช่สองเท่าครึ่งแบบ Heartopia
+ * ลองใช้อัตราของ Heartopia ตรง ๆ ก่อนแล้วพบว่ากำไรพุ่งถึงร้อยละสองร้อยยี่สิบเจ็ด
+ * ซึ่งทำให้เกมเหลือกลยุทธ์เดียวคือสร้างโรงแปรรูปแล้วแปรรูปอย่างเดียว
+ * การเลือกพืช การขยายแปลง และการดูแลโดม กลายเป็นเรื่องที่ไม่ต้องคิดไปหมด
+ *
+ * ที่หนึ่งเท่าแปด การแปรรูปยังคุ้มชัดเจนและยังเป็นบทเรียนเดิม
+ * แต่ยังต้องเลือกว่าจะแปรรูปอะไร เพราะกำลังของโรงแปรรูปมีจำกัดต่อวัน
+ *
+ * ตัวเลขชุดนี้มาจากการศึกษา Heartopia โดยตรง ซึ่งเป็นบทเรียนคณิตศาสตร์
+ * ที่สมบูรณ์อยู่แล้วโดยที่เกมนั้นไม่ได้ตั้งใจให้เป็นบทเรียนเลย
+ * บลูเบอร์รี่ 4 ลูก ลูกละ 16 ทอง ขายแยกได้ 64 ทอง แต่ทำแยมขายได้ 170 ทอง
+ *
+ * นี่คือรูปแบบที่เอกสารออกแบบเรียกว่า "คณิตศาสตร์เป็นวิธีเล่นที่ดีกว่า"
+ * เด็กที่คำนวณส่วนต่างเป็นจะรวยกว่าเด็กที่ขายของสด โดยเกมไม่ต้องบังคับให้ทำโจทย์
+ * ต่างจากด่านเก็บค่าผ่านทางที่ตอบให้ถูกแล้วเดินผ่านไป ซึ่งไม่ได้สอนว่า
+ * คณิตศาสตร์มีประโยชน์ตรงไหน
+ */
+export interface Recipe {
+  id: string
+  name: string
+  emoji: string
+  /** วัตถุดิบที่ใช้ */
+  input: CropId
+  /** ใช้วัตถุดิบกี่ชิ้นต่อผลิตภัณฑ์หนึ่งชิ้น */
+  inputPerUnit: number
+  /** ราคาขายผลิตภัณฑ์หนึ่งชิ้น */
+  price: number
+  color: string
+}
+
+export const RECIPES: readonly Recipe[] = [
+  {
+    id: 'sauce',
+    name: 'ซอสมะเขือเทศ',
+    emoji: '🥫',
+    input: 'tomato',
+    inputPerUnit: 4,
+    price: 115,
+    color: '#c0392b',
+  },
+  {
+    id: 'salad',
+    name: 'สลัดพร้อมทาน',
+    emoji: '🥗',
+    input: 'lettuce',
+    inputPerUnit: 3,
+    price: 160,
+    color: '#4f9e4f',
+  },
+  {
+    id: 'roasted',
+    name: 'ข้าวโพดอบ',
+    emoji: '🍿',
+    input: 'corn',
+    inputPerUnit: 5,
+    price: 390,
+    color: '#e0a83a',
+  },
+  {
+    id: 'bread',
+    name: 'ขนมปัง',
+    emoji: '🍞',
+    input: 'wheat',
+    inputPerUnit: 4,
+    price: 430,
+    color: '#c8934a',
+  },
+  {
+    id: 'soup',
+    name: 'ซุปฟักทอง',
+    emoji: '🍲',
+    input: 'pumpkin',
+    inputPerUnit: 3,
+    price: 450,
+    color: '#e8862c',
+  },
+]
+
+export function findRecipe(id: string): Recipe {
+  const found = RECIPES.find((recipe) => recipe.id === id)
+  if (!found) throw new Error(`ไม่รู้จักสูตรแปรรูป: ${id}`)
+  return found
+}
+
+/** รหัสของผลิตภัณฑ์แปรรูปในคลัง */
+export function craftKey(id: string): string {
+  return `craft-${id}`
+}
+
+/** โรงแปรรูปหนึ่งหลังทำได้กี่ชิ้นต่อวัน */
+export const KITCHEN_CAPACITY = 6
+
+/** ราคาโรงแปรรูปหนึ่งหลัง */
+export const KITCHEN_COST = 750
+
+/** งานแปรรูปที่สั่งไว้ จะเสร็จตอนปิดวัน */
+export interface CraftOrder {
+  recipe: string
+  units: number
 }
 
 /** ราคาอาหารสัตว์ต่อหนึ่งกิโลกรัม */
@@ -408,6 +513,10 @@ export interface FarmState {
   feed: number
   /** อาคารที่สร้างแล้ว นับเป็นจำนวนหลังต่อรหัสอาคาร */
   buildings: Record<string, number>
+  /** โรงแปรรูปที่สร้างแล้ว แยกจาก buildings เพราะไม่ได้ผลิตทรัพยากรให้โดม */
+  kitchens: number
+  /** งานแปรรูปที่สั่งไว้วันนี้ จะเสร็จตอนปิดวัน */
+  crafting: CraftOrder[]
   /** ทรัพยากรคงเหลือในถัง */
   resources: Record<ResourceId, number>
   /** ของในคลังที่รอขาย */

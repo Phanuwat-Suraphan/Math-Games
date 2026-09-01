@@ -27,10 +27,13 @@ import {
   ENERGY_BONUS_PERFECT_LEDGER,
   ENERGY_PER_DAY,
   RESOURCES,
+  craftKey,
   findAnimal,
   findCrop,
+  findRecipe,
   findResource,
 } from './types'
+import { marketPrice } from './market'
 import type { AnimalId, CropId, FarmState, ResourceId } from './types'
 import {
   FOOD_PER_PRODUCE,
@@ -72,6 +75,23 @@ export interface FeedPlan {
   produced: number
 }
 
+/** งานแปรรูปหนึ่งชุดที่จะเสร็จเมื่อปิดวัน */
+export interface CraftPlan {
+  recipe: string
+  units: number
+  inputPerUnit: number
+  /** วัตถุดิบที่ใช้ไปทั้งหมด เท่ากับจำนวนชิ้นคูณอัตราส่วน */
+  inputsUsed: number
+  /** ราคาวัตถุดิบต่อชิ้นในวันนี้ */
+  inputPrice: number
+  /** ถ้าขายวัตถุดิบสดจะได้กี่บาท */
+  rawValue: number
+  /** ขายผลิตภัณฑ์ได้กี่บาท */
+  craftValue: number
+  /** แปรรูปแล้วได้เพิ่มกี่บาท */
+  gain: number
+}
+
 /** ทรัพยากรหนึ่งอย่างเมื่อจบวัน */
 export interface ResourcePlan {
   id: ResourceId
@@ -87,6 +107,7 @@ export interface ResourcePlan {
 export interface DayPlan {
   day: number
   harvests: HarvestPlan[]
+  crafts: CraftPlan[]
   /** ผลผลิตพืชที่จะเข้าคลัง รวมตามชนิด */
   cropYield: { crop: CropId; count: number }[]
   feeding: FeedPlan[]
@@ -147,6 +168,26 @@ export function planDay(farm: FarmState): DayPlan {
     feedLeft = leftover
   }
 
+  const crafts: CraftPlan[] = farm.crafting
+    .filter((order) => order.units > 0)
+    .map((order) => {
+      const recipe = findRecipe(order.recipe)
+      const inputsUsed = order.units * recipe.inputPerUnit
+      const inputPrice = marketPrice(farm, recipe.input)
+      const rawValue = inputsUsed * inputPrice
+      const craftValue = order.units * recipe.price
+      return {
+        recipe: order.recipe,
+        units: order.units,
+        inputPerUnit: recipe.inputPerUnit,
+        inputsUsed,
+        inputPrice,
+        rawValue,
+        craftValue,
+        gain: craftValue - rawValue,
+      }
+    })
+
   const production = dailyProduction(farm)
   const consumption = dailyConsumption(farm)
   const resources: ResourcePlan[] = RESOURCES.map((spec) => {
@@ -171,6 +212,7 @@ export function planDay(farm: FarmState): DayPlan {
   return {
     day: farm.day,
     harvests,
+    crafts,
     cropYield: [...yieldMap.entries()].map(([crop, count]) => ({ crop, count })),
     feeding,
     feedLeftover: feedLeft,
@@ -191,7 +233,14 @@ export interface LedgerField {
   unit: string
 }
 
-export type LedgerKind = 'harvest' | 'feed' | 'resource' | 'forecast' | 'percent' | 'average'
+export type LedgerKind =
+  | 'harvest'
+  | 'feed'
+  | 'craft'
+  | 'resource'
+  | 'forecast'
+  | 'percent'
+  | 'average'
 
 export interface LedgerRow {
   id: string
@@ -255,6 +304,39 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
         feed.capacity < feed.herdCount
           ? `ฝูงมี ${feed.herdCount} ตัว อาหารไม่พอ วันนี้จึงมี ${feed.herdCount - feed.capacity} ตัวที่ยังไม่ได้กิน`
           : `ฝูงมี ${feed.herdCount} ตัว อาหารพอทุกตัว`,
+      ],
+    })
+  }
+
+  /*
+   * ---- โรงแปรรูป: กำไรขาดทุน ----
+   *
+   * นี่คือแถวที่ตรงกับหัวใจของบทเรียนมากที่สุด และเป็นแถวเดียวที่ตอบได้
+   * แล้วเด็กจะ "อยากทำอีก" เพราะเห็นกับตาว่าการคำนวณทำให้ได้เงินเพิ่มเท่าไร
+   *
+   * ข้ามแถวไปเลยถ้าแปรรูปแล้วขาดทุน ซึ่งไม่ควรเกิดกับราคาชุดปัจจุบัน
+   * แต่ถ้าวันหนึ่งมีคนปรับราคาจนขาดทุนจริง คำตอบจะติดลบ
+   * แล้วช่องกรอกที่รับเฉพาะตัวเลขจะทำให้ปิดวันไม่ได้ตลอดกาล
+   * เคยเกิดมาแล้วกับแถวทรัพยากร จึงกันไว้ตั้งแต่ต้นในแถวนี้
+   */
+  for (const craft of plan.crafts.slice(0, 2)) {
+    if (craft.gain <= 0) continue
+    const recipe = findRecipe(craft.recipe)
+    const crop = findCrop(recipe.input)
+    rows.push({
+      id: `craft-${craft.recipe}`,
+      kind: 'craft',
+      skill: 'การคูณ · กำไรขาดทุน',
+      prompt: `วันนี้แปรรูป${crop.name}เป็น${recipe.name} ${craft.units} ชิ้น ใช้${crop.name}ชิ้นละ ${craft.inputPerUnit} ผล · ถ้าขาย${crop.name}สดวันนี้ได้ผลละ ${withCommas(craft.inputPrice)} บาท แต่${recipe.name}ขายได้ชิ้นละ ${withCommas(recipe.price)} บาท`,
+      fields: [
+        { key: 'inputs', label: `ใช้${crop.name}ไปทั้งหมด`, answer: craft.inputsUsed, unit: 'ผล' },
+        { key: 'gain', label: 'แปรรูปแล้วได้เงินเพิ่ม', answer: craft.gain, unit: 'บาท' },
+      ],
+      working: [
+        `ใช้วัตถุดิบ · ${craft.units} × ${craft.inputPerUnit} = ${withCommas(craft.inputsUsed)} ผล`,
+        `ขายสด · ${withCommas(craft.inputsUsed)} × ${withCommas(craft.inputPrice)} = ${withCommas(craft.rawValue)} บาท`,
+        `แปรรูป · ${craft.units} × ${withCommas(recipe.price)} = ${withCommas(craft.craftValue)} บาท`,
+        `ได้เพิ่ม · ${withCommas(craft.craftValue)} − ${withCommas(craft.rawValue)} = ${withCommas(craft.gain)} บาท`,
       ],
     })
   }
@@ -341,6 +423,30 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
     })
   }
 
+  // ---- ป.6 ร้อยละของมูลค่าที่เพิ่มขึ้นจากการแปรรูป ----
+  const firstCraft = plan.crafts.find((entry) => entry.gain > 0 && entry.rawValue > 0)
+  if (farm.grade >= 6 && firstCraft) {
+    const recipe = findRecipe(firstCraft.recipe)
+    rows.push({
+      id: `craft-percent-${firstCraft.recipe}`,
+      kind: 'percent',
+      skill: 'ร้อยละ · มูลค่าเพิ่ม',
+      prompt: `${recipe.name}ชุดนี้ ถ้าขายวัตถุดิบสดได้ ${withCommas(firstCraft.rawValue)} บาท แต่แปรรูปแล้วขายได้ ${withCommas(firstCraft.craftValue)} บาท มูลค่าเพิ่มขึ้นร้อยละเท่าไร (ปัดเป็นจำนวนเต็ม)`,
+      fields: [
+        {
+          key: 'percent',
+          label: 'มูลค่าเพิ่มขึ้นร้อยละ',
+          answer: Math.round((firstCraft.gain / firstCraft.rawValue) * 100),
+          unit: '%',
+        },
+      ],
+      working: [
+        `ส่วนที่เพิ่ม · ${withCommas(firstCraft.craftValue)} − ${withCommas(firstCraft.rawValue)} = ${withCommas(firstCraft.gain)} บาท`,
+        `เทียบกับของเดิม · ${withCommas(firstCraft.gain)} ÷ ${withCommas(firstCraft.rawValue)} × 100 = ${Math.round((firstCraft.gain / firstCraft.rawValue) * 100)}%`,
+      ],
+    })
+  }
+
   // ---- ป.6 เพิ่มร้อยละของถัง ----
   if (farm.grade >= 6 && focus) {
     const spec = findResource(focus.id)
@@ -390,6 +496,12 @@ export function closeDay(farm: FarmState, plan: DayPlan, perfect: boolean): void
     if (plot) plot.planting = null
     farm.stock[harvest.crop] = (farm.stock[harvest.crop] ?? 0) + harvest.count
   }
+
+  for (const craft of plan.crafts) {
+    const key = craftKey(craft.recipe)
+    farm.stock[key] = (farm.stock[key] ?? 0) + craft.units
+  }
+  farm.crafting = []
 
   plan.feeding.forEach((entry, index) => {
     const herd = farm.herds[index]

@@ -14,6 +14,8 @@ import {
   BUILDINGS,
   CROPS,
   ENERGY_COST,
+  KITCHEN_CAPACITY,
+  KITCHEN_COST,
   ENERGY_PER_DAY,
   FEED_PRICE,
   MAX_PLOTS,
@@ -24,9 +26,12 @@ import {
   STARTING_FAMILIES,
   STARTING_FEED,
   STARTING_RESOURCE_RATIO,
+  RECIPES,
+  craftKey,
   findAnimal,
   findBuilding,
   findCrop,
+  findRecipe,
 } from './types'
 import type {
   AnimalId,
@@ -36,6 +41,7 @@ import type {
   Plot,
   ResourceId,
 } from './types'
+import { marketPrice } from './market'
 
 /**
  * ผลของการสั่งงานหนึ่งครั้ง
@@ -83,6 +89,8 @@ export function createFarm(seed: string, grade: Grade): FarmState {
     herds: [],
     feed: STARTING_FEED,
     buildings: { solar: 1, purifier: 1, scrubber: 1 },
+    kitchens: 0,
+    crafting: [],
     resources,
     stock: {},
     perfectDays: 0,
@@ -220,7 +228,7 @@ export function sellStock(farm: FarmState, key: string, amount: number): ActionR
 
   farm.stock[key] = have - amount
   pruneStock(farm, key)
-  farm.coins += amount * unitPrice(key)
+  farm.coins += amount * marketPrice(farm, key)
   return OK
 }
 
@@ -347,3 +355,111 @@ export function acceptFamily(farm: FarmState): ActionResult {
 export function isCritical(farm: FarmState, id: ResourceId): boolean {
   return daysRemaining(farm, id) < 7
 }
+
+/* ------------------------------------------------------------------ *
+ * โรงแปรรูป
+ * ------------------------------------------------------------------ */
+
+/** ทำได้กี่ชิ้นต่อวันตามจำนวนโรงแปรรูปที่มี */
+export function craftCapacity(farm: FarmState): number {
+  return farm.kitchens * KITCHEN_CAPACITY
+}
+
+/** วันนี้สั่งแปรรูปไปแล้วกี่ชิ้น */
+export function craftedToday(farm: FarmState): number {
+  return farm.crafting.reduce((total, order) => total + order.units, 0)
+}
+
+export function buyKitchen(farm: FarmState): ActionResult {
+  if (farm.coins < KITCHEN_COST) {
+    return fail(`โรงแปรรูปราคา ${KITCHEN_COST} เหรียญ ตอนนี้มี ${farm.coins}`)
+  }
+  farm.coins -= KITCHEN_COST
+  farm.kitchens += 1
+  return OK
+}
+
+/** ทำผลิตภัณฑ์ตามสูตรนี้ได้มากที่สุดกี่ชิ้นจากของที่มีในคลัง */
+export function craftableUnits(farm: FarmState, recipeId: string): number {
+  const recipe = findRecipe(recipeId)
+  const have = farm.stock[recipe.input] ?? 0
+  const byStock = Math.floor(have / recipe.inputPerUnit)
+  const byCapacity = craftCapacity(farm) - craftedToday(farm)
+  return Math.max(0, Math.min(byStock, byCapacity))
+}
+
+/**
+ * สั่งแปรรูป
+ *
+ * ตัดวัตถุดิบออกจากคลังทันทีที่สั่ง ไม่ได้รอไปตัดตอนปิดวัน
+ * เพราะถ้ารอ ผู้เล่นจะสั่งแปรรูปแล้วเอาวัตถุดิบชุดเดิมไปขายหรือส่งเข้าคลังอาหารได้อีก
+ * แล้วตอนปิดวันงานจะทำไม่สำเร็จโดยที่ผู้เล่นไม่รู้ว่าทำอะไรผิด
+ */
+export function startCraft(
+  farm: FarmState,
+  recipeId: string,
+  units: number,
+): ActionResult {
+  if (units <= 0) return fail('ต้องแปรรูปอย่างน้อยหนึ่งชิ้น')
+  if (farm.kitchens === 0) return fail('ยังไม่มีโรงแปรรูป ต้องสร้างก่อน')
+  if (farm.energy < ENERGY_COST.craft) return fail('แรงหมดแล้ว ปิดวันเพื่อพักก่อน')
+
+  const recipe = findRecipe(recipeId)
+  const free = craftCapacity(farm) - craftedToday(farm)
+  if (units > free) {
+    return fail(`วันนี้โรงแปรรูปทำได้อีก ${free} ชิ้น`)
+  }
+
+  const need = units * recipe.inputPerUnit
+  const have = farm.stock[recipe.input] ?? 0
+  if (have < need) {
+    return fail(
+      `ต้องใช้${findCrop(recipe.input).name} ${need} ชิ้น ตอนนี้มี ${have}`,
+    )
+  }
+
+  farm.stock[recipe.input] = have - need
+  pruneStock(farm, recipe.input)
+  farm.energy -= ENERGY_COST.craft
+
+  const existing = farm.crafting.find((order) => order.recipe === recipeId)
+  if (existing) existing.units += units
+  else farm.crafting.push({ recipe: recipeId, units })
+  return OK
+}
+
+/**
+ * ยกเลิกงานแปรรูปที่สั่งไว้ คืนวัตถุดิบให้ครบ
+ *
+ * มีไว้เพราะการกดผิดหนึ่งครั้งไม่ควรทำให้เสียผลผลิตทั้งแปลง
+ * แรงที่ใช้ไปแล้วไม่คืน เพราะเป็นเวลาที่ใช้ไปจริง
+ */
+export function cancelCraft(farm: FarmState, recipeId: string): ActionResult {
+  const index = farm.crafting.findIndex((order) => order.recipe === recipeId)
+  if (index < 0) return fail('วันนี้ไม่ได้สั่งแปรรูปสูตรนี้ไว้')
+
+  const order = farm.crafting[index]
+  if (!order) return fail('วันนี้ไม่ได้สั่งแปรรูปสูตรนี้ไว้')
+
+  const recipe = findRecipe(order.recipe)
+  farm.stock[recipe.input] =
+    (farm.stock[recipe.input] ?? 0) + order.units * recipe.inputPerUnit
+  farm.crafting.splice(index, 1)
+  return OK
+}
+
+/** สูตรที่ทำได้ตอนนี้ ใช้จัดลำดับให้หน้าจอแสดงสูตรที่พร้อมทำก่อน */
+export function readyRecipes(farm: FarmState): string[] {
+  return RECIPES.filter((recipe) => craftableUnits(farm, recipe.id) > 0).map(
+    (recipe) => recipe.id,
+  )
+}
+
+/** ส่วนต่างของการแปรรูปหนึ่งชุด เทียบกับการขายวัตถุดิบสด */
+export function craftGain(farm: FarmState, recipeId: string, units: number): number {
+  const recipe = findRecipe(recipeId)
+  const rawValue = units * recipe.inputPerUnit * marketPrice(farm, recipe.input)
+  return units * recipe.price - rawValue
+}
+
+export { craftKey }

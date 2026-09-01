@@ -12,6 +12,11 @@ import {
   buyAnimal,
   buyBuilding,
   buyFeed,
+  buyKitchen,
+  cancelCraft,
+  craftCapacity,
+  craftableUnits,
+  craftedToday,
   createFarm,
   dailyConsumption,
   dailyProduction,
@@ -25,10 +30,11 @@ import {
   productKey,
   seedCostFor,
   sellStock,
-  unitPrice,
+  startCraft,
   unlockPlot,
   waterPlot,
 } from '../farm/engine'
+import { basePrice, marketPrice, priceChangePercent } from '../farm/market'
 import { buildLedger, closeDay, eventForDay, planDay } from '../farm/ledger'
 import { decodeFarm, encodeFarm } from '../farm/save'
 import { clearFarm, loadFarm, saveFarm } from '../farm/storage'
@@ -43,10 +49,15 @@ import {
   BUILDINGS,
   CROPS,
   ENERGY_PER_DAY,
+  KITCHEN_CAPACITY,
+  KITCHEN_COST,
   MAX_PLOTS,
+  RECIPES,
   RESOURCES,
+  craftKey,
   findAnimal,
   findCrop,
+  findRecipe,
   findResource,
 } from '../farm/types'
 import type { AnimalId, FarmState, Grade, ResourceId } from '../farm/types'
@@ -67,12 +78,13 @@ import type { Player } from '../types/player'
  */
 
 type Phase = 'intro' | 'day' | 'ledger'
-type Panel = 'plots' | 'animals' | 'dome' | 'market'
+type Panel = 'plots' | 'animals' | 'kitchen' | 'dome' | 'market'
 
 /** ทักษะที่แถวสมุดบัญชีแต่ละชนิดบันทึกลงสถิติ */
 const LEDGER_SKILL: Record<LedgerRow['kind'], SkillId> = {
   harvest: 'multiplication',
   feed: 'division',
+  craft: 'multiplication',
   resource: 'wordProblems',
   forecast: 'division',
   percent: 'percentages',
@@ -350,11 +362,12 @@ export function Farm({ player }: { player: Player }) {
           </p>
         ) : null}
 
-        <nav aria-label="แผงควบคุมฟาร์ม" className="mt-4 grid grid-cols-4 gap-2">
+        <nav aria-label="แผงควบคุมฟาร์ม" className="mt-4 grid grid-cols-5 gap-2">
           {(
             [
               ['plots', '🌱', 'แปลงปลูก'],
               ['animals', '🐔', 'สัตว์'],
+              ['kitchen', '🥫', 'แปรรูป'],
               ['dome', '🏙️', 'โดม'],
               ['market', '🛒', 'ตลาด'],
             ] as const
@@ -387,6 +400,7 @@ export function Farm({ player }: { player: Player }) {
             />
           ) : null}
           {panel === 'animals' ? <AnimalPanel farm={farm} onAct={act} /> : null}
+          {panel === 'kitchen' ? <KitchenPanel farm={farm} onAct={act} /> : null}
           {panel === 'dome' ? (
             <DomePanel
               farm={farm}
@@ -748,6 +762,131 @@ function AnimalPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
   )
 }
 
+/**
+ * แผงโรงแปรรูป
+ *
+ * แสดงส่วนต่างเป็นตัวเลขให้เห็นก่อนกด ไม่ใช่ให้กดแล้วค่อยรู้
+ * เพราะสิ่งที่อยากให้เด็กได้จากระบบนี้คือการ "เปรียบเทียบก่อนตัดสินใจ"
+ * ถ้าซ่อนตัวเลขไว้จนกดแล้ว มันจะกลายเป็นปุ่มที่กดไปเรื่อย ๆ แล้วได้เงินเพิ่ม
+ * ซึ่งไม่ต่างอะไรกับปุ่มเก็บรางวัลในเกมทั่วไป และไม่ได้สอนอะไรเลย
+ */
+function KitchenPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
+  if (farm.kitchens === 0) {
+    return (
+      <div>
+        <p className="text-sm text-slate-200">
+          โรงแปรรูปเปลี่ยนผลผลิตสดให้เป็นของที่ขายได้แพงกว่า
+          เช่นมะเขือเทศ {findRecipe('sauce').inputPerUnit} ผล ทำซอสได้ 1 ขวด
+        </p>
+        <p className="mt-2 text-sm text-gold-300">
+          ราคาของแปรรูปไม่ขึ้นลงตามตลาดด้วย ต่างจากผลผลิตสด
+        </p>
+        <Button
+          className="mt-3"
+          size="lg"
+          icon="🥫"
+          onClick={() => onAct((draft) => buyKitchen(draft))}
+        >
+          สร้างโรงแปรรูป · {withCommas(KITCHEN_COST)} 🪙
+        </Button>
+      </div>
+    )
+  }
+
+  const used = craftedToday(farm)
+  const capacity = craftCapacity(farm)
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-2 text-sm">
+        <span className="stat-chip">🥫 โรงแปรรูป {farm.kitchens} หลัง</span>
+        <span className="stat-chip">
+          วันนี้ทำไปแล้ว {used} จาก {capacity} ชิ้น
+        </span>
+        <button
+          type="button"
+          className="farm-pill"
+          onClick={() => onAct((draft) => buyKitchen(draft))}
+        >
+          สร้างเพิ่ม · {withCommas(KITCHEN_COST)} 🪙 (+{KITCHEN_CAPACITY} ชิ้น/วัน)
+        </button>
+      </div>
+
+      {farm.crafting.length > 0 ? (
+        <div className="mt-3 rounded-xl border border-leaf-400/40 bg-leaf-500/10 p-3">
+          <p className="text-sm font-bold text-leaf-300">กำลังแปรรูป จะเสร็จตอนปิดวัน</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {farm.crafting.map((order) => {
+              const recipe = findRecipe(order.recipe)
+              return (
+                <button
+                  key={order.recipe}
+                  type="button"
+                  className="farm-pill"
+                  onClick={() => onAct((draft) => cancelCraft(draft, order.recipe))}
+                >
+                  {recipe.emoji} {recipe.name} {order.units} ชิ้น · กดเพื่อยกเลิก
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-3 space-y-2">
+        {RECIPES.map((recipe) => {
+          const crop = findCrop(recipe.input)
+          const have = farm.stock[recipe.input] ?? 0
+          const most = craftableUnits(farm, recipe.id)
+          const cropPrice = marketPrice(farm, recipe.input)
+          const rawValue = recipe.inputPerUnit * cropPrice
+          const gain = recipe.price - rawValue
+
+          return (
+            <div
+              key={recipe.id}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-3"
+            >
+              <span aria-hidden="true" className="text-2xl">
+                {recipe.emoji}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-white">
+                  {recipe.name} · ใช้{crop.name} {recipe.inputPerUnit} ผล ต่อ 1 ชิ้น
+                </span>
+                <span className="block text-xs text-slate-400">
+                  ขาย{crop.name}สด {recipe.inputPerUnit} ผลได้ {withCommas(rawValue)} 🪙 ·
+                  แปรรูปแล้วขายได้ {withCommas(recipe.price)} 🪙 ·{' '}
+                  <strong className="text-leaf-400">ได้เพิ่ม {withCommas(gain)} 🪙</strong>
+                </span>
+                <span className="block text-xs text-slate-500">
+                  มี{crop.name}ในคลัง {withCommas(have)} ผล · ทำได้ {most} ชิ้น
+                </span>
+              </span>
+              <button
+                type="button"
+                disabled={most === 0}
+                className="farm-pill disabled:opacity-40"
+                onClick={() => onAct((draft) => startCraft(draft, recipe.id, 1))}
+              >
+                ทำ 1 ชิ้น
+              </button>
+              <button
+                type="button"
+                disabled={most === 0}
+                className="farm-pill disabled:opacity-40"
+                onClick={() => onAct((draft) => startCraft(draft, recipe.id, most))}
+              >
+                ทำเต็มที่ {most} ชิ้น
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function DomePanel({
   farm,
   consumption,
@@ -843,16 +982,50 @@ function DomePanel({
 function MarketPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
   const entries = Object.entries(farm.stock).filter(([, amount]) => amount > 0)
 
+  /*
+   * กระดานราคาวันนี้ แสดงทุกพืชแม้ยังไม่มีของในคลัง
+   *
+   * เพราะการตัดสินใจว่า "วันนี้ควรขายอะไร" ต้องเห็นราคาก่อนถึงจะตัดสินใจได้
+   * ถ้าโชว์เฉพาะของที่มี เด็กจะไม่มีทางรู้ว่าพืชที่กำลังปลูกอยู่ราคาขึ้นหรือลง
+   */
+  const board = (
+    <div className="mb-4">
+      <p className="text-xs font-bold uppercase tracking-widest text-leaf-400">
+        ราคาตลาดวันนี้
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {CROPS.map((crop) => {
+          const price = marketPrice(farm, crop.id)
+          const change = priceChangePercent(farm, crop.id)
+          return (
+            <span
+              key={crop.id}
+              className={`farm-pill ${change > 0 ? 'farm-pill-up' : change < 0 ? 'farm-pill-down' : ''}`}
+              title={`ราคาปกติ ${basePrice(crop.id)} บาท`}
+            >
+              {crop.emoji} {price}
+              {change !== 0 ? (change > 0 ? ` ▲${change}%` : ` ▼${Math.abs(change)}%`) : ' ปกติ'}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+
   if (entries.length === 0) {
     return (
-      <p className="text-sm text-slate-300">
-        คลังยังว่างอยู่ ผลผลิตจะเข้าคลังตอนปิดวันที่แปลงโตเต็มที่
-      </p>
+      <div>
+        {board}
+        <p className="text-sm text-slate-300">
+          คลังยังว่างอยู่ ผลผลิตจะเข้าคลังตอนปิดวันที่แปลงโตเต็มที่
+        </p>
+      </div>
     )
   }
 
   return (
     <div>
+      {board}
       <p className="text-sm text-slate-300">
         ผลผลิตหนึ่งชิ้นเลือกได้อย่างเดียว จะขายเป็นเงิน หรือเก็บเป็นอาหารให้คนในโดม
         (ชิ้นละ {FOOD_PER_PRODUCE} กิโลกรัม)
@@ -861,8 +1034,22 @@ function MarketPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
         {entries.map(([key, amount]) => {
           const crop = CROPS.find((entry) => entry.id === key)
           const animal = ANIMALS.find((entry) => productKey(entry.id) === key)
-          const name = crop ? crop.name : animal ? animal.productName : key
-          const emoji = crop ? crop.emoji : animal ? animal.productEmoji : '📦'
+          const recipe = RECIPES.find((entry) => craftKey(entry.id) === key)
+          const name = crop
+            ? crop.name
+            : animal
+              ? animal.productName
+              : recipe
+                ? recipe.name
+                : key
+          const emoji = crop
+            ? crop.emoji
+            : animal
+              ? animal.productEmoji
+              : recipe
+                ? recipe.emoji
+                : '📦'
+          const price = marketPrice(farm, key)
           return (
             <div
               key={key}
@@ -876,8 +1063,7 @@ function MarketPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
                   {name} · {withCommas(amount)} ชิ้น
                 </span>
                 <span className="block text-xs text-slate-400">
-                  ขายได้ชิ้นละ {unitPrice(key)} 🪙 · ขายทั้งหมดได้{' '}
-                  {withCommas(amount * unitPrice(key))} 🪙
+                  ขายได้ชิ้นละ {price} 🪙 · ขายทั้งหมดได้ {withCommas(amount * price)} 🪙
                 </span>
               </span>
               <button

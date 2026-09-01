@@ -122,6 +122,8 @@ const REQUIRED_CLASSES = [
   'farm-tab-active',
   'farm-pill',
   'farm-pill-active',
+  'farm-pill-up',
+  'farm-pill-down',
   'farm-option',
   'farm-terminal',
   'farm-grow',

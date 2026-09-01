@@ -874,6 +874,24 @@ html[data-animations='off'] *::after {
   color: #bbf7d0;
 }
 
+/*
+ * ราคาขึ้นและราคาลง
+ *
+ * ใช้สีคู่กับลูกศรและตัวเลขเปอร์เซ็นต์เสมอ ไม่ใช้สีอย่างเดียว
+ * เพราะเด็กที่แยกสีแดงเขียวไม่ออกต้องอ่านข้อมูลเดียวกันนี้ได้ครบเท่ากัน
+ */
+.farm-pill-up {
+  border-color: rgba(74, 222, 128, 0.7);
+  background: rgba(34, 197, 94, 0.18);
+  color: #bbf7d0;
+}
+
+.farm-pill-down {
+  border-color: rgba(251, 146, 60, 0.6);
+  background: rgba(249, 115, 22, 0.16);
+  color: #fed7aa;
+}
+
 /* ตัวเลือกที่มีรายละเอียดสองบรรทัด เช่นพืชที่จะปลูก */
 .farm-option {
   display: flex;

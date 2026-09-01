@@ -37,6 +37,8 @@ const T = load('farm/types')
 const E = load('farm/engine')
 const L = load('farm/ledger')
 const S = load('farm/save')
+const M = load('farm/market')
+const R = load('math/rng')
 
 let passed = 0
 const failures = []
@@ -162,7 +164,10 @@ check('ขายของแล้วของต้องหายจากค�
   const coins = farm.coins
   assert(E.sellStock(farm, 'tomato', 4).ok, 'ขายไม่ได้')
   assert(farm.stock.tomato === 6, `เหลือ ${farm.stock.tomato} ผล`)
-  assert(farm.coins === coins + 4 * T.findCrop('tomato').sellPrice, 'เงินไม่ตรง')
+  assert(
+    farm.coins === coins + 4 * M.marketPrice(farm, 'tomato'),
+    `เงินไม่ตรงกับราคาตลาดของวันนั้น (ราคาวันนี้ ${M.marketPrice(farm, 'tomato')})`,
+  )
   assert(!E.sellStock(farm, 'tomato', 99).ok, 'ขายเกินที่มีได้')
   assert(farm.stock.tomato === 6, 'ขายไม่สำเร็จแต่ของหาย')
 })
@@ -482,6 +487,256 @@ check('อาหารสัตว์ที่เหลือต้องถู�
   assert(farm.feed > 0, 'เทสต์นี้ต้องมีอาหารเหลือถึงจะทดสอบได้')
 })
 
+// ---------- ตลาด ----------
+
+check('ราคาต้องซ้ำเดิมเมื่อ seed และวันเดิม และเปลี่ยนไปตามวัน', () => {
+  const farm = E.createFarm('ราคา', 4)
+  assert(
+    M.marketPrice(farm, 'tomato') === M.marketPrice(farm, 'tomato'),
+    'วันเดิมได้คนละราคา',
+  )
+
+  const seen = new Set()
+  for (let day = 1; day <= 40; day += 1) {
+    farm.day = day
+    seen.add(M.marketPrice(farm, 'tomato'))
+  }
+  assert(seen.size >= 3, `สี่สิบวันราคาต่างกันแค่ ${seen.size} แบบ`)
+})
+
+check('ราคาทุกวันต้องเป็นจำนวนเต็มบวก ไม่งั้นโจทย์การคูณจะมีทศนิยมโผล่มา', () => {
+  for (const crop of T.CROPS) {
+    for (let day = 1; day <= 60; day += 1) {
+      const farm = E.createFarm('เต็ม', 4)
+      farm.day = day
+      const price = M.marketPrice(farm, crop.id)
+      assert(Number.isInteger(price), `${crop.name} วันที่ ${day} ราคาเป็น ${price}`)
+      assert(price > 0, `${crop.name} วันที่ ${day} ราคาไม่เป็นบวก`)
+    }
+  }
+})
+
+check('ราคาเฉลี่ยระยะยาวต้องใกล้เคียงราคาปกติ ไม่ทำให้เศรษฐกิจเฟ้อหรือฝืด', () => {
+  for (const crop of T.CROPS) {
+    let total = 0
+    const days = 400
+    for (let day = 1; day <= days; day += 1) {
+      const farm = E.createFarm('เฉลี่ย', 4)
+      farm.day = day
+      total += M.marketPrice(farm, crop.id)
+    }
+    const average = total / days
+    const drift = Math.abs(average - crop.sellPrice) / crop.sellPrice
+    assert(drift < 0.06, `${crop.name} เฉลี่ย ${average.toFixed(1)} ต่างจากปกติ ${(drift * 100).toFixed(1)}%`)
+  }
+})
+
+check('ของแปรรูปและผลผลิตจากสัตว์ต้องราคานิ่ง ไม่ขึ้นลงตามวัน', () => {
+  const keys = [
+    ...T.RECIPES.map((recipe) => T.craftKey(recipe.id)),
+    ...T.ANIMALS.map((animal) => E.productKey(animal.id)),
+  ]
+  for (const key of keys) {
+    const prices = new Set()
+    for (let day = 1; day <= 30; day += 1) {
+      const farm = E.createFarm('นิ่ง', 4)
+      farm.day = day
+      prices.add(M.marketPrice(farm, key))
+    }
+    assert(prices.size === 1, `${key} ราคาขึ้นลง ${prices.size} แบบ ทั้งที่ควรนิ่ง`)
+  }
+})
+
+// ---------- โรงแปรรูป ----------
+
+check('สั่งแปรรูปแล้ววัตถุดิบต้องถูกตัดทันที และผลิตภัณฑ์เข้าคลังตอนปิดวัน', () => {
+  const farm = E.createFarm('แปรรูป', 4)
+  farm.kitchens = 1
+  farm.stock = { tomato: 30 }
+
+  assert(E.startCraft(farm, 'sauce', 5).ok, 'สั่งแปรรูปไม่ได้')
+  assert(farm.stock.tomato === 30 - 5 * T.findRecipe('sauce').inputPerUnit, 'วัตถุดิบไม่ถูกตัด')
+  assert((farm.stock[T.craftKey('sauce')] ?? 0) === 0, 'ผลิตภัณฑ์เสร็จก่อนปิดวัน')
+
+  L.closeDay(farm, L.planDay(farm), true)
+  assert(farm.stock[T.craftKey('sauce')] === 5, 'ปิดวันแล้วผลิตภัณฑ์ไม่เข้าคลัง')
+  assert(farm.crafting.length === 0, 'ปิดวันแล้วงานยังค้างอยู่')
+})
+
+check('ไม่มีโรงแปรรูป หรือวัตถุดิบไม่พอ ต้องสั่งไม่ได้และของต้องไม่หาย', () => {
+  const none = E.createFarm('ไม่มีครัว', 4)
+  none.stock = { tomato: 100 }
+  assert(!E.startCraft(none, 'sauce', 1).ok, 'ไม่มีโรงแปรรูปแต่สั่งได้')
+  assert(none.stock.tomato === 100, 'สั่งไม่สำเร็จแต่ของหาย')
+
+  const short = E.createFarm('ของไม่พอ', 4)
+  short.kitchens = 1
+  short.stock = { tomato: 3 }
+  assert(!E.startCraft(short, 'sauce', 1).ok, 'วัตถุดิบไม่พอแต่สั่งได้')
+  assert(short.stock.tomato === 3, 'สั่งไม่สำเร็จแต่ของหาย')
+})
+
+check('กำลังของโรงแปรรูปต้องจำกัดจำนวนต่อวัน และเพิ่มขึ้นตามจำนวนโรง', () => {
+  const farm = E.createFarm('กำลัง', 4)
+  farm.kitchens = 1
+  farm.stock = { tomato: 999 }
+  assert(E.craftCapacity(farm) === T.KITCHEN_CAPACITY, 'กำลังหนึ่งโรงไม่ตรง')
+
+  assert(E.startCraft(farm, 'sauce', T.KITCHEN_CAPACITY).ok, 'ทำเต็มกำลังไม่ได้')
+  assert(!E.startCraft(farm, 'sauce', 1).ok, 'ทำเกินกำลังได้')
+
+  farm.kitchens = 2
+  assert(E.craftCapacity(farm) === T.KITCHEN_CAPACITY * 2, 'สองโรงกำลังไม่เพิ่ม')
+  assert(E.startCraft(farm, 'sauce', 1).ok, 'สร้างเพิ่มแล้วยังทำไม่ได้')
+})
+
+check('ยกเลิกงานแปรรูปแล้ววัตถุดิบต้องคืนครบ', () => {
+  const farm = E.createFarm('ยกเลิก', 4)
+  farm.kitchens = 1
+  farm.stock = { corn: 40 }
+  const before = farm.stock.corn
+
+  E.startCraft(farm, 'roasted', 4)
+  assert(farm.stock.corn < before, 'สั่งแล้ววัตถุดิบไม่ถูกตัด')
+  assert(E.cancelCraft(farm, 'roasted').ok, 'ยกเลิกไม่ได้')
+  assert(farm.stock.corn === before, `คืนของแล้วเหลือ ${farm.stock.corn} จาก ${before}`)
+  assert(farm.crafting.length === 0, 'ยกเลิกแล้วงานยังอยู่')
+})
+
+check('แปรรูปต้องได้กำไรเสมอ ไม่ว่าราคาวัตถุดิบวันนั้นจะแพงแค่ไหน', () => {
+  /*
+   * ถ้าวันหนึ่งมีคนปรับราคาจนแปรรูปแล้วขาดทุน คำตอบในสมุดบัญชีจะติดลบ
+   * แล้วช่องกรอกที่รับเฉพาะตัวเลขจะทำให้ปิดวันไม่ได้ตลอดกาล
+   * เคยเกิดมาแล้วกับแถวทรัพยากร ข้อนี้จึงเฝ้าไว้ไม่ให้เกิดซ้ำที่แถวแปรรูป
+   */
+  for (const recipe of T.RECIPES) {
+    for (let day = 1; day <= 40; day += 1) {
+      const farm = E.createFarm('กำไร', 4)
+      farm.day = day
+      const rawValue = recipe.inputPerUnit * M.marketPrice(farm, recipe.input)
+      assert(
+        recipe.price > rawValue,
+        `${recipe.name} วันที่ ${day} ขายสดได้ ${rawValue} แต่แปรรูปได้แค่ ${recipe.price}`,
+      )
+    }
+  }
+})
+
+check('แถวแปรรูปในสมุดบัญชีต้องคำนวณส่วนต่างถูกต้อง', () => {
+  const farm = E.createFarm('แถวแปรรูป', 4)
+  farm.kitchens = 1
+  farm.stock = { wheat: 40 }
+  E.startCraft(farm, 'bread', 4)
+
+  const plan = L.planDay(farm)
+  const craft = plan.crafts[0]
+  const recipe = T.findRecipe('bread')
+
+  assert(craft.inputsUsed === 4 * recipe.inputPerUnit, 'วัตถุดิบที่ใช้ไม่ตรง')
+  assert(craft.craftValue === 4 * recipe.price, 'มูลค่าผลิตภัณฑ์ไม่ตรง')
+  assert(craft.rawValue === craft.inputsUsed * craft.inputPrice, 'มูลค่าของสดไม่ตรง')
+  assert(craft.gain === craft.craftValue - craft.rawValue, 'ส่วนต่างไม่ตรง')
+
+  const row = L.buildLedger(farm, plan).find((entry) => entry.kind === 'craft')
+  assert(row, 'ไม่มีแถวแปรรูปในสมุดบัญชี')
+  assert(row.fields[0].answer === craft.inputsUsed, 'ช่องวัตถุดิบตอบผิด')
+  assert(row.fields[1].answer === craft.gain, 'ช่องส่วนต่างตอบผิด')
+})
+
+check('แถวร้อยละของการแปรรูปต้องมีเฉพาะ ป.6', () => {
+  const build = (grade) => {
+    const farm = E.createFarm('ชั้นแปรรูป', grade)
+    farm.kitchens = 1
+    farm.stock = { tomato: 40 }
+    E.startCraft(farm, 'sauce', 4)
+    return L.buildLedger(farm, L.planDay(farm)).map((row) => row.id)
+  }
+  assert(!build(4).some((id) => id.startsWith('craft-percent')), 'ป.4 เจอแถวร้อยละของการแปรรูป')
+  assert(build(6).some((id) => id.startsWith('craft-percent')), 'ป.6 ไม่มีแถวร้อยละของการแปรรูป')
+})
+
+check('รหัสฟาร์มต้องเก็บโรงแปรรูปและงานที่สั่งค้างไว้', () => {
+  const farm = E.createFarm('เก็บครัว', 5)
+  farm.kitchens = 2
+  farm.stock = { tomato: 40, corn: 40 }
+  E.startCraft(farm, 'sauce', 3)
+  E.startCraft(farm, 'roasted', 2)
+
+  const decoded = S.decodeFarm(S.encodeFarm(farm))
+  assert(decoded.ok, `อ่านรหัสไม่ได้: ${decoded.reason}`)
+  assert(decoded.farm.kitchens === 2, 'จำนวนโรงแปรรูปหาย')
+  assert(
+    JSON.stringify(decoded.farm.crafting) === JSON.stringify(farm.crafting),
+    'งานแปรรูปที่สั่งค้างไว้ไม่ตรง',
+  )
+})
+
+check('รหัสรุ่นเก่าที่ยังไม่มีโรงแปรรูป ต้องยังอ่านได้ และได้ฟาร์มที่ถูกต้อง', () => {
+  /*
+   * รหัสฟาร์มคือสิ่งเดียวที่กันไม่ให้ฟาร์มของเด็กหาย
+   * การทำให้รหัสที่จดไว้เมื่อสัปดาห์ก่อนใช้ไม่ได้ คือการทำลายสิ่งที่มันมีไว้ป้องกันพอดี
+   *
+   * สร้างรหัสรุ่นเก่าขึ้นมาเองที่นี่ แทนการฝังข้อความตายตัวไว้
+   * เพราะรหัสตายตัวจะใช้ไม่ได้ทันทีที่มีการเพิ่มพืชหรืออาคาร ซึ่งเป็นเรื่องปกติ
+   * แล้ววันนั้นคนแก้จะลบเทสต์ข้อนี้ทิ้งเพราะคิดว่ามันพัง ทั้งที่มันกำลังทำงาน
+   */
+  // ใช้ seed แบบที่เกมสร้างจริง คือตัวเลขล้วนจากเวลาปัจจุบัน
+  const modern = E.createFarm('1735689600000', 5)
+  modern.coins = 9_999
+  E.plantPlot(modern, 0, 'corn')
+  E.buyAnimal(modern, 'chicken', 3)
+  modern.day = 12
+  modern.stock = { tomato: 7 }
+
+  // ถอดรหัสรุ่นใหม่ออกเป็นส่วน ๆ แล้วประกอบกลับเป็นรูปแบบรุ่นเก่า
+  const parts = S.encodeFarm(modern).split('~')
+  const head = parts[1].split('.').slice(0, 9).join('.')
+  const body = [head, parts[2], parts[3], parts[4], parts[5], parts[6], parts[8]].join('~')
+  const legacy = `DOME1~${body}~${R.hashSeed(body).toString(36).slice(0, 6)}`
+
+  const decoded = S.decodeFarm(legacy)
+  assert(decoded.ok, `อ่านรหัสรุ่นเก่าไม่ได้: ${decoded.reason}`)
+  assert(decoded.farm.kitchens === 0, 'รหัสรุ่นเก่าควรได้ฟาร์มที่ยังไม่มีโรงแปรรูป')
+  assert(decoded.farm.crafting.length === 0, 'รหัสรุ่นเก่าไม่ควรมีงานแปรรูปค้าง')
+  assert(decoded.farm.day === 12, `วันที่เพี้ยนเป็น ${decoded.farm.day}`)
+  assert(decoded.farm.coins === modern.coins, 'เหรียญเพี้ยน')
+  assert(decoded.farm.seed === modern.seed, `seed เพี้ยนเป็น ${decoded.farm.seed}`)
+  assert(
+    JSON.stringify(decoded.farm.plots) === JSON.stringify(modern.plots),
+    'แปลงปลูกเพี้ยน',
+  )
+  assert(decoded.farm.stock.tomato === 7, 'คลังเพี้ยน')
+})
+
+check('seed ที่มีอักขระนอกเหนือจากตัวเลขและอังกฤษ ต้องถูกแทนที่อย่างตั้งใจ', () => {
+  /*
+   * seed ถูกใช้สุ่มเหตุการณ์และราคาประจำวัน ถ้ามันเปลี่ยนไปเงียบ ๆ ตอนกู้รหัส
+   * ฟาร์มที่กู้กลับมาจะเจอเหตุการณ์และราคาคนละชุดกับของเดิม
+   *
+   * เกมสร้าง seed จากเวลาปัจจุบันซึ่งเป็นตัวเลขล้วนอยู่แล้ว จึงไม่กระทบการเล่นจริง
+   * ข้อนี้มีไว้บันทึกว่าเป็นพฤติกรรมที่ตั้งใจ ไม่ใช่ความบังเอิญที่ไม่มีใครรู้
+   */
+  const thai = E.createFarm('ห้องเรียนป4', 4)
+  const decoded = S.decodeFarm(S.encodeFarm(thai))
+  assert(decoded.ok, 'อ่านรหัสไม่ได้')
+  assert(decoded.farm.seed !== thai.seed, 'seed ภาษาไทยกลับรอดมาได้ ซึ่งไม่ตรงกับที่ออกแบบไว้')
+  assert(decoded.farm.seed.length > 0, 'seed กลายเป็นค่าว่าง')
+
+  const digits = E.createFarm('1735689600002', 4)
+  const kept = S.decodeFarm(S.encodeFarm(digits))
+  assert(kept.ok && kept.farm.seed === digits.seed, 'seed ที่เกมสร้างจริงกลับไม่รอด')
+})
+
+check('รหัสรุ่นเก่าที่ถูกแก้ ต้องถูกปฏิเสธเหมือนรหัสรุ่นใหม่', () => {
+  const modern = E.createFarm('1735689600001', 4)
+  const parts = S.encodeFarm(modern).split('~')
+  const head = parts[1].split('.').slice(0, 9).join('.')
+  const body = [head, parts[2], parts[3], parts[4], parts[5], parts[6], parts[8]].join('~')
+
+  assert(!S.decodeFarm(`DOME1~${body}~zzzzzz`).ok, 'รหัสรุ่นเก่าที่เลขตรวจสอบผิดกลับอ่านได้')
+  assert(!S.decodeFarm(`DOME1~${body}`).ok, 'รหัสรุ่นเก่าที่ขาดเลขตรวจสอบกลับอ่านได้')
+})
+
 // ---------- เหตุการณ์ ----------
 
 check('เหตุการณ์ประจำวันต้องซ้ำเดิมเมื่อ seed และวันเดิม และต่างกันเมื่อวันต่าง', () => {
@@ -545,7 +800,7 @@ check('รหัสที่ถูกแก้ ถูกตัด หรือ�
     '',
     'สวัสดีครับ',
     code.slice(0, code.length - 4),
-    code.replace('DOME1', 'DOME9'),
+    code.replace(/^DOME\d/, 'MAZE1'),
     code.replace(/~[a-z0-9]+$/, '~zzzzzz'),
   ]
   for (const entry of broken) {
@@ -630,18 +885,48 @@ function simulate(days, options = {}) {
       if (have > 0) E.sellStock(farm, key, have)
     }
 
+    // แปรรูปให้เต็มกำลังด้วยสูตรที่แพงที่สุดที่วัตถุดิบพอ
+    if (farm.kitchens > 0) {
+      for (const recipe of [...T.RECIPES].reverse()) {
+        const units = E.craftableUnits(farm, recipe.id)
+        if (units > 0) E.startCraft(farm, recipe.id, units)
+      }
+    }
+
     if (!options.careless) {
+      /*
+       * ลำดับการลงทุนสำคัญกว่าที่คิด
+       *
+       * ตอนเพิ่มโรงแปรรูปเข้ามาแล้ววางไว้ก่อนอาคารของโดม ผลคือทรัพยากรหมด
+       * ตั้งแต่วันที่สิบหก เพราะเงินถูกดูดไปสร้างโรงแปรรูปจนไม่พอสร้างโรงกรอง
+       * ผู้เล่นที่ตั้งใจดูแลโดมจะไม่ทำแบบนั้น จึงเรียงให้ดูแลคนก่อนลงทุนเสมอ
+       */
       for (const building of T.BUILDINGS) {
-        if (
-          E.daysRemaining(farm, building.produces) < 10 &&
-          farm.coins > building.cost + 300
-        ) {
-          E.buyBuilding(farm, building.id)
-        }
+        const left = E.daysRemaining(farm, building.produces)
+        /*
+         * ของใกล้หมดจริง ๆ ก็ซื้อทันทีถ้าเงินพอ ไม่ต้องเหลือกันไว้
+         *
+         * เคยตั้งกฎว่าต้องมีเงินเกินราคาสามร้อยถึงจะซื้อ ผลคือผู้เล่นจำลอง
+         * นั่งดูอากาศลดจากสิบสองวันเหลือศูนย์ทั้งที่มีเงินห้าร้อยแปดสิบ
+         * และเครื่องฟอกราคาสี่ร้อยแปดสิบ ซึ่งไม่มีคนจริงคนไหนทำแบบนั้น
+         */
+        const urgent = left < 8 && farm.coins >= building.cost
+        const planned = left < 12 && farm.coins > building.cost + 300
+        if (urgent || planned) E.buyBuilding(farm, building.id)
       }
       const plotCost = E.nextPlotCost(farm)
       if (plotCost !== null && farm.coins > plotCost + 400) E.unlockPlot(farm)
-      if (T.RESOURCES.every((spec) => E.daysRemaining(farm, spec.id) > 15)) {
+
+      // โรงแปรรูปเป็นการลงทุนต่อยอด ทำเมื่อโดมมั่นคงแล้วเท่านั้น
+      const settled = T.RESOURCES.every((spec) => E.daysRemaining(farm, spec.id) > 20)
+      if (settled && farm.kitchens === 0 && farm.coins > T.KITCHEN_COST + 400) {
+        E.buyKitchen(farm)
+      }
+      // ไม่รับคนเพิ่มจนกว่าจะมีกำลังผลิตรองรับ คือมีแปลงมากกว่าหนึ่งแปลง
+      if (
+        farm.plots.length > 1 &&
+        T.RESOURCES.every((spec) => E.daysRemaining(farm, spec.id) > 15)
+      ) {
         E.acceptFamily(farm)
       }
     }

@@ -18,11 +18,22 @@
  */
 
 import { hashSeed } from '../math/rng'
-import { ANIMALS, BUILDINGS, CROPS, PLOT_SIZES, RESOURCES } from './types'
-import type { AnimalId, CropId, FarmState, Grade, ResourceId } from './types'
+import { ANIMALS, BUILDINGS, CROPS, PLOT_SIZES, RECIPES, RESOURCES } from './types'
+import type { AnimalId, CraftOrder, CropId, FarmState, Grade, ResourceId } from './types'
 import { productKey } from './engine'
 
-const PREFIX = 'DOME1'
+/**
+ * คำนำหน้ารหัส บอกรุ่นของรูปแบบ
+ *
+ * DOME1 คือรุ่นก่อนมีโรงแปรรูป DOME2 เพิ่มจำนวนโรงแปรรูปกับงานที่สั่งค้างไว้
+ * ตัวอ่านรับได้ทั้งสองรุ่น รหัสรุ่นเก่าจะได้ฟาร์มที่ยังไม่มีโรงแปรรูป
+ * ซึ่งถูกต้องตามความจริง เพราะตอนที่บันทึกรหัสนั้นยังไม่มีระบบนี้
+ *
+ * ที่ต้องรับรุ่นเก่าด้วย เพราะรหัสฟาร์มคือสิ่งเดียวที่กันไม่ให้ฟาร์มของเด็กหาย
+ * การทำให้รหัสที่จดไว้เมื่อสัปดาห์ก่อนใช้ไม่ได้ คือการทำลายสิ่งที่มันมีไว้ป้องกันพอดี
+ */
+const PREFIX = 'DOME2'
+const LEGACY_PREFIX = 'DOME1'
 
 /** ตัวคั่นสามชั้น เลือกอักขระที่ไม่มีในตัวเลขและไม่ถูกโปรแกรมแชตตัดทิ้ง */
 const SECTION = '~'
@@ -34,6 +45,7 @@ const PART = ':'
 const CROP_ORDER: readonly CropId[] = CROPS.map((crop) => crop.id)
 const ANIMAL_ORDER: readonly AnimalId[] = ANIMALS.map((animal) => animal.id)
 const BUILDING_ORDER: readonly string[] = BUILDINGS.map((building) => building.id)
+const RECIPE_ORDER: readonly string[] = RECIPES.map((recipe) => recipe.id)
 const RESOURCE_ORDER: readonly ResourceId[] = RESOURCES.map((resource) => resource.id)
 
 /**
@@ -73,6 +85,7 @@ export function encodeFarm(farm: FarmState): string {
     farm.perfectDays,
     farm.ledgerAnswered,
     farm.ledgerCorrect,
+    farm.kitchens,
   ].join(FIELD)
 
   const plots = farm.plots
@@ -103,9 +116,21 @@ export function encodeFarm(farm: FarmState): string {
     .join(RECORD)
 
   // seed อยู่ท้ายสุดเพราะเป็นข้อความอิสระ ถ้าอยู่กลางจะทำให้แยกส่วนยาก
-  const payload = [head, plots, herds, buildings, resources, stock, safeSeed(farm.seed)].join(
-    SECTION,
-  )
+  const crafting = farm.crafting
+    .filter((order) => order.units > 0 && RECIPE_ORDER.includes(order.recipe))
+    .map((order) => [RECIPE_ORDER.indexOf(order.recipe), order.units].join(PART))
+    .join(RECORD)
+
+  const payload = [
+    head,
+    plots,
+    herds,
+    buildings,
+    resources,
+    stock,
+    crafting,
+    safeSeed(farm.seed),
+  ].join(SECTION)
   return `${PREFIX}${SECTION}${payload}${SECTION}${checksum(payload)}`
 }
 
@@ -136,15 +161,19 @@ export function decodeFarm(code: string): DecodeResult {
   if (trimmed.length === 0) return { ok: false, reason: 'ยังไม่ได้วางรหัสฟาร์ม' }
 
   const sections = trimmed.split(SECTION)
-  if (sections[0] !== PREFIX) {
+  const legacy = sections[0] === LEGACY_PREFIX
+  if (sections[0] !== PREFIX && !legacy) {
     return { ok: false, reason: 'นี่ไม่ใช่รหัสฟาร์มของโดมสีเขียว ลองคัดลอกใหม่อีกครั้ง' }
   }
-  if (sections.length !== 9) {
+
+  // รุ่นเก่ามีเจ็ดส่วน รุ่นใหม่มีแปดส่วน นับรวมคำนำหน้ากับเลขตรวจสอบแล้วต่างกันหนึ่ง
+  const expected = legacy ? 9 : 10
+  if (sections.length !== expected) {
     return { ok: false, reason: 'รหัสไม่ครบ อาจคัดลอกมาไม่หมด ลองคัดลอกทั้งบรรทัดอีกครั้ง' }
   }
 
-  const payload = sections.slice(1, 8).join(SECTION)
-  if (checksum(payload) !== sections[8]) {
+  const payload = sections.slice(1, expected - 1).join(SECTION)
+  if (checksum(payload) !== sections[expected - 1]) {
     return { ok: false, reason: 'รหัสนี้ดูเหมือนถูกแก้หรือคัดลอกมาไม่ครบ ตัวเลขท้ายรหัสไม่ตรงกัน' }
   }
 
@@ -208,10 +237,22 @@ export function decodeFarm(code: string): DecodeResult {
     if (key && amount > 0) stock[key] = amount
   }
 
+  const crafting: CraftOrder[] = legacy
+    ? []
+    : (sections[7] ?? '')
+        .split(RECORD)
+        .filter((entry) => entry.length > 0)
+        .map((entry) => {
+          const parts = entry.split(PART)
+          const recipe = RECIPE_ORDER[toInt(parts[0], -1)]
+          return recipe ? { recipe, units: Math.max(0, toInt(parts[1])) } : null
+        })
+        .filter((order): order is CraftOrder => order !== null && order.units > 0)
+
   return {
     ok: true,
     farm: {
-      seed: sections[7] || 'farm',
+      seed: sections[legacy ? 7 : 8] || 'farm',
       grade: grade as Grade,
       day: Math.max(1, toInt(head[1], 1)),
       energy: Math.max(0, toInt(head[2])),
@@ -221,6 +262,16 @@ export function decodeFarm(code: string): DecodeResult {
       herds,
       feed: Math.max(0, toInt(head[5])),
       buildings,
+      /*
+       * ลำดับคีย์ต้องตรงกับ createFarm เป๊ะ
+       *
+       * ชุดทดสอบเทียบฟาร์มด้วย JSON.stringify ซึ่งสนใจลำดับคีย์ด้วย
+       * ตอนแรกเผลอวางสองคีย์นี้ไว้ท้ายสุด ข้อมูลตรงกันทุกช่องแต่เทสต์ไม่ผ่าน
+       * ซึ่งดูเหมือนเทสต์จุกจิกเกินไป แต่จริง ๆ แล้วมันจับสิ่งที่ควรจับพอดี
+       * คือตัวสร้างฟาร์มสองทางที่เริ่มไม่เหมือนกัน ซึ่งวันหนึ่งจะกลายเป็นบั๊กจริง
+       */
+      kitchens: Math.max(0, toInt(head[9])),
+      crafting,
       resources,
       stock,
       perfectDays: Math.max(0, toInt(head[6])),

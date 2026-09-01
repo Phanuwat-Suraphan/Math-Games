@@ -52,9 +52,15 @@ function penAnchor(index: number): Vec3 {
   return vec3((index - 1) * 6.4, 0, 12.4)
 }
 
-/** ตำแหน่งอาคาร */
+/**
+ * ตำแหน่งอาคารในแถวอุตสาหกรรม
+ *
+ * สี่ช่อง สามช่องแรกเป็นอาคารที่ผลิตทรัพยากรให้โดม ช่องที่สี่เป็นโรงแปรรูป
+ * วางไว้แถวเดียวกันเพราะเป็น "ของที่สร้างเพิ่มได้ด้วยเงิน" เหมือนกันหมด
+ * ต่างจากแปลงกับคอกที่เป็นของที่ต้องดูแลทุกวัน
+ */
 function buildingAnchor(index: number): Vec3 {
-  return vec3((index - 1) * 6.4, 0, -12.4)
+  return vec3(-9.6 + index * 6.4, 0, -12.4)
 }
 
 /**
@@ -377,6 +383,46 @@ function emitBuilding(out: SceneFace[], farm: FarmState, index: number): void {
   }
 }
 
+/** โรงแปรรูป บ้านหลังเล็กมีปล่องไฟ ให้แยกออกจากเครื่องจักรของโดมได้แต่ไกล */
+function emitKitchen(out: SceneFace[], farm: FarmState, time: number): void {
+  const anchor = buildingAnchor(3)
+  emitFloorRect(out, anchor.x, anchor.z, 5, 4, 0.02, '#8a7f6a', farm.kitchens > 0 ? 1 : 0.45)
+  if (farm.kitchens === 0) return
+
+  const shown = Math.min(4, farm.kitchens)
+  for (let n = 0; n < shown; n += 1) {
+    const x = anchor.x - 1.4 + (n % 2) * 2.8
+    const z = anchor.z - 0.8 + Math.floor(n / 2) * 1.6
+
+    emitBox(out, {
+      center: vec3(x, 0.55, z),
+      size: vec3(1.5, 1.1, 1.3),
+      color: '#b5714a',
+      topColor: '#d4926a',
+      outline: '#43261a',
+      skipBottom: true,
+    })
+    emitBox(out, {
+      center: vec3(x + 0.45, 1.4, z),
+      size: vec3(0.3, 0.6, 0.3),
+      color: '#7d5340',
+      outline: '#43261a',
+      skipBottom: true,
+    })
+    // ควันลอยขึ้นจากปล่อง บอกว่าโรงกำลังทำงานอยู่
+    for (let puff = 0; puff < 3; puff += 1) {
+      const rise = ((time * 0.0007 + puff * 0.33 + n * 0.17) % 1)
+      emitBox(out, {
+        center: vec3(x + 0.45, 1.8 + rise * 1.4, z),
+        size: vec3(0.22 + rise * 0.3, 0.22 + rise * 0.3, 0.22 + rise * 0.3),
+        color: '#e8ede8',
+        outline: null,
+        alpha: 0.45 * (1 - rise),
+      })
+    }
+  }
+}
+
 /** เสาค้ำโดมที่ขอบฉาก ทำให้รู้ว่าอยู่ในที่ปิด ไม่ใช่ทุ่งโล่ง */
 function emitDomeFrame(out: SceneFace[]): void {
   for (const [x, z] of [
@@ -495,6 +541,7 @@ export function drawFarm(
     emitPen(faces, farm, index, time)
     emitBuilding(faces, farm, index)
   }
+  emitKitchen(faces, farm, time)
 
   /*
    * ปิดหมอกด้วยการตั้งระยะไว้ไกลกว่าทุกอย่างในฉาก
