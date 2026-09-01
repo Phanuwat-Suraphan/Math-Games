@@ -269,19 +269,51 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
   const focus = plan.resources[(farm.day - 1) % plan.resources.length]
   if (focus) {
     const spec = findResource(focus.id)
-    rows.push({
-      id: `resource-${focus.id}`,
-      kind: 'resource',
-      skill: 'โจทย์ปัญหาสองขั้นตอน · จำนวนนับหลักหมื่นขึ้นไป',
-      prompt: `เมื่อเช้าโดมมี${spec.name} ${withCommas(focus.before)} ${spec.unit} วันนี้ผลิตเพิ่มได้ ${withCommas(focus.production)} ${spec.unit} และใช้ไป ${withCommas(focus.consumption)} ${spec.unit} สิ้นวันจะเหลือเท่าไร`,
-      fields: [
-        { key: 'after', label: `${spec.name}คงเหลือ`, answer: focus.raw, unit: spec.unit },
-      ],
-      working: [
-        `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(focus.before + focus.production)}`,
-        `ขั้นที่ 2 · ${withCommas(focus.before + focus.production)} − ${withCommas(focus.consumption)} = ${withCommas(focus.raw)}`,
-      ],
-    })
+    const available = focus.before + focus.production
+    const lead = `เมื่อเช้าโดมมี${spec.name} ${withCommas(focus.before)} ${spec.unit} วันนี้ผลิตเพิ่มได้ ${withCommas(focus.production)} ${spec.unit} และต้องใช้ ${withCommas(focus.consumption)} ${spec.unit}`
+
+    /*
+     * ถามคนละคำถามเมื่อทรัพยากรไม่พอ
+     *
+     * ปกติถามว่า "สิ้นวันจะเหลือเท่าไร" ซึ่งใช้ได้ตราบใดที่ยังเหลือ
+     * แต่วันที่ใช้มากกว่าที่มี คำตอบจะติดลบ ซึ่งเป็นปัญหาสองชั้นพร้อมกัน
+     * ชั้นแรก ป.4 ยังไม่เรียนจำนวนเต็มลบ ชั้นที่สองหนักกว่า คือช่องกรอกคำตอบ
+     * รับเฉพาะตัวเลข เด็กจึงพิมพ์คำตอบที่ถูกไม่ได้เลย แล้วปิดวันไม่ได้ตลอดกาล
+     * เกมค้างถาวรโดยที่เด็กไม่ได้ทำอะไรผิด
+     *
+     * ถามว่า "ขาดอยู่เท่าไร" แทน ได้คำตอบที่เป็นจำนวนนับ ยังเป็นการลบสองขั้นเหมือนเดิม
+     * และตรงกับสิ่งที่เด็กต้องรู้จริง ๆ ในสถานการณ์นั้นมากกว่าด้วย
+     */
+    if (focus.raw >= 0) {
+      rows.push({
+        id: `resource-${focus.id}`,
+        kind: 'resource',
+        skill: 'โจทย์ปัญหาสองขั้นตอน · จำนวนนับหลักหมื่นขึ้นไป',
+        prompt: `${lead} สิ้นวันจะเหลือเท่าไร`,
+        fields: [
+          { key: 'after', label: `${spec.name}คงเหลือ`, answer: focus.raw, unit: spec.unit },
+        ],
+        working: [
+          `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
+          `ขั้นที่ 2 · ${withCommas(available)} − ${withCommas(focus.consumption)} = ${withCommas(focus.raw)}`,
+        ],
+      })
+    } else {
+      rows.push({
+        id: `resource-${focus.id}`,
+        kind: 'resource',
+        skill: 'โจทย์ปัญหาสองขั้นตอน · จำนวนนับหลักหมื่นขึ้นไป',
+        prompt: `${lead} วันนี้${spec.name}ไม่พอ ขาดอยู่กี่${spec.unit}`,
+        fields: [
+          { key: 'short', label: `${spec.name}ที่ขาด`, answer: -focus.raw, unit: spec.unit },
+        ],
+        working: [
+          `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
+          `ขั้นที่ 2 · ${withCommas(focus.consumption)} − ${withCommas(available)} = ${withCommas(-focus.raw)}`,
+          `แปลว่าต้องผลิต${spec.name}เพิ่มอีกวันละ ${withCommas(-focus.raw)} ${spec.unit} ถึงจะพอ`,
+        ],
+      })
+    }
   }
 
   /*

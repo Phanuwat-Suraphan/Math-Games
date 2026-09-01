@@ -298,6 +298,47 @@ check('แถวทรัพยากรต้องเป็นโจทย์�
   }
 })
 
+check('ฟาร์มที่ทรัพยากรหมดแล้ว ต้องยังปิดวันได้ ไม่ใช่ค้างเพราะคำตอบติดลบ', () => {
+  /*
+   * เคยเป็นบั๊กจริง ช่องกรอกคำตอบรับเฉพาะตัวเลข พอทรัพยากรติดลบ
+   * เด็กจึงพิมพ์คำตอบที่ถูกไม่ได้เลย แล้วปิดวันไม่ได้ตลอดกาล
+   * เกมค้างถาวรโดยที่เด็กไม่ได้ทำอะไรผิด
+   */
+  for (const spec of T.RESOURCES) {
+    for (let day = 1; day <= T.RESOURCES.length; day += 1) {
+      const farm = E.createFarm('หมดเกลี้ยง', 6)
+      farm.day = day
+      for (const other of T.RESOURCES) farm.resources[other.id] = 0
+      farm.herds = [{ animal: 'goat', count: 4, fedToday: false }]
+      farm.feed = 9
+
+      const rows = L.buildLedger(farm, L.planDay(farm))
+      for (const row of rows) {
+        for (const field of row.fields) {
+          assert(
+            Number.isInteger(field.answer) && field.answer >= 0,
+            `${spec.name} วันที่ ${day} แถว ${row.id} ตอบเป็น ${field.answer} ซึ่งพิมพ์ลงช่องไม่ได้`,
+          )
+        }
+      }
+    }
+  }
+})
+
+check('วันที่ทรัพยากรไม่พอ ต้องถามว่าขาดเท่าไร และคำตอบต้องตรงกับส่วนที่ขาดจริง', () => {
+  const farm = E.createFarm('ขาด', 4)
+  farm.day = 2
+  farm.resources.water = 0
+
+  const plan = L.planDay(farm)
+  const entry = plan.resources.find((item) => item.id === 'water')
+  assert(entry.raw < 0, 'ตั้งค่าแล้วน้ำยังไม่ติดลบ ทดสอบนี้จึงไม่ได้ทดสอบอะไร')
+
+  const row = L.buildLedger(farm, plan).find((item) => item.kind === 'resource')
+  assert(row.fields[0].answer === -entry.raw, `ถามส่วนที่ขาดแล้วได้ ${row.fields[0].answer}`)
+  assert(row.prompt.includes('ขาด'), 'ไม่ได้เปลี่ยนคำถามเป็นการถามส่วนที่ขาด')
+})
+
 check('ทุกวันต้องหมุนไปถามทรัพยากรคนละอย่าง ไม่ใช่ถามอย่างเดิมซ้ำ ๆ', () => {
   const seen = new Set()
   for (let day = 1; day <= T.RESOURCES.length; day += 1) {
