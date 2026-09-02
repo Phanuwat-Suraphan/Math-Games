@@ -29,8 +29,37 @@ import type { Prop } from './scenery'
  */
 const PARTICLE_INK = '#2a1533'
 
+/**
+ * ความเร็วของการสลับภาพท่าเดิน หน่วยเป็นเฟรมต่อวินาที
+ *
+ * แปดเฟรมต่อวินาทีกับสี่ท่า เท่ากับก้าวครบรอบวินาทีละสองครั้ง
+ * ซึ่งใกล้เคียงจังหวะเดินของคนจริง ถ้าเร็วกว่านี้จะกลายเป็นวิ่งซอยเท้า
+ * และไม่ตรงกับความเร็วที่ตัวละครเคลื่อนที่จริงบนจอ
+ */
+const WALK_FPS = 8
+
+/**
+ * เลือกภาพท่าเดินของเวลานี้
+ *
+ * แยกออกมาเป็นฟังก์ชันบริสุทธิ์ เพื่อให้ชุดทดสอบตรวจได้โดยไม่ต้องเปิดเบราว์เซอร์
+ * ซึ่งเป็นวิธีเดียวที่จะรู้ว่าท่าเดินยังสลับอยู่จริง เพราะการดูภาพนิ่งบอกไม่ได้
+ *
+ * ตอนยืนนิ่งคืนศูนย์เสมอ ซึ่งเป็นท่ายืนขาชิด
+ * ถ้าปล่อยให้สลับต่อไปตอนหยุด ตัวละครจะย่ำเท้าอยู่กับที่
+ */
+export function walkFrameIndex(time: number, count: number, moving: boolean): number {
+  if (!moving || count <= 0) return 0
+  return Math.floor(time * WALK_FPS) % count
+}
+
 export interface HeroView {
-  image: HTMLImageElement | null
+  /**
+   * ภาพท่าเดินเรียงตามลำดับเฟรม ว่างได้เมื่อยังโหลดไม่เสร็จ
+   *
+   * ที่ต้องมีหลายภาพ เพราะอนิเมชันในภาพ SVG ไม่ขยับเมื่อวาดลง canvas
+   * การเดินจึงต้องทำด้วยการสลับภาพเอง เหมือนสไปรต์ชีตของเกมสมัยก่อน
+   */
+  frames: HTMLImageElement[]
   /** ภาพมอนสเตอร์ทุกชนิด แยกตามไอดีภาพ */
   monsters: Map<string, HTMLImageElement>
   /** 1 = หันขวา -1 = หันซ้าย */
@@ -585,16 +614,24 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
   ctx.ellipse(pos.x, pos.y + radius * 0.82, radius * 0.9, radius * 0.34, 0, 0, Math.PI * 2)
   ctx.fill()
 
-  if (hero.image) {
+  if (hero.frames.length > 0) {
     /*
-     * ท่าเดิน: ขยับขึ้นลงเร็วตอนเดิน ช้าตอนยืนนิ่ง และพลิกตามทิศที่เดิน
-     * เป็นการเคลื่อนไหวที่น้อยที่สุดที่ทำให้ตัวละครดูมีชีวิต
-     * โดยไม่ต้องมีภาพหลายเฟรมให้ต้องวาดเพิ่มทีละตัว
+     * ท่าเดิน: สลับภาพขาตามเวลา บวกกับขยับขึ้นลงและเอียงตัวเล็กน้อย
+     *
+     * การสลับภาพคือสิ่งที่ทำให้ขาเดินจริง เพราะอนิเมชันในภาพ SVG
+     * ไม่ขยับเลยเมื่อวาดลง canvas ส่วนการขยับขึ้นลงเป็นของเดิมที่ยังเก็บไว้
+     * เพราะมันเพิ่มน้ำหนักให้ก้าวเดิน ไม่ได้ทำหน้าที่แทนขา
+     *
+     * ตอนยืนนิ่งใช้เฟรมแรกเสมอ ซึ่งเป็นท่ายืนขาชิด
+     * ถ้าปล่อยให้สลับต่อไปตอนหยุด ตัวละครจะย่ำเท้าอยู่กับที่
      */
     const size = radius * 3.6
     const bob = hero.moving
       ? Math.abs(Math.sin(world.time * 11)) * -4
       : Math.sin(world.time * 2.3) * 1.1
+
+    const frame = walkFrameIndex(world.time, hero.frames.length, hero.moving)
+    const sprite = hero.frames[frame] ?? hero.frames[0]
 
     ctx.save()
     ctx.translate(pos.x, pos.y + bob)
@@ -602,7 +639,7 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     // เอียงตัวเล็กน้อยตอนเดิน ทำให้รู้สึกว่ากำลังออกแรง
     if (hero.moving) ctx.rotate(Math.sin(world.time * 11) * 0.05)
     if (blink) ctx.globalAlpha = 0.55
-    ctx.drawImage(hero.image, -size / 2, -size * 0.78, size, size)
+    if (sprite) ctx.drawImage(sprite, -size / 2, -size * 0.78, size, size)
     ctx.restore()
     ctx.globalAlpha = 1
   } else {

@@ -36,6 +36,7 @@ const ART = load('art/heroes')
 const PERK = load('data/perks')
 const PS = load('services/perkService')
 const SC = load('survivor/scenery')
+const R = load('survivor/render')
 const STORAGE = load('services/storage')
 
 let passed = 0
@@ -2823,6 +2824,75 @@ check('เรียกซ้ำผ่านตัวเก็บของ ต้
   const a = SC.sceneryFor('ห้องเก็บของ')
   const b = SC.sceneryFor('ห้องเก็บของ')
   assert(a === b, 'ตัวเก็บของไม่ได้ทำงาน จึงสุ่มใหม่ทุกครั้งที่วาด')
+})
+
+/* ------------------------------------------------------------------ *
+ * ท่าเดินของตัวละคร
+ * ------------------------------------------------------------------ */
+
+check('เดินอยู่ต้องสลับท่าไปเรื่อย ๆ ไม่ใช่ค้างท่าเดียว', () => {
+  /*
+   * เรื่องนี้ตรวจด้วยตาไม่ได้ เพราะภาพนิ่งภาพเดียวดูไม่ออกว่าขาสลับหรือไม่
+   *
+   * และมันเคยผิดมาแล้วจริง ๆ ตอนใส่ขาให้ตัวละครรอบแรก
+   * ภาพตัวละครมีอนิเมชันอยู่ในตัว แต่อนิเมชันนั้นไม่ขยับเมื่อวาดลง canvas
+   * ขาจึงมีให้เห็นแต่แข็งค้างท่าเดียว ตัวละครไถลไปกับพื้นแทนที่จะเดิน
+   */
+  const seen = new Set()
+  for (let step = 0; step < 16; step += 1) {
+    seen.add(R.walkFrameIndex(step / 8, 4, true))
+  }
+  assert(seen.size === 4, `เดินแล้วใช้ท่าแค่ ${seen.size} ท่า จากทั้งหมด 4 ท่า`)
+})
+
+check('ยืนนิ่งต้องค้างท่าเดียว ไม่ใช่ย่ำเท้าอยู่กับที่', () => {
+  for (let step = 0; step < 16; step += 1) {
+    assert(
+      R.walkFrameIndex(step / 8, 4, false) === 0,
+      `ยืนนิ่งแต่เลือกท่าที่ ${R.walkFrameIndex(step / 8, 4, false)}`,
+    )
+  }
+})
+
+check('ท่าเดินต้องวนครบรอบแล้วกลับมาเริ่มใหม่ ไม่ใช่วิ่งเลยขอบรายการ', () => {
+  for (let step = 0; step < 200; step += 1) {
+    const index = R.walkFrameIndex(step * 0.37, 4, true)
+    assert(index >= 0 && index < 4, `ท่าที่ ${index} อยู่นอกรายการ`)
+  }
+})
+
+check('ยังไม่มีภาพท่าเดินสักภาพ ต้องไม่พัง', () => {
+  assert(R.walkFrameIndex(12.5, 0, true) === 0, 'ไม่มีภาพเลยแต่ยังเลือกท่าที่ไม่ใช่ศูนย์')
+})
+
+check('ท่าเดินทั้งสี่ต้องเป็นภาพคนละท่าจริง ไม่ใช่ภาพเดียวกันสี่ใบ', () => {
+  /*
+   * ถ้าท่าทุกท่าเหมือนกัน การสลับภาพก็ไม่มีความหมาย
+   * ตัวชี้วัดคือมุมขา ซึ่งอ่านได้จากคำสั่ง rotate ในภาพ
+   */
+  const angles = new Set()
+  for (let frame = 0; frame < ART.WALK_FRAMES; frame += 1) {
+    const svg = ART.heroArt('warrior', ART.walkPose(frame))
+    const match = svg.match(/rotate\((-?[0-9.]+) 43 75\)/)
+    assert(match !== null, `ท่าที่ ${frame} ไม่มีขาที่โพสท่าไว้`)
+    angles.add(match[1])
+  }
+  assert(angles.size >= 3, `สี่ท่ามีมุมขาต่างกันแค่ ${angles.size} แบบ`)
+})
+
+check('ท่ายืนนิ่งต้องเป็นขาชิด ไม่ใช่ขากางค้าง', () => {
+  const svg = ART.heroArt('warrior', ART.walkPose(0))
+  const match = svg.match(/rotate\((-?[0-9.]+) 43 75\)/)
+  assert(match !== null, 'ไม่มีขาที่โพสท่าไว้')
+  assert(Math.abs(Number(match[1])) < 0.5, `ท่าแรกขากางอยู่ ${match[1]} องศา`)
+})
+
+check('ภาพที่ไม่ได้ส่งท่ามา ต้องยังแกว่งขาเองได้ เพราะหน้าเลือกตัวละครใช้แบบนั้น', () => {
+  const svg = ART.heroArt('warrior')
+  assert(
+    svg.includes('animateTransform'),
+    'ภาพที่ไม่ได้ส่งท่ามาไม่มีอนิเมชัน หน้าเลือกตัวละครจะกลายเป็นรูปนิ่ง',
+  )
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

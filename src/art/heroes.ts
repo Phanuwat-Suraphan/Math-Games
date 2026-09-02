@@ -109,6 +109,14 @@ const TROUSER = '#4b5563'
 const SHOE = '#3f2a1d'
 
 /**
+ * มุมสูงสุดที่ขาแกว่งตอนเดิน หน่วยเป็นองศา
+ *
+ * ค่าเดียวกับที่ SMIL ใช้ เพื่อให้ท่าเดินในหน้าเลือกตัวละคร
+ * กับท่าเดินในสนามรบเป็นท่าเดียวกัน ไม่ใช่คนละคนที่เดินคนละแบบ
+ */
+const LEG_SWING = 11
+
+/**
  * ขาสองข้าง ก้าวสลับกันซ้ายขวา
  *
  * จุดหมุนอยู่ที่สะโพก (y=78) ไม่ใช่กลางขา เพราะขาคนหมุนรอบสะโพก
@@ -118,15 +126,32 @@ const SHOE = '#3f2a1d'
  * สองข้างใช้ begin ต่างกันครึ่งจังหวะ ขาหนึ่งไปหน้าอีกขาไปหลังเสมอ
  * ถ้าเริ่มพร้อมกันจะกลายเป็นกระโดดสองขาแทนที่จะเป็นเดิน
  */
-function legs(): string {
+function legs(pose: number | null): string {
   const leg = (x: number) => `
     <path d="M${x} 75 L${x} 91" stroke="${TROUSER}" stroke-width="7"
       stroke-linecap="round"/>
     <ellipse cx="${x}" cy="93.6" rx="5.6" ry="3.4" fill="${SHOE}"/>`
 
+  /*
+   * pose เป็น null แปลว่าให้ขาแกว่งเองด้วย SMIL
+   *
+   * ใช้กับที่ที่ภาพอยู่ใน DOM จริง เช่นหน้าเลือกตัวละครกับหน้าโปรไฟล์
+   * ซึ่งเบราว์เซอร์เล่นอนิเมชันให้เอง
+   *
+   * ส่วนสนามรบวาดด้วย canvas ซึ่งวาด SVG ผ่าน Image เท่านั้น
+   * และ SMIL ในภาพจะไม่ขยับเลยเมื่อวาดลง canvas (ทดลองยืนยันแล้ว)
+   * ที่นั่นจึงต้องส่งมุมมาตรง ๆ แล้วสลับภาพหลายท่าเอา
+   */
+  if (pose === null) {
+    return `
+      ${sway(leg(43), 1.1, 11, 43, 75)}
+      ${sway(leg(57), 1.1, 11, 57, 75, 0.55)}`
+  }
+
+  const swing = LEG_SWING * pose
   return `
-    ${sway(leg(43), 1.1, 11, 43, 75)}
-    ${sway(leg(57), 1.1, 11, 57, 75, 0.55)}`
+    <g transform="rotate(${swing.toFixed(1)} 43 75)">${leg(43)}</g>
+    <g transform="rotate(${(-swing).toFixed(1)} 57 75)">${leg(57)}</g>`
 }
 
 /**
@@ -135,9 +160,9 @@ function legs(): string {
  * ลำดับชั้นที่ทำให้ดูมีระยะ: ขา → แขนหลัง (เข้ม) → ลำตัว (ไล่สี) → รอยพับ → คอเสื้อ
  * ขาอยู่ล่างสุดของกอง เพื่อให้ชายเสื้อทับต้นขาไว้ ซึ่งซ่อนรอยต่อพอดี
  */
-function body(p: string, dark: string): string {
+function body(p: string, dark: string, pose: number | null = null): string {
   return `
-    ${legs()}
+    ${legs(pose)}
     <!--
       แขนแกว่งรอบหัวไหล่ ซ้ายขวาคนละจังหวะ
       ถ้าแกว่งพร้อมกันจะดูเหมือนหุ่นเชิดที่ถูกดึงเชือกเส้นเดียว
@@ -199,7 +224,7 @@ function hero(p: string, main: string, dark: string, extraDefs: string, gear: st
 }
 
 /** นักรบ — หมวกเหล็กและโล่ */
-function warrior(): string {
+function warrior(pose: number | null): string {
   const p = 'hw'
   return hero(
     p,
@@ -209,7 +234,7 @@ function warrior(): string {
     ${verticalGradient(`${p}-steel`, '#cbd5e1', '#475569')}
     ${sphereGradient(`${p}-gold`, '#fef08a', '#facc15', '#a16207')}`,
     `
-    ${body(p, '#991b1b')}
+    ${body(p, '#991b1b', pose)}
     ${face()}
 
     <!-- หมวกเหล็ก ไล่สีแนวดิ่งทำให้โลหะดูโค้ง -->
@@ -246,7 +271,7 @@ function warrior(): string {
 }
 
 /** นักเวท — หมวกแหลมและไม้เท้าเรืองแสง */
-function mage(): string {
+function mage(pose: number | null): string {
   const p = 'hm'
   return hero(
     p,
@@ -260,7 +285,7 @@ function mage(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#4c1d95')}
+    ${body(p, '#4c1d95', pose)}
     ${face()}
 
     <!-- หมวกกรวยสูงจึงโยกมากกว่าหัว จุดหมุนอยู่ที่ขอบหมวก -->
@@ -309,7 +334,7 @@ function mage(): string {
 }
 
 /** นักสำรวจ — หมวกปีกกว้างและเข็มทิศ */
-function explorer(): string {
+function explorer(pose: number | null): string {
   const p = 'he'
   return hero(
     p,
@@ -320,7 +345,7 @@ function explorer(): string {
     ${verticalGradient(`${p}-brim`, '#eab308', '#a16207')}
     ${sphereGradient(`${p}-brass`, '#fef3c7', '#fbbf24', '#b45309')}`,
     `
-    ${body(p, '#14532d')}
+    ${body(p, '#14532d', pose)}
     ${face()}
 
     <!-- ปีกหมวกทอดเงาลงบนหน้า เป็นสัญญาณระยะที่อ่านง่ายที่สุด -->
@@ -357,7 +382,7 @@ function explorer(): string {
 }
 
 /** นักประดิษฐ์ — แว่นตาช่างและประแจ */
-function inventor(): string {
+function inventor(pose: number | null): string {
   const p = 'hi'
   return hero(
     p,
@@ -368,7 +393,7 @@ function inventor(): string {
     ${verticalGradient(`${p}-metal`, '#e2e8f0', '#64748b')}
     ${verticalGradient(`${p}-lens`, '#7dd3fc', '#0369a1')}`,
     `
-    ${body(p, '#7c2d12')}
+    ${body(p, '#7c2d12', pose)}
     ${face()}
 
     <path d="M28 26 Q28 12 50 12 Q72 12 72 26 L72 24 Q50 18 28 24 Z"
@@ -409,7 +434,7 @@ function inventor(): string {
 }
 
 /** นักวิทยาศาสตร์ — เสื้อกาวน์และหลอดทดลอง */
-function scientist(): string {
+function scientist(pose: number | null): string {
   const p = 'hs'
   return hero(
     p,
@@ -419,7 +444,7 @@ function scientist(): string {
     ${sphereGradient(`${p}-cap`, '#7dd3fc', '#0ea5e9', '#075985')}
     ${verticalGradient(`${p}-glass`, '#cffafe', '#67e8f9')}`,
     `
-    ${body(p, '#94a3b8')}
+    ${body(p, '#94a3b8', pose)}
     <path d="M50 62 L50 80" stroke="#94a3b8" stroke-width="1.6" opacity=".7"/>
     ${face()}
 
@@ -456,7 +481,7 @@ function scientist(): string {
 }
 
 /** นักผจญภัย — เป้สะพายหลังและผ้าพันคอ */
-function adventurer(): string {
+function adventurer(pose: number | null): string {
   const p = 'ha'
   return hero(
     p,
@@ -472,7 +497,7 @@ function adventurer(): string {
     <rect x="16" y="72" width="14" height="7" rx="2" fill="#5b3a08"/>
     <rect x="16" y="68" width="3" height="20" rx="1.5" fill="#fff" opacity=".18"/>
 
-    ${body(p, '#881337')}
+    ${body(p, '#881337', pose)}
     ${face()}
 
     <!-- ผ้าพันคอสะบัดตามลม เป็นชิ้นที่ขยับมากที่สุดในภาพ -->
@@ -506,7 +531,7 @@ function adventurer(): string {
 }
 
 /** นักกีฬา — ผ้าคาดหัวและเหรียญรางวัล */
-function athlete(): string {
+function athlete(pose: number | null): string {
   const p = 'hat'
   return hero(
     p,
@@ -517,7 +542,7 @@ function athlete(): string {
     ${sphereGradient(`${p}-hair`, '#3f3f46', '#27272a', '#111113')}
     ${sphereGradient(`${p}-medal`, '#fef08a', '#facc15', '#a16207')}`,
     `
-    ${body(p, '#9f1239')}
+    ${body(p, '#9f1239', pose)}
     ${face()}
 
     <!-- แถบสีขาวพาดเสื้อ เป็นลายของชุดกีฬาที่อ่านออกทันทีแม้ภาพเล็ก -->
@@ -558,7 +583,7 @@ function athlete(): string {
 }
 
 /** นักดนตรี — หมวกเบเรต์และตัวโน้ตลอย */
-function musician(): string {
+function musician(pose: number | null): string {
   const p = 'hmu'
   return hero(
     p,
@@ -572,7 +597,7 @@ function musician(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#075985')}
+    ${body(p, '#075985', pose)}
     ${face()}
 
     <!-- ขลุ่ยถือเฉียง แกว่งเบา ๆ เหมือนกำลังจะยกขึ้นเป่า -->
@@ -619,7 +644,7 @@ function musician(): string {
 }
 
 /** หมอยา — หม้อยาและใบไม้ */
-function healer(): string {
+function healer(pose: number | null): string {
   const p = 'hh'
   return hero(
     p,
@@ -634,7 +659,7 @@ function healer(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#14532d')}
+    ${body(p, '#14532d', pose)}
     ${face()}
 
     <!-- หม้อยาอุ้มไว้หน้าลำตัว จึงทอดเงาลงบนเสื้อ -->
@@ -672,7 +697,7 @@ function healer(): string {
 }
 
 /** นักดาราศาสตร์ — กล้องส่องดาวและดาวลอยรอบตัว */
-function astronomer(): string {
+function astronomer(pose: number | null): string {
   const p = 'has'
   return hero(
     p,
@@ -687,7 +712,7 @@ function astronomer(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#3b0764')}
+    ${body(p, '#3b0764', pose)}
     ${face()}
 
     <!-- ดาวบนเสื้อคลุม บอกอาชีพได้แม้ตอนภาพย่อจนเห็นแค่ลำตัว -->
@@ -739,7 +764,7 @@ function astronomer(): string {
   )
 }
 
-const HERO_ART: Record<string, () => string> = {
+const HERO_ART: Record<string, (pose: number | null) => string> = {
   warrior,
   mage,
   explorer,
@@ -752,10 +777,16 @@ const HERO_ART: Record<string, () => string> = {
   astronomer,
 }
 
-/** ภาพของอวตารหนึ่งตัว คืนภาพสำรองถ้ายังไม่มีของตัวนั้น */
-export function heroArt(avatarId: string): string {
+/**
+ * ภาพของอวตารหนึ่งตัว คืนภาพสำรองถ้ายังไม่มีของตัวนั้น
+ *
+ * pose คือท่าของขา ตั้งแต่ -1 (ขาขวานำ) ถึง 1 (ขาซ้ายนำ)
+ * ส่ง null หรือไม่ส่งเลย แปลว่าให้ขาแกว่งเองด้วยอนิเมชันในภาพ
+ * ซึ่งใช้ได้เฉพาะที่ที่ภาพอยู่ใน DOM จริง เช่นหน้าเลือกตัวละคร
+ */
+export function heroArt(avatarId: string, pose: number | null = null): string {
   const draw = HERO_ART[avatarId]
-  if (draw) return draw()
+  if (draw) return draw(pose)
 
   return hero(
     'hd',
@@ -763,9 +794,29 @@ export function heroArt(avatarId: string): string {
     '#334155',
     '',
     `
-    ${body('hd', '#334155')}
+    ${body('hd', '#334155', pose)}
     ${face()}`,
   )
+}
+
+/**
+ * จำนวนท่าเดินที่สนามรบใช้สลับกัน
+ *
+ * สี่ท่าคือจำนวนน้อยที่สุดที่ยังอ่านเป็นการเดิน
+ * ขาซ้ายนำ ผ่านกลาง ขาขวานำ แล้วผ่านกลางอีกที
+ * สองท่าจะกลายเป็นการกระตุก ส่วนหกท่าขึ้นไปตาแทบแยกไม่ออกจากสี่
+ * แต่กินหน่วยความจำเพิ่มขึ้นตามจำนวนภาพที่ต้องเก็บไว้
+ */
+export const WALK_FRAMES = 4
+
+/**
+ * ท่าของขาในเฟรมที่กำหนด
+ *
+ * ใช้ไซน์เพื่อให้ช่วงกลางก้าวเคลื่อนเร็วและช่วงปลายก้าวช้าลง
+ * ซึ่งเป็นจังหวะของการเดินจริง ถ้าแบ่งมุมเท่า ๆ กันจะดูเป็นหุ่นยนต์
+ */
+export function walkPose(frame: number): number {
+  return Math.sin((frame / WALK_FRAMES) * Math.PI * 2)
 }
 
 export function hasHeroArt(avatarId: string): boolean {
