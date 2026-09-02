@@ -115,6 +115,18 @@ check('ทุกแถวของสมุดบัญชีโดมสีเ�
   }
 })
 
+check('แถวสร้างโจทย์เองของฟาร์มนับเป็นตัวชี้วัดเดียวกับภารกิจสร้างโจทย์ของ Safe Zone', () => {
+  /*
+   * สองที่นี้ต้องลงช่องเดียวกัน เพราะเหตุผลทั้งหมดที่เพิ่มแถวในฟาร์ม
+   * คือเพื่อให้ตัวชี้วัดข้อนี้มีข้อมากพอจะตัดสินได้ในคาบเดียว
+   * ถ้าไปลงคนละช่อง ทั้งสองช่องก็จะยังมีข้อไม่พอเหมือนเดิม
+   */
+  assert(
+    I.LEDGER_INDICATOR.build === I.MISSION_INDICATOR.supply,
+    `แถว build ลงช่อง ${I.LEDGER_INDICATOR.build} แต่ภารกิจ supply ลงช่อง ${I.MISSION_INDICATOR.supply}`,
+  )
+})
+
 check('โจทย์ของโดรนไม่ถูกนับเป็นตัวชี้วัดของ ป.4', () => {
   const meta = I.findIndicator(I.DRONE_INDICATOR)
   assert(meta !== null, 'ตัวชี้วัดของโดรนไม่มีอยู่จริง')
@@ -440,7 +452,17 @@ check('การจำลองต้องเห็นแถวสมุดบ�
       }
     }
   }
-  const expected = ['harvest', 'feed', 'craft', 'resource', 'forecast', 'percent', 'average']
+  const expected = [
+    'harvest',
+    'feed',
+    'craft',
+    'resource',
+    'forecast',
+    'percent',
+    'average',
+    'build',
+    'unknown',
+  ]
   const unseen = expected.filter((kind) => !kinds.has(kind))
   assert(unseen.length === 0, `จำลองแล้วไม่เคยเห็นแถวชนิด ${unseen.join(' ')}`)
 })
@@ -489,6 +511,89 @@ check('ตัวชี้วัดที่เขียนบนจอในภ�
       `ภารกิจ ${mission.id} เขียนบนจอว่า "${mission.indicator}" แต่แผงคุณครูนับเป็น ${meta.code}`,
     )
   }
+})
+
+/* ------------------------------------------------------------------ *
+ * ตัวชี้วัดทุกข้อต้องวัดได้จริงในหนึ่งคาบ
+ * ------------------------------------------------------------------ */
+
+check('ทุกตัวชี้วัดของชั้น ป.4 ต้องมีข้อมากพอให้ครูตัดสินได้ภายในหนึ่งคาบ', () => {
+  /*
+   * ข้อนี้ดักบั๊กทั้งตระกูล ไม่ใช่บั๊กเดียว
+   *
+   * ตัวชี้วัดที่มีที่มาเดียวคือภารกิจใน Safe Zone จะตอบได้ครั้งเดียวต่อการเล่นหนึ่งรอบ
+   * แต่แผงคุณครูต้องเห็นอย่างน้อยสามข้อถึงจะตัดสินได้ว่าเด็กผ่านหรือยัง
+   * แปลว่าครูต้องให้เด็กเล่นจบสามรอบเพื่อวัดตัวชี้วัดเดียว ซึ่งไม่มีคาบไหนทำได้
+   * ตัวชี้วัดข้อนั้นจึงอยู่ในตารางของครูโดยที่ไม่มีวันมีข้อมูลพอจะตัดสิน
+   *
+   * เรื่องนี้เกิดขึ้นจริงสองครั้ง ครั้งแรกกับ ป.4/12 ครั้งที่สองกับ ป.4/8
+   * ครั้งที่สองเกิดเพราะตอนแก้ครั้งแรกไปแก้เฉพาะข้อที่เห็น ไม่ได้ไล่ดูทั้งชุด
+   * ข้อทดสอบนี้จึงไล่ทั้งชุดให้แทน และจะดักข้อถัดไปที่ยังไม่มีใครเพิ่มเข้ามา
+   *
+   * จำลองหนึ่งคาบ = เล่นฟาร์มสิบวัน บวกกับเล่น Safe Zone จบหนึ่งรอบ
+   */
+  const counts = new Map()
+  const bump = (indicator, times) => {
+    if (!indicator) return
+    counts.set(indicator, (counts.get(indicator) ?? 0) + times)
+  }
+
+  // ฝั่ง Safe Zone: ภารกิจละหนึ่งข้อต่อการเล่นหนึ่งรอบ
+  for (const mission of SM.buildMissions('หนึ่งคาบ')) {
+    bump(I.MISSION_INDICATOR[mission.id], 1)
+  }
+
+  // ฝั่งฟาร์ม: นับแถวที่เกิดขึ้นจริงตลอดสิบวัน
+  const farm = FE.createFarm('หนึ่งคาบ', 4)
+  FE.buyAnimal(farm, 'chicken', 2)
+  FE.buyFeed(farm, 20)
+  for (let day = 0; day < 10; day += 1) {
+    farm.plots.forEach((plot, index) => {
+      if (plot.planting && !FE.isReady(plot)) FE.waterPlot(farm, index)
+    })
+    farm.plots.forEach((plot, index) => {
+      if (plot.planting) return
+      for (const crop of FT.CROPS) {
+        if (FE.plantPlot(farm, index, crop.id).ok) break
+      }
+    })
+    for (const [key, amount] of Object.entries(farm.stock)) {
+      if (amount > 0) FE.sellStock(farm, key, amount)
+    }
+    if (farm.feed < 20 && farm.coins > 200) FE.buyFeed(farm, 40)
+
+    const plan = FL.planDay(farm)
+    for (const row of FL.buildLedger(farm, plan)) bump(I.LEDGER_INDICATOR[row.kind], 1)
+    FL.closeDay(farm, plan, true)
+  }
+
+  const short = I.INDICATORS.filter(
+    (item) => item.level === 'core' && (counts.get(item.id) ?? 0) < L.MIN_ATTEMPTS_FOR_MASTERY,
+  ).map((item) => `${item.code} ${item.short} ได้แค่ ${counts.get(item.id) ?? 0} ข้อ`)
+
+  assert(
+    short.length === 0,
+    `ตัวชี้วัดที่หนึ่งคาบยังทำไม่ถึง ${L.MIN_ATTEMPTS_FOR_MASTERY} ข้อ จึงวัดไม่ได้จริง: ${short.join(' · ')}`,
+  )
+})
+
+check('ตัวชี้วัด ป.4 ทุกข้อต้องมีที่มาจากโดมสีเขียวด้วย ไม่ใช่จาก Safe Zone อย่างเดียว', () => {
+  /*
+   * ข้อข้างบนวัดผลลัพธ์ ข้อนี้วัดสาเหตุ
+   *
+   * ตัวชี้วัดที่มีที่มาจาก Safe Zone อย่างเดียว จะพอวัดได้ก็ต่อเมื่อเด็กเล่นซ้ำหลายรอบ
+   * ซึ่งเป็นสิ่งที่ครูควบคุมไม่ได้ ข้อนี้จึงบังคับให้ทุกตัวชี้วัดของ ป.4
+   * มีแถวในสมุดบัญชีรองรับด้วย เพราะแถวในสมุดบัญชีเกิดซ้ำได้ทุกวันที่เล่น
+   */
+  const fromFarm = new Set(Object.values(I.LEDGER_INDICATOR))
+  const missing = I.INDICATORS.filter(
+    (item) => item.level === 'core' && !fromFarm.has(item.id),
+  ).map((item) => `${item.code} ${item.short}`)
+
+  assert(
+    missing.length === 0,
+    `ตัวชี้วัดที่ยังไม่มีแถวในสมุดบัญชีรองรับ: ${missing.join(' · ')}`,
+  )
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

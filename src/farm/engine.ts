@@ -42,6 +42,7 @@ import type {
   ResourceId,
 } from './types'
 import { marketPrice } from './market'
+import { seedMultiplier } from './events'
 
 /**
  * ผลของการสั่งงานหนึ่งครั้ง
@@ -130,8 +131,22 @@ export function unlockPlot(farm: FarmState): ActionResult {
 }
 
 /** ราคาเมล็ดที่ต้องจ่ายเพื่อปลูกเต็มแปลง */
-export function seedCostFor(plot: Plot, cropId: CropId): number {
-  return plotCells(plot) * findCrop(cropId).seedCost
+/**
+ * ราคาเมล็ดเต็มแปลงของวันนี้
+ *
+ * รับ farm เข้ามาด้วยเพราะเหตุการณ์ประจำวันมีผลกับราคาเมล็ดจริง
+ * วันที่ฝูงนกอพยพผ่าน เมล็ดถูกลงครึ่งหนึ่ง และต้องถูกลงจริงตอนกดปลูก
+ * ไม่ใช่ถูกลงแค่ในข้อความบนหัวจอ
+ *
+ * ปัดเป็นจำนวนเต็มใกล้เคียงที่สุด แล้วกันไม่ให้ต่ำกว่าหนึ่ง
+ *
+ * ตอนแรกใช้ปัดขึ้น เพื่อไม่ให้แปลงเล็กกลายเป็นของฟรีในวันที่ลดราคา
+ * แต่ปัดขึ้นทำให้ผู้เล่นจ่ายแพงกว่าที่ควรทุกครั้งที่มีเศษ ทั้งวันที่ลดและวันที่ขึ้นราคา
+ * ซึ่งเป็นภาษีเล็ก ๆ ที่มองไม่เห็นแต่สะสมได้ ปัญหาเดียวกับที่ applyEvent เคยมี
+ */
+export function seedCostFor(farm: FarmState, plot: Plot, cropId: CropId): number {
+  const full = plotCells(plot) * findCrop(cropId).seedCost
+  return Math.max(1, Math.round(full * seedMultiplier(farm)))
 }
 
 export function plantPlot(farm: FarmState, index: number, cropId: CropId): ActionResult {
@@ -140,7 +155,7 @@ export function plantPlot(farm: FarmState, index: number, cropId: CropId): Actio
   if (plot.planting) return fail('แปลงนี้ปลูกอยู่แล้ว')
   if (farm.energy < ENERGY_COST.plant) return fail('แรงหมดแล้ว ปิดวันเพื่อพักก่อน')
 
-  const cost = seedCostFor(plot, cropId)
+  const cost = seedCostFor(farm, plot, cropId)
   if (farm.coins < cost) return fail(`เมล็ดเต็มแปลงราคา ${cost} เหรียญ ตอนนี้มี ${farm.coins}`)
 
   farm.coins -= cost

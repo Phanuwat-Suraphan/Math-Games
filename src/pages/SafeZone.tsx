@@ -392,8 +392,16 @@ export function SafeZone({ player }: { player: Player }) {
   }, [world])
 
   const finishMission = useCallback(
-    (mission: Mission, isCorrect: boolean) => {
-      record(`mission-${mission.id}`, MISSION_SKILL[mission.id], isCorrect)
+    (mission: Mission, isCorrect: boolean, firstTry: boolean) => {
+      /*
+       * สองบรรทัดนี้นับคนละอย่างโดยตั้งใจ
+       *
+       * สถิติของเกมนับตอนภารกิจจบ และนับว่าถูกก็ต่อเมื่อถูกตั้งแต่ครั้งแรก
+       * เพราะมันผูกกับดาว ค่าประสบการณ์ และเหรียญ ซึ่งเป็นรางวัล
+       * ส่วนสมุดตัวชี้วัดของครูนับทุกครั้งที่เด็กลอง เพราะมันเป็นการวัดผล
+       * ครูต้องเห็นว่าเด็กลองไปกี่ครั้งกว่าจะได้ ไม่ใช่เห็นแค่ผลสุดท้าย
+       */
+      if (isCorrect) record(`mission-${mission.id}`, MISSION_SKILL[mission.id], firstTry)
       // ภารกิจที่ยังไม่ได้โยงกับตัวชี้วัด ไม่บันทึก ดีกว่าบันทึกผิดช่อง
       const indicator = MISSION_INDICATOR[mission.id]
       if (indicator) logIndicator(indicator, isCorrect)
@@ -918,7 +926,13 @@ function DroneTerminal({ puzzle, picked, onAnswer, onRetreat }: DroneTerminalPro
 
 interface MissionTerminalProps {
   mission: Mission
-  onResult: (mission: Mission, isCorrect: boolean) => void
+  /**
+   * เรียกทุกครั้งที่เด็กกดส่งคำตอบ
+   *
+   * isCorrect คือครั้งนี้ถูกไหม ใช้กับสมุดตัวชี้วัดของครู ซึ่งต้องเห็นทุกครั้งที่ลอง
+   * firstTry คือถูกตั้งแต่ครั้งแรกไหม ใช้กับสถิติและรางวัลของเกม ซึ่งนับตอนภารกิจจบ
+   */
+  onResult: (mission: Mission, isCorrect: boolean, firstTry: boolean) => void
   onNext: () => void
 }
 
@@ -947,9 +961,21 @@ function MissionTerminal({ mission, onResult, onNext }: MissionTerminalProps) {
     (isCorrect: boolean, message: string) => {
       playSfx(isCorrect ? 'correct' : 'wrong')
       setFeedback(message)
+
+      /*
+       * ส่งผลออกไปทุกครั้งที่เด็กกดส่งคำตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       *
+       * เดิมบรรทัดนี้อยู่ในวงเล็บของ if (isCorrect) ซึ่งดูสมเหตุสมผล
+       * เพราะภารกิจยังไม่จบจนกว่าจะตอบถูก แต่ผลข้างเคียงคือ
+       * เด็กที่ลองแล้วลองอีกแต่ทำไม่ได้เลย จะไม่ถูกบันทึกอะไรเลยสักข้อ
+       * ในตารางของครู ช่องของเด็กคนนั้นจะว่างเปล่า
+       * ซึ่งหน้าตาเหมือนกับเด็กที่ยังเล่นมาไม่ถึงภารกิจนี้ทุกประการ
+       * แปลว่าเด็กที่ครูต้องเห็นที่สุด คือเด็กกลุ่มเดียวที่ระบบมองไม่เห็น
+       */
+      onResult(mission, isCorrect, wrongCount === 0)
+
       if (isCorrect) {
         setSolved(true)
-        onResult(mission, wrongCount === 0)
         return
       }
       setWrongCount((count) => count + 1)

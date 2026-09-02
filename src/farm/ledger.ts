@@ -22,10 +22,12 @@
  * สิ่งที่ตอบถูกแล้วได้คือแรงเพิ่มในวันรุ่งขึ้น ซึ่งเป็นรางวัล ไม่ใช่การไม่ถูกลงโทษ
  */
 
-import { createRng } from '../math/rng'
 import {
+  BUILDINGS,
   ENERGY_BONUS_PERFECT_LEDGER,
   ENERGY_PER_DAY,
+  FEED_PRICE,
+  KITCHEN_COST,
   RESOURCES,
   craftKey,
   findAnimal,
@@ -34,16 +36,27 @@ import {
   findResource,
 } from './types'
 import { marketPrice } from './market'
+import { applyEvent, eventForDay } from './events'
+import type { DailyEvent } from './events'
 import type { AnimalId, CropId, FarmState, ResourceId } from './types'
 import {
   FOOD_PER_PRODUCE,
   dailyConsumption,
   dailyProduction,
   isReady,
+  nextPlotCost,
   plotCells,
   productKey,
   tightestResource,
 } from './engine'
+
+/**
+ * ความจุขั้นต่ำของถังที่จะเอามาออกโจทย์ ป.4/8
+ *
+ * ตัวชี้วัดระบุว่าเป็นจำนวนนับที่มากกว่า 100,000 จึงต้องกรองด้วยตัวเลขนี้
+ * ไม่ใช่เลือกถังไหนก็ได้ที่มีอยู่
+ */
+const UNKNOWN_MIN_CAPACITY = 100_000
 
 /** แปลงหนึ่งแปลงที่ถึงเวลาเก็บเกี่ยวเมื่อปิดวัน */
 export interface HarvestPlan {
@@ -106,6 +119,8 @@ export interface ResourcePlan {
 
 export interface DayPlan {
   day: number
+  /** เหตุการณ์ของวันนี้ ตัวเลขในแผนนี้ผ่านผลของเหตุการณ์มาแล้ว */
+  event: DailyEvent
   harvests: HarvestPlan[]
   crafts: CraftPlan[]
   /** ผลผลิตพืชที่จะเข้าคลัง รวมตามชนิด */
@@ -188,8 +203,21 @@ export function planDay(farm: FarmState): DayPlan {
       }
     })
 
-  const production = dailyProduction(farm)
-  const consumption = dailyConsumption(farm)
+  /*
+   * เหตุการณ์ของวันนี้มีผลกับตัวเลขของวันนี้เท่านั้น
+   *
+   * ตั้งใจไม่ให้ไปแตะ dailyProduction กับ dailyConsumption ที่เป็นอัตราปกติ
+   * เพราะสองตัวนั้นถูกใช้คำนวณว่า "ของจะพอใช้อีกกี่วัน" ซึ่งเป็นการพยากรณ์
+   * การพยากรณ์ต้องอยู่บนอัตราปกติ ไม่ใช่บนเหตุการณ์ของวันเดียว
+   * ไม่งั้นตัวเลขวันที่เหลือจะกระโดดไปมาทุกวันจนเด็กวางแผนอะไรไม่ได้เลย
+   *
+   * ผลคือเหตุการณ์กลายเป็น "ส่วนต่างจากที่คาดไว้" ซึ่งเป็นที่มาของความลุ้น
+   * และเป็นตัวเลขที่เด็กเห็นได้ในสมุดบัญชีของวันนั้นตรง ๆ
+   */
+  const event = eventForDay(farm)
+  const adjusted = applyEvent(event, dailyProduction(farm), dailyConsumption(farm))
+  const production = adjusted.production
+  const consumption = adjusted.consumption
   const resources: ResourcePlan[] = RESOURCES.map((spec) => {
     const before = farm.resources[spec.id]
     const raw = before + production[spec.id] - consumption[spec.id]
@@ -211,6 +239,7 @@ export function planDay(farm: FarmState): DayPlan {
 
   return {
     day: farm.day,
+    event,
     harvests,
     crafts,
     cropYield: [...yieldMap.entries()].map(([crop, count]) => ({ crop, count })),
@@ -241,6 +270,48 @@ export type LedgerKind =
   | 'forecast'
   | 'percent'
   | 'average'
+  | 'build'
+  | 'unknown'
+
+/** ตัวเลือกหนึ่งอันในแถวสร้างโจทย์เอง ป้ายกำกับคือเรื่องราว ค่าคือตัวเลขจริง */
+export interface BuilderOption {
+  key: string
+  label: string
+  value: number
+}
+
+/**
+ * แถวที่เด็กสร้างโจทย์ของตัวเอง ตามตัวชี้วัด ป.4/12
+ *
+ * ทำไมต้องมีแถวแบบนี้ในฟาร์มด้วย ทั้งที่ Safe Zone มีภารกิจสร้างโจทย์อยู่แล้ว
+ *
+ * เพราะภารกิจนั้นตอบได้ครั้งเดียวต่อการเล่นหนึ่งรอบ
+ * แผงคุณครูต้องเห็นอย่างน้อยสามข้อถึงจะตัดสินได้ว่าเด็กผ่านตัวชี้วัดหรือยัง
+ * แปลว่าครูต้องให้เด็กเล่น Safe Zone จบสามรอบ เพื่อวัดตัวชี้วัดเดียว
+ * ซึ่งไม่มีคาบเรียนไหนทำได้ ตัวชี้วัดข้อนี้จึงกลายเป็นข้อที่วัดไม่ได้จริง
+ *
+ * ที่นี่เด็กสร้างโจทย์ใหม่ได้ทุกวันที่เก็บเกี่ยว จากตัวเลขของฟาร์มตัวเอง
+ * และเป็นตัวเลขจริงทั้งหมด ไม่ใช่ตัวเลขที่แต่งขึ้นมาให้เลือก
+ */
+export interface BuilderSpec {
+  /** เงินที่โดมมีอยู่จริงตอนนี้ ใช้เป็นตัวตั้งของโจทย์ */
+  coins: number
+  /** เลือกว่าจะขายอะไร ค่าคือเงินที่จะได้จริงตามราคาตลาดวันนี้ */
+  sell: BuilderOption[]
+  /** เลือกว่าจะเอาเงินไปซื้ออะไร ค่าคือราคาจริงของสิ่งนั้น */
+  spend: BuilderOption[]
+}
+
+/**
+ * คำตอบของโจทย์ที่เด็กสร้างเอง
+ *
+ * บวกก่อนลบเสมอ และตัวเลือกฝั่งจ่ายทุกอันถูกคัดมาให้ไม่เกินเงินตั้งต้นบวกรายรับที่น้อยที่สุด
+ * จึงไม่มีทางที่เด็กจะเลือกชุดที่ได้คำตอบติดลบ ซึ่งเป็นจำนวนที่ ป.4 ยังไม่เรียน
+ * และเป็นความผิดของคนออกแบบโจทย์ ไม่ใช่ของเด็กที่เลือก
+ */
+export function builderAnswer(spec: BuilderSpec, sell: number, spend: number): number {
+  return spec.coins + sell - spend
+}
 
 export interface LedgerRow {
   id: string
@@ -251,6 +322,59 @@ export interface LedgerRow {
   fields: LedgerField[]
   /** วิธีคิดทีละขั้น แสดงเมื่อตอบผิด */
   working: string[]
+  /**
+   * มีเฉพาะแถวชนิด build
+   *
+   * แถวนี้ไม่มีคำตอบตายตัวใน fields เพราะคำตอบขึ้นกับสิ่งที่เด็กเลือก
+   * หน้าจอจึงต้องคิดคำตอบเองด้วย builderAnswer หลังเด็กเลือกครบ
+   */
+  builder?: BuilderSpec
+}
+
+/**
+ * ทรัพยากรที่โจทย์สองขั้นตอนจะถามในวันนั้น
+ *
+ * มีสองเป้าหมายที่ขัดกันเอง และต้องได้ทั้งคู่
+ *
+ * เป้าหมายแรก วันที่มีเหตุการณ์แตะทรัพยากรตัวไหน ควรได้คำนวณตัวนั้น
+ * ตอนแรกปล่อยให้เหตุการณ์กับโจทย์เลือกกันคนละที ผลคือแทบไม่เคยตรงกัน
+ * วันที่คลื่นความร้อนทำให้ใช้น้ำมากขึ้น โจทย์กลับไปถามเรื่องอากาศ
+ * เหตุการณ์จึงยังแยกขาดจากคณิตศาสตร์ ต่างกันแค่คราวนี้ตัวเลขขยับจริง
+ *
+ * เป้าหมายที่สอง ต้องไม่ถามทรัพยากรเดิมซ้ำ ๆ ติดกัน
+ * เพราะแถวที่หน้าตาเหมือนกันเป๊ะติดกัน เด็กจะเลิกอ่านโจทย์แล้วทำตามรูปแบบ
+ * ซึ่งไม่ใช่การคิด เป้าหมายนี้มีมาก่อน และชุดทดสอบเฝ้าไว้อยู่แล้ว
+ *
+ * ทางออกคือยึดเหตุการณ์เป็นหลัก เว้นแต่จะไปซ้ำกับที่ถามไปเมื่อวาน
+ * แล้วจึงหมุนตามเลขวันแทน มองย้อนหลังชั้นเดียวพอ ไม่ต้องไล่ตั้งแต่วันแรก
+ */
+function spotlightOf(farm: FarmState, day: number): ResourceId | null {
+  const event = eventForDay({ ...farm, day })
+  return event.production?.id ?? event.consumption?.id ?? null
+}
+
+function rotationOf(day: number): ResourceId {
+  const spec = RESOURCES[(day - 1) % RESOURCES.length]
+  return (spec ?? RESOURCES[0]).id
+}
+
+function focusResourceFor(farm: FarmState, day: number): ResourceId {
+  /*
+   * ไล่จากวันแรกขึ้นมา เพราะการตัดสินของวันนี้ขึ้นกับที่ถามไปเมื่อวานจริง ๆ
+   * ไม่ใช่ขึ้นกับเหตุการณ์ของเมื่อวาน สองอย่างนี้ไม่เหมือนกัน
+   * เมื่อวานอาจโดนสลับไปหมุนตามเลขวันแล้วก็ได้ ถ้าตัวมันเองไปซ้ำกับวันก่อนหน้า
+   * เขียนครั้งแรกโดยมองย้อนแค่เหตุการณ์ของเมื่อวาน แล้วยังถามน้ำสองวันติดอยู่ดี
+   */
+  let previous: ResourceId | null = null
+  let current: ResourceId = rotationOf(1)
+  for (let step = 1; step <= day; step += 1) {
+    const spotlight = spotlightOf(farm, step)
+    current =
+      spotlight && spotlight !== previous ? spotlight : rotationOf(step)
+    if (current === previous) current = rotationOf(step + 1)
+    previous = current
+  }
+  return current
 }
 
 function withCommas(value: number): string {
@@ -348,9 +472,22 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
    * เพราะสี่แถวที่หน้าตาเหมือนกันเป๊ะติดกัน เด็กจะเลิกอ่านโจทย์ตั้งแต่แถวที่สอง
    * แล้วทำตามรูปแบบไปเรื่อย ๆ ซึ่งไม่ใช่การคิด
    */
-  const focus = plan.resources[(farm.day - 1) % plan.resources.length]
+  const focusId = focusResourceFor(farm, farm.day)
+  const focus = plan.resources.find((entry) => entry.id === focusId)
   if (focus) {
     const spec = findResource(focus.id)
+    /*
+     * ถ้าเหตุการณ์ของวันนี้ไปแตะทรัพยากรตัวนี้ ให้บอกไว้ในวิธีคิดด้วย
+     *
+     * เพราะเด็กที่จำได้ว่าเมื่อวานผลิตไฟได้เท่าไร แล้ววันนี้เลขไม่ตรง
+     * จะสรุปว่าตัวเองจำผิดหรือเกมคำนวณผิด ทั้งที่ทั้งสองอย่างไม่จริง
+     * บรรทัดเดียวที่โยงเรื่องเข้ากับตัวเลข ทำให้ความประหลาดใจกลายเป็นความเข้าใจ
+     */
+    const touched =
+      plan.event.production?.id === focus.id || plan.event.consumption?.id === focus.id
+    const eventNote = touched
+      ? [`${plan.event.emoji} ${plan.event.title} · ${plan.event.effect}`]
+      : []
     const available = focus.before + focus.production
     const lead = `เมื่อเช้าโดมมี${spec.name} ${withCommas(focus.before)} ${spec.unit} วันนี้ผลิตเพิ่มได้ ${withCommas(focus.production)} ${spec.unit} และต้องใช้ ${withCommas(focus.consumption)} ${spec.unit}`
 
@@ -376,6 +513,7 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
           { key: 'after', label: `${spec.name}คงเหลือ`, answer: focus.raw, unit: spec.unit },
         ],
         working: [
+          ...eventNote,
           `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
           `ขั้นที่ 2 · ${withCommas(available)} − ${withCommas(focus.consumption)} = ${withCommas(focus.raw)}`,
         ],
@@ -390,6 +528,7 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
           { key: 'short', label: `${spec.name}ที่ขาด`, answer: -focus.raw, unit: spec.unit },
         ],
         working: [
+          ...eventNote,
           `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
           `ขั้นที่ 2 · ${withCommas(focus.consumption)} − ${withCommas(available)} = ${withCommas(-focus.raw)}`,
           `แปลว่าต้องผลิต${spec.name}เพิ่มอีกวันละ ${withCommas(-focus.raw)} ${spec.unit} ถึงจะพอ`,
@@ -477,7 +616,142 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
     })
   }
 
+  /*
+   * ---- ป.4/8 หาค่าตัวไม่ทราบค่าในประโยคสัญลักษณ์ ----
+   *
+   * ทำไมต้องมีแถวนี้ ทั้งที่ Safe Zone มีภารกิจปรับสมดุลอากาศอยู่แล้ว
+   *
+   * ด้วยเหตุผลเดียวกับแถวสร้างโจทย์เอง ภารกิจนั้นตอบได้ครั้งเดียวต่อการเล่นหนึ่งรอบ
+   * ครูจึงต้องให้เด็กเล่นจบสามรอบเพื่อวัดตัวชี้วัดเดียว ซึ่งไม่มีคาบไหนทำได้
+   * ตอนแก้ปัญหานี้ให้ ป.4/12 รอบก่อน มองข้ามไปว่า ป.4/8 เป็นแบบเดียวกันเป๊ะ
+   *
+   * ความจุถังของโดมเป็นตัวเลขที่เหมาะกับตัวชี้วัดนี้พอดี
+   * เพราะถังไฟฟ้าจุ 160,000 และถังน้ำจุ 120,000 ซึ่งเกินหนึ่งแสน
+   * ตรงกับข้อความของตัวชี้วัดที่ระบุว่า "จำนวนนับที่มากกว่า 100,000"
+   *
+   * จึงใช้เฉพาะถังที่จุเกินหนึ่งแสนจริง ๆ ไม่รวมถังอากาศที่จุ 90,000
+   * และถังอาหารที่จุ 6,000 ทั้งสองถังนั้นเป็นโจทย์ลบที่ถูกต้องอยู่แล้ว
+   * แต่ไม่ใช่โจทย์ของตัวชี้วัดข้อนี้ และแผงคุณครูจะนับให้เป็นข้อของ ป.4/8
+   * ซึ่งกลายเป็นการรายงานให้ครูผิด ไม่ใช่แค่โจทย์ที่ง่ายไปหน่อย
+   *
+   * ใช้ถังคนละใบกับแถวสองขั้นตอนข้างบน เพื่อไม่ให้ถามเรื่องถังใบเดียวกันสองรอบในวันเดียว
+   */
+  const bigTanks = plan.resources.filter(
+    (entry) => findResource(entry.id).capacity > UNKNOWN_MIN_CAPACITY,
+  )
+  const preferred = bigTanks[farm.day % Math.max(1, bigTanks.length)]
+  const tank =
+    preferred && focus && preferred.id === focus.id && bigTanks.length > 1
+      ? bigTanks[(farm.day + 1) % bigTanks.length]
+      : preferred
+  if (tank) {
+    const spec = findResource(tank.id)
+    const room = spec.capacity - tank.after
+    // ถังที่เต็มพอดีจะได้โจทย์ที่คำตอบเป็นศูนย์ ซึ่งถูกแต่ไม่ได้ฝึกอะไร
+    if (room > 0) {
+      rows.push({
+        id: `unknown-${tank.id}`,
+        kind: 'unknown',
+        skill: 'หาค่าตัวไม่ทราบค่าในประโยคสัญลักษณ์',
+        prompt: `ถัง${spec.name}ของโดมจุได้เต็มที่ ${withCommas(spec.capacity)} ${spec.unit} สิ้นวันนี้มีอยู่ ${withCommas(tank.after)} ${spec.unit} ต้องเติมอีกกี่${spec.unit}ถึงจะเต็มถัง`,
+        fields: [
+          { key: 'room', label: `${spec.name}ที่ต้องเติมเพิ่ม`, answer: room, unit: spec.unit },
+        ],
+        working: [
+          `เขียนเป็นประโยคสัญลักษณ์ · [ ? ] + ${withCommas(tank.after)} = ${withCommas(spec.capacity)}`,
+          `หาตัวที่ไม่รู้ค่าด้วยการลบ · ${withCommas(spec.capacity)} − ${withCommas(tank.after)} = ${withCommas(room)}`,
+        ],
+      })
+    }
+  }
+
+  // ---- ป.4/12 เด็กสร้างโจทย์สองขั้นตอนของตัวเอง ----
+  const builder = buildBuilderSpec(farm, plan)
+  if (builder) {
+    rows.push({
+      id: 'build-own',
+      kind: 'build',
+      skill: 'สร้างโจทย์ปัญหาสองขั้นตอนพร้อมหาคำตอบ',
+      prompt: `วันนี้โดมมีเงิน ${withCommas(builder.coins)} บาท เลือกว่าจะขายอะไรและจะเอาเงินไปซื้ออะไร นั่นคือโจทย์ของหนูเอง แล้วหาคำตอบว่าสุดท้ายจะเหลือเงินกี่บาท`,
+      // แถวนี้ไม่มีคำตอบตายตัว หน้าจอคิดเองจาก builder หลังเด็กเลือกครบ
+      fields: [],
+      working: [
+        'ขั้นที่ 1 · เงินที่มี บวก เงินที่ขายได้',
+        'ขั้นที่ 2 · เอาผลลัพธ์ ลบ ราคาของที่ซื้อ',
+      ],
+      builder,
+    })
+  }
+
   return rows
+}
+
+/**
+ * สร้างตัวเลือกให้เด็กประกอบเป็นโจทย์ของตัวเอง
+ *
+ * คืน null เมื่อวันนั้นไม่มีอะไรให้ขาย หรือไม่มีอะไรที่ซื้อไหว
+ * ซึ่งถูกต้องตามความจริง ดีกว่าแต่งตัวเลือกปลอมขึ้นมาให้ครบ
+ * เพราะทั้งแถวนี้มีค่าก็เพราะตัวเลขในนั้นเป็นของฟาร์มเด็กจริง ๆ
+ */
+function buildBuilderSpec(farm: FarmState, plan: DayPlan): BuilderSpec | null {
+  const sell: BuilderOption[] = []
+
+  for (const entry of plan.cropYield) {
+    const crop = findCrop(entry.crop)
+    const value = entry.count * marketPrice(farm, entry.crop)
+    if (value > 0) {
+      sell.push({
+        key: `crop-${entry.crop}`,
+        label: `ขาย${crop.name}ที่เก็บได้วันนี้ ${withCommas(entry.count)} ต้น`,
+        value,
+      })
+    }
+  }
+
+  for (const entry of plan.feeding) {
+    if (entry.produced <= 0) continue
+    const animal = findAnimal(entry.animal)
+    const value = entry.produced * animal.productPrice
+    sell.push({
+      key: `animal-${entry.animal}`,
+      label: `ขาย${animal.productName}ที่ได้วันนี้ ${withCommas(entry.produced)} ชิ้น`,
+      value,
+    })
+  }
+
+  // ต้องมีอย่างน้อยสองทางเลือก ไม่งั้นไม่ใช่การสร้างโจทย์ เป็นการอ่านโจทย์ที่เกมเขียนไว้
+  if (sell.length < 2) return null
+
+  const cheapestSale = Math.min(...sell.map((option) => option.value))
+  const budget = farm.coins + cheapestSale
+
+  /*
+   * ราคาทุกอันในฝั่งจ่ายเป็นราคาจริงที่กดซื้อได้ในเกม
+   *
+   * ที่ต้องเป็นราคาจริง เพราะโจทย์ข้อนี้ไม่ได้จบที่คำตอบ
+   * เด็กที่คิดออกว่าขายอันไหนแล้วซื้ออาคารได้พอดี จะเดินไปกดซื้อจริงในวันรุ่งขึ้น
+   * ถ้าราคาในโจทย์กับราคาในร้านไม่ตรงกัน สิ่งที่เด็กคิดถูกจะกลายเป็นสิ่งที่ใช้ไม่ได้
+   */
+  const candidates: BuilderOption[] = [
+    { key: 'feed', label: `ซื้ออาหารสัตว์ 20 กิโลกรัม`, value: 20 * FEED_PRICE },
+    { key: 'feed-big', label: `ซื้ออาหารสัตว์ 60 กิโลกรัม`, value: 60 * FEED_PRICE },
+  ]
+
+  const plotCost = nextPlotCost(farm)
+  if (plotCost !== null && plotCost > 0) {
+    candidates.push({ key: 'plot', label: 'เปิดแปลงปลูกใหม่อีกหนึ่งแปลง', value: plotCost })
+  }
+  if (farm.kitchens === 0) {
+    candidates.push({ key: 'kitchen', label: 'สร้างโรงแปรรูป', value: KITCHEN_COST })
+  }
+  for (const building of BUILDINGS) {
+    candidates.push({ key: `building-${building.id}`, label: `สร้าง${building.name}`, value: building.cost })
+  }
+
+  const spend = candidates.filter((option) => option.value <= budget).slice(0, 4)
+  if (spend.length < 2) return null
+
+  return { coins: farm.coins, sell: sell.slice(0, 4), spend }
 }
 
 /* ------------------------------------------------------------------ *
@@ -527,50 +801,15 @@ export function closeDay(farm: FarmState, plan: DayPlan, perfect: boolean): void
   if (perfect) farm.perfectDays += 1
 }
 
-/**
- * เหตุการณ์ประจำวัน
+/*
+ * เหตุการณ์ประจำวันอยู่ใน events.ts
  *
- * สุ่มจาก seed บวกเลขวัน จึงได้เหตุการณ์เดิมทุกครั้งที่เล่นด่านเดิม
- * ครูเปิดชุดเดียวกันให้ทั้งห้องดูพร้อมกันได้ และชุดทดสอบตรวจซ้ำได้
+ * ย้ายออกไปเพราะทั้ง engine และไฟล์นี้ต้องใช้ ถ้าอยู่ที่นี่ engine จะนำเข้าไม่ได้
+ * ตอนย้ายเคยใส่บรรทัดส่งต่อชื่อไว้ที่นี่ด้วย เพื่อให้หน้าจอที่เคยนำเข้าจากที่นี่
+ * ไม่ต้องแก้ แต่ผลคือมีสองทางไปหาของชิ้นเดียวกัน ซึ่งไม่มีใครได้อะไรเพิ่ม
+ * จึงเอาออก แล้วให้หน้าจอนำเข้าจาก events.ts ตรง ๆ
  */
-export interface DailyEvent {
-  id: string
-  emoji: string
-  title: string
-  detail: string
-}
 
-const EVENTS: readonly DailyEvent[] = [
-  {
-    id: 'dust',
-    emoji: '🌪️',
-    title: 'พายุฝุ่นพัดผ่านโดม',
-    detail: 'แผงโซลาร์สกปรก วันนี้ผลิตไฟได้น้อยลง ต้องรีบทำความสะอาด',
-  },
-  {
-    id: 'knock',
-    emoji: '🚪',
-    title: 'มีคนมาเคาะประตูโดม',
-    detail: 'ครอบครัวหนึ่งเดินข้ามทะเลทรายมาถึง กำลังรอคำตอบอยู่หน้าประตู',
-  },
-  {
-    id: 'birds',
-    emoji: '🕊️',
-    title: 'ฝูงนกอพยพผ่าน',
-    detail: 'นกทิ้งเมล็ดพันธุ์ไว้ในแปลง วันนี้ราคาเมล็ดในตลาดถูกลง',
-  },
-  {
-    id: 'quiet',
-    emoji: '🌤️',
-    title: 'วันที่เงียบสงบ',
-    detail: 'ไม่มีอะไรผิดปกติ เป็นวันที่ดีสำหรับวางแผนล่วงหน้า',
-  },
-]
-
-export function eventForDay(farm: FarmState): DailyEvent {
-  const rng = createRng(`farm-event-${farm.seed}-${farm.day}`)
-  return rng.pick(EVENTS)
-}
 
 /** อาหารที่ผลผลิตหนึ่งชิ้นแปลงเป็นได้ ใช้แสดงในหน้าจอ */
 export { FOOD_PER_PRODUCE }
