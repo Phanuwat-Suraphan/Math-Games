@@ -18,6 +18,8 @@
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from './types'
 import type { WorldState } from './types'
+import { sceneryFor } from './scenery'
+import type { Prop } from './scenery'
 
 /**
  * สีหมึกของเส้นขอบเศษ
@@ -96,6 +98,8 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     ctx.lineTo(ARENA_WIDTH, y)
     ctx.stroke()
   }
+
+  drawScenery(ctx, world.seed)
 
   // คริสตัล
   for (const gem of world.gems) {
@@ -816,5 +820,213 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     ctx.globalAlpha = 1
   }
 
+  ctx.restore()
+}
+
+/* ------------------------------------------------------------------ *
+ * องค์ประกอบของสนาม
+ * ------------------------------------------------------------------ */
+
+/**
+ * เงาใต้ของประดับ ทำให้มันดูวางอยู่บนพื้น ไม่ใช่ลอยอยู่
+ *
+ * ใช้หลักเดียวกับเงาใต้เท้าตัวละคร คือรีแบน ๆ สีดำจาง
+ * ถ้าไม่มีเงา ต้นไม้จะดูเหมือนสติกเกอร์ที่แปะทับพื้นไว้เฉย ๆ
+ */
+function propShadow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
+  ctx.fillStyle = 'rgba(40,60,30,.16)'
+  ctx.beginPath()
+  ctx.ellipse(x, y, r, r * 0.36, 0, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+function drawTree(ctx: CanvasRenderingContext2D, prop: Prop): void {
+  const s = prop.scale
+  propShadow(ctx, prop.x, prop.y + 2, 15 * s)
+
+  ctx.fillStyle = '#7c5a3a'
+  ctx.fillRect(prop.x - 2.5 * s, prop.y - 20 * s, 5 * s, 20 * s)
+
+  // พุ่มใบสามก้อนซ้อนกัน อ่านเป็นทรงพุ่มโดยไม่ต้องวาดใบทีละใบ
+  ctx.fillStyle = prop.tint
+  for (const [dx, dy, r] of [
+    [0, -32, 15],
+    [-10, -24, 11],
+    [10, -25, 11],
+  ] as const) {
+    ctx.beginPath()
+    ctx.arc(prop.x + dx * s, prop.y + dy * s, r * s, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // แสงบนยอดพุ่ม บอกว่าแดดมาจากซ้ายบน เหมือนของทุกชิ้นในเกม
+  ctx.fillStyle = 'rgba(255,255,255,.22)'
+  ctx.beginPath()
+  ctx.arc(prop.x - 5 * s, prop.y - 36 * s, 6 * s, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+function drawBush(ctx: CanvasRenderingContext2D, prop: Prop): void {
+  const s = prop.scale
+  propShadow(ctx, prop.x, prop.y + 1, 11 * s)
+  ctx.fillStyle = prop.tint
+  for (const [dx, dy, r] of [
+    [0, -7, 9],
+    [-7, -4, 7],
+    [7, -4, 7],
+  ] as const) {
+    ctx.beginPath()
+    ctx.arc(prop.x + dx * s, prop.y + dy * s, r * s, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(255,255,255,.18)'
+  ctx.beginPath()
+  ctx.arc(prop.x - 3 * s, prop.y - 11 * s, 4 * s, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+function drawRock(ctx: CanvasRenderingContext2D, prop: Prop): void {
+  const s = prop.scale
+  propShadow(ctx, prop.x, prop.y + 1, 9 * s)
+  ctx.fillStyle = prop.tint
+  ctx.beginPath()
+  ctx.moveTo(prop.x - 9 * s, prop.y)
+  ctx.lineTo(prop.x - 5 * s, prop.y - 8 * s)
+  ctx.lineTo(prop.x + 4 * s, prop.y - 9 * s)
+  ctx.lineTo(prop.x + 9 * s, prop.y)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = 'rgba(255,255,255,.25)'
+  ctx.beginPath()
+  ctx.moveTo(prop.x - 5 * s, prop.y - 8 * s)
+  ctx.lineTo(prop.x + 4 * s, prop.y - 9 * s)
+  ctx.lineTo(prop.x + 1 * s, prop.y - 5 * s)
+  ctx.closePath()
+  ctx.fill()
+}
+
+function drawFlower(ctx: CanvasRenderingContext2D, prop: Prop): void {
+  const s = prop.scale
+  ctx.strokeStyle = 'rgba(80,130,70,.7)'
+  ctx.lineWidth = 1.4 * s
+  ctx.beginPath()
+  ctx.moveTo(prop.x, prop.y)
+  ctx.lineTo(prop.x, prop.y - 7 * s)
+  ctx.stroke()
+
+  ctx.fillStyle = prop.tint
+  for (let i = 0; i < 5; i += 1) {
+    const angle = (Math.PI * 2 * i) / 5
+    ctx.beginPath()
+    ctx.arc(
+      prop.x + Math.cos(angle) * 2.6 * s,
+      prop.y - 7 * s + Math.sin(angle) * 2.6 * s,
+      2.2 * s,
+      0,
+      Math.PI * 2,
+    )
+    ctx.fill()
+  }
+  ctx.fillStyle = '#fbbf24'
+  ctx.beginPath()
+  ctx.arc(prop.x, prop.y - 7 * s, 1.6 * s, 0, Math.PI * 2)
+  ctx.fill()
+}
+
+function drawGrass(ctx: CanvasRenderingContext2D, prop: Prop): void {
+  const s = prop.scale
+  ctx.strokeStyle = prop.tint
+  ctx.lineWidth = 1.6 * s
+  ctx.lineCap = 'round'
+  for (const lean of [-3, 0, 3]) {
+    ctx.beginPath()
+    ctx.moveTo(prop.x + lean * s * 0.7, prop.y)
+    ctx.quadraticCurveTo(
+      prop.x + lean * s * 1.4,
+      prop.y - 5 * s,
+      prop.x + lean * s * 2.2,
+      prop.y - 8 * s,
+    )
+    ctx.stroke()
+  }
+}
+
+/**
+ * วาดฉากทั้งหมดของสนาม
+ *
+ * ลำดับ: เขาไกล → ทางเดิน → ของบนพื้นเรียงตามความลึก
+ * ทุกชั้นวาดด้วยความทึบต่ำ เพราะสิ่งที่ต้องอ่านออกที่สุดบนจอนี้
+ * คือมอนกับตัวละคร ไม่ใช่ฉาก
+ */
+function drawScenery(ctx: CanvasRenderingContext2D, seed: string): void {
+  const scenery = sceneryFor(seed)
+
+  /*
+   * ตัดทุกอย่างให้อยู่ในกรอบสนาม
+   *
+   * เขากับทางเดินจงใจให้จุดปลายเลยขอบออกไป เพื่อไม่ให้เห็นหัวท้ายของมัน
+   * ซึ่งจะอ่านเป็น "เส้นที่จบกลางอากาศ" แทนที่จะเป็นทางที่ทอดต่อไปไกล ๆ
+   * แต่ถ้าไม่ตัดกรอบ ส่วนที่เลยออกไปจะไปวาดทับพื้นหลังของหน้าเว็บจริง ๆ
+   * ซึ่งเห็นชัดมากตอนเรนเดอร์ออกมาดู
+   */
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
+  ctx.clip()
+
+  /*
+   * ---- เขาไกล ๆ ที่ขอบฟ้า ----
+   *
+   * เตี้ยและจางมาก เพราะมันอยู่ในแถบ "ท้องฟ้า" ด้านบนของสนาม
+   * ซึ่งเป็นแถบที่มอนเดินลงมาจากขอบบนพอดี
+   * ลองทำให้สูงและเข้มกว่านี้แล้วเรนเดอร์ดู กลายเป็นก้อนเขียวใหญ่
+   * ที่สายตาสับสนกับฝูงมอนสีเขียว ซึ่งเป็นสิ่งที่ห้ามเกิดที่สุดในสนามนี้
+   */
+  ctx.globalAlpha = 0.28
+  ctx.fillStyle = '#8dc79a'
+  for (const hill of scenery.hills) {
+    ctx.beginPath()
+    ctx.ellipse(hill.x, hill.y + 14, hill.r, hill.r * 0.42, 0, Math.PI, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
+
+  // ---- ทางเดินดิน ----
+  ctx.globalAlpha = 0.3
+  ctx.strokeStyle = '#d8c39a'
+  ctx.lineWidth = 34
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  const [start, ...rest] = scenery.path
+  if (start) {
+    ctx.moveTo(start.x, start.y)
+    for (let i = 0; i < rest.length; i += 1) {
+      const point = rest[i]
+      const next = rest[i + 1]
+      if (!point) continue
+      if (next) {
+        ctx.quadraticCurveTo(point.x, point.y, (point.x + next.x) / 2, (point.y + next.y) / 2)
+      } else {
+        ctx.lineTo(point.x, point.y)
+      }
+    }
+    ctx.stroke()
+  }
+  ctx.restore()
+
+  // ---- ของบนพื้น ----
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
+  ctx.clip()
+  ctx.globalAlpha = 0.78
+  for (const prop of scenery.props) {
+    if (prop.kind === 'tree') drawTree(ctx, prop)
+    else if (prop.kind === 'bush') drawBush(ctx, prop)
+    else if (prop.kind === 'rock') drawRock(ctx, prop)
+    else if (prop.kind === 'flower') drawFlower(ctx, prop)
+    else drawGrass(ctx, prop)
+  }
   ctx.restore()
 }

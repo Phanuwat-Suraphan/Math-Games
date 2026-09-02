@@ -35,6 +35,7 @@ const AV = load('data/avatars')
 const ART = load('art/heroes')
 const PERK = load('data/perks')
 const PS = load('services/perkService')
+const SC = load('survivor/scenery')
 const STORAGE = load('services/storage')
 
 let passed = 0
@@ -2739,6 +2740,89 @@ check('ดาวฉลองเลเวลต้องหายไปเอง 
     world.particles.filter((p) => p.shape === 'star').length === 0,
     'ดาวฉลองยังค้างอยู่บนจอหลังผ่านไปสองวินาที',
   )
+})
+
+/* ------------------------------------------------------------------ *
+ * องค์ประกอบของสนาม
+ * ------------------------------------------------------------------ */
+
+check('สนามเดิมต้องได้ของวางเหมือนเดิมทุกครั้ง', () => {
+  /*
+   * draw ถูกเรียกหกสิบครั้งต่อวินาที ถ้าของวางไม่คงที่
+   * ต้นไม้จะย้ายที่ทุกเฟรมจนกลายเป็นภาพสั่นทั้งจอ
+   */
+  const first = SC.buildScenery('ห้องเดียวกัน')
+  const second = SC.buildScenery('ห้องเดียวกัน')
+  assert(
+    JSON.stringify(first) === JSON.stringify(second),
+    'seed เดียวกันได้สนามคนละแบบ',
+  )
+})
+
+check('คนละ seed ต้องได้สนามคนละแบบ', () => {
+  const a = SC.buildScenery('ห้องหนึ่ง')
+  const b = SC.buildScenery('ห้องสอง')
+  assert(JSON.stringify(a) !== JSON.stringify(b), 'สอง seed ได้สนามเหมือนกันเป๊ะ')
+})
+
+check('ของประดับทุกชิ้นต้องอยู่ในกรอบสนาม', () => {
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    for (const prop of SC.buildScenery(seed).props) {
+      assert(
+        prop.x >= 0 && prop.x <= T.ARENA_WIDTH,
+        `seed ${seed} มีของที่ x=${prop.x} ซึ่งอยู่นอกสนาม`,
+      )
+      assert(
+        prop.y >= 0 && prop.y <= T.ARENA_HEIGHT,
+        `seed ${seed} มีของที่ y=${prop.y} ซึ่งอยู่นอกสนาม`,
+      )
+    }
+  }
+})
+
+check('ห้ามมีของประดับใกล้จุดเกิดของตัวละคร', () => {
+  /*
+   * ตรงกลางคือจุดที่ตัวละครเกิดและเป็นที่ที่การต่อสู้หนาแน่นที่สุดตลอดเกม
+   * ของประดับตรงนั้นจะกลายเป็นสิ่งรบกวนตลอดรอบ ไม่ใช่แค่ตอนเดินผ่าน
+   */
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    for (const prop of SC.buildScenery(seed).props) {
+      const distance = Math.hypot(prop.x - cx, prop.y - cy)
+      assert(
+        distance >= 100,
+        `seed ${seed} มีของห่างจุดเกิดแค่ ${Math.round(distance)} พิกเซล`,
+      )
+    }
+  }
+})
+
+check('ของประดับต้องเรียงตามความลึก ไม่งั้นของไกลจะทับของใกล้', () => {
+  for (const seed of ['ก', 'ข', 'ค']) {
+    const props = SC.buildScenery(seed).props
+    for (let i = 1; i < props.length; i += 1) {
+      assert(
+        props[i].y >= props[i - 1].y,
+        `seed ${seed} ตำแหน่งที่ ${i} เรียงผิด (${props[i - 1].y} แล้วตามด้วย ${props[i].y})`,
+      )
+    }
+  }
+})
+
+check('ทุก seed ต้องมีของครบทุกชนิด ไม่มี seed ที่ได้สนามโล่ง', () => {
+  for (let index = 0; index < 20; index += 1) {
+    const kinds = new Set(SC.buildScenery(`สนาม-${index}`).props.map((p) => p.kind))
+    for (const kind of ['tree', 'bush', 'rock', 'flower', 'grass']) {
+      assert(kinds.has(kind), `seed ${index} ไม่มี ${kind} เลย`)
+    }
+  }
+})
+
+check('เรียกซ้ำผ่านตัวเก็บของ ต้องได้ก้อนเดิมกลับมา ไม่ใช่ก้อนใหม่', () => {
+  const a = SC.sceneryFor('ห้องเก็บของ')
+  const b = SC.sceneryFor('ห้องเก็บของ')
+  assert(a === b, 'ตัวเก็บของไม่ได้ทำงาน จึงสุ่มใหม่ทุกครั้งที่วาด')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
