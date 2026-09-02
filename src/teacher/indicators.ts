@@ -181,6 +181,7 @@ export const LEDGER_INDICATOR: Record<string, IndicatorId> = {
   percent: 'percent',
   average: 'average',
   build: 'buildProblem',
+  unknown: 'unknownAddSub',
 }
 
 /** โจทย์ของโดรนตรวจการณ์ระหว่างเดินในเขาวงกต */

@@ -93,6 +93,7 @@ const LEDGER_SKILL: Record<LedgerRow['kind'], SkillId> = {
   percent: 'percentages',
   average: 'wordProblems',
   build: 'wordProblems',
+  unknown: 'subtraction',
 }
 
 function withCommas(value: number): string {

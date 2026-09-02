@@ -49,6 +49,14 @@ import {
   tightestResource,
 } from './engine'
 
+/**
+ * ความจุขั้นต่ำของถังที่จะเอามาออกโจทย์ ป.4/8
+ *
+ * ตัวชี้วัดระบุว่าเป็นจำนวนนับที่มากกว่า 100,000 จึงต้องกรองด้วยตัวเลขนี้
+ * ไม่ใช่เลือกถังไหนก็ได้ที่มีอยู่
+ */
+const UNKNOWN_MIN_CAPACITY = 100_000
+
 /** แปลงหนึ่งแปลงที่ถึงเวลาเก็บเกี่ยวเมื่อปิดวัน */
 export interface HarvestPlan {
   plotIndex: number
@@ -246,6 +254,7 @@ export type LedgerKind =
   | 'percent'
   | 'average'
   | 'build'
+  | 'unknown'
 
 /** ตัวเลือกหนึ่งอันในแถวสร้างโจทย์เอง ป้ายกำกับคือเรื่องราว ค่าคือตัวเลขจริง */
 export interface BuilderOption {
@@ -527,6 +536,55 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
       fields: [{ key: 'average', label: 'เฉลี่ยตัวละ', answer: produced / fedAnimals, unit: 'ชิ้น' }],
       working: [`${produced} ÷ ${fedAnimals} = ${produced / fedAnimals} ชิ้นต่อตัว`],
     })
+  }
+
+  /*
+   * ---- ป.4/8 หาค่าตัวไม่ทราบค่าในประโยคสัญลักษณ์ ----
+   *
+   * ทำไมต้องมีแถวนี้ ทั้งที่ Safe Zone มีภารกิจปรับสมดุลอากาศอยู่แล้ว
+   *
+   * ด้วยเหตุผลเดียวกับแถวสร้างโจทย์เอง ภารกิจนั้นตอบได้ครั้งเดียวต่อการเล่นหนึ่งรอบ
+   * ครูจึงต้องให้เด็กเล่นจบสามรอบเพื่อวัดตัวชี้วัดเดียว ซึ่งไม่มีคาบไหนทำได้
+   * ตอนแก้ปัญหานี้ให้ ป.4/12 รอบก่อน มองข้ามไปว่า ป.4/8 เป็นแบบเดียวกันเป๊ะ
+   *
+   * ความจุถังของโดมเป็นตัวเลขที่เหมาะกับตัวชี้วัดนี้พอดี
+   * เพราะถังไฟฟ้าจุ 160,000 และถังน้ำจุ 120,000 ซึ่งเกินหนึ่งแสน
+   * ตรงกับข้อความของตัวชี้วัดที่ระบุว่า "จำนวนนับที่มากกว่า 100,000"
+   *
+   * จึงใช้เฉพาะถังที่จุเกินหนึ่งแสนจริง ๆ ไม่รวมถังอากาศที่จุ 90,000
+   * และถังอาหารที่จุ 6,000 ทั้งสองถังนั้นเป็นโจทย์ลบที่ถูกต้องอยู่แล้ว
+   * แต่ไม่ใช่โจทย์ของตัวชี้วัดข้อนี้ และแผงคุณครูจะนับให้เป็นข้อของ ป.4/8
+   * ซึ่งกลายเป็นการรายงานให้ครูผิด ไม่ใช่แค่โจทย์ที่ง่ายไปหน่อย
+   *
+   * ใช้ถังคนละใบกับแถวสองขั้นตอนข้างบน เพื่อไม่ให้ถามเรื่องถังใบเดียวกันสองรอบในวันเดียว
+   */
+  const bigTanks = plan.resources.filter(
+    (entry) => findResource(entry.id).capacity > UNKNOWN_MIN_CAPACITY,
+  )
+  const preferred = bigTanks[farm.day % Math.max(1, bigTanks.length)]
+  const tank =
+    preferred && focus && preferred.id === focus.id && bigTanks.length > 1
+      ? bigTanks[(farm.day + 1) % bigTanks.length]
+      : preferred
+  if (tank) {
+    const spec = findResource(tank.id)
+    const room = spec.capacity - tank.after
+    // ถังที่เต็มพอดีจะได้โจทย์ที่คำตอบเป็นศูนย์ ซึ่งถูกแต่ไม่ได้ฝึกอะไร
+    if (room > 0) {
+      rows.push({
+        id: `unknown-${tank.id}`,
+        kind: 'unknown',
+        skill: 'หาค่าตัวไม่ทราบค่าในประโยคสัญลักษณ์',
+        prompt: `ถัง${spec.name}ของโดมจุได้เต็มที่ ${withCommas(spec.capacity)} ${spec.unit} สิ้นวันนี้มีอยู่ ${withCommas(tank.after)} ${spec.unit} ต้องเติมอีกกี่${spec.unit}ถึงจะเต็มถัง`,
+        fields: [
+          { key: 'room', label: `${spec.name}ที่ต้องเติมเพิ่ม`, answer: room, unit: spec.unit },
+        ],
+        working: [
+          `เขียนเป็นประโยคสัญลักษณ์ · [ ? ] + ${withCommas(tank.after)} = ${withCommas(spec.capacity)}`,
+          `หาตัวที่ไม่รู้ค่าด้วยการลบ · ${withCommas(spec.capacity)} − ${withCommas(tank.after)} = ${withCommas(room)}`,
+        ],
+      })
+    }
   }
 
   // ---- ป.4/12 เด็กสร้างโจทย์สองขั้นตอนของตัวเอง ----

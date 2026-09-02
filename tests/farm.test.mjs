@@ -940,6 +940,86 @@ function simulate(days, options = {}) {
 }
 
 /* ------------------------------------------------------------------ *
+ * แถวหาค่าตัวไม่ทราบค่า ตัวชี้วัด ป.4/8
+ * ------------------------------------------------------------------ */
+
+/** เก็บแถวหาค่าตัวไม่ทราบค่าที่เกิดขึ้นจริง พร้อมแถวอื่นของวันเดียวกัน */
+function collectUnknownRows(days) {
+  const found = []
+  const farm = E.createFarm('ตัวไม่ทราบค่า', 4)
+  for (let step = 0; step < days; step += 1) {
+    const plan = L.planDay(farm)
+    const rows = L.buildLedger(farm, plan)
+    const unknown = rows.find((row) => row.kind === 'unknown')
+    if (unknown) {
+      found.push({
+        row: unknown,
+        resourceRow: rows.find((row) => row.kind === 'resource'),
+        plan,
+      })
+    }
+    L.closeDay(farm, plan, true)
+  }
+  return found
+}
+
+check('แถวหาค่าตัวไม่ทราบค่าต้องเกิดเกือบทุกวัน ไม่งั้นครูวัด ป.4/8 ไม่ได้', () => {
+  const found = collectUnknownRows(10)
+  assert(found.length >= 8, `สิบวันเจอแค่ ${found.length} วัน ซึ่งน้อยเกินไป`)
+})
+
+check('คำตอบต้องเท่ากับความจุถังลบด้วยของที่มีอยู่จริง', () => {
+  for (const { row, plan } of collectUnknownRows(20)) {
+    const id = row.id.slice('unknown-'.length)
+    const spec = T.findResource(id)
+    const entry = plan.resources.find((item) => item.id === id)
+    assert(entry !== undefined, `ไม่พบทรัพยากร ${id} ในแผนของวันนั้น`)
+    assert(
+      row.fields[0].answer === spec.capacity - entry.after,
+      `คำตอบ ${row.fields[0].answer} ไม่เท่ากับ ${spec.capacity} − ${entry.after}`,
+    )
+    assert(row.fields[0].answer > 0, 'คำตอบต้องเป็นจำนวนนับ ไม่ใช่ศูนย์หรือติดลบ')
+  }
+})
+
+check('ต้องใช้เฉพาะถังที่จุเกินหนึ่งแสน ตามข้อความของตัวชี้วัด ป.4/8', () => {
+  /*
+   * ตัวชี้วัดระบุว่าเป็นจำนวนนับที่มากกว่า 100,000
+   * ถังอากาศจุ 90,000 และถังอาหารจุ 6,000 ซึ่งเป็นโจทย์ลบที่ถูกต้องอยู่แล้ว
+   * แต่ไม่ใช่โจทย์ของตัวชี้วัดข้อนี้ ถ้าเอามาใช้ แผงคุณครูจะนับให้เป็นข้อของ ป.4/8
+   * ซึ่งกลายเป็นการรายงานให้ครูผิด ไม่ใช่แค่โจทย์ที่ง่ายไปหน่อย
+   */
+  const found = collectUnknownRows(20)
+  assert(found.length > 0, 'ไม่เจอแถวนี้เลย ข้อทดสอบจึงไม่ได้ตรวจอะไร')
+  for (const { row } of found) {
+    const spec = T.findResource(row.id.slice('unknown-'.length))
+    assert(
+      spec.capacity > 100_000,
+      `ใช้ถัง${spec.name}ที่จุแค่ ${spec.capacity} ซึ่งไม่เกินหนึ่งแสน`,
+    )
+  }
+})
+
+check('ต้องไม่ถามเรื่องถังใบเดียวกับแถวสองขั้นตอนในวันเดียวกัน', () => {
+  for (const { row, resourceRow } of collectUnknownRows(20)) {
+    if (!resourceRow) continue
+    assert(
+      row.id.slice('unknown-'.length) !== resourceRow.id.slice('resource-'.length),
+      `วันเดียวกันถามถัง ${row.id} ซ้ำกับ ${resourceRow.id}`,
+    )
+  }
+})
+
+check('วิธีคิดต้องเขียนเป็นประโยคสัญลักษณ์ ซึ่งเป็นแก่นของตัวชี้วัดข้อนี้', () => {
+  for (const { row } of collectUnknownRows(10)) {
+    assert(
+      row.working[0].includes('[ ? ]'),
+      `บรรทัดแรกของวิธีคิดไม่มีประโยคสัญลักษณ์: ${row.working[0]}`,
+    )
+  }
+})
+
+/* ------------------------------------------------------------------ *
  * แถวสร้างโจทย์เอง ตัวชี้วัด ป.4/12
  * ------------------------------------------------------------------ */
 
