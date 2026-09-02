@@ -22,7 +22,6 @@
  * สิ่งที่ตอบถูกแล้วได้คือแรงเพิ่มในวันรุ่งขึ้น ซึ่งเป็นรางวัล ไม่ใช่การไม่ถูกลงโทษ
  */
 
-import { createRng } from '../math/rng'
 import {
   BUILDINGS,
   ENERGY_BONUS_PERFECT_LEDGER,
@@ -37,6 +36,8 @@ import {
   findResource,
 } from './types'
 import { marketPrice } from './market'
+import { applyEvent, eventForDay } from './events'
+import type { DailyEvent } from './events'
 import type { AnimalId, CropId, FarmState, ResourceId } from './types'
 import {
   FOOD_PER_PRODUCE,
@@ -118,6 +119,8 @@ export interface ResourcePlan {
 
 export interface DayPlan {
   day: number
+  /** เหตุการณ์ของวันนี้ ตัวเลขในแผนนี้ผ่านผลของเหตุการณ์มาแล้ว */
+  event: DailyEvent
   harvests: HarvestPlan[]
   crafts: CraftPlan[]
   /** ผลผลิตพืชที่จะเข้าคลัง รวมตามชนิด */
@@ -200,8 +203,21 @@ export function planDay(farm: FarmState): DayPlan {
       }
     })
 
-  const production = dailyProduction(farm)
-  const consumption = dailyConsumption(farm)
+  /*
+   * เหตุการณ์ของวันนี้มีผลกับตัวเลขของวันนี้เท่านั้น
+   *
+   * ตั้งใจไม่ให้ไปแตะ dailyProduction กับ dailyConsumption ที่เป็นอัตราปกติ
+   * เพราะสองตัวนั้นถูกใช้คำนวณว่า "ของจะพอใช้อีกกี่วัน" ซึ่งเป็นการพยากรณ์
+   * การพยากรณ์ต้องอยู่บนอัตราปกติ ไม่ใช่บนเหตุการณ์ของวันเดียว
+   * ไม่งั้นตัวเลขวันที่เหลือจะกระโดดไปมาทุกวันจนเด็กวางแผนอะไรไม่ได้เลย
+   *
+   * ผลคือเหตุการณ์กลายเป็น "ส่วนต่างจากที่คาดไว้" ซึ่งเป็นที่มาของความลุ้น
+   * และเป็นตัวเลขที่เด็กเห็นได้ในสมุดบัญชีของวันนั้นตรง ๆ
+   */
+  const event = eventForDay(farm)
+  const adjusted = applyEvent(event, dailyProduction(farm), dailyConsumption(farm))
+  const production = adjusted.production
+  const consumption = adjusted.consumption
   const resources: ResourcePlan[] = RESOURCES.map((spec) => {
     const before = farm.resources[spec.id]
     const raw = before + production[spec.id] - consumption[spec.id]
@@ -223,6 +239,7 @@ export function planDay(farm: FarmState): DayPlan {
 
   return {
     day: farm.day,
+    event,
     harvests,
     crafts,
     cropYield: [...yieldMap.entries()].map(([crop, count]) => ({ crop, count })),
@@ -312,6 +329,52 @@ export interface LedgerRow {
    * หน้าจอจึงต้องคิดคำตอบเองด้วย builderAnswer หลังเด็กเลือกครบ
    */
   builder?: BuilderSpec
+}
+
+/**
+ * ทรัพยากรที่โจทย์สองขั้นตอนจะถามในวันนั้น
+ *
+ * มีสองเป้าหมายที่ขัดกันเอง และต้องได้ทั้งคู่
+ *
+ * เป้าหมายแรก วันที่มีเหตุการณ์แตะทรัพยากรตัวไหน ควรได้คำนวณตัวนั้น
+ * ตอนแรกปล่อยให้เหตุการณ์กับโจทย์เลือกกันคนละที ผลคือแทบไม่เคยตรงกัน
+ * วันที่คลื่นความร้อนทำให้ใช้น้ำมากขึ้น โจทย์กลับไปถามเรื่องอากาศ
+ * เหตุการณ์จึงยังแยกขาดจากคณิตศาสตร์ ต่างกันแค่คราวนี้ตัวเลขขยับจริง
+ *
+ * เป้าหมายที่สอง ต้องไม่ถามทรัพยากรเดิมซ้ำ ๆ ติดกัน
+ * เพราะแถวที่หน้าตาเหมือนกันเป๊ะติดกัน เด็กจะเลิกอ่านโจทย์แล้วทำตามรูปแบบ
+ * ซึ่งไม่ใช่การคิด เป้าหมายนี้มีมาก่อน และชุดทดสอบเฝ้าไว้อยู่แล้ว
+ *
+ * ทางออกคือยึดเหตุการณ์เป็นหลัก เว้นแต่จะไปซ้ำกับที่ถามไปเมื่อวาน
+ * แล้วจึงหมุนตามเลขวันแทน มองย้อนหลังชั้นเดียวพอ ไม่ต้องไล่ตั้งแต่วันแรก
+ */
+function spotlightOf(farm: FarmState, day: number): ResourceId | null {
+  const event = eventForDay({ ...farm, day })
+  return event.production?.id ?? event.consumption?.id ?? null
+}
+
+function rotationOf(day: number): ResourceId {
+  const spec = RESOURCES[(day - 1) % RESOURCES.length]
+  return (spec ?? RESOURCES[0]).id
+}
+
+function focusResourceFor(farm: FarmState, day: number): ResourceId {
+  /*
+   * ไล่จากวันแรกขึ้นมา เพราะการตัดสินของวันนี้ขึ้นกับที่ถามไปเมื่อวานจริง ๆ
+   * ไม่ใช่ขึ้นกับเหตุการณ์ของเมื่อวาน สองอย่างนี้ไม่เหมือนกัน
+   * เมื่อวานอาจโดนสลับไปหมุนตามเลขวันแล้วก็ได้ ถ้าตัวมันเองไปซ้ำกับวันก่อนหน้า
+   * เขียนครั้งแรกโดยมองย้อนแค่เหตุการณ์ของเมื่อวาน แล้วยังถามน้ำสองวันติดอยู่ดี
+   */
+  let previous: ResourceId | null = null
+  let current: ResourceId = rotationOf(1)
+  for (let step = 1; step <= day; step += 1) {
+    const spotlight = spotlightOf(farm, step)
+    current =
+      spotlight && spotlight !== previous ? spotlight : rotationOf(step)
+    if (current === previous) current = rotationOf(step + 1)
+    previous = current
+  }
+  return current
 }
 
 function withCommas(value: number): string {
@@ -409,9 +472,22 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
    * เพราะสี่แถวที่หน้าตาเหมือนกันเป๊ะติดกัน เด็กจะเลิกอ่านโจทย์ตั้งแต่แถวที่สอง
    * แล้วทำตามรูปแบบไปเรื่อย ๆ ซึ่งไม่ใช่การคิด
    */
-  const focus = plan.resources[(farm.day - 1) % plan.resources.length]
+  const focusId = focusResourceFor(farm, farm.day)
+  const focus = plan.resources.find((entry) => entry.id === focusId)
   if (focus) {
     const spec = findResource(focus.id)
+    /*
+     * ถ้าเหตุการณ์ของวันนี้ไปแตะทรัพยากรตัวนี้ ให้บอกไว้ในวิธีคิดด้วย
+     *
+     * เพราะเด็กที่จำได้ว่าเมื่อวานผลิตไฟได้เท่าไร แล้ววันนี้เลขไม่ตรง
+     * จะสรุปว่าตัวเองจำผิดหรือเกมคำนวณผิด ทั้งที่ทั้งสองอย่างไม่จริง
+     * บรรทัดเดียวที่โยงเรื่องเข้ากับตัวเลข ทำให้ความประหลาดใจกลายเป็นความเข้าใจ
+     */
+    const touched =
+      plan.event.production?.id === focus.id || plan.event.consumption?.id === focus.id
+    const eventNote = touched
+      ? [`${plan.event.emoji} ${plan.event.title} · ${plan.event.effect}`]
+      : []
     const available = focus.before + focus.production
     const lead = `เมื่อเช้าโดมมี${spec.name} ${withCommas(focus.before)} ${spec.unit} วันนี้ผลิตเพิ่มได้ ${withCommas(focus.production)} ${spec.unit} และต้องใช้ ${withCommas(focus.consumption)} ${spec.unit}`
 
@@ -437,6 +513,7 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
           { key: 'after', label: `${spec.name}คงเหลือ`, answer: focus.raw, unit: spec.unit },
         ],
         working: [
+          ...eventNote,
           `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
           `ขั้นที่ 2 · ${withCommas(available)} − ${withCommas(focus.consumption)} = ${withCommas(focus.raw)}`,
         ],
@@ -451,6 +528,7 @@ export function buildLedger(farm: FarmState, plan: DayPlan): LedgerRow[] {
           { key: 'short', label: `${spec.name}ที่ขาด`, answer: -focus.raw, unit: spec.unit },
         ],
         working: [
+          ...eventNote,
           `ขั้นที่ 1 · ${withCommas(focus.before)} + ${withCommas(focus.production)} = ${withCommas(available)}`,
           `ขั้นที่ 2 · ${withCommas(focus.consumption)} − ${withCommas(available)} = ${withCommas(-focus.raw)}`,
           `แปลว่าต้องผลิต${spec.name}เพิ่มอีกวันละ ${withCommas(-focus.raw)} ${spec.unit} ถึงจะพอ`,
@@ -723,50 +801,15 @@ export function closeDay(farm: FarmState, plan: DayPlan, perfect: boolean): void
   if (perfect) farm.perfectDays += 1
 }
 
-/**
- * เหตุการณ์ประจำวัน
+/*
+ * เหตุการณ์ประจำวันอยู่ใน events.ts
  *
- * สุ่มจาก seed บวกเลขวัน จึงได้เหตุการณ์เดิมทุกครั้งที่เล่นด่านเดิม
- * ครูเปิดชุดเดียวกันให้ทั้งห้องดูพร้อมกันได้ และชุดทดสอบตรวจซ้ำได้
+ * ย้ายออกไปเพราะทั้ง engine และไฟล์นี้ต้องใช้ ถ้าอยู่ที่นี่ engine จะนำเข้าไม่ได้
+ * ตอนย้ายเคยใส่บรรทัดส่งต่อชื่อไว้ที่นี่ด้วย เพื่อให้หน้าจอที่เคยนำเข้าจากที่นี่
+ * ไม่ต้องแก้ แต่ผลคือมีสองทางไปหาของชิ้นเดียวกัน ซึ่งไม่มีใครได้อะไรเพิ่ม
+ * จึงเอาออก แล้วให้หน้าจอนำเข้าจาก events.ts ตรง ๆ
  */
-export interface DailyEvent {
-  id: string
-  emoji: string
-  title: string
-  detail: string
-}
 
-const EVENTS: readonly DailyEvent[] = [
-  {
-    id: 'dust',
-    emoji: '🌪️',
-    title: 'พายุฝุ่นพัดผ่านโดม',
-    detail: 'แผงโซลาร์สกปรก วันนี้ผลิตไฟได้น้อยลง ต้องรีบทำความสะอาด',
-  },
-  {
-    id: 'knock',
-    emoji: '🚪',
-    title: 'มีคนมาเคาะประตูโดม',
-    detail: 'ครอบครัวหนึ่งเดินข้ามทะเลทรายมาถึง กำลังรอคำตอบอยู่หน้าประตู',
-  },
-  {
-    id: 'birds',
-    emoji: '🕊️',
-    title: 'ฝูงนกอพยพผ่าน',
-    detail: 'นกทิ้งเมล็ดพันธุ์ไว้ในแปลง วันนี้ราคาเมล็ดในตลาดถูกลง',
-  },
-  {
-    id: 'quiet',
-    emoji: '🌤️',
-    title: 'วันที่เงียบสงบ',
-    detail: 'ไม่มีอะไรผิดปกติ เป็นวันที่ดีสำหรับวางแผนล่วงหน้า',
-  },
-]
-
-export function eventForDay(farm: FarmState): DailyEvent {
-  const rng = createRng(`farm-event-${farm.seed}-${farm.day}`)
-  return rng.pick(EVENTS)
-}
 
 /** อาหารที่ผลผลิตหนึ่งชิ้นแปลงเป็นได้ ใช้แสดงในหน้าจอ */
 export { FOOD_PER_PRODUCE }

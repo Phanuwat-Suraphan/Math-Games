@@ -18,6 +18,7 @@
 
 import { createRng } from '../math/rng'
 import { ANIMALS, CROPS, RECIPES, craftKey, findCrop } from './types'
+import { sellMultiplier } from './events'
 import type { FarmState } from './types'
 
 /**
@@ -42,8 +43,19 @@ export function priceMultiplier(farm: FarmState, cropId: string): number {
  * และเพราะราคาที่มีทศนิยมทำให้โจทย์การคูณในสมุดบัญชียากขึ้นโดยไม่ได้ตั้งใจ
  */
 export function marketPrice(farm: FarmState, key: string): number {
+  /*
+   * เหตุการณ์ประจำวันมีผลกับผลผลิตสดเท่านั้น
+   *
+   * วันที่พ่อค้าเร่มาถึง ของสดขายได้แพงขึ้นจริง ส่วนของแปรรูปกับผลผลิตจากสัตว์
+   * ยังราคานิ่งเหมือนเดิม ด้วยเหตุผลเดียวกับที่ราคาตลาดไม่แตะสองอย่างนั้น
+   * คือให้เด็กเห็นเองว่าการแปรรูปลดความเสี่ยงด้วย ไม่ใช่แค่เพิ่มมูลค่า
+   * ถ้าเหตุการณ์ไปดันราคาของแปรรูปด้วย บทเรียนนั้นจะหายไป
+   */
   const crop = CROPS.find((entry) => entry.id === key)
-  if (crop) return Math.round(crop.sellPrice * priceMultiplier(farm, crop.id))
+  if (crop) {
+    const price = crop.sellPrice * priceMultiplier(farm, crop.id) * sellMultiplier(farm)
+    return Math.round(price)
+  }
 
   const recipe = RECIPES.find((entry) => craftKey(entry.id) === key)
   if (recipe) return recipe.price

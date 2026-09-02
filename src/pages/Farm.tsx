@@ -38,7 +38,8 @@ import { basePrice, marketPrice, priceChangePercent } from '../farm/market'
 import { LEDGER_INDICATOR } from '../teacher/indicators'
 import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { ResultCodeCard } from '../components/ResultCodeCard'
-import { buildLedger, builderAnswer, closeDay, eventForDay, planDay } from '../farm/ledger'
+import { buildLedger, builderAnswer, closeDay, planDay } from '../farm/ledger'
+import { eventForDay } from '../farm/events'
 import { decodeFarm, encodeFarm } from '../farm/save'
 import { clearFarm, loadFarm, saveFarm } from '../farm/storage'
 import {
@@ -65,6 +66,7 @@ import {
 } from '../farm/types'
 import type { AnimalId, FarmState, Grade, ResourceId } from '../farm/types'
 import type { BuilderSpec, DayPlan, LedgerRow } from '../farm/ledger'
+import type { DailyEvent } from '../farm/events'
 import type { SkillId } from '../types/stats'
 import type { Player } from '../types/player'
 
@@ -352,16 +354,7 @@ export function Farm({ player }: { player: Player }) {
           ))}
         </div>
 
-        {/* เหตุการณ์ประจำวัน */}
-        <div className="panel mt-3 flex items-start gap-3 p-4">
-          <span aria-hidden="true" className="text-2xl">
-            {event.emoji}
-          </span>
-          <div className="min-w-0">
-            <p className="text-sm font-black text-white">{event.title}</p>
-            <p className="text-sm text-slate-300">{event.detail}</p>
-          </div>
-        </div>
+        <EventCard event={event} />
 
         {notice ? (
           <p
@@ -684,7 +677,7 @@ function PlotPanel({
               </p>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {CROPS.map((crop) => {
-                  const cost = seedCostFor(plot, crop.id)
+                  const cost = seedCostFor(farm, plot, crop.id)
                   const income = plotCells(plot) * crop.sellPrice
                   return (
                     <button
@@ -1095,6 +1088,56 @@ function MarketPanel({ farm, onAct }: { farm: FarmState; onAct: ActFn }) {
             </div>
           )
         })}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * การ์ดเหตุการณ์ประจำวัน
+ *
+ * ของเดิมเป็นกล่องสีเดียวกับทุกอย่างบนจอ ซึ่งทำให้เหตุการณ์กลายเป็นของประดับ
+ * ทั้งที่ตอนนี้มันเปลี่ยนตัวเลขของทั้งวันจริง ๆ
+ *
+ * สามอย่างที่การ์ดนี้ต้องทำให้ได้
+ * หนึ่ง เห็นแต่ไกลว่าวันนี้เป็นวันดีหรือวันร้าย จากสีและกรอบ ไม่ต้องอ่านก่อน
+ * สอง บอกผลเป็นตัวเลขในบรรทัดเดียว สำหรับเด็กที่กำลังรีบวางแผน
+ * สาม ไม่ตะโกนใส่วันธรรมดา เพราะถ้าทุกวันดูตื่นเต้นเท่ากัน ก็ไม่มีวันไหนตื่นเต้น
+ */
+function EventCard({ event }: { event: DailyEvent }) {
+  const tone =
+    event.mood === 'bad'
+      ? {
+          box: 'border-ember-400/50 bg-ember-500/10',
+          chip: 'bg-ember-500/25 text-ember-200',
+          label: 'ระวัง',
+        }
+      : event.mood === 'good'
+        ? {
+            box: 'border-leaf-400/50 bg-leaf-500/10',
+            chip: 'bg-leaf-500/25 text-leaf-200',
+            label: 'โอกาส',
+          }
+        : {
+            box: 'border-white/10 bg-white/5',
+            chip: 'bg-white/10 text-slate-300',
+            label: 'ปกติ',
+          }
+
+  return (
+    <div className={`mt-3 flex items-start gap-3 rounded-2xl border p-4 ${tone.box}`}>
+      <span aria-hidden="true" className="text-3xl">
+        {event.emoji}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-black text-white">{event.title}</p>
+          <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tone.chip}`}>
+            {tone.label}
+          </span>
+        </div>
+        <p className="mt-0.5 text-sm text-slate-300">{event.detail}</p>
+        <p className="mt-1 text-sm font-bold text-white">{event.effect}</p>
       </div>
     </div>
   )

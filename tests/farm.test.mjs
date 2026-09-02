@@ -38,6 +38,7 @@ const E = load('farm/engine')
 const L = load('farm/ledger')
 const S = load('farm/save')
 const M = load('farm/market')
+const V = load('farm/events')
 const R = load('math/rng')
 
 let passed = 0
@@ -100,7 +101,7 @@ check('ต้องมีคู่แปลงที่พื้นที่ก�
 
 check('ปลูกแล้วต้องเสียทั้งเงินและแรง และปลูกซ้ำแปลงเดิมไม่ได้', () => {
   const farm = E.createFarm('ปลูก', 4)
-  const cost = E.seedCostFor(farm.plots[0], 'tomato')
+  const cost = E.seedCostFor(farm, farm.plots[0], 'tomato')
   const coins = farm.coins
   const energy = farm.energy
 
@@ -345,15 +346,33 @@ check('วันที่ทรัพยากรไม่พอ ต้องถ
 })
 
 check('ทุกวันต้องหมุนไปถามทรัพยากรคนละอย่าง ไม่ใช่ถามอย่างเดิมซ้ำ ๆ', () => {
-  const seen = new Set()
-  for (let day = 1; day <= T.RESOURCES.length; day += 1) {
-    const farm = E.createFarm('หมุน', 4)
-    farm.day = day
-    const plan = L.planDay(farm)
-    const row = L.buildLedger(farm, plan).find((entry) => entry.kind === 'resource')
-    seen.add(row.id)
+  /*
+   * เดิมข้อนี้ตรวจว่าสี่วันติดต้องได้ครบสี่ทรัพยากรพอดี ซึ่งทำได้ตอนที่โจทย์
+   * หมุนตามเลขวันอย่างเดียว แต่พอผูกโจทย์เข้ากับเหตุการณ์ของวันนั้น
+   * ลำดับก็ขึ้นกับเหตุการณ์ที่สุ่มมาด้วย จึงรับประกันแบบเป๊ะสี่วันไม่ได้อีก
+   *
+   * สิ่งที่ข้อนี้ต้องการจริง ๆ คือเด็กต้องไม่เจอโจทย์หน้าตาเดิมซ้ำจนเลิกอ่าน
+   * ซึ่งวัดได้ตรงกว่าด้วยสองอย่าง คือห้ามถามซ้ำติดกันเด็ดขาด
+   * และภายในหนึ่งคาบต้องได้ครบทุกทรัพยากร ทั้งสองอย่างนี้รับประกันได้จริง
+   */
+  const seeds = ['หมุน', 'ห้อง-1', 'ห้อง-2', 'ห้อง-3']
+  for (const seed of seeds) {
+    const seen = new Set()
+    let previous = null
+    for (let day = 1; day <= 10; day += 1) {
+      const farm = E.createFarm(seed, 4)
+      farm.day = day
+      const plan = L.planDay(farm)
+      const row = L.buildLedger(farm, plan).find((entry) => entry.kind === 'resource')
+      assert(row.id !== previous, `seed ${seed} วันที่ ${day} ถาม ${row.id} ซ้ำกับเมื่อวาน`)
+      previous = row.id
+      seen.add(row.id)
+    }
+    assert(
+      seen.size === T.RESOURCES.length,
+      `seed ${seed} เล่นสิบวันแล้วถามแค่ ${seen.size} จาก ${T.RESOURCES.length} ทรัพยากร`,
+    )
   }
-  assert(seen.size === T.RESOURCES.length, `${T.RESOURCES.length} วันถามซ้ำเหลือ ${seen.size} แบบ`)
 })
 
 check('คำตอบทุกช่องต้องเป็นจำนวนเต็มไม่ติดลบ เพราะ ป.4 ยังไม่เรียนจำนวนเต็มลบ', () => {
@@ -741,13 +760,13 @@ check('รหัสรุ่นเก่าที่ถูกแก้ ต้อ
 
 check('เหตุการณ์ประจำวันต้องซ้ำเดิมเมื่อ seed และวันเดิม และต่างกันเมื่อวันต่าง', () => {
   const farm = E.createFarm('เหตุการณ์', 4)
-  const first = L.eventForDay(farm)
-  assert(first.id === L.eventForDay(farm).id, 'วันเดิมได้คนละเหตุการณ์')
+  const first = V.eventForDay(farm)
+  assert(first.id === V.eventForDay(farm).id, 'วันเดิมได้คนละเหตุการณ์')
 
   const seen = new Set()
   for (let day = 1; day <= 40; day += 1) {
     farm.day = day
-    seen.add(L.eventForDay(farm).id)
+    seen.add(V.eventForDay(farm).id)
   }
   assert(seen.size >= 3, `สี่สิบวันเจอเหตุการณ์แค่ ${seen.size} แบบ`)
 })
@@ -938,6 +957,252 @@ function simulate(days, options = {}) {
   }
   return { farm, shortages }
 }
+
+/* ------------------------------------------------------------------ *
+ * เหตุการณ์ประจำวัน
+ * ------------------------------------------------------------------ */
+
+/** หาวันที่เกิดเหตุการณ์ที่ต้องการ คืน null เมื่อหาไม่เจอในช่วงที่ค้น */
+function findEventDay(seed, id, limit = 400) {
+  const farm = E.createFarm(seed, 4)
+  for (let step = 0; step < limit; step += 1) {
+    farm.day = step + 1
+    if (V.eventForDay(farm).id === id) return farm.day
+  }
+  return null
+}
+
+check('เหตุการณ์ทุกอันที่บอกว่ามีผล ต้องมีผลจริง', () => {
+  /*
+   * ข้อนี้คือเหตุผลทั้งหมดที่รื้อระบบเหตุการณ์
+   *
+   * ของเดิมเป็นข้อความล้วน เกมบอกว่าพายุฝุ่นทำให้ผลิตไฟได้น้อยลง
+   * แล้วไฟที่ผลิตได้เท่าเดิมทุกหน่วย เด็กที่อ่านแล้ววางแผนตาม
+   * จะวางแผนจากข้อมูลที่ไม่จริง ซึ่งแย่กว่าการไม่มีเหตุการณ์เลย
+   */
+  for (const event of V.EVENTS) {
+    const hasEffect =
+      event.production !== undefined ||
+      event.consumption !== undefined ||
+      event.seedMultiplier !== undefined ||
+      event.sellMultiplier !== undefined
+    if (event.mood === 'calm') {
+      assert(!hasEffect, `${event.id} บอกว่าเป็นวันปกติ แต่มีผลทางตัวเลข`)
+    } else {
+      assert(hasEffect, `${event.id} ขึ้นข้อความว่ามีผล แต่ไม่ได้ทำอะไรเลย`)
+    }
+  }
+})
+
+check('ทิศทางของผลต้องตรงกับที่บอกว่าเป็นเรื่องดีหรือเรื่องร้าย', () => {
+  for (const event of V.EVENTS) {
+    if (event.mood === 'calm') continue
+    const good = event.mood === 'good'
+    if (event.production) {
+      const up = event.production.multiplier > 1
+      assert(up === good, `${event.id} บอกว่า ${event.mood} แต่กำลังผลิตไปคนละทาง`)
+    }
+    if (event.consumption) {
+      const down = event.consumption.multiplier < 1
+      assert(down === good, `${event.id} บอกว่า ${event.mood} แต่ปริมาณที่ใช้ไปคนละทาง`)
+    }
+    if (event.seedMultiplier !== undefined) {
+      const cheaper = event.seedMultiplier < 1
+      assert(cheaper === good, `${event.id} บอกว่า ${event.mood} แต่ราคาเมล็ดไปคนละทาง`)
+    }
+    if (event.sellMultiplier !== undefined) {
+      const richer = event.sellMultiplier > 1
+      assert(richer === good, `${event.id} บอกว่า ${event.mood} แต่ราคาขายไปคนละทาง`)
+    }
+  }
+})
+
+check('เหตุการณ์ร้ายทุกอันต้องมีคู่ที่ดี กระทำคันโยกเดียวกัน และเฉลี่ยได้หนึ่ง', () => {
+  /*
+   * กติกาสองข้อที่ได้มาจากการพลาดสองรอบ
+   *
+   * รอบแรกฝั่งน้ำมีแต่เรื่องร้ายสองอัน ไม่มีเรื่องดีเลย น้ำหมดวันที่สิบแปด
+   * รอบสองจับคู่แล้วแต่คนละคันโยก คือเรื่องร้ายเพิ่ม "การใช้น้ำ"
+   * ส่วนเรื่องดีเพิ่ม "การผลิตน้ำ" ซึ่งดูสมมาตรบนกระดาษแต่ไม่สมมาตรจริง
+   * เพราะการใช้มีทุกวันตั้งแต่วันแรก ส่วนการผลิตเป็นศูนย์จนกว่าจะซื้อเครื่องกรอง
+   * เหตุการณ์จึงกลายเป็นภาษีที่เก็บทุกวัน แทนที่จะเป็นความลุ้น
+   */
+  const levers = new Map()
+  const add = (lever, multiplier, id) => {
+    const list = levers.get(lever) ?? []
+    list.push({ multiplier, id })
+    levers.set(lever, list)
+  }
+  for (const event of V.EVENTS) {
+    if (event.production) add(`production:${event.production.id}`, event.production.multiplier, event.id)
+    if (event.consumption) add(`consumption:${event.consumption.id}`, event.consumption.multiplier, event.id)
+    if (event.seedMultiplier !== undefined) add('seed', event.seedMultiplier, event.id)
+    if (event.sellMultiplier !== undefined) add('sell', event.sellMultiplier, event.id)
+  }
+
+  assert(levers.size > 0, 'ไม่มีเหตุการณ์ที่มีผลเลย')
+  for (const [lever, list] of levers) {
+    assert(
+      list.length === 2,
+      `คันโยก ${lever} มี ${list.length} เหตุการณ์ (${list.map((x) => x.id).join(' ')}) ต้องมีคู่พอดีสองอัน`,
+    )
+    const mean = (list[0].multiplier + list[1].multiplier) / 2
+    assert(
+      Math.abs(mean - 1) < 0.001,
+      `คันโยก ${lever} เฉลี่ยได้ ${mean.toFixed(3)} ซึ่งไม่ใช่หนึ่ง จึงเอนไปข้างใดข้างหนึ่ง`,
+    )
+  }
+})
+
+check('เหตุการณ์ของวันเดิมต้องเหมือนเดิมทุกครั้งที่เรียก', () => {
+  const farm = E.createFarm('ซ้ำได้', 4)
+  for (let day = 1; day <= 20; day += 1) {
+    farm.day = day
+    assert(
+      V.eventForDay(farm).id === V.eventForDay(farm).id,
+      `วันที่ ${day} เรียกสองครั้งได้คนละเหตุการณ์`,
+    )
+  }
+})
+
+check('วันที่ฝูงนกมา เมล็ดต้องถูกลงจริง และวันที่แมลงระบาด ต้องแพงขึ้นจริง', () => {
+  const seed = 'ราคาเมล็ด'
+  const farm = E.createFarm(seed, 4)
+  const quietDay = findEventDay(seed, 'quiet')
+  const birdDay = findEventDay(seed, 'birds')
+  const blightDay = findEventDay(seed, 'blight')
+  assert(quietDay && birdDay && blightDay, 'หาวันของเหตุการณ์ที่ต้องใช้ไม่เจอ')
+
+  farm.day = quietDay
+  const normal = E.seedCostFor(farm, farm.plots[0], 'tomato')
+  farm.day = birdDay
+  const cheap = E.seedCostFor(farm, farm.plots[0], 'tomato')
+  farm.day = blightDay
+  const dear = E.seedCostFor(farm, farm.plots[0], 'tomato')
+
+  assert(cheap < normal, `วันฝูงนก ราคา ${cheap} ไม่ได้ถูกกว่าวันปกติ ${normal}`)
+  assert(dear > normal, `วันแมลงระบาด ราคา ${dear} ไม่ได้แพงกว่าวันปกติ ${normal}`)
+})
+
+check('วันที่พ่อค้าเร่มา ของสดต้องแพงขึ้น แต่ของแปรรูปกับผลผลิตสัตว์ต้องนิ่ง', () => {
+  /*
+   * ของแปรรูปราคานิ่งเป็นการตัดสินใจเดิมของเกม ตั้งใจให้เด็กเห็นเองว่า
+   * การแปรรูปลดความเสี่ยงด้วย ไม่ใช่แค่เพิ่มมูลค่า
+   * ถ้าเหตุการณ์ไปดันราคาของแปรรูปด้วย บทเรียนนั้นจะหายไปเงียบ ๆ
+   */
+  const seed = 'ราคาขาย'
+  const farm = E.createFarm(seed, 4)
+  const quietDay = findEventDay(seed, 'quiet')
+  const traderDay = findEventDay(seed, 'trader')
+  assert(quietDay && traderDay, 'หาวันของเหตุการณ์ที่ต้องใช้ไม่เจอ')
+
+  const craftedKey = T.craftKey(T.RECIPES[0].id)
+  const animalKey = E.productKey(T.ANIMALS[0].id)
+
+  farm.day = quietDay
+  const normalCrop = M.marketPrice(farm, 'tomato')
+  const normalCraft = M.marketPrice(farm, craftedKey)
+  const normalAnimal = M.marketPrice(farm, animalKey)
+
+  farm.day = traderDay
+  assert(
+    M.marketPrice(farm, 'tomato') > normalCrop,
+    'วันพ่อค้าเร่ ของสดไม่ได้แพงขึ้น',
+  )
+  assert(
+    M.marketPrice(farm, craftedKey) === normalCraft,
+    'วันพ่อค้าเร่ ของแปรรูปราคาขยับ ซึ่งต้องนิ่ง',
+  )
+  assert(
+    M.marketPrice(farm, animalKey) === normalAnimal,
+    'วันพ่อค้าเร่ ผลผลิตจากสัตว์ราคาขยับ ซึ่งต้องนิ่ง',
+  )
+})
+
+check('ตัวเลขในสมุดบัญชีต้องเป็นตัวเลขหลังเหตุการณ์แล้ว', () => {
+  /*
+   * ถ้าแผนของวันใช้อัตราปกติ แต่เหตุการณ์ไปมีผลที่อื่น
+   * โจทย์ในสมุดบัญชีจะไม่ตรงกับสิ่งที่เกิดขึ้นจริง ซึ่งเป็นบั๊กที่แย่ที่สุดของโหมดนี้
+   */
+  const seed = 'พายุฝุ่น'
+  const dustDay = findEventDay(seed, 'dust')
+  assert(dustDay, 'หาวันพายุฝุ่นไม่เจอ')
+
+  const farm = E.createFarm(seed, 4)
+  E.buyBuilding(farm, T.BUILDINGS[0].id)
+  farm.day = dustDay
+
+  const plan = L.planDay(farm)
+  const normal = E.dailyProduction(farm)
+  const row = plan.resources.find((entry) => entry.id === 'power')
+  assert(plan.event.id === 'dust', `วันที่เลือกไม่ใช่วันพายุฝุ่น แต่เป็น ${plan.event.id}`)
+  assert(
+    row.production < normal.power,
+    `วันพายุฝุ่น แผนบอกว่าผลิตได้ ${row.production} เท่ากับวันปกติ ${normal.power}`,
+  )
+  assert(
+    row.raw === row.before + row.production - row.consumption,
+    'ตัวเลขในแผนไม่สอดคล้องกันเอง',
+  )
+})
+
+check('วันที่เหตุการณ์แตะทรัพยากรไหน โจทย์ของวันนั้นต้องถามทรัพยากรนั้น', () => {
+  /*
+   * ตอนแรกปล่อยให้เหตุการณ์กับโจทย์เลือกทรัพยากรกันคนละที ผลคือแทบไม่เคยตรงกัน
+   * วันที่คลื่นความร้อนทำให้ใช้น้ำมากขึ้น โจทย์กลับไปถามเรื่องอากาศ
+   * เหตุการณ์จึงยังแยกขาดจากคณิตศาสตร์อยู่ดี ต่างกันแค่คราวนี้ตัวเลขขยับจริง
+   */
+  const farm = E.createFarm('ผูกเรื่องกับเลข', 4)
+  E.buyBuilding(farm, T.BUILDINGS[0].id)
+  let spotlightDays = 0
+  let matched = 0
+  for (let day = 1; day <= 80; day += 1) {
+    farm.day = day
+    const plan = L.planDay(farm)
+    const touched = plan.event.production?.id ?? plan.event.consumption?.id ?? null
+    if (!touched) continue
+    spotlightDays += 1
+    const row = L.buildLedger(farm, plan).find((entry) => entry.kind === 'resource')
+    assert(row !== undefined, `วันที่ ${day} ไม่มีแถวทรัพยากรเลย`)
+    if (row.id !== `resource-${touched}`) continue
+    matched += 1
+    assert(
+      row.working[0].includes(plan.event.title),
+      `วันที่ ${day} โจทย์ถามเรื่องที่เกิดเหตุ แต่วิธีคิดไม่ได้บอกว่าเหตุการณ์อะไรทำให้ตัวเลขเปลี่ยน`,
+    )
+  }
+  assert(spotlightDays >= 20, `ตรวจได้แค่ ${spotlightDays} วัน ซึ่งน้อยเกินกว่าจะเชื่อผล`)
+
+  /*
+   * ไม่เรียกร้องให้ตรงกันทุกวัน เพราะกติกาห้ามถามซ้ำติดกันมาก่อน
+   * วันที่เหตุการณ์ไปแตะทรัพยากรเดียวกับที่เพิ่งถามไปเมื่อวาน จะถูกสลับไปถามตัวอื่น
+   * ซึ่งเป็นการยอมเสียการผูกเรื่องของวันนั้น เพื่อรักษาความหลากหลายของโจทย์
+   */
+  const rate = matched / spotlightDays
+  assert(
+    rate >= 0.6,
+    `วันที่มีเหตุการณ์แตะทรัพยากร โจทย์ตรงกันแค่ ${(rate * 100).toFixed(0)}% ซึ่งน้อยเกินไป`,
+  )
+})
+
+check('การพยากรณ์วันที่เหลือต้องอยู่บนอัตราปกติ ไม่ใช่บนเหตุการณ์ของวันเดียว', () => {
+  /*
+   * ถ้าเหตุการณ์ไปแตะอัตราปกติด้วย ตัวเลข "ของจะพอใช้อีกกี่วัน" จะกระโดดทุกวัน
+   * แล้วเด็กจะวางแผนล่วงหน้าอะไรไม่ได้เลย ซึ่งเป็นหัวใจของโหมดนี้
+   */
+  const seed = 'พยากรณ์'
+  const farm = E.createFarm(seed, 4)
+  E.buyBuilding(farm, T.BUILDINGS[0].id)
+  const values = new Set()
+  for (let day = 1; day <= 12; day += 1) {
+    farm.day = day
+    values.add(E.dailyProduction(farm).power)
+  }
+  assert(
+    values.size === 1,
+    `กำลังผลิตปกติเปลี่ยนไป ${values.size} ค่าเมื่อเปลี่ยนวัน ซึ่งแปลว่าเหตุการณ์ไปแตะอัตราปกติ`,
+  )
+})
 
 /* ------------------------------------------------------------------ *
  * แถวหาค่าตัวไม่ทราบค่า ตัวชี้วัด ป.4/8
@@ -1168,6 +1433,36 @@ check('แถวสร้างโจทย์เองต้องไม่ม�
   }
 })
 
+/**
+ * มูลค่ารวมของฟาร์ม คือเงินสดบวกกับทุกอย่างที่เงินถูกเปลี่ยนไปเป็น
+ *
+ * ทำไมต้องวัดแบบนี้ ไม่วัดที่เงินสดอย่างเดียว
+ *
+ * เดิมข้อทดสอบนี้วัดความเติบโตด้วยเงินสดท้ายเกม ซึ่งดูสมเหตุสมผล
+ * แต่ผู้เล่นที่เล่นเก่งจะเอาเงินไปเปิดแปลงและสร้างอาคารจนเงินสดเกือบหมด
+ * ซึ่งคือการโตเต็มที่ ไม่ใช่การถังแตก เงินสดจึงวัดสิ่งที่ตรงข้ามกับที่ตั้งใจวัด
+ *
+ * ตรวจย้อนหลังแล้วพบว่าข้อนี้เคยผิดมาตลอด ไม่ใช่เพิ่งผิดตอนเพิ่มเหตุการณ์
+ * ลองรัน seed สิบสามชุดกับโค้ดก่อนมีเหตุการณ์ มีสาม seed ที่เงินสดท้ายเกม
+ * น้อยกว่าเงินตั้งต้น ทั้งที่เปิดแปลงครบหกแปลงทุก seed
+ * ข้อนี้ผ่านมาตลอดเพราะบังเอิญ seed ที่ตั้งไว้เป็นค่าเริ่มต้นจบด้วยเงินเยอะ
+ */
+function netWorth(farm) {
+  let total = farm.coins
+  for (let index = 1; index < farm.plots.length; index += 1) {
+    total += T.PLOT_UNLOCK_COST[index] ?? 0
+  }
+  for (const building of T.BUILDINGS) {
+    total += (farm.buildings[building.id] ?? 0) * building.cost
+  }
+  total += farm.kitchens * T.KITCHEN_COST
+  total += farm.feed * T.FEED_PRICE
+  for (const [key, amount] of Object.entries(farm.stock)) {
+    total += amount * E.unitPrice(key)
+  }
+  return total
+}
+
 check('เล่นแบบตั้งใจสามสิบวัน ต้องไม่มีทรัพยากรไหนหมด และฟาร์มต้องโตขึ้น', () => {
   const { farm, shortages } = simulate(30)
   assert(
@@ -1175,7 +1470,25 @@ check('เล่นแบบตั้งใจสามสิบวัน ต้
     `ทรัพยากรหมด ${shortages.length} ครั้ง ครั้งแรกวันที่ ${shortages[0]?.day} (${shortages[0]?.id})`,
   )
   assert(farm.plots.length > 1, `เล่นสามสิบวันแล้วยังมีแปลงเดียว`)
-  assert(farm.coins > T.STARTING_COINS, `เงินลดจาก ${T.STARTING_COINS} เหลือ ${farm.coins}`)
+  assert(farm.families > 1, `เล่นสามสิบวันแล้วยังไม่ได้รับใครเข้าโดมเพิ่มเลย`)
+  assert(
+    netWorth(farm) > T.STARTING_COINS,
+    `มูลค่ารวมของฟาร์มลดจาก ${T.STARTING_COINS} เหลือ ${netWorth(farm)}`,
+  )
+})
+
+check('ทุก seed ต้องโตขึ้นจริง ไม่ใช่แค่ seed ที่ตั้งเป็นค่าเริ่มต้น', () => {
+  /*
+   * ข้อนี้มีไว้กันไม่ให้ข้อข้างบนกลับไปผ่านเพราะความบังเอิญอีก
+   * ซึ่งเป็นสิ่งที่เกิดขึ้นจริงมาแล้วกับเกณฑ์เงินสดชุดเดิม
+   */
+  for (let index = 0; index < 12; index += 1) {
+    const { farm } = simulate(30, { seed: `ห้อง-${index}` })
+    assert(
+      netWorth(farm) > T.STARTING_COINS,
+      `seed ${index} มูลค่ารวมเหลือ ${netWorth(farm)} ซึ่งไม่โตขึ้นเลย`,
+    )
+  }
 })
 
 check('เล่นสิบวันแรกซึ่งเท่ากับหนึ่งคาบเรียน ต้องเห็นความก้าวหน้าและไม่มีอะไรหมด', () => {
