@@ -43,8 +43,16 @@ const SHARED_DEFS = `
   ${blurFilter('heroSoft', 1.2)}
   ${edgeClip('heroHeadRim', 60, 22, 40, 34)}`
 
-/** เส้นรอบตัวจริงของลำตัว เก็บไว้ที่เดียวเพื่อให้แสงขอบเดินตามเป๊ะเสมอ */
-const BODY_PATH = 'M28 96 Q28 66 50 62 Q72 66 72 96 Z'
+/**
+ * เส้นรอบตัวจริงของลำตัว เก็บไว้ที่เดียวเพื่อให้แสงขอบเดินตามเป๊ะเสมอ
+ *
+ * เดิมเสื้อยาวลงไปจบที่ขอบล่างของกรอบภาพ (y=96) ซึ่งแปลว่าตัวละครไม่มีขาเลย
+ * มองเผิน ๆ เหมือนสไตล์ที่ตั้งใจ แต่พอเรนเดอร์ออกมาดูจริงจะเห็นว่ามันอ่านเป็น
+ * ตัวหมากรุกมากกว่าเป็นคน และตอนเดินในสนามรบก็ได้แค่ขยับขึ้นลงทั้งก้อน
+ *
+ * ย่นชายเสื้อขึ้นมาที่ y=80 แล้วใส่ขาลงไปในที่ว่างที่เหลือ
+ */
+const BODY_PATH = 'M31 80 Q29 66 50 62 Q71 66 69 80 Z'
 
 /**
  * เฉพาะ "ขอบขวา" ของลำตัว ตัดท่อนปิดด้านล่างออก
@@ -52,7 +60,7 @@ const BODY_PATH = 'M28 96 Q28 66 50 62 Q72 66 72 96 Z'
  * ถ้าตีเส้นทับ BODY_PATH ทั้งเส้น ท่อน Z ที่ลากปิดตรงชายเสื้อจะถูกตีเส้นด้วย
  * กลายเป็นแถบเทานอนขวางชายเสื้อทุกตัว ซึ่งไม่ใช่แสงขอบแต่เป็นขอบกรอบ
  */
-const BODY_RIGHT_EDGE = 'M50 62 Q72 66 72 96'
+const BODY_RIGHT_EDGE = 'M50 62 Q71 66 69 80'
 
 /**
  * หน้าตาแบบเดียวกันทุกตัว ไล่สีทรงกลมทำให้หัวดูเป็นลูกกลม ไม่ใช่วงกลมแบน
@@ -96,32 +104,84 @@ function rawFace(): string {
     )}`
 }
 
+/** สีกางเกงกับรองเท้า ใช้ชุดเดียวกันทุกอาชีพ */
+const TROUSER = '#4b5563'
+const SHOE = '#3f2a1d'
+
 /**
- * ลำตัวพร้อมแขน สีเปลี่ยนตามอาชีพ
+ * มุมสูงสุดที่ขาแกว่งตอนเดิน หน่วยเป็นองศา
  *
- * ลำดับชั้นที่ทำให้ดูมีระยะ: แขนหลัง (เข้ม) → ลำตัว (ไล่สี) → รอยพับ → คอเสื้อ
+ * ค่าเดียวกับที่ SMIL ใช้ เพื่อให้ท่าเดินในหน้าเลือกตัวละคร
+ * กับท่าเดินในสนามรบเป็นท่าเดียวกัน ไม่ใช่คนละคนที่เดินคนละแบบ
  */
-function body(p: string, dark: string): string {
+const LEG_SWING = 11
+
+/**
+ * ขาสองข้าง ก้าวสลับกันซ้ายขวา
+ *
+ * จุดหมุนอยู่ที่สะโพก (y=78) ไม่ใช่กลางขา เพราะขาคนหมุนรอบสะโพก
+ * ถ้าหมุนรอบกลางขา ปลายเท้าจะกวาดไปข้างหน้าพร้อมกับสะโพกที่ขยับตาม
+ * ซึ่งอ่านเป็นตัวละครกำลังลอยแล้วแกว่งขา ไม่ใช่กำลังเดิน
+ *
+ * สองข้างใช้ begin ต่างกันครึ่งจังหวะ ขาหนึ่งไปหน้าอีกขาไปหลังเสมอ
+ * ถ้าเริ่มพร้อมกันจะกลายเป็นกระโดดสองขาแทนที่จะเป็นเดิน
+ */
+function legs(pose: number | null): string {
+  const leg = (x: number) => `
+    <path d="M${x} 75 L${x} 91" stroke="${TROUSER}" stroke-width="7"
+      stroke-linecap="round"/>
+    <ellipse cx="${x}" cy="93.6" rx="5.6" ry="3.4" fill="${SHOE}"/>`
+
+  /*
+   * pose เป็น null แปลว่าให้ขาแกว่งเองด้วย SMIL
+   *
+   * ใช้กับที่ที่ภาพอยู่ใน DOM จริง เช่นหน้าเลือกตัวละครกับหน้าโปรไฟล์
+   * ซึ่งเบราว์เซอร์เล่นอนิเมชันให้เอง
+   *
+   * ส่วนสนามรบวาดด้วย canvas ซึ่งวาด SVG ผ่าน Image เท่านั้น
+   * และ SMIL ในภาพจะไม่ขยับเลยเมื่อวาดลง canvas (ทดลองยืนยันแล้ว)
+   * ที่นั่นจึงต้องส่งมุมมาตรง ๆ แล้วสลับภาพหลายท่าเอา
+   */
+  if (pose === null) {
+    return `
+      ${sway(leg(43), 1.1, 11, 43, 75)}
+      ${sway(leg(57), 1.1, 11, 57, 75, 0.55)}`
+  }
+
+  const swing = LEG_SWING * pose
   return `
+    <g transform="rotate(${swing.toFixed(1)} 43 75)">${leg(43)}</g>
+    <g transform="rotate(${(-swing).toFixed(1)} 57 75)">${leg(57)}</g>`
+}
+
+/**
+ * ลำตัวพร้อมแขนและขา สีเปลี่ยนตามอาชีพ
+ *
+ * ลำดับชั้นที่ทำให้ดูมีระยะ: ขา → แขนหลัง (เข้ม) → ลำตัว (ไล่สี) → รอยพับ → คอเสื้อ
+ * ขาอยู่ล่างสุดของกอง เพื่อให้ชายเสื้อทับต้นขาไว้ ซึ่งซ่อนรอยต่อพอดี
+ */
+function body(p: string, dark: string, pose: number | null = null): string {
+  return `
+    ${legs(pose)}
     <!--
       แขนแกว่งรอบหัวไหล่ ซ้ายขวาคนละจังหวะ
       ถ้าแกว่งพร้อมกันจะดูเหมือนหุ่นเชิดที่ถูกดึงเชือกเส้นเดียว
     -->
     ${sway(
-      `<path d="M28 78 L18 90" stroke="${dark}" stroke-width="9" stroke-linecap="round"/>
-       <circle cx="18" cy="90" r="5" fill="url(#heroSkin)"/>`,
+      `<path d="M30 70 L21 82" stroke="${dark}" stroke-width="9" stroke-linecap="round"/>
+       <circle cx="21" cy="82" r="5" fill="url(#heroSkin)"/>`,
       3.6,
       4,
-      28,
-      78,
+      30,
+      70,
     )}
     ${sway(
-      `<path d="M72 78 L82 90" stroke="${dark}" stroke-width="9" stroke-linecap="round"/>
-       <circle cx="82" cy="90" r="5" fill="url(#heroSkin)"/>`,
+      `<path d="M70 70 L79 82" stroke="${dark}" stroke-width="9" stroke-linecap="round"/>
+       <circle cx="79" cy="82" r="5" fill="url(#heroSkin)"/>`,
       4.1,
       4,
-      72,
-      78,
+      70,
+      70,
       0.6,
     )}
 
@@ -129,7 +189,7 @@ function body(p: string, dark: string): string {
 
     <!-- รอยพับผ้าสองเส้น ทำให้ผืนผ้าไม่แบนเป็นแผ่นเดียว -->
     <g stroke="${dark}" stroke-width="1.3" opacity=".4" fill="none">
-      <path d="M40 70 Q38 84 39 96 M60 70 Q62 84 61 96"/>
+      <path d="M41 70 Q39 76 40 80 M59 70 Q61 76 60 80"/>
     </g>
 
     <!-- คอเสื้อ เป็นเงาลึกที่รอยต่อหัวกับตัว -->
@@ -164,7 +224,7 @@ function hero(p: string, main: string, dark: string, extraDefs: string, gear: st
 }
 
 /** นักรบ — หมวกเหล็กและโล่ */
-function warrior(): string {
+function warrior(pose: number | null): string {
   const p = 'hw'
   return hero(
     p,
@@ -174,7 +234,7 @@ function warrior(): string {
     ${verticalGradient(`${p}-steel`, '#cbd5e1', '#475569')}
     ${sphereGradient(`${p}-gold`, '#fef08a', '#facc15', '#a16207')}`,
     `
-    ${body(p, '#991b1b')}
+    ${body(p, '#991b1b', pose)}
     ${face()}
 
     <!-- หมวกเหล็ก ไล่สีแนวดิ่งทำให้โลหะดูโค้ง -->
@@ -211,7 +271,7 @@ function warrior(): string {
 }
 
 /** นักเวท — หมวกแหลมและไม้เท้าเรืองแสง */
-function mage(): string {
+function mage(pose: number | null): string {
   const p = 'hm'
   return hero(
     p,
@@ -225,7 +285,7 @@ function mage(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#4c1d95')}
+    ${body(p, '#4c1d95', pose)}
     ${face()}
 
     <!-- หมวกกรวยสูงจึงโยกมากกว่าหัว จุดหมุนอยู่ที่ขอบหมวก -->
@@ -274,7 +334,7 @@ function mage(): string {
 }
 
 /** นักสำรวจ — หมวกปีกกว้างและเข็มทิศ */
-function explorer(): string {
+function explorer(pose: number | null): string {
   const p = 'he'
   return hero(
     p,
@@ -285,7 +345,7 @@ function explorer(): string {
     ${verticalGradient(`${p}-brim`, '#eab308', '#a16207')}
     ${sphereGradient(`${p}-brass`, '#fef3c7', '#fbbf24', '#b45309')}`,
     `
-    ${body(p, '#14532d')}
+    ${body(p, '#14532d', pose)}
     ${face()}
 
     <!-- ปีกหมวกทอดเงาลงบนหน้า เป็นสัญญาณระยะที่อ่านง่ายที่สุด -->
@@ -322,7 +382,7 @@ function explorer(): string {
 }
 
 /** นักประดิษฐ์ — แว่นตาช่างและประแจ */
-function inventor(): string {
+function inventor(pose: number | null): string {
   const p = 'hi'
   return hero(
     p,
@@ -333,7 +393,7 @@ function inventor(): string {
     ${verticalGradient(`${p}-metal`, '#e2e8f0', '#64748b')}
     ${verticalGradient(`${p}-lens`, '#7dd3fc', '#0369a1')}`,
     `
-    ${body(p, '#7c2d12')}
+    ${body(p, '#7c2d12', pose)}
     ${face()}
 
     <path d="M28 26 Q28 12 50 12 Q72 12 72 26 L72 24 Q50 18 28 24 Z"
@@ -374,7 +434,7 @@ function inventor(): string {
 }
 
 /** นักวิทยาศาสตร์ — เสื้อกาวน์และหลอดทดลอง */
-function scientist(): string {
+function scientist(pose: number | null): string {
   const p = 'hs'
   return hero(
     p,
@@ -384,8 +444,8 @@ function scientist(): string {
     ${sphereGradient(`${p}-cap`, '#7dd3fc', '#0ea5e9', '#075985')}
     ${verticalGradient(`${p}-glass`, '#cffafe', '#67e8f9')}`,
     `
-    ${body(p, '#94a3b8')}
-    <path d="M50 62 L50 96" stroke="#94a3b8" stroke-width="1.6" opacity=".7"/>
+    ${body(p, '#94a3b8', pose)}
+    <path d="M50 62 L50 80" stroke="#94a3b8" stroke-width="1.6" opacity=".7"/>
     ${face()}
 
     <path d="M28 32 Q26 14 50 14 Q74 14 72 32 Q64 22 50 24 Q36 22 28 32 Z"
@@ -421,7 +481,7 @@ function scientist(): string {
 }
 
 /** นักผจญภัย — เป้สะพายหลังและผ้าพันคอ */
-function adventurer(): string {
+function adventurer(pose: number | null): string {
   const p = 'ha'
   return hero(
     p,
@@ -437,7 +497,7 @@ function adventurer(): string {
     <rect x="16" y="72" width="14" height="7" rx="2" fill="#5b3a08"/>
     <rect x="16" y="68" width="3" height="20" rx="1.5" fill="#fff" opacity=".18"/>
 
-    ${body(p, '#881337')}
+    ${body(p, '#881337', pose)}
     ${face()}
 
     <!-- ผ้าพันคอสะบัดตามลม เป็นชิ้นที่ขยับมากที่สุดในภาพ -->
@@ -471,7 +531,7 @@ function adventurer(): string {
 }
 
 /** นักกีฬา — ผ้าคาดหัวและเหรียญรางวัล */
-function athlete(): string {
+function athlete(pose: number | null): string {
   const p = 'hat'
   return hero(
     p,
@@ -482,18 +542,18 @@ function athlete(): string {
     ${sphereGradient(`${p}-hair`, '#3f3f46', '#27272a', '#111113')}
     ${sphereGradient(`${p}-medal`, '#fef08a', '#facc15', '#a16207')}`,
     `
-    ${body(p, '#9f1239')}
+    ${body(p, '#9f1239', pose)}
     ${face()}
 
     <!-- แถบสีขาวพาดเสื้อ เป็นลายของชุดกีฬาที่อ่านออกทันทีแม้ภาพเล็ก -->
-    <path d="M38 64 L44 63 L36 96 L30 96 Z" fill="#fff" opacity=".85"/>
-    <path d="M56 63 L62 64 L70 96 L64 96 Z" fill="#fff" opacity=".55"/>
+    <path d="M38 64 L44 63 L38 80 L33 80 Z" fill="#fff" opacity=".85"/>
+    <path d="M56 63 L62 64 L67 80 L62 80 Z" fill="#fff" opacity=".55"/>
 
     <!-- เหรียญห้อยคอ แกว่งช้ากว่าลำตัว จึงดูมีน้ำหนักจริง -->
     ${sway(
-      `<path d="M44 62 L50 76 L56 62" stroke="#fbbf24" stroke-width="1.8" fill="none"/>
-       <circle cx="50" cy="79" r="5.5" fill="url(#${p}-medal)"/>
-       ${specular(48, 77, 1.8, 1.2, -25, 0.7)}`,
+      `<path d="M44 62 L50 72 L56 62" stroke="#fbbf24" stroke-width="1.8" fill="none"/>
+       <circle cx="50" cy="75" r="5.5" fill="url(#${p}-medal)"/>
+       ${specular(48, 73, 1.8, 1.2, -25, 0.7)}`,
       3.4,
       3.2,
       50,
@@ -523,7 +583,7 @@ function athlete(): string {
 }
 
 /** นักดนตรี — หมวกเบเรต์และตัวโน้ตลอย */
-function musician(): string {
+function musician(pose: number | null): string {
   const p = 'hmu'
   return hero(
     p,
@@ -537,7 +597,7 @@ function musician(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#075985')}
+    ${body(p, '#075985', pose)}
     ${face()}
 
     <!-- ขลุ่ยถือเฉียง แกว่งเบา ๆ เหมือนกำลังจะยกขึ้นเป่า -->
@@ -584,7 +644,7 @@ function musician(): string {
 }
 
 /** หมอยา — หม้อยาและใบไม้ */
-function healer(): string {
+function healer(pose: number | null): string {
   const p = 'hh'
   return hero(
     p,
@@ -599,17 +659,17 @@ function healer(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#14532d')}
+    ${body(p, '#14532d', pose)}
     ${face()}
 
     <!-- หม้อยาอุ้มไว้หน้าลำตัว จึงทอดเงาลงบนเสื้อ -->
-    <ellipse cx="70" cy="86" rx="11" ry="7" fill="#000" opacity=".26"
+    <ellipse cx="70" cy="80" rx="11" ry="7" fill="#000" opacity=".26"
       filter="url(#heroSoft)"/>
     ${sway(
-      `<path d="M60 78 Q60 92 70 92 Q80 92 80 78 Z" fill="url(#${p}-pot)"/>
-       <ellipse cx="70" cy="78" rx="10" ry="3.4" fill="#78716c"/>
-       <ellipse cx="70" cy="78" rx="7.5" ry="2.2" fill="#4ade80" opacity=".85"/>
-       ${specular(65, 83, 2, 3.4, -22, 0.42)}
+      `<path d="M60 72 Q60 86 70 86 Q80 86 80 72 Z" fill="url(#${p}-pot)"/>
+       <ellipse cx="70" cy="72" rx="10" ry="3.4" fill="#78716c"/>
+       <ellipse cx="70" cy="72" rx="7.5" ry="2.2" fill="#4ade80" opacity=".85"/>
+       ${specular(65, 77, 2, 3.4, -22, 0.42)}
        <!-- ไอยาลอยขึ้นจากปากหม้อ เป็นสัญญาณว่ายากำลังเดือด -->
        ${mote(68, 72, 1.7, '#bbf7d0', 3.4, 0)}
        ${mote(73, 68, 1.3, '#86efac', 4, 1.3)}`,
@@ -637,7 +697,7 @@ function healer(): string {
 }
 
 /** นักดาราศาสตร์ — กล้องส่องดาวและดาวลอยรอบตัว */
-function astronomer(): string {
+function astronomer(pose: number | null): string {
   const p = 'has'
   return hero(
     p,
@@ -652,7 +712,7 @@ function astronomer(): string {
       <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>`,
     `
-    ${body(p, '#3b0764')}
+    ${body(p, '#3b0764', pose)}
     ${face()}
 
     <!-- ดาวบนเสื้อคลุม บอกอาชีพได้แม้ตอนภาพย่อจนเห็นแค่ลำตัว -->
@@ -704,7 +764,7 @@ function astronomer(): string {
   )
 }
 
-const HERO_ART: Record<string, () => string> = {
+const HERO_ART: Record<string, (pose: number | null) => string> = {
   warrior,
   mage,
   explorer,
@@ -717,10 +777,16 @@ const HERO_ART: Record<string, () => string> = {
   astronomer,
 }
 
-/** ภาพของอวตารหนึ่งตัว คืนภาพสำรองถ้ายังไม่มีของตัวนั้น */
-export function heroArt(avatarId: string): string {
+/**
+ * ภาพของอวตารหนึ่งตัว คืนภาพสำรองถ้ายังไม่มีของตัวนั้น
+ *
+ * pose คือท่าของขา ตั้งแต่ -1 (ขาขวานำ) ถึง 1 (ขาซ้ายนำ)
+ * ส่ง null หรือไม่ส่งเลย แปลว่าให้ขาแกว่งเองด้วยอนิเมชันในภาพ
+ * ซึ่งใช้ได้เฉพาะที่ที่ภาพอยู่ใน DOM จริง เช่นหน้าเลือกตัวละคร
+ */
+export function heroArt(avatarId: string, pose: number | null = null): string {
   const draw = HERO_ART[avatarId]
-  if (draw) return draw()
+  if (draw) return draw(pose)
 
   return hero(
     'hd',
@@ -728,9 +794,29 @@ export function heroArt(avatarId: string): string {
     '#334155',
     '',
     `
-    ${body('hd', '#334155')}
+    ${body('hd', '#334155', pose)}
     ${face()}`,
   )
+}
+
+/**
+ * จำนวนท่าเดินที่สนามรบใช้สลับกัน
+ *
+ * สี่ท่าคือจำนวนน้อยที่สุดที่ยังอ่านเป็นการเดิน
+ * ขาซ้ายนำ ผ่านกลาง ขาขวานำ แล้วผ่านกลางอีกที
+ * สองท่าจะกลายเป็นการกระตุก ส่วนหกท่าขึ้นไปตาแทบแยกไม่ออกจากสี่
+ * แต่กินหน่วยความจำเพิ่มขึ้นตามจำนวนภาพที่ต้องเก็บไว้
+ */
+export const WALK_FRAMES = 4
+
+/**
+ * ท่าของขาในเฟรมที่กำหนด
+ *
+ * ใช้ไซน์เพื่อให้ช่วงกลางก้าวเคลื่อนเร็วและช่วงปลายก้าวช้าลง
+ * ซึ่งเป็นจังหวะของการเดินจริง ถ้าแบ่งมุมเท่า ๆ กันจะดูเป็นหุ่นยนต์
+ */
+export function walkPose(frame: number): number {
+  return Math.sin((frame / WALK_FRAMES) * Math.PI * 2)
 }
 
 export function hasHeroArt(avatarId: string): boolean {

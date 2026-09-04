@@ -35,6 +35,8 @@ const AV = load('data/avatars')
 const ART = load('art/heroes')
 const PERK = load('data/perks')
 const PS = load('services/perkService')
+const SC = load('survivor/scenery')
+const R = load('survivor/render')
 const STORAGE = load('services/storage')
 
 let passed = 0
@@ -2738,6 +2740,158 @@ check('ดาวฉลองเลเวลต้องหายไปเอง 
   assert(
     world.particles.filter((p) => p.shape === 'star').length === 0,
     'ดาวฉลองยังค้างอยู่บนจอหลังผ่านไปสองวินาที',
+  )
+})
+
+/* ------------------------------------------------------------------ *
+ * องค์ประกอบของสนาม
+ * ------------------------------------------------------------------ */
+
+check('สนามเดิมต้องได้ของวางเหมือนเดิมทุกครั้ง', () => {
+  /*
+   * draw ถูกเรียกหกสิบครั้งต่อวินาที ถ้าของวางไม่คงที่
+   * ต้นไม้จะย้ายที่ทุกเฟรมจนกลายเป็นภาพสั่นทั้งจอ
+   */
+  const first = SC.buildScenery('ห้องเดียวกัน')
+  const second = SC.buildScenery('ห้องเดียวกัน')
+  assert(
+    JSON.stringify(first) === JSON.stringify(second),
+    'seed เดียวกันได้สนามคนละแบบ',
+  )
+})
+
+check('คนละ seed ต้องได้สนามคนละแบบ', () => {
+  const a = SC.buildScenery('ห้องหนึ่ง')
+  const b = SC.buildScenery('ห้องสอง')
+  assert(JSON.stringify(a) !== JSON.stringify(b), 'สอง seed ได้สนามเหมือนกันเป๊ะ')
+})
+
+check('ของประดับทุกชิ้นต้องอยู่ในกรอบสนาม', () => {
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    for (const prop of SC.buildScenery(seed).props) {
+      assert(
+        prop.x >= 0 && prop.x <= T.ARENA_WIDTH,
+        `seed ${seed} มีของที่ x=${prop.x} ซึ่งอยู่นอกสนาม`,
+      )
+      assert(
+        prop.y >= 0 && prop.y <= T.ARENA_HEIGHT,
+        `seed ${seed} มีของที่ y=${prop.y} ซึ่งอยู่นอกสนาม`,
+      )
+    }
+  }
+})
+
+check('ห้ามมีของประดับใกล้จุดเกิดของตัวละคร', () => {
+  /*
+   * ตรงกลางคือจุดที่ตัวละครเกิดและเป็นที่ที่การต่อสู้หนาแน่นที่สุดตลอดเกม
+   * ของประดับตรงนั้นจะกลายเป็นสิ่งรบกวนตลอดรอบ ไม่ใช่แค่ตอนเดินผ่าน
+   */
+  const cx = T.ARENA_WIDTH / 2
+  const cy = T.ARENA_HEIGHT / 2
+  for (const seed of ['ก', 'ข', 'ค', 'ง', 'จ']) {
+    for (const prop of SC.buildScenery(seed).props) {
+      const distance = Math.hypot(prop.x - cx, prop.y - cy)
+      assert(
+        distance >= 100,
+        `seed ${seed} มีของห่างจุดเกิดแค่ ${Math.round(distance)} พิกเซล`,
+      )
+    }
+  }
+})
+
+check('ของประดับต้องเรียงตามความลึก ไม่งั้นของไกลจะทับของใกล้', () => {
+  for (const seed of ['ก', 'ข', 'ค']) {
+    const props = SC.buildScenery(seed).props
+    for (let i = 1; i < props.length; i += 1) {
+      assert(
+        props[i].y >= props[i - 1].y,
+        `seed ${seed} ตำแหน่งที่ ${i} เรียงผิด (${props[i - 1].y} แล้วตามด้วย ${props[i].y})`,
+      )
+    }
+  }
+})
+
+check('ทุก seed ต้องมีของครบทุกชนิด ไม่มี seed ที่ได้สนามโล่ง', () => {
+  for (let index = 0; index < 20; index += 1) {
+    const kinds = new Set(SC.buildScenery(`สนาม-${index}`).props.map((p) => p.kind))
+    for (const kind of ['tree', 'bush', 'rock', 'flower', 'grass']) {
+      assert(kinds.has(kind), `seed ${index} ไม่มี ${kind} เลย`)
+    }
+  }
+})
+
+check('เรียกซ้ำผ่านตัวเก็บของ ต้องได้ก้อนเดิมกลับมา ไม่ใช่ก้อนใหม่', () => {
+  const a = SC.sceneryFor('ห้องเก็บของ')
+  const b = SC.sceneryFor('ห้องเก็บของ')
+  assert(a === b, 'ตัวเก็บของไม่ได้ทำงาน จึงสุ่มใหม่ทุกครั้งที่วาด')
+})
+
+/* ------------------------------------------------------------------ *
+ * ท่าเดินของตัวละคร
+ * ------------------------------------------------------------------ */
+
+check('เดินอยู่ต้องสลับท่าไปเรื่อย ๆ ไม่ใช่ค้างท่าเดียว', () => {
+  /*
+   * เรื่องนี้ตรวจด้วยตาไม่ได้ เพราะภาพนิ่งภาพเดียวดูไม่ออกว่าขาสลับหรือไม่
+   *
+   * และมันเคยผิดมาแล้วจริง ๆ ตอนใส่ขาให้ตัวละครรอบแรก
+   * ภาพตัวละครมีอนิเมชันอยู่ในตัว แต่อนิเมชันนั้นไม่ขยับเมื่อวาดลง canvas
+   * ขาจึงมีให้เห็นแต่แข็งค้างท่าเดียว ตัวละครไถลไปกับพื้นแทนที่จะเดิน
+   */
+  const seen = new Set()
+  for (let step = 0; step < 16; step += 1) {
+    seen.add(R.walkFrameIndex(step / 8, 4, true))
+  }
+  assert(seen.size === 4, `เดินแล้วใช้ท่าแค่ ${seen.size} ท่า จากทั้งหมด 4 ท่า`)
+})
+
+check('ยืนนิ่งต้องค้างท่าเดียว ไม่ใช่ย่ำเท้าอยู่กับที่', () => {
+  for (let step = 0; step < 16; step += 1) {
+    assert(
+      R.walkFrameIndex(step / 8, 4, false) === 0,
+      `ยืนนิ่งแต่เลือกท่าที่ ${R.walkFrameIndex(step / 8, 4, false)}`,
+    )
+  }
+})
+
+check('ท่าเดินต้องวนครบรอบแล้วกลับมาเริ่มใหม่ ไม่ใช่วิ่งเลยขอบรายการ', () => {
+  for (let step = 0; step < 200; step += 1) {
+    const index = R.walkFrameIndex(step * 0.37, 4, true)
+    assert(index >= 0 && index < 4, `ท่าที่ ${index} อยู่นอกรายการ`)
+  }
+})
+
+check('ยังไม่มีภาพท่าเดินสักภาพ ต้องไม่พัง', () => {
+  assert(R.walkFrameIndex(12.5, 0, true) === 0, 'ไม่มีภาพเลยแต่ยังเลือกท่าที่ไม่ใช่ศูนย์')
+})
+
+check('ท่าเดินทั้งสี่ต้องเป็นภาพคนละท่าจริง ไม่ใช่ภาพเดียวกันสี่ใบ', () => {
+  /*
+   * ถ้าท่าทุกท่าเหมือนกัน การสลับภาพก็ไม่มีความหมาย
+   * ตัวชี้วัดคือมุมขา ซึ่งอ่านได้จากคำสั่ง rotate ในภาพ
+   */
+  const angles = new Set()
+  for (let frame = 0; frame < ART.WALK_FRAMES; frame += 1) {
+    const svg = ART.heroArt('warrior', ART.walkPose(frame))
+    const match = svg.match(/rotate\((-?[0-9.]+) 43 75\)/)
+    assert(match !== null, `ท่าที่ ${frame} ไม่มีขาที่โพสท่าไว้`)
+    angles.add(match[1])
+  }
+  assert(angles.size >= 3, `สี่ท่ามีมุมขาต่างกันแค่ ${angles.size} แบบ`)
+})
+
+check('ท่ายืนนิ่งต้องเป็นขาชิด ไม่ใช่ขากางค้าง', () => {
+  const svg = ART.heroArt('warrior', ART.walkPose(0))
+  const match = svg.match(/rotate\((-?[0-9.]+) 43 75\)/)
+  assert(match !== null, 'ไม่มีขาที่โพสท่าไว้')
+  assert(Math.abs(Number(match[1])) < 0.5, `ท่าแรกขากางอยู่ ${match[1]} องศา`)
+})
+
+check('ภาพที่ไม่ได้ส่งท่ามา ต้องยังแกว่งขาเองได้ เพราะหน้าเลือกตัวละครใช้แบบนั้น', () => {
+  const svg = ART.heroArt('warrior')
+  assert(
+    svg.includes('animateTransform'),
+    'ภาพที่ไม่ได้ส่งท่ามาไม่มีอนิเมชัน หน้าเลือกตัวละครจะกลายเป็นรูปนิ่ง',
   )
 })
 

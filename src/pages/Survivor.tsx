@@ -30,7 +30,7 @@ import {
 import { getWeapon, weaponDisplayName } from '../survivor/weapons'
 import { ultimateFor } from '../survivor/ultimates'
 import type { Ultimate } from '../survivor/ultimates'
-import { HERO_VIEWBOX, heroArt } from '../art/heroes'
+import { HERO_VIEWBOX, WALK_FRAMES, heroArt, walkPose } from '../art/heroes'
 import { MONSTER_ART_IDS, MONSTER_VIEWBOX, monsterArt } from '../art/monsters'
 import { ARENA_HEIGHT, ARENA_WIDTH } from '../survivor/types'
 import { draw } from '../survivor/render'
@@ -105,17 +105,36 @@ function useMonsterImages(): MutableRefObject<Map<string, HTMLImageElement>> {
   return ref
 }
 
-function useHeroImage(avatarId: string): MutableRefObject<HTMLImageElement | null> {
-  const ref = useRef<HTMLImageElement | null>(null)
+/**
+ * ภาพท่าเดินของตัวละคร เตรียมไว้หลายท่าแล้วสลับกันตอนวาด
+ *
+ * ทำไมต้องเตรียมหลายภาพ แทนที่จะให้ภาพเดียวขยับเอง
+ *
+ * ภาพตัวละครมีอนิเมชัน SMIL อยู่ในตัวอยู่แล้ว และมันขยับจริงในหน้าเลือกตัวละคร
+ * แต่ไม่ขยับเลยเมื่อวาดลง canvas ซึ่งทดลองยืนยันแล้วด้วยการวาดภาพเดียวกัน
+ * สองครั้งห่างกันครึ่งวินาทีแล้วเทียบพิกเซล ได้ผลว่าเหมือนกันทุกจุด
+ *
+ * ผลคือตอนใส่ขาให้ตัวละครรอบแรก ขามีให้เห็นแต่แข็งค้างอยู่ท่าเดียว
+ * ตัวละครจึงไถลไปกับพื้นแทนที่จะเดิน ซึ่งดูแย่กว่าตอนยังไม่มีขาด้วยซ้ำ
+ * เพราะสายตาคาดหวังให้ขาขยับทันทีที่เห็นว่ามีขา
+ *
+ * เตรียมภาพครั้งเดียวตอนเปลี่ยนตัวละคร ไม่ใช่ทุกเฟรม
+ */
+function useHeroFrames(avatarId: string): MutableRefObject<HTMLImageElement[]> {
+  const ref = useRef<HTMLImageElement[]>([])
 
   useEffect(() => {
-    const image = svgToImage(heroArt(avatarId), HERO_VIEWBOX, 128)
-    image.onload = () => {
-      ref.current = image
+    const frames: HTMLImageElement[] = []
+    for (let frame = 0; frame < WALK_FRAMES; frame += 1) {
+      const image = svgToImage(heroArt(avatarId, walkPose(frame)), HERO_VIEWBOX, 128)
+      image.onload = () => {
+        frames[frame] = image
+        ref.current = frames.filter(Boolean)
+      }
     }
 
     return () => {
-      ref.current = null
+      ref.current = []
     }
   }, [avatarId])
 
@@ -141,10 +160,10 @@ export function Survivor({ player }: { player: Player }) {
   const worldRef = useRef<WorldState>(
     createWorld(`${Date.now()}`, player.avatar, allPerkLevels(player)),
   )
-  const heroImageRef = useHeroImage(player.avatar)
+  const heroFramesRef = useHeroFrames(player.avatar)
   const monsterImagesRef = useMonsterImages()
   const heroViewRef = useRef<HeroView>({
-    image: null,
+    frames: [],
     monsters: new Map(),
     facing: 1,
     moving: false,
@@ -259,7 +278,7 @@ export function Survivor({ player }: { player: Player }) {
 
       const move = inputRef.current.move
       const view = heroViewRef.current
-      view.image = heroImageRef.current
+      view.frames = heroFramesRef.current
       view.monsters = monsterImagesRef.current
       view.moving = Math.hypot(move.x, move.y) > 0.06
       if (move.x > 0.06) view.facing = 1
@@ -344,7 +363,7 @@ export function Survivor({ player }: { player: Player }) {
 
     frame = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(frame)
-  }, [askQuestion, heroImageRef, monsterImagesRef, phase, ultimate.color])
+  }, [askQuestion, heroFramesRef, monsterImagesRef, phase, ultimate.color])
 
   /*
    * แป้นพิมพ์ WASD และปุ่มลูกศร
