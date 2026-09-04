@@ -360,7 +360,7 @@ function withEnemiesAt(seed, positions, hp = 9999) {
       burnDps: 0,
       elite: false,
       splitInto: 0,
-      shootCooldown: 99,
+      abilityCooldown: 99,
     })),
   }
 }
@@ -572,7 +572,7 @@ check('มอนที่ยิงไกลต้องยิงกระสุ�
     ...world,
     weapons: {},
     weaponCooldowns: {},
-    enemies: [{ ...world.enemies[0], behavior: 'ranged', speed: 20, damage: 10, shootCooldown: 0.1 }],
+    enemies: [{ ...world.enemies[0], behavior: 'ranged', speed: 20, damage: 10, abilityCooldown: 0.1 }],
   }
 
   let sawShot = false
@@ -1151,7 +1151,7 @@ check('ล้มบอสแล้วต้องมีหีบตก ไม่
         id: 999, pos: { x: world.player.pos.x + 70, y: world.player.pos.y },
         hp: 1, maxHp: 300, speed: 0, radius: 20, damage: 0, kind: 'boss-slime-king',
         xpValue: 40, hitFlash: 0, behavior: 'chase', clock: 0, slowFor: 0,
-        burnFor: 0, burnDps: 0, elite: false, boss: true, splitInto: 0, shootCooldown: 9,
+        burnFor: 0, burnDps: 0, elite: false, boss: true, splitInto: 0, abilityCooldown: 9,
       },
     ],
   }
@@ -1281,7 +1281,7 @@ check('เก็บระเบิดแล้วต้องทำร้าย�
         id: 1, pos: far, hp: 500, maxHp: 500, speed: 0, radius: 16, damage: 0,
         kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase', clock: 0,
         slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
-        splitInto: 0, shootCooldown: 9,
+        splitInto: 0, abilityCooldown: 9,
       },
     ],
     pickups: [{ id: 2, kind: 'bomb', pos: { ...world.player.pos }, life: 10 }],
@@ -1418,7 +1418,7 @@ check('ล้มมอนแล้วต้องชาร์จสกิล แ
     id: 1, pos: { x: 400, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
     damage: 0, kind: boss ? 'boss-slime-king' : 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss, splitInto: 0, shootCooldown: 9,
+    elite: false, boss, splitInto: 0, abilityCooldown: 9,
   })
 
   const normal = E.step({ ...E.createWorld('ชาร์จ', 'warrior'), enemies: [make(false)] }, STILL)
@@ -1433,7 +1433,7 @@ check('ตวัดพายุต้องกวาดมอนที่รุ�
     id: 1, pos: { x: 420, y: 300 }, hp: 500, maxHp: 500, speed: 0, radius: 16,
     damage: 0, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
     clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
-    splitInto: 0, shootCooldown: 9,
+    splitInto: 0, abilityCooldown: 9,
   }
   const world = chargedWorld('warrior', { enemies: [near] })
   const after = E.step(world, { move: { x: 0, y: 0 }, useUltimate: true })
@@ -1448,7 +1448,7 @@ check('หยุดเวลาต้องทำให้มอนเกือ�
     id: 1, pos: { x: 100, y: 300 }, hp: 999, maxHp: 999, speed: 150, radius: 16,
     damage: 0, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
     clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
-    splitInto: 0, shootCooldown: 9,
+    splitInto: 0, abilityCooldown: 9,
   })
 
   let frozen = chargedWorld('scientist', { enemies: [enemy()] })
@@ -1475,7 +1475,7 @@ check('ลมกรดกับโล่พลังงานต้องทำ�
     id: 1, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
     damage: 40, kind: 'number-slime', xpValue: 1, hitFlash: 0, behavior: 'chase',
     clock: 0, slowFor: 0, burnFor: 0, burnDps: 0, elite: false, boss: false,
-    splitInto: 0, shootCooldown: 9,
+    splitInto: 0, abilityCooldown: 9,
   }
 
   for (const avatar of ['explorer', 'inventor']) {
@@ -1676,7 +1676,7 @@ check('เกราะหนาต้องลดความเสียหา�
     id, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
     damage: 40, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   })
 
   const run = (skills) => {
@@ -1708,7 +1708,7 @@ check('หนามสะท้อนต้องทำให้ตัวที�
     id: 1, pos: { x: 400, y: 300 }, hp: 9999, maxHp: 9999, speed: 0, radius: 20,
     damage: 5, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   }
 
   let world = {
@@ -1729,7 +1729,7 @@ check('ไอเย็นรอบตัวต้องทำให้มอน�
     id: 1, pos: { x: 340, y: 300 }, hp: 9999, maxHp: 9999, speed: 150, radius: 16,
     damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   })
 
   const run = (skills) => {
@@ -1747,7 +1747,7 @@ check('ระเบิดลูกโซ่ต้องลามไปยัง�
     id, pos: { x, y: 300 }, hp, maxHp: 9999, speed: 0, radius: 16,
     damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   })
 
   // ตัวแรกตายในเฟรมนี้ ตัวที่สองอยู่ข้าง ๆ และต้องโดนลูกหลง
@@ -1768,7 +1768,7 @@ check('ดูดพลังต้องฟื้นเลือดเมื่�
     id: 1, pos: { x: 200, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
     damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   }
 
   let world = { ...E.createWorld('ดูดพลัง'), skills: { lifesteal: 4 }, enemies: [dying] }
@@ -1783,7 +1783,7 @@ check('พลังล้นต้องชาร์จสกิลวิเศ�
     id, pos: { x: 200, y: 300 }, hp: -1, maxHp: 100, speed: 0, radius: 16,
     damage: 0, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   })
 
   const run = (skills) =>
@@ -1928,7 +1928,7 @@ check('ฟื้นคืนชีพต้องช่วยได้จริ�
     id, pos: { x: 400, y: 300 }, hp: 99999, maxHp: 99999, speed: 0, radius: 20,
     damage: 9999, kind: 'number-slime', art: 'number-slime', xpValue: 1, hitFlash: 0,
     behavior: 'chase', clock: 0, slowFor: 0, burnFor: 0, burnDps: 0,
-    elite: false, boss: false, splitInto: 0, shootCooldown: 99,
+    elite: false, boss: false, splitInto: 0, abilityCooldown: 99,
   })
 
   let world = E.createWorld('ฟื้น', 'warrior', { phoenix: 1 })
@@ -2370,7 +2370,7 @@ function ringAround(seed, count, spread, hp = 9_000_000) {
       pos: { x: at.x + Math.cos(angle) * spread, y: at.y + Math.sin(angle) * spread },
       hp, maxHp: hp, speed: 0, radius: 14, damage: 0, kind: 'number-slime',
       behavior: 'chase', hitFlash: 0, xpValue: 1, slowFor: 0, burnFor: 0,
-      burnDps: 0, elite: false, boss: false, shootCooldown: 99, clock: 0,
+      burnDps: 0, elite: false, boss: false, abilityCooldown: 99, clock: 0,
     })
   }
   return { ...base, spawnCooldown: 999, eliteCooldown: 999, bossCooldown: 999, enemies }
@@ -2830,6 +2830,266 @@ check('เรียกซ้ำผ่านตัวเก็บของ ต้
   const a = SC.sceneryFor('ห้องเก็บของ')
   const b = SC.sceneryFor('ห้องเก็บของ')
   assert(a === b, 'ตัวเก็บของไม่ได้ทำงาน จึงสุ่มใหม่ทุกครั้งที่วาด')
+})
+
+/* ------------------------------------------------------------------ *
+ * พฤติกรรมมอนชุดใหม่
+ * ------------------------------------------------------------------ */
+
+/** สร้างมอนหนึ่งตัวสำหรับทดสอบ ระบุเฉพาะช่องที่สนใจ */
+function enemyAt(over) {
+  return {
+    id: 1,
+    pos: { x: 400, y: 300 },
+    hp: 100,
+    maxHp: 100,
+    speed: 100,
+    radius: 16,
+    damage: 10,
+    kind: 'number-slime',
+    art: 'number-slime',
+    xpValue: 1,
+    hitFlash: 0,
+    behavior: 'chase',
+    clock: 0,
+    slowFor: 0,
+    burnFor: 0,
+    burnDps: 0,
+    elite: false,
+    boss: false,
+    splitInto: 0,
+    abilityCooldown: 9,
+    ...over,
+  }
+}
+
+check('ทุกพฤติกรรมต้องมีมอนอย่างน้อยหนึ่งชนิดใช้จริง', () => {
+  /*
+   * พฤติกรรมที่ไม่มีมอนตัวไหนใช้ คือโค้ดที่ตายแล้ว
+   * ซึ่งเป็นบั๊กที่เงียบที่สุดชนิดหนึ่ง เพราะทุกอย่างยังทำงานปกติทุกประการ
+   * ต่างกันแค่มีความสนุกก้อนหนึ่งที่เขียนไว้แล้วไม่มีใครได้เจอ
+   */
+  const world = { ...E.createWorld('ครบทุกแบบ'), time: 400 }
+  const seen = new Set()
+  for (let i = 0; i < 600; i += 1) seen.add(E.spawnOne(world, `แบบ-${i}`).behavior)
+
+  for (const behavior of ['chase', 'zigzag', 'dash', 'ranged', 'orbit', 'bomber', 'healer', 'summoner']) {
+    assert(seen.has(behavior), `สุ่มมอน 600 ตัวแล้วไม่เคยได้ ${behavior} เลย`)
+  }
+})
+
+check('ตัววนรอบต้องวิ่งตัดขวาง ไม่ใช่พุ่งเข้าหาตรง ๆ', () => {
+  /*
+   * ตัวนี้มีเหตุผลอยู่อย่างเดียว คือมันไม่เคยเข้าแถวหางที่ผู้เล่นกวาดอยู่
+   * ถ้ามันพุ่งเข้าหาเหมือนตัวอื่น มันก็เป็นแค่ตัวไล่ตามที่มีชื่อแปลก
+   */
+  const orbiter = enemyAt({ behavior: 'orbit', pos: { x: 400, y: 160 }, speed: 120 })
+  const world = { ...E.createWorld('วนรอบ'), enemies: [orbiter] }
+  const after = E.step(world, STILL)
+
+  const moved = after.enemies[0].pos
+  const toward = Math.abs(moved.y - orbiter.pos.y)
+  const across = Math.abs(moved.x - orbiter.pos.x)
+  assert(
+    across > toward,
+    `ขยับเข้าหา ${toward.toFixed(2)} แต่ขยับตัดขวางแค่ ${across.toFixed(2)} ` +
+      'ซึ่งแปลว่ามันพุ่งเข้าหาตรง ๆ เหมือนตัวไล่ตามธรรมดา',
+  )
+})
+
+check('วงของตัววนรอบต้องแคบลงตามอายุ ปล่อยทิ้งไว้ตลอดไม่ได้', () => {
+  /*
+   * ถ้าวงคงที่ตลอด ตัวนี้จะกลายเป็นของประดับที่ไม่มีวันทำอะไรใครได้
+   * เด็กที่รู้ทันจะเมินมันทั้งรอบ ซึ่งแปลว่ามันไม่ได้เพิ่มอะไรให้เกมเลย
+   */
+  const ringAfter = (clock) => {
+    const orbiter = enemyAt({ behavior: 'orbit', pos: { x: 400, y: 120 }, speed: 260, clock })
+    let world = { ...E.createWorld('วงแคบ'), enemies: [orbiter] }
+    for (let i = 0; i < 90; i += 1) world = E.step(world, STILL)
+    const enemy = world.enemies[0]
+    return Math.hypot(enemy.pos.x - world.player.pos.x, enemy.pos.y - world.player.pos.y)
+  }
+
+  const young = ringAfter(0)
+  const old = ringAfter(26)
+  assert(
+    old < young - 20,
+    `ตัวที่เพิ่งเกิดอยู่ห่าง ${young.toFixed(0)} ตัวที่ปล่อยไว้นานอยู่ห่าง ${old.toFixed(0)} ` +
+      'ซึ่งไม่ได้เข้ามาใกล้ขึ้นเลย',
+  )
+})
+
+check('ตัวระเบิดตายแล้วต้องระเบิดใส่มอนข้าง ๆ', () => {
+  const bomber = enemyAt({ id: 1, behavior: 'bomber', hp: -1, damage: 20, pos: { x: 200, y: 200 } })
+  const near = enemyAt({ id: 2, hp: 300, maxHp: 300, speed: 0, pos: { x: 240, y: 200 } })
+  const far = enemyAt({ id: 3, hp: 300, maxHp: 300, speed: 0, pos: { x: 600, y: 500 } })
+
+  const after = E.step({ ...E.createWorld('ระเบิด'), enemies: [bomber, near, far] }, STILL)
+  const hitNear = after.enemies.find((enemy) => enemy.id === 2)
+  const hitFar = after.enemies.find((enemy) => enemy.id === 3)
+
+  assert(hitNear.hp < 300, 'ตัวที่อยู่ในรัศมีระเบิดไม่เจ็บเลย')
+  assert(hitFar.hp === 300, 'ตัวที่อยู่นอกรัศมีระเบิดกลับเจ็บด้วย')
+})
+
+check('ตัวระเบิดต้องทำให้ผู้เล่นเจ็บด้วย ไม่งั้นมันเป็นของฟรี', () => {
+  /*
+   * ถ้าระเบิดโดนแต่มอน ตัวนี้จะกลายเป็นมอนที่เด็กอยากเจอ
+   * เพราะฆ่าแล้วได้ระเบิดช่วยกวาดฝูงให้ ซึ่งตรงข้ามกับที่ตั้งใจไว้ทั้งหมด
+   */
+  const bomber = enemyAt({ behavior: 'bomber', hp: -1, damage: 30, pos: { x: 400, y: 300 } })
+  const world = { ...E.createWorld('ระเบิดโดนเรา'), enemies: [bomber] }
+  const after = E.step({ ...world, player: { ...world.player, invulnerable: 0 } }, STILL)
+
+  assert(
+    after.player.hp < world.player.maxHp,
+    'ระเบิดกลางตัวผู้เล่นแล้วผู้เล่นไม่เจ็บเลย',
+  )
+})
+
+check('ระเบิดต้องเคารพช่วงอมตะ ไม่ใช่ทะลุเข้ามาซ้ำทันที', () => {
+  /*
+   * เด็กที่เพิ่งโดนตีแล้วโดนระเบิดซ้ำในเสี้ยววินาทีเดียวกัน
+   * จะอ่านไม่ออกเลยว่าตายเพราะอะไร ซึ่งเป็นความตายที่เรียนรู้อะไรไม่ได้
+   */
+  const bomber = enemyAt({ behavior: 'bomber', hp: -1, damage: 30, pos: { x: 400, y: 300 } })
+  const world = E.createWorld('อมตะ')
+  const after = E.step(
+    { ...world, enemies: [bomber], player: { ...world.player, invulnerable: 1 } },
+    STILL,
+  )
+  assert(after.player.hp === world.player.maxHp, 'ระเบิดทะลุช่วงอมตะเข้ามาได้')
+})
+
+check('ตัวฟื้นเลือดต้องฟื้นให้เพื่อน แต่ไม่ฟื้นให้ตัวเอง', () => {
+  /*
+   * ถ้าฟื้นให้ตัวเองด้วย มันจะกลายเป็นตัวที่ล้มไม่ลง
+   * ซึ่งเป็นกำแพงเวลา ไม่ใช่การตัดสินใจ
+   *
+   * วางทุกตัวไว้มุมจอ ห่างจากผู้เล่นที่อยู่กลางสนาม
+   *
+   * เขียนครั้งแรกวางไว้ใกล้ผู้เล่น แล้วข้อนี้ผ่านทั้งที่แก้โค้ดให้ฟื้นตัวเองแล้ว
+   * เพราะดาบของผู้เล่นตีมันไปด้วยตลอด เลือดจึงไม่เคยขึ้นเหนือค่าตั้งต้น
+   * ทั้งที่ตรวจดูจริงพบว่ามันไต่จาก 38.7 ขึ้นไป 44.0 คือฟื้นตัวเองอยู่จริง ๆ
+   * ข้อทดสอบที่ผ่านเพราะมีอย่างอื่นมากลบผล แย่กว่าไม่มีข้อทดสอบ
+   */
+  const healer = enemyAt({ id: 1, behavior: 'healer', hp: 50, maxHp: 100, pos: { x: 60, y: 60 } })
+  const friend = enemyAt({ id: 2, hp: 50, maxHp: 100, speed: 0, pos: { x: 100, y: 60 } })
+  const stranger = enemyAt({ id: 3, hp: 50, maxHp: 100, speed: 0, pos: { x: 760, y: 560 } })
+
+  let world = { ...E.createWorld('หมอ'), enemies: [healer, friend, stranger], spawnCooldown: 9999 }
+  for (let i = 0; i < 30; i += 1) world = E.step(world, STILL)
+
+  const after = (id) => world.enemies.find((enemy) => enemy.id === id)
+  assert(after(2).hp > 50, 'เพื่อนที่อยู่ในระยะไม่ได้เลือดเพิ่มเลย')
+  assert(after(3).hp === 50, 'ตัวที่อยู่นอกระยะกลับได้เลือดเพิ่ม')
+  assert(
+    after(1).hp <= 50,
+    `ตัวฟื้นเลือดฟื้นให้ตัวเองจนขึ้นไปที่ ${after(1).hp.toFixed(1)} จากที่เริ่มมา 50`,
+  )
+})
+
+check('การฟื้นเลือดต้องไม่ดันเลือดเกินหลอด', () => {
+  const healer = enemyAt({ id: 1, behavior: 'healer', pos: { x: 400, y: 200 } })
+  const friend = enemyAt({ id: 2, hp: 100, maxHp: 100, speed: 0, pos: { x: 430, y: 200 } })
+
+  let world = { ...E.createWorld('เต็มหลอด'), enemies: [healer, friend] }
+  for (let i = 0; i < 60; i += 1) world = E.step(world, STILL)
+
+  const after = world.enemies.find((enemy) => enemy.id === 2)
+  assert(after.hp <= 100, `เลือดพองไปถึง ${after.hp} ทั้งที่หลอดเต็มอยู่ที่ 100`)
+})
+
+check('ตัวเรียกสมุนต้องเรียกสมุนออกมาจริง', () => {
+  const summoner = enemyAt({ behavior: 'summoner', abilityCooldown: 0.05, pos: { x: 200, y: 200 } })
+  let world = { ...E.createWorld('เรียกสมุน'), enemies: [summoner], spawnCooldown: 9999 }
+  const before = world.enemies.length
+  for (let i = 0; i < 60; i += 1) world = E.step(world, STILL)
+
+  assert(
+    world.enemies.length > before,
+    `เล่นไปหนึ่งวินาทีแล้วมอนยังมี ${world.enemies.length} ตัวเท่าเดิม`,
+  )
+})
+
+check('เรียกสมุนหนึ่งครั้งต้องได้หนึ่งตัว ไม่ใช่หลายตัวในเฟรมเดียว', () => {
+  const summoner = enemyAt({ behavior: 'summoner', abilityCooldown: 0, pos: { x: 200, y: 200 } })
+  const world = { ...E.createWorld('เรียกทีละตัว'), enemies: [summoner], spawnCooldown: 9999 }
+  const after = E.step(world, STILL)
+
+  assert(
+    after.enemies.length === 2,
+    `เฟรมเดียวมอนขึ้นจาก 1 เป็น ${after.enemies.length} ตัว`,
+  )
+})
+
+check('ตัวเรียกสมุนต้องไม่ทำให้จอเต็มจนเครื่องช้า', () => {
+  /*
+   * ความยากที่เล่นแก้ได้ กับเกมที่พังไปเฉย ๆ เป็นคนละเรื่องกัน
+   * มอนสามพันตัวไม่ใช่ความท้าทาย มันคือจอที่มองไม่เห็นอะไรและเครื่องที่ค้าง
+   */
+  const summoners = []
+  for (let i = 0; i < 8; i += 1) {
+    summoners.push(
+      enemyAt({
+        id: i + 1,
+        behavior: 'summoner',
+        hp: 99999,
+        maxHp: 99999,
+        abilityCooldown: 0.05,
+        pos: { x: 100 + i * 70, y: 120 },
+      }),
+    )
+  }
+
+  let world = { ...E.createWorld('เพดาน'), enemies: summoners }
+  for (let i = 0; i < 60 * 90; i += 1) {
+    if (world.phase === 'question') { world = E.resolveQuestion(world, true); continue }
+    if (world.phase === 'choosing') { world = E.skipSkill(world); continue }
+    if (world.phase === 'dead') break
+    world = E.step(world, STILL)
+    world = { ...world, player: { ...world.player, hp: world.player.maxHp } }
+  }
+
+  assert(
+    world.enemies.length <= 130,
+    `เล่นไปเก้าสิบวินาทีแล้วมีมอน ${world.enemies.length} ตัวบนจอ`,
+  )
+})
+
+check('บอสตัวที่เรียกสมุนต้องเรียกได้ถี่กว่ามอนธรรมดา', () => {
+  /*
+   * บอสตัวนี้มีเหตุผลอยู่อย่างเดียว คือเป็นบอสตัวเดียวที่ยิ่งยืดเวลายิ่งแย่
+   * ถ้าเรียกถี่เท่ามอนธรรมดา มันก็เป็นบอสถังเลือดเหมือนตัวอื่น
+   */
+  const summonsIn = (boss) => {
+    const one = enemyAt({
+      behavior: 'summoner',
+      boss,
+      hp: 99999,
+      maxHp: 99999,
+      abilityCooldown: 0,
+      pos: { x: 200, y: 200 },
+    })
+    let world = { ...E.createWorld('บอสเรียก'), enemies: [one], spawnCooldown: 9999 }
+    for (let i = 0; i < 60 * 10; i += 1) {
+      if (world.phase !== 'playing') break
+      world = E.step(world, STILL)
+      world = { ...world, player: { ...world.player, hp: world.player.maxHp }, spawnCooldown: 9999 }
+    }
+    /*
+     * นับตัวที่ "เคยถูกเรียก" ไม่ใช่ตัวที่ยังเหลืออยู่
+     *
+     * เขียนครั้งแรกนับตัวที่เหลือ แล้วได้ผลกลับด้าน คือบอสเรียกได้น้อยกว่า
+     * เพราะอาวุธของผู้เล่นเก็บสมุนไปเรื่อย ๆ ระหว่างสิบวินาทีนั้น
+     * ตัวที่เหลือจึงวัด "อาวุธฆ่าทันไหม" ไม่ได้วัด "เรียกถี่แค่ไหน"
+     */
+    return world.kills + world.enemies.length - 1
+  }
+
+  const normal = summonsIn(false)
+  const boss = summonsIn(true)
+  assert(boss > normal, `บอสเรียกได้ ${boss} ตัว มอนธรรมดาเรียกได้ ${normal} ตัว`)
 })
 
 /* ------------------------------------------------------------------ *

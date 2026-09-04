@@ -16,7 +16,7 @@
  * และเป็นข้อผิดพลาดชนิดที่ชุดทดสอบไม่มีทางจับได้เลย
  */
 
-import { ARENA_HEIGHT, ARENA_WIDTH } from './types'
+import { ARENA_HEIGHT, ARENA_WIDTH, HEAL_RADIUS } from './types'
 import type { WorldState } from './types'
 import { getBiome } from './biomes'
 import { sceneryFor } from './scenery'
@@ -239,6 +239,19 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
       ctx.arc(enemy.pos.x, enemy.pos.y, enemy.radius, 0, Math.PI * 2)
       ctx.fill()
     }
+
+    /*
+     * เครื่องหมายประจำพฤติกรรม
+     *
+     * สี่พฤติกรรมใหม่ต้องรับมือคนละวิธี แต่บางตัวใช้ภาพร่วมกับมอนตัวอื่น
+     * ถ้าไม่มีเครื่องหมาย เด็กจะไม่มีทางรู้เลยว่าตัวไหนควรเก็บก่อน
+     * ซึ่งแปลว่ากลไกที่เขียนไว้ทั้งหมดกลายเป็นเรื่องบังเอิญในสายตาเด็ก
+     *
+     * ห้าพฤติกรรมเดิมไม่มีเครื่องหมาย ตั้งใจให้เป็นแบบนั้น
+     * เพราะถ้าทุกตัวมีวงแหวน จอจะเต็มไปด้วยวงแหวนจนไม่มีวงไหนสะดุดตา
+     * เครื่องหมายมีค่าก็ต่อเมื่อมันหายาก
+     */
+    drawBehaviorMark(ctx, enemy, world.time)
 
     // ตัวใหญ่พิเศษมีวงแหวนทองรอบตัว ให้เห็นแต่ไกลว่าตัวนี้ไม่ธรรมดา
     if (enemy.elite) {
@@ -872,6 +885,86 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
  * ใช้หลักเดียวกับเงาใต้เท้าตัวละคร คือรีแบน ๆ สีดำจาง
  * ถ้าไม่มีเงา ต้นไม้จะดูเหมือนสติกเกอร์ที่แปะทับพื้นไว้เฉย ๆ
  */
+/**
+ * วาดเครื่องหมายบอกพฤติกรรมของมอนที่ต้องรับมือเป็นพิเศษ
+ *
+ * ทุกเครื่องหมายวาดเป็น "วงรอบตัว" ไม่ใช่การเปลี่ยนสีตัวมอน
+ * เพราะการเปลี่ยนสีจะไปชนกับการกระพริบขาวตอนโดนตี ซึ่งเป็นสัญญาณที่สำคัญกว่า
+ * และวงรอบตัวยังอ่านออกตอนมอนซ้อนกันหลายตัว ในขณะที่สีตัวจะถูกบัง
+ */
+function drawBehaviorMark(
+  ctx: CanvasRenderingContext2D,
+  enemy: WorldState['enemies'][number],
+  time: number,
+): void {
+  const { x, y } = enemy.pos
+
+  if (enemy.behavior === 'bomber') {
+    // วงเต้นเป็นจังหวะ อ่านเป็น "นับถอยหลัง" แม้จะไม่ได้นับถอยหลังจริง ๆ
+    const pulse = 0.5 + Math.sin(time * 9 + enemy.id) * 0.5
+    ctx.strokeStyle = `rgba(239,68,68,${0.45 + pulse * 0.5})`
+    ctx.lineWidth = 2.5
+    ctx.beginPath()
+    ctx.arc(x, y, enemy.radius + 4 + pulse * 3, 0, Math.PI * 2)
+    ctx.stroke()
+    return
+  }
+
+  if (enemy.behavior === 'healer') {
+    /*
+     * วาดวงระยะฟื้นเลือดจริง ๆ ไม่ใช่วงประดับ
+     * เด็กจึงเห็นได้ตรง ๆ ว่าต้องดึงมอนออกไปพ้นวงไหน หรือต้องเก็บตัวไหนก่อน
+     * เลขรัศมีมาจาก HEAL_RADIUS ตัวเดียวกับที่เครื่องยนต์ใช้ จึงไม่มีทางไม่ตรงกัน
+     */
+    ctx.strokeStyle = 'rgba(74,222,128,.30)'
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.arc(x, y, HEAL_RADIUS, 0, Math.PI * 2)
+    ctx.stroke()
+
+    /*
+     * กากบาทเขียวเหนือหัว บอกว่าตัวนี้คือตัวที่ทำให้ตัวอื่นล้มไม่ลง
+     *
+     * ยกสูงกว่ารัศมีการชนพอสมควร เพราะภาพมอนถูกวาดใหญ่กว่ารัศมีถึง 3.3 เท่า
+     * ตั้งไว้ที่ +12 ตอนแรกแล้วเรนเดอร์ดู กากบาทไปทับขอบบนของตัวมอนพอดี
+     */
+    const top = y - enemy.radius - 24
+    ctx.fillStyle = '#22c55e'
+    ctx.fillRect(x - 2, top - 6, 4, 12)
+    ctx.fillRect(x - 6, top - 2, 12, 4)
+    return
+  }
+
+  if (enemy.behavior === 'summoner') {
+    // สามจุดวิ่งรอบตัว อ่านเป็น "กำลังผลิตอะไรออกมา"
+    ctx.fillStyle = '#c084fc'
+    for (let i = 0; i < 3; i += 1) {
+      const angle = time * 2.4 + (i / 3) * Math.PI * 2
+      ctx.beginPath()
+      ctx.arc(
+        x + Math.cos(angle) * (enemy.radius + 8),
+        y + Math.sin(angle) * (enemy.radius + 8),
+        3,
+        0,
+        Math.PI * 2,
+      )
+      ctx.fill()
+    }
+    return
+  }
+
+  if (enemy.behavior === 'orbit') {
+    // วงประ บอกว่าตัวนี้ไม่ได้วิ่งเข้าหา แต่วิ่งวนอยู่รอบ ๆ
+    ctx.strokeStyle = 'rgba(56,189,248,.75)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([5, 5])
+    ctx.beginPath()
+    ctx.arc(x, y, enemy.radius + 5, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+  }
+}
+
 function propShadow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number): void {
   ctx.fillStyle = 'rgba(40,60,30,.16)'
   ctx.beginPath()

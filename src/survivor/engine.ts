@@ -28,6 +28,7 @@ import { biomeFor, getBiome, NEUTRAL_RULES, type BiomeRules } from './biomes'
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
+  HEAL_RADIUS,
   type DamageNumber,
   type Effect,
   type EnemyBehavior,
@@ -80,6 +81,31 @@ const SPARK_COLORS: Record<string, string> = {
 }
 
 const MAX_PARTICLES = 240
+
+/**
+ * เพดานจำนวนมอนทั้งสนาม ใช้กับตัวเรียกสมุนเท่านั้น
+ *
+ * การโผล่ตามปกติมีเพดานอยู่แล้วที่ spawnPlan แต่ตัวเรียกสมุนไม่มี
+ * ตัวเรียกสองสามตัวที่รอดนานพอจะทำให้จอเต็มจนเครื่องช้าและมองไม่เห็นอะไรเลย
+ * ซึ่งไม่ใช่ความยากที่เล่นแก้ได้ แต่เป็นเกมที่พังไปเฉย ๆ
+ */
+const MAX_ENEMIES = 120
+
+/** เลือดที่ตัวฟื้นเลือดคืนให้เพื่อนต่อวินาที และวินาทีระหว่างการเรียกสมุนแต่ละครั้ง */
+const HEAL_PER_SECOND = 16
+const SUMMON_EVERY = 4.5
+
+/**
+ * รัศมีและตัวคูณความเสียหายของการระเบิดตอนตัวระเบิดตาย
+ *
+ * ตัวเลขความเสียหายตั้งไว้ต่ำกว่าการชนตัวมันเอง ไม่ใช่สูงกว่า
+ * เพราะการระเบิดหลบยากกว่าการชนมาก มันเกิดขึ้นในจังหวะที่ผู้เล่นเพิ่งทำสำเร็จ
+ * ถ้าลงโทษแรงกว่าการปล่อยให้มันเดินมาชน เด็กจะเรียนว่า "อย่าฆ่ามัน"
+ * ซึ่งตรงข้ามกับทั้งเกม
+ */
+const BOMB_RADIUS = 108
+const BOMB_TO_PLAYER = 0.85
+const BOMB_TO_ENEMIES = 1.6
 
 /** ตัวเลขความเสียหายที่แสดงพร้อมกันได้มากที่สุด */
 const MAX_DAMAGE_NUMBERS = 40
@@ -168,6 +194,26 @@ const ENEMY_KINDS: EnemyKind[] = [
     behavior: 'dash', splitInto: 3, fromTime: 240 },
   { kind: 'cube-sentinel', art: 'chaos-cube', hp: 300, speed: 112, damage: 24, radius: 26, xpValue: 14,
     behavior: 'ranged', splitInto: 0, fromTime: 280 },
+
+  /*
+   * ชุดที่สาม สี่ตัวที่ทำให้ "วิ่งวนแล้วกวาด" ใช้ไม่ได้ผล
+   *
+   * ห้าพฤติกรรมเดิมรับมือด้วยวิธีเดียวกันได้เกือบหมด คือวิ่งวนเป็นวงกว้าง
+   * แล้วกวาดตัวที่ต่อแถวตามมา สี่ตัวนี้แต่ละตัวพังวิธีนั้นคนละจุด
+   * ดูคำอธิบายของแต่ละพฤติกรรมใน types.ts
+   *
+   * ตั้งเวลาที่เริ่มโผล่ให้ทยอยเข้ามาทีละตัว ไม่ใช่โผล่พร้อมกันหมด
+   * เพราะเด็กต้องมีเวลาเรียนรู้วิธีรับมือทีละอย่าง ไม่ใช่เจอสี่อย่างใหม่พร้อมกัน
+   * แล้วตายโดยไม่รู้ว่าตายเพราะตัวไหน
+   */
+  { kind: 'logic-orbiter', art: 'equation-wraith', hp: 60, speed: 130, damage: 12, radius: 17, xpValue: 5,
+    behavior: 'orbit', splitInto: 0, fromTime: 80 },
+  { kind: 'bomb-bug', art: 'chaos-cube', hp: 40, speed: 120, damage: 14, radius: 18, xpValue: 5,
+    behavior: 'bomber', splitInto: 0, fromTime: 100 },
+  { kind: 'mender-wraith', art: 'equation-wraith', hp: 90, speed: 118, damage: 10, radius: 17, xpValue: 7,
+    behavior: 'healer', splitInto: 0, fromTime: 130 },
+  { kind: 'sum-summoner', art: 'math-guardian', hp: 130, speed: 96, damage: 14, radius: 21, xpValue: 8,
+    behavior: 'summoner', splitInto: 0, fromTime: 165 },
 ]
 
 /**
@@ -195,6 +241,12 @@ const BOSS_KINDS: EnemyKind[] = [
     radius: 44, xpValue: 90, behavior: 'tank', splitInto: 0, fromTime: 0 },
   { kind: 'boss-chaos-cube', art: 'chaos-cube', hp: 1250, speed: 120, damage: 34,
     radius: 44, xpValue: 105, behavior: 'ranged', splitInto: 0, fromTime: 0 },
+  /*
+   * บอสตัวเดียวที่เรียกสมุน จึงเป็นบอสตัวเดียวที่ยิ่งยืดเวลายิ่งแย่
+   * บอสตัวอื่นรอจังหวะได้ ตัวนี้รอไม่ได้ ซึ่งเป็นความรู้สึกที่ยังไม่เคยมีในเกม
+   */
+  { kind: 'boss-swarm-mother', art: 'math-guardian', hp: 900, speed: 100, damage: 26,
+    radius: 44, xpValue: 82, behavior: 'summoner', splitInto: 0, fromTime: 0 },
 ]
 
 /** ชื่อบอสที่แสดงตอนโผล่ ไล่ตามลำดับเดียวกับ BOSS_KINDS */
@@ -205,6 +257,7 @@ const BOSS_NAMES = [
   'มังกรแห่งตัวเลข',
   'อัศวินจำนวนเฉพาะ',
   'ลูกบาศก์วุ่นวาย',
+  'แม่ทัพฝูงสมการ',
 ]
 
 /** ชื่อบอสตัวที่เท่าไร ใช้ทั้งตอนประกาศและตอนสรุปผล */
@@ -416,7 +469,7 @@ function makeEnemy(
     elite,
     boss,
     splitInto: template.splitInto,
-    shootCooldown: 1.2,
+    abilityCooldown: 1.2,
   }
 }
 
@@ -764,6 +817,20 @@ export function step(world: WorldState, input: Input): WorldState {
   // ---------- มอนเคลื่อนที่ตามพฤติกรรมของตัวเอง ----------
   const enemyShots: EnemyShot[] = world.enemyShots.map((shot) => ({ ...shot }))
 
+  /*
+   * ลูกสมุนที่ถูกเรียกในก้าวนี้ เก็บไว้ต่อท้ายหลังวนครบ
+   *
+   * for...of จะวิ่งเข้าไปในตัวที่ต่อเข้ารายการระหว่างที่ยังวนอยู่
+   * ตอนนี้ยังไม่มีผลเสียที่วัดได้ เพราะสมุนที่เรียกออกมาเป็นตัวไล่ตามธรรมดา
+   * มันจึงแค่ได้ขยับก่อนหนึ่งเฟรม ซึ่งไม่มีใครสังเกตเห็น
+   * (ลองแก้ให้ต่อเข้ารายการตรง ๆ แล้ววัดดู ไม่มีข้อทดสอบข้อไหนจับได้เลย)
+   *
+   * ที่ยังกันไว้เพราะวันที่มีสมุนที่เรียกสมุนต่อได้ มันจะกลายเป็นการวนไม่รู้จบ
+   * ในเฟรมเดียว ซึ่งเป็นบั๊กที่หาสาเหตุยากมากถ้าไปเจอตอนนั้น
+   * และการกันไว้ตรงนี้ไม่มีต้นทุนอะไรเลย
+   */
+  const summoned: EnemyEntity[] = []
+
   for (const enemy of enemies) {
     enemy.hitFlash = Math.max(0, enemy.hitFlash - dt)
     enemy.clock += dt
@@ -821,8 +888,8 @@ export function step(world: WorldState, input: Input): WorldState {
         vy = -toPlayer.y * speed * 0.6
       }
 
-      enemy.shootCooldown -= dt
-      if (enemy.shootCooldown <= 0 && dist < 320) {
+      enemy.abilityCooldown -= dt
+      if (enemy.abilityCooldown <= 0 && dist < 320) {
         enemyShots.push({
           id: nextId,
           pos: { ...enemy.pos },
@@ -832,12 +899,87 @@ export function step(world: WorldState, input: Input): WorldState {
           life: 3,
         })
         nextId += 1
-        enemy.shootCooldown = 2.2
+        enemy.abilityCooldown = 2.2
+      }
+    } else if (enemy.behavior === 'orbit') {
+      /*
+       * วนรอบตัวผู้เล่นที่ระยะหนึ่ง ไม่พุ่งเข้ามาตรง ๆ
+       *
+       * ตัวนี้ไม่เคยเข้าแถวหางที่ผู้เล่นกวาดอยู่ การกวาดจึงไม่โดนมันเลย
+       * ต้องหันไปเล็งมันโดยเฉพาะ หรือใช้อาวุธที่ตีเป็นวงรอบตัว
+       *
+       * วงแคบลงตามอายุของตัวมันเอง ไม่ใช่ตามเวลาในเกม
+       * ทำให้ตัวที่เพิ่งเกิดยังไกล ส่วนตัวที่ปล่อยทิ้งไว้นานจะมาจ่ออยู่ข้างตัว
+       * ถ้าวงคงที่ตลอด มันจะกลายเป็นของประดับที่ไม่มีวันทำอะไรใครได้
+       */
+      const ring = Math.max(46, 190 - enemy.clock * 6)
+      const pull = dist > ring ? 0.5 : -0.45
+      vx = toPlayer.x * speed * pull + -toPlayer.y * speed * 0.88
+      vy = toPlayer.y * speed * pull + toPlayer.x * speed * 0.88
+    } else if (enemy.behavior === 'healer') {
+      /*
+       * ฟื้นเลือดให้มอนตัวอื่นรอบตัว และถอยห่างเหมือนพวกยิงไกล
+       *
+       * ฟื้นให้ตัวอื่นเท่านั้น ไม่ฟื้นให้ตัวเอง ไม่งั้นมันจะเป็นตัวที่ล้มไม่ลง
+       * ซึ่งกลายเป็นกำแพงเวลา ไม่ใช่การตัดสินใจ
+       * และฟื้นไม่เกินเลือดเต็มของตัวที่ถูกฟื้น เพื่อไม่ให้เลือดพองเกินหลอด
+       */
+      const KEEP = 210
+      if (dist < KEEP) {
+        vx = -toPlayer.x * speed * 0.7
+        vy = -toPlayer.y * speed * 0.7
+      }
+      for (const friend of enemies) {
+        if (friend.id === enemy.id || friend.hp <= 0) continue
+        if (distance(friend.pos, enemy.pos) > HEAL_RADIUS) continue
+        friend.hp = Math.min(friend.maxHp, friend.hp + HEAL_PER_SECOND * dt)
+      }
+    } else if (enemy.behavior === 'summoner') {
+      /*
+       * เรียกลูกสมุนเป็นระยะ และถอยห่างเหมือนพวกยิงไกล
+       *
+       * มีเพดานจำนวนมอนทั้งสนาม เพราะถ้าไม่มี ตัวเรียกสองสามตัวที่รอดนาน
+       * จะทำให้จอเต็มจนเครื่องช้าและมองไม่เห็นอะไรเลย
+       * ซึ่งไม่ใช่ความยากที่เล่นแก้ได้ แต่เป็นเกมที่พังไปเฉย ๆ
+       */
+      const KEEP = 240
+      if (dist < KEEP) {
+        vx = -toPlayer.x * speed * 0.7
+        vy = -toPlayer.y * speed * 0.7
+      }
+
+      enemy.abilityCooldown -= dt
+      if (enemy.abilityCooldown <= 0) {
+        enemy.abilityCooldown = enemy.boss ? SUMMON_EVERY * 0.55 : SUMMON_EVERY
+        if (enemies.length + summoned.length < MAX_ENEMIES) {
+          const count = enemy.boss ? 3 : 1
+          for (let i = 0; i < count; i += 1) {
+            const angle = (i / count) * Math.PI * 2 + enemy.clock
+            summoned.push(
+              makeEnemy(
+                nextId,
+                SPLIT_CHILD,
+                {
+                  x: clamp(enemy.pos.x + Math.cos(angle) * 26, 0, ARENA_WIDTH),
+                  y: clamp(enemy.pos.y + Math.sin(angle) * 26, 0, ARENA_HEIGHT),
+                },
+                difficultyScale(time),
+                false,
+                false,
+                biomeRules,
+              ),
+            )
+            nextId += 1
+          }
+          sounds.push('zap')
+        }
       }
     }
 
     enemy.pos = { x: enemy.pos.x + vx * dt, y: enemy.pos.y + vy * dt }
   }
+
+  enemies.push(...summoned)
 
   /*
    * ---------- แอ่งบนพื้น ----------
@@ -1576,6 +1718,43 @@ export function step(world: WorldState, input: Input): WorldState {
     }
 
     lifestealHeal += stats.lifestealPerKill
+
+    /*
+     * ตัวระเบิด ตายแล้วระเบิดใส่ทุกอย่างรอบตัว รวมทั้งผู้เล่นด้วย
+     *
+     * ที่ต้องโดนผู้เล่นด้วย ไม่งั้นมันเป็นของฟรีล้วน ๆ คือฆ่าแล้วได้ระเบิด
+     * ช่วยกวาดฝูงให้ ซึ่งกลายเป็นมอนที่เด็กอยากเจอ ไม่ใช่มอนที่ต้องระวัง
+     *
+     * ผ่านโล่กับช่วงอมตะเหมือนความเสียหายอื่นทุกอย่าง เพราะเด็กที่เพิ่งโดนตี
+     * แล้วโดนระเบิดซ้ำทันทีในเสี้ยววินาทีเดียวกัน จะอ่านไม่ออกเลยว่าตายเพราะอะไร
+     */
+    if (enemy.behavior === 'bomber') {
+      for (const other of enemies) {
+        if (other.id === enemy.id || other.hp <= 0) continue
+        if (distance(other.pos, enemy.pos) > BOMB_RADIUS) continue
+        hurt(other, enemy.damage * BOMB_TO_ENEMIES)
+      }
+      if (
+        invulnerable <= 0 &&
+        !ultimateGuard &&
+        distance(enemy.pos, player.pos) <= BOMB_RADIUS + player.radius
+      ) {
+        hp -= enemy.damage * BOMB_TO_PLAYER * (1 - stats.damageReduction)
+        invulnerable = stats.graceSeconds
+        sounds.push('hurt')
+        addShake(0.5)
+      }
+      effects.push({
+        id: nextId,
+        kind: 'blast',
+        pos: { ...enemy.pos },
+        radius: BOMB_RADIUS,
+        life: 0.3,
+        maxLife: 0.3,
+      })
+      nextId += 1
+      sounds.push('explode')
+    }
 
     // ระเบิดลูกโซ่ ทำให้ฝูงที่เบียดกันแน่นล้มต่อกันเป็นทอด ๆ
     if (stats.bloomDamage > 0) {
