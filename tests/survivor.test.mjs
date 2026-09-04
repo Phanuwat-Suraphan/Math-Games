@@ -36,6 +36,7 @@ const ART = load('art/heroes')
 const PERK = load('data/perks')
 const PS = load('services/perkService')
 const SC = load('survivor/scenery')
+const BIO = load('survivor/biomes')
 const R = load('survivor/render')
 const STORAGE = load('services/storage')
 
@@ -972,8 +973,13 @@ check('เก็บสกิลครบทุกใบแล้วต้อง�
 // ---------- ความสมดุล ----------
 
 /** จำลองการเล่นแบบวิ่งวน โดยคุมความแรงของก้านบังคับได้ */
-function playCircling(seed, magnitude, maxSeconds = 400) {
-  let world = E.createWorld(seed)
+function playCircling(seed, magnitude, maxSeconds = 400, biome = undefined) {
+  /*
+   * ปักสนามได้ เพื่อให้ข้อที่วัดสมดุลรายสนามเทียบกันได้จริง
+   * ไม่ปักก็ได้สนามที่ seed สุ่มมาให้ ซึ่งเป็นพฤติกรรมของเกมจริง
+   */
+  const created = E.createWorld(seed)
+  let world = biome === undefined ? created : { ...created, biome }
   const steps = Math.round(maxSeconds / E.FIXED_STEP)
 
   for (let i = 0; i < steps; i += 1) {
@@ -2824,6 +2830,276 @@ check('เรียกซ้ำผ่านตัวเก็บของ ต้
   const a = SC.sceneryFor('ห้องเก็บของ')
   const b = SC.sceneryFor('ห้องเก็บของ')
   assert(a === b, 'ตัวเก็บของไม่ได้ทำงาน จึงสุ่มใหม่ทุกครั้งที่วาด')
+})
+
+/* ------------------------------------------------------------------ *
+ * สนามหลายแบบ
+ * ------------------------------------------------------------------ */
+
+const RULE_KEYS = ['enemySpeed', 'enemyHp', 'spawnRate', 'xpValue', 'dropChance']
+
+check('ต้องมีสนามมาตรฐานอยู่หนึ่งสนามพอดี ไม่ขาดไม่เกิน', () => {
+  /*
+   * เด็กต้องมีที่ให้เทียบว่า "ปกติ" หน้าตาเป็นยังไง
+   * ถ้าไม่มีเลย ก็ไม่มีใครรู้ว่าสนามอื่นต่างจากอะไร
+   * ถ้ามีสองสนาม แปลว่ามีสนามที่หน้าตาต่างกันแต่เล่นเหมือนกันเป๊ะ
+   */
+  const plain = BIO.BIOMES.filter((biome) =>
+    RULE_KEYS.every((key) => biome.rules[key] === 1),
+  )
+  assert(plain.length === 1, `มีสนามที่ตัวคูณเป็นหนึ่งทุกช่อง ${plain.length} สนาม`)
+})
+
+check('ตัวคูณทุกช่องต้องอยู่ในเพดานที่ตั้งไว้', () => {
+  for (const biome of BIO.BIOMES) {
+    for (const key of RULE_KEYS) {
+      const value = biome.rules[key]
+      assert(
+        value >= BIO.RULE_MIN && value <= BIO.RULE_MAX,
+        `${biome.id} ตั้ง ${key} ไว้ที่ ${value} ซึ่งเกินช่วง ` +
+          `${BIO.RULE_MIN}–${BIO.RULE_MAX} สนามจะกลายเป็นตัวตัดสินผลแทนฝีมือ`,
+      )
+    }
+  }
+})
+
+check('ตัวคูณที่ไม่เท่ากับหนึ่ง ต้องต่างมากพอให้เด็กรู้สึกได้', () => {
+  /*
+   * ตัวคูณที่รู้สึกไม่ได้ไม่ใช่ของฟรี มันจ่ายด้วยความยาวของข้อความ
+   * ที่เด็กต้องอ่านทุกรอบ ดู RULE_MIN_EFFECT ใน biomes.ts
+   */
+  for (const biome of BIO.BIOMES) {
+    for (const key of RULE_KEYS) {
+      const value = biome.rules[key]
+      if (value === 1) continue
+      assert(
+        Math.abs(value - 1) >= BIO.RULE_MIN_EFFECT - 1e-9,
+        `${biome.id} ตั้ง ${key} ไว้ที่ ${value} ซึ่งต่างจากปกติแค่ ` +
+          `${Math.round(Math.abs(value - 1) * 100)}% น้อยเกินกว่าจะรู้สึกได้`,
+      )
+    }
+  }
+})
+
+check('สนามสองแบบต้องต่างกันอย่างน้อยสองช่อง ไม่ใช่แค่เปลี่ยนสี', () => {
+  for (let i = 0; i < BIO.BIOMES.length; i += 1) {
+    for (let j = i + 1; j < BIO.BIOMES.length; j += 1) {
+      const a = BIO.BIOMES[i]
+      const b = BIO.BIOMES[j]
+      const differing = RULE_KEYS.filter((key) => a.rules[key] !== b.rules[key])
+      assert(
+        differing.length >= 2,
+        `${a.id} กับ ${b.id} ต่างกันแค่ ${differing.length} ช่อง ` +
+          'ซึ่งใกล้เคียงกันเกินกว่าจะนับเป็นคนละสนาม',
+      )
+    }
+  }
+})
+
+check('ข้อความบอกสนามต้องพูดถึงทุกช่องที่ต่างจากปกติ และไม่พูดถึงช่องที่ไม่ต่าง', () => {
+  /*
+   * ข้อนี้คือข้อที่ทำให้เกม "โกหกเด็ก" ไม่ได้
+   *
+   * ถ้าวันหนึ่งใครไปแก้ตัวคูณแล้วลืมแก้ข้อความ ข้อนี้จะจับได้ทันที
+   * เป็นความผิดพลาดชนิดเดียวกับเหตุการณ์ประจำวันของฟาร์มที่เคยเป็นข้อความประดับ
+   */
+  const WORD = {
+    enemySpeed: 'มอนวิ่ง',
+    enemyHp: 'มอนเลือด',
+    spawnRate: 'มอนโผล่',
+    xpValue: 'คริสตัล',
+    dropChance: 'ของตก',
+  }
+
+  for (const biome of BIO.BIOMES) {
+    const blurb = BIO.biomeBlurb(biome.rules)
+    for (const key of RULE_KEYS) {
+      const differs = biome.rules[key] !== 1
+      const mentioned = blurb.includes(WORD[key])
+      assert(
+        differs === mentioned,
+        differs
+          ? `${biome.id} แก้ ${key} เป็น ${biome.rules[key]} แต่ข้อความไม่ได้บอกเด็ก: "${blurb}"`
+          : `${biome.id} ไม่ได้แก้ ${key} แต่ข้อความไปบอกว่าแก้: "${blurb}"`,
+      )
+      if (differs) {
+        const percent = `${Math.round(Math.abs(biome.rules[key] - 1) * 100)}%`
+        assert(
+          blurb.includes(percent),
+          `${biome.id} ไม่ได้บอกตัวเลข ${percent} ของ ${key} ใน "${blurb}"`,
+        )
+      }
+    }
+  }
+})
+
+check('พื้นทุกสนามต้องสว่างพอให้เส้นขอบสีเข้มของมอนอ่านออก', () => {
+  /*
+   * ข้อบังคับข้อแรกของสนามคือเด็กต้องอ่านออกในเสี้ยววินาทีว่าอะไรคือมอน
+   * มอนกับตัวละครเป็นสไตล์เส้นขอบหนาสีเข้ม ซึ่งจมหายไปกับพื้นมืดทันที
+   * เคยลองพื้นสีม่วงเกือบดำแล้วเรนเดอร์ดู เส้นขอบหายไปหมดจริง ๆ
+   *
+   * ข้อนี้กันไม่ให้สนามใหม่ในอนาคตพาปัญหานั้นกลับมา โดยที่ไม่มีใครทันสังเกต
+   * เพราะพื้นมืดมักจะดูสวยในภาพนิ่ง และไปพังตอนมีมอนสามสิบตัวอยู่บนจอ
+   */
+  const luminance = (hex) => {
+    const value = hex.replace('#', '')
+    const full = value.length === 3 ? value.split('').map((c) => c + c).join('') : value
+    const r = parseInt(full.slice(0, 2), 16)
+    const g = parseInt(full.slice(2, 4), 16)
+    const b = parseInt(full.slice(4, 6), 16)
+    return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
+  }
+
+  for (const biome of BIO.BIOMES) {
+    for (const key of ['skyTop', 'skyMid', 'ground', 'hill', 'path']) {
+      const lum = luminance(biome.palette[key])
+      assert(
+        lum >= 0.62,
+        `${biome.id} ตั้ง ${key} เป็น ${biome.palette[key]} ซึ่งสว่างแค่ ` +
+          `${lum.toFixed(2)} มืดเกินไปจนเส้นขอบมอนจะจมหาย`,
+      )
+    }
+  }
+})
+
+check('seed เดิมต้องได้สนามเดิมเสมอ และทุกสนามต้องมีโอกาสถูกสุ่มได้จริง', () => {
+  assert(
+    BIO.biomeFor('เมล็ดเดิม').id === BIO.biomeFor('เมล็ดเดิม').id,
+    'seed เดิมได้คนละสนาม การเล่นซ้ำ seed เดิมจึงไม่ใช่เกมเดิม',
+  )
+
+  /*
+   * สนามที่ไม่มีวันถูกสุ่มได้คือโค้ดที่ตายแล้ว
+   * ซึ่งเป็นบั๊กที่เงียบที่สุดชนิดหนึ่ง เพราะทุกอย่างยังทำงานปกติทุกประการ
+   */
+  const seen = new Set()
+  for (let i = 0; i < 400; i += 1) seen.add(BIO.biomeFor(`สุ่ม-${i}`).id)
+  for (const id of BIO.BIOME_IDS) {
+    assert(seen.has(id), `สุ่ม 400 ครั้งแล้วไม่เคยได้ ${id} เลย`)
+  }
+})
+
+check('จำนวนของประดับต้องมาจากสนาม ไม่ใช่ค่าตายตัวชุดเดียวทั้งเกม', () => {
+  for (const biome of BIO.BIOMES) {
+    const props = SC.buildScenery('นับของ', biome).props
+    for (const kind of ['tree', 'bush', 'rock', 'flower', 'grass']) {
+      const got = props.filter((prop) => prop.kind === kind).length
+      assert(
+        got === biome.props[kind],
+        `${biome.id} ควรมี ${kind} ${biome.props[kind]} ชิ้น แต่ได้ ${got} ชิ้น`,
+      )
+      assert(got > 0, `${biome.id} ไม่มี ${kind} เลย สนามจะดูเหมือนยังโหลดไม่เสร็จ`)
+    }
+  }
+})
+
+check('สองสนามที่ใช้ seed เดียวกัน ต้องได้คนละผัง', () => {
+  const a = SC.buildScenery('เมล็ดร่วม', BIO.getBiome('desert'))
+  const b = SC.buildScenery('เมล็ดร่วม', BIO.getBiome('deepwood'))
+  assert(a.props.length !== b.props.length, 'สองสนามได้ผังเหมือนกันเป๊ะ')
+})
+
+check('ตัวเก็บผังต้องแยกตามสนาม ไม่ใช่แยกตาม seed อย่างเดียว', () => {
+  /*
+   * ถ้าคีย์เป็น seed อย่างเดียว รอบที่ seed ซ้ำแต่คนละสนามจะได้ผังของสนามผิด
+   * เป็นบั๊กที่มองไม่เห็น เพราะทั้งสองผังก็ดูสมเหตุสมผลของมันเอง
+   */
+  const desert = SC.sceneryFor('คีย์ซ้ำ', 'desert')
+  const wood = SC.sceneryFor('คีย์ซ้ำ', 'deepwood')
+  assert(desert !== wood, 'คนละสนามได้ผังก้อนเดียวกัน แปลว่าคีย์ไม่ได้รวมสนาม')
+  assert(
+    SC.sceneryFor('คีย์ซ้ำ', 'desert') === desert,
+    'เรียกซ้ำสนามเดิมแล้วได้ก้อนใหม่ ตัวเก็บของไม่ทำงาน',
+  )
+})
+
+check('ตัวคูณของสนามต้องมีผลกับมอนที่เกิดจริง ไม่ใช่แค่ตัวเลขในตาราง', () => {
+  /*
+   * ตรวจที่ตัวมอนที่เกิดออกมา ไม่ได้ตรวจที่ตาราง
+   * เพราะจุดที่พังได้จริงคือการลืมส่งตัวคูณเข้าไปในที่ที่สร้างมอน
+   * ซึ่งตารางที่ถูกต้องทุกช่องก็ไม่ช่วยอะไรเลย
+   */
+  const plain = { ...E.createWorld('วัดตัวคูณ'), biome: 'meadow', time: 300 }
+  const ember = { ...plain, biome: 'emberlands' }
+
+  let fasterCount = 0
+  let tougherCount = 0
+  const ROUNDS = 40
+  for (let i = 0; i < ROUNDS; i += 1) {
+    const a = E.spawnOne(plain, `ตัว-${i}`)
+    const b = E.spawnOne(ember, `ตัว-${i}`)
+    assert(a.kind === b.kind, 'สองสนามสุ่มได้มอนคนละชนิด เทียบกันไม่ได้')
+    if (b.speed > a.speed) fasterCount += 1
+    if (b.maxHp > a.maxHp) tougherCount += 1
+  }
+  assert(fasterCount === ROUNDS, `มอนในดินแดนลาวาเร็วกว่าแค่ ${fasterCount}/${ROUNDS} ตัว`)
+  assert(tougherCount === ROUNDS, `มอนในดินแดนลาวาถึกกว่าแค่ ${tougherCount}/${ROUNDS} ตัว`)
+})
+
+check('บอสต้องรับตัวคูณของสนามด้วย ไม่งั้นข้อความที่บอกเด็กจะไม่จริง', () => {
+  /*
+   * ข้อความบอกว่า "มอนเลือดหนาขึ้น 20%" ถ้ายกเว้นบอส ข้อความนั้นก็ไม่จริง
+   * และบอสคือมอนที่เด็กจ้องมองนานที่สุดในรอบ จึงเป็นตัวที่สังเกตง่ายที่สุดด้วย
+   */
+  const bossHp = (biome) => {
+    let world = { ...E.createWorld('บอสตามสนาม'), biome }
+    for (let i = 0; i < 62 * 60; i += 1) {
+      world = E.step(world, { move: { x: 0.4, y: 0.3 } })
+      if (world.phase === 'question') world = E.skipSkill(E.resolveQuestion(world, true))
+      world = { ...world, player: { ...world.player, hp: world.player.maxHp } }
+      const boss = world.enemies.find((enemy) => enemy.boss)
+      if (boss) return boss.maxHp
+    }
+    return 0
+  }
+
+  const plain = bossHp('meadow')
+  const ember = bossHp('emberlands')
+  assert(plain > 0 && ember > 0, 'หาบอสไม่เจอในหนึ่งนาที')
+  assert(ember > plain, `บอสสนามมาตรฐาน ${plain} เลือด ดินแดนลาวา ${ember} เลือด`)
+})
+
+check('ทุกสนามต้องให้เวลารอดใกล้เคียงกัน เด็กเลือกสนามไม่ได้', () => {
+  /*
+   * ข้อนี้คือข้อที่จับความผิดพลาดใหญ่ที่สุดของระบบสนาม
+   *
+   * ตัวคูณชุดแรกตั้งจากสูตรบนกระดาษ คือให้ดัชนีความยากเท่ากับดัชนีรางวัล
+   * ทะเลทรายที่สูตรบอกว่ายากขึ้น 4% จำลองแล้วรอดนานกว่าสนามมาตรฐาน 43%
+   * เพราะมอนที่โผล่ถี่ขึ้นคือคริสตัลที่มากขึ้น ซึ่งคือเลเวลที่เร็วขึ้น
+   * ซึ่งย้อนกลับมาทำให้เอาตัวรอดง่ายขึ้นอีก สูตรจึงผิดทั้งทิศทาง
+   *
+   * ทำไมต้องเป็นค่ากลาง ไม่ใช่ค่าเฉลี่ย
+   * เพราะบางเมล็ดสโนว์บอลจนรอดยาวกว่าเพื่อนหลายเท่า ค่าเฉลี่ยจึงถูกหางลากไป
+   * วัดด้วยค่าเฉลี่ยแล้วได้ตัวเลขที่สลับที่กันเองเมื่อเปลี่ยนชุดเมล็ด
+   *
+   * ทำไมต้องล็อกรายชื่อเมล็ด
+   * เพราะความแปรปรวนรายเมล็ดอยู่ที่ราว 13% ซึ่งใหญ่พอจะกลบผลของสนาม
+   * รายชื่อที่ล็อกไว้ทำให้ข้อนี้เป็นการวัดที่ให้ผลเดิมทุกครั้ง
+   * ไม่ใช่การสุ่มที่บางวันผ่านบางวันไม่ผ่าน
+   *
+   * ตรวจกับตัวคูณชุดแรกที่ผิดแล้ว ยืนยันว่าข้อนี้รายงานว่าทะเลทรายอยู่ที่ 1.43 เท่า
+   */
+  const SEEDS = 'ง จ ฉ ช ก ข ค ซ ฌ ญ ฎ ฏ ฐ ฑ ฒ ณ ด ต ถ ท'.split(' ')
+  const CAP = 240
+
+  const medianSurvival = (biome) => {
+    const times = SEEDS.map((seed) => playCircling(seed, 0.8, CAP, biome).time)
+    times.sort((a, b) => a - b)
+    return times[Math.floor(times.length / 2)]
+  }
+
+  const base = medianSurvival('meadow')
+  assert(base > 60, `สนามมาตรฐานเองรอดแค่ ${base.toFixed(0)} วินาที ซึ่งสั้นผิดปกติ`)
+
+  for (const biome of BIO.BIOMES) {
+    const ratio = medianSurvival(biome.id) / base
+    assert(
+      ratio >= 0.8 && ratio <= 1.25,
+      `${biome.id} รอดได้ ${ratio.toFixed(2)} เท่าของสนามมาตรฐาน ` +
+        'ซึ่งแปลว่าคะแนนของเด็กขึ้นกับสนามที่สุ่มได้มากกว่าฝีมือ',
+    )
+  }
 })
 
 /* ------------------------------------------------------------------ *

@@ -12,6 +12,7 @@ import { allPerkLevels, buyPerk, perkBlockedReason, perkLevel } from '../service
 import { recordSurvivorRun } from '../services/recordService'
 import { useMusic } from '../hooks/useMusic'
 import { PERKS, perkCost } from '../data/perks'
+import { biomeBlurb, getBiome, type Biome } from '../survivor/biomes'
 import {
   advance,
   createWorld,
@@ -179,6 +180,11 @@ export function Survivor({ player }: { player: Player }) {
   // สถานะที่หน้าจอต้องรู้จริง ๆ เท่านั้นที่เก็บเป็น state
   const [phase, setPhase] = useState<'idle' | 'playing' | 'question' | 'choosing' | 'dead'>('idle')
   const [hud, setHud] = useState({ hp: 100, maxHp: 100, level: 1, xp: 0, xpToNext: 5, time: 0, kills: 0 })
+  /*
+   * สนามของรอบนี้ ไม่ได้อยู่ใน hud เพราะ hud ถูกตั้งใหม่หกสิบครั้งต่อวินาที
+   * ส่วนสนามเปลี่ยนแค่ตอนเริ่มรอบใหม่เท่านั้น
+   */
+  const [arena, setArena] = useState(() => getBiome(worldRef.current.biome))
   const [question, setQuestion] = useState<Question | null>(null)
   const [summary, setSummary] = useState<ReturnType<typeof summarize> | null>(null)
   const [immersive, setImmersive] = useState(false)
@@ -463,6 +469,7 @@ export function Survivor({ player }: { player: Player }) {
   const start = useCallback(() => {
     paidRef.current = false
     worldRef.current = createWorld(`${Date.now()}`, player.avatar, allPerkLevels(player))
+    setArena(getBiome(worldRef.current.biome))
     inputRef.current = { move: { x: 0, y: 0 } }
     setSummary(null)
     setQuestion(null)
@@ -553,6 +560,7 @@ export function Survivor({ player }: { player: Player }) {
           >
             <Hud
               hud={hud}
+              arena={arena}
               weapons={weaponBar}
               chests={chests}
               immersive={immersive}
@@ -786,6 +794,7 @@ function PerkShop({ player }: { player: Player }) {
 
 function Hud({
   hud,
+  arena,
   weapons,
   chests,
   immersive,
@@ -793,6 +802,7 @@ function Hud({
   onEndRun,
 }: {
   hud: { hp: number; maxHp: number; level: number; xp: number; xpToNext: number; time: number; kills: number }
+  arena: Biome
   weapons: { id: string; level: number; name: string; color: string; evolved: boolean; ready: boolean }[]
   chests: number
   immersive: boolean
@@ -848,6 +858,20 @@ function Hud({
             จบรอบ
           </button>
         )}
+      </div>
+
+      {/*
+        สนามของรอบนี้ กับกติกาที่มันแก้จริง ๆ
+
+        ข้อความสร้างจากตัวคูณโดยตรง (ดู biomeBlurb) ไม่ได้พิมพ์มือ
+        จึงเป็นไปไม่ได้ที่บรรทัดนี้จะบอกเด็กในสิ่งที่เกมไม่ได้ทำ
+
+        แสดงตลอดรอบ ไม่ใช่แค่ตอนเริ่ม เพราะมันคือข้อมูลที่ใช้ตัดสินใจได้จริง
+        เช่น รู้ว่ามอนเลือดหนาขึ้น 35% ก็จะเลือกการ์ดพลังโจมตีแทนการ์ดยิงไว
+      */}
+      <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px]">
+        <span className="font-bold text-leaf-200">{arena.name}</span>
+        <span className="text-slate-400">{biomeBlurb(arena.rules)}</span>
       </div>
 
       {/* อาวุธที่ถืออยู่ พร้อมระดับของแต่ละชิ้น */}

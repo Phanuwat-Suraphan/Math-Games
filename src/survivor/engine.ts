@@ -24,6 +24,7 @@ import {
   weaponDisplayName,
   weaponStats,
 } from './weapons'
+import { biomeFor, getBiome, NEUTRAL_RULES, type BiomeRules } from './biomes'
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
@@ -267,6 +268,8 @@ export function createWorld(
 
   return {
     seed,
+    // สนามของรอบนี้ตัดสินตั้งแต่วินาทีแรก และไม่เปลี่ยนอีกจนจบรอบ
+    biome: biomeFor(seed).id,
     time: 0,
     player: {
       pos: { x: ARENA_WIDTH / 2, y: ARENA_HEIGHT / 2 },
@@ -364,6 +367,17 @@ function difficultyScale(time: number): number {
   return base * (1 + (time - ENDGAME_FROM) / 150)
 }
 
+/**
+ * ตัวคูณของสนามที่รอบนี้เล่นอยู่
+ *
+ * อ่านจากไอดีที่เก็บไว้ในสถานะเกม ไม่ได้คำนวณจาก seed ใหม่ทุกครั้ง
+ * เพราะการคำนวณใหม่ทุกครั้งแปลว่ามีสองที่ที่ตัดสินว่ารอบนี้เป็นสนามไหน
+ * ซึ่งวันหนึ่งจะไม่ตรงกัน
+ */
+function rulesOf(world: WorldState): BiomeRules {
+  return getBiome(world.biome).rules
+}
+
 function makeEnemy(
   id: number,
   template: EnemyKind,
@@ -371,21 +385,27 @@ function makeEnemy(
   scale: number,
   elite: boolean,
   boss = false,
+  rules: BiomeRules = NEUTRAL_RULES,
 ): EnemyEntity {
+  /*
+   * ตัวคูณของสนามคูณทับค่าที่ปรับสมดุลไว้แล้ว ไม่ได้เขียนทับ
+   * และคูณกับบอสด้วย ไม่ยกเว้น เพราะข้อความที่บอกเด็กว่า "มอนเลือดหนาขึ้น 35%"
+   * ต้องเป็นจริงกับมอนทุกตัวที่เด็กเจอ ถ้ายกเว้นบอส ข้อความนั้นก็ไม่จริงอีกต่อไป
+   */
   // ตัวใหญ่พิเศษถึกกว่ามาก ตัวโตกว่า และให้ XP คุ้มกับที่ต้องออกแรง
-  const hp = Math.round(template.hp * scale * (elite ? 8 : 1))
+  const hp = Math.round(template.hp * scale * (elite ? 8 : 1) * rules.enemyHp)
 
   return {
     id,
     pos,
     hp,
     maxHp: hp,
-    speed: template.speed * (elite ? 0.7 : 1),
+    speed: template.speed * (elite ? 0.7 : 1) * rules.enemySpeed,
     radius: template.radius * (elite ? 1.7 : 1),
     damage: Math.round(template.damage * (elite ? 1.6 : 1)),
     kind: template.kind,
     art: template.art,
-    xpValue: template.xpValue * (elite ? 10 : 1),
+    xpValue: template.xpValue * (elite ? 10 : 1) * rules.xpValue,
     hitFlash: 0,
     behavior: template.behavior,
     // นาฬิกาเริ่มไม่ตรงกัน มอนที่เกิดพร้อมกันจึงไม่ส่ายพร้อมกันเป็นแถว
@@ -407,12 +427,18 @@ function makeEnemy(
  * บอสที่โผล่ทับตัวผู้เล่นคือความตายที่หลบไม่ได้ ซึ่งไม่ยุติธรรมเป็นพิเศษ
  * เพราะบอสแรงกว่ามอนธรรมดาหลายเท่า
  */
-function makeBoss(id: number, index: number, time: number, rng: Rng): EnemyEntity {
+function makeBoss(
+  id: number,
+  index: number,
+  time: number,
+  rng: Rng,
+  rules: BiomeRules = NEUTRAL_RULES,
+): EnemyEntity {
   const template = BOSS_KINDS[index % BOSS_KINDS.length]
   // วนรอบที่สองเป็นต้นไปแข็งขึ้นอีกชั้น ไม่งั้นบอสตัวเดิมจะกลายเป็นของง่าย
   const lap = Math.floor(index / BOSS_KINDS.length)
   const scale = difficultyScale(time) * (1 + lap * 0.6)
-  return makeEnemy(id, template, edgeSpawn(rng), scale, false, true)
+  return makeEnemy(id, template, edgeSpawn(rng), scale, false, true, rules)
 }
 
 /** สุ่มตำแหน่งเกิดที่ขอบสนาม */
@@ -432,7 +458,15 @@ function edgeSpawn(rng: Rng): Vec {
 function spawnEnemy(world: WorldState, rng: Rng, elite = false): EnemyEntity {
   const available = ENEMY_KINDS.filter((kind) => world.time >= kind.fromTime)
   const template = rng.pick(available)
-  return makeEnemy(world.nextId, template, edgeSpawn(rng), difficultyScale(world.time), elite)
+  return makeEnemy(
+    world.nextId,
+    template,
+    edgeSpawn(rng),
+    difficultyScale(world.time),
+    elite,
+    false,
+    rulesOf(world),
+  )
 }
 
 /** สร้างมอนหนึ่งตัวสำหรับชุดทดสอบ ใช้ตรวจว่าพฤติกรรมหลากหลายจริง */
@@ -662,6 +696,8 @@ export function step(world: WorldState, input: Input): WorldState {
   // ---------- เกิดมอน ----------
   const enemies: EnemyEntity[] = world.enemies.map((enemy) => ({ ...enemy }))
 
+  const biomeRules = rulesOf(world)
+
   let spawnCooldown = world.spawnCooldown - dt
   if (spawnCooldown <= 0) {
     const plan = spawnPlan(time)
@@ -671,7 +707,15 @@ export function step(world: WorldState, input: Input): WorldState {
       )
       nextId += 1
     }
-    spawnCooldown = plan.interval
+    /*
+     * สนามเร่งความถี่ด้วยการหารเวลารอ ไม่ใช่ด้วยการเพิ่มจำนวนต่อชุด
+     *
+     * สองวิธีนี้ให้จำนวนมอนต่อวินาทีเท่ากัน แต่ให้ความรู้สึกคนละอย่าง
+     * การเพิ่มจำนวนต่อชุดทำให้มอนมาเป็นกำแพงหนาขึ้นทีเดียวแล้วเงียบเท่าเดิม
+     * ส่วนการหารเวลารอทำให้มาถี่ขึ้นแต่ยังเป็นกลุ่มขนาดเดิม
+     * ซึ่งอ่านง่ายกว่ามากตอนอยู่ในสนามจริง และหลบได้ด้วยการเดินแบบเดิม
+     */
+    spawnCooldown = plan.interval / biomeRules.spawnRate
   }
 
   /*
@@ -700,7 +744,9 @@ export function step(world: WorldState, input: Input): WorldState {
 
   if (bossCooldown <= 0) {
     const index = Math.max(0, Math.round((time - 60) / 60))
-    enemies.push(makeBoss(nextId, index, time, createRng(`${world.seed}-boss-${nextId}`)))
+    enemies.push(
+      makeBoss(nextId, index, time, createRng(`${world.seed}-boss-${nextId}`), biomeRules),
+    )
     /* บอสเดินเข้ามาจากขอบจอ เสียงกับแรงสั่นจึงมาถึงก่อนภาพเสมอ */
     sounds.push('bossRoar')
     addShake(0.55)
@@ -1564,7 +1610,9 @@ export function step(world: WorldState, input: Input): WorldState {
        * ถ้าตกบ่อยกว่านี้ เลือดจะเต็มตลอดเวลาจนไม่มีความกดดันเหลือเลย
        * แต่ถ้าไม่มีเลย ช่วงกลางรอบจะเงียบสนิทเพราะไม่มีอะไรเกิดขึ้น
        */
-      const roll = createRng(`${world.seed}-drop-${enemy.id}`).next() / stats.luckMultiplier
+      const roll =
+        createRng(`${world.seed}-drop-${enemy.id}`).next() /
+        (stats.luckMultiplier * biomeRules.dropChance)
       const kind: PickupKind | undefined =
         roll < 0.028 ? 'heart' : roll < 0.045 ? 'bomb' : roll < 0.062 ? 'magnet' : undefined
 
@@ -1587,6 +1635,8 @@ export function step(world: WorldState, input: Input): WorldState {
           },
           difficultyScale(time),
           false,
+          false,
+          biomeRules,
         ),
       )
       nextId += 1

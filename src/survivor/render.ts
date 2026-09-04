@@ -18,6 +18,7 @@
 
 import { ARENA_HEIGHT, ARENA_WIDTH } from './types'
 import type { WorldState } from './types'
+import { getBiome } from './biomes'
 import { sceneryFor } from './scenery'
 import type { Prop } from './scenery'
 
@@ -107,13 +108,14 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
    * ไล่สีจากฟ้าอ่อนด้านบนลงมาเขียวอ่อนด้านล่าง อ่านเป็นท้องฟ้ากับพื้นหญ้า
    * ซึ่งทำให้สนามรู้สึกเป็น "ที่" จริง ๆ ไม่ใช่กระดานสีเดียว
    */
+  const palette = getBiome(world.biome).palette
   const ground = ctx.createLinearGradient(0, 0, 0, ARENA_HEIGHT)
-  ground.addColorStop(0, '#bfe8ff')
-  ground.addColorStop(0.55, '#d9f2c9')
-  ground.addColorStop(1, '#a8dd8f')
+  ground.addColorStop(0, palette.skyTop)
+  ground.addColorStop(0.55, palette.skyMid)
+  ground.addColorStop(1, palette.ground)
   ctx.fillStyle = ground
   ctx.fillRect(0, 0, ARENA_WIDTH, ARENA_HEIGHT)
-  ctx.strokeStyle = 'rgba(30,64,40,.10)'
+  ctx.strokeStyle = palette.grid
   ctx.lineWidth = 1
   for (let x = 0; x <= ARENA_WIDTH; x += 50) {
     ctx.beginPath()
@@ -128,7 +130,7 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     ctx.stroke()
   }
 
-  drawScenery(ctx, world.seed)
+  drawScenery(ctx, world.seed, world.biome)
 
   // คริสตัล
   for (const gem of world.gems) {
@@ -942,9 +944,15 @@ function drawRock(ctx: CanvasRenderingContext2D, prop: Prop): void {
   ctx.fill()
 }
 
-function drawFlower(ctx: CanvasRenderingContext2D, prop: Prop): void {
+function drawFlower(ctx: CanvasRenderingContext2D, prop: Prop, stem: string): void {
   const s = prop.scale
-  ctx.strokeStyle = 'rgba(80,130,70,.7)'
+  /*
+   * ก้านดอกใช้สีใบของสนามนั้น ไม่ใช่สีเขียวตายตัว
+   * ก้านสีเขียวในทุ่งน้ำแข็งกับในดินแดนลาวาเป็นจุดเดียวที่หลุดจากชุดสี
+   * เล็กมากจนแทบไม่เห็น แต่ถ้าปล่อยไว้ ทุกครั้งที่เพิ่มสนามใหม่
+   * จะต้องมีคนมานั่งสงสัยว่าทำไมมีสีเขียวโผล่มาในสนามที่ไม่มีอะไรเขียวเลย
+   */
+  ctx.strokeStyle = stem
   ctx.lineWidth = 1.4 * s
   ctx.beginPath()
   ctx.moveTo(prop.x, prop.y)
@@ -995,8 +1003,9 @@ function drawGrass(ctx: CanvasRenderingContext2D, prop: Prop): void {
  * ทุกชั้นวาดด้วยความทึบต่ำ เพราะสิ่งที่ต้องอ่านออกที่สุดบนจอนี้
  * คือมอนกับตัวละคร ไม่ใช่ฉาก
  */
-function drawScenery(ctx: CanvasRenderingContext2D, seed: string): void {
-  const scenery = sceneryFor(seed)
+function drawScenery(ctx: CanvasRenderingContext2D, seed: string, biomeId: string): void {
+  const scenery = sceneryFor(seed, biomeId)
+  const palette = getBiome(biomeId).palette
 
   /*
    * ตัดทุกอย่างให้อยู่ในกรอบสนาม
@@ -1020,7 +1029,7 @@ function drawScenery(ctx: CanvasRenderingContext2D, seed: string): void {
    * ที่สายตาสับสนกับฝูงมอนสีเขียว ซึ่งเป็นสิ่งที่ห้ามเกิดที่สุดในสนามนี้
    */
   ctx.globalAlpha = 0.28
-  ctx.fillStyle = '#8dc79a'
+  ctx.fillStyle = palette.hill
   for (const hill of scenery.hills) {
     ctx.beginPath()
     ctx.ellipse(hill.x, hill.y + 14, hill.r, hill.r * 0.42, 0, Math.PI, Math.PI * 2)
@@ -1030,7 +1039,7 @@ function drawScenery(ctx: CanvasRenderingContext2D, seed: string): void {
 
   // ---- ทางเดินดิน ----
   ctx.globalAlpha = 0.3
-  ctx.strokeStyle = '#d8c39a'
+  ctx.strokeStyle = palette.path
   ctx.lineWidth = 34
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -1062,7 +1071,7 @@ function drawScenery(ctx: CanvasRenderingContext2D, seed: string): void {
     if (prop.kind === 'tree') drawTree(ctx, prop)
     else if (prop.kind === 'bush') drawBush(ctx, prop)
     else if (prop.kind === 'rock') drawRock(ctx, prop)
-    else if (prop.kind === 'flower') drawFlower(ctx, prop)
+    else if (prop.kind === 'flower') drawFlower(ctx, prop, palette.leafTints[0] ?? '#5ba85f')
     else drawGrass(ctx, prop)
   }
   ctx.restore()

@@ -24,6 +24,7 @@
  */
 
 import { createRng } from '../math/rng'
+import { DEFAULT_BIOME, getBiome, type Biome } from './biomes'
 import { ARENA_HEIGHT, ARENA_WIDTH } from './types'
 
 /** ของหนึ่งชิ้นที่วางอยู่บนพื้นสนาม */
@@ -52,9 +53,6 @@ export interface Scenery {
  */
 const SAFE_RADIUS = 120
 
-const LEAF_TINTS = ['#5ba85f', '#4e9a56', '#69b96b', '#3f8a4c']
-const FLOWER_TINTS = ['#f9a8d4', '#fde68a', '#fca5a5', '#c4b5fd', '#fff']
-
 /**
  * ของประดับกินที่ตรงกลางไหม
  *
@@ -73,8 +71,9 @@ function tooCentral(x: number, y: number): boolean {
  * เพราะถ้าสุ่มจำนวนด้วย จะมี seed ที่ได้สนามโล่งกว่าเพื่อนอย่างเห็นได้ชัด
  * ซึ่งเป็นความต่างที่ไม่ได้ทำให้สนุกขึ้น มีแต่ทำให้บาง seed ดูเหมือนยังโหลดไม่เสร็จ
  */
-export function buildScenery(seed: string): Scenery {
+export function buildScenery(seed: string, biome: Biome = DEFAULT_BIOME): Scenery {
   const rng = createRng(`arena-${seed}`)
+  const { palette, props: counts } = biome
 
   const props: Prop[] = []
   const place = (kind: Prop['kind'], count: number, tints: readonly string[]) => {
@@ -96,11 +95,18 @@ export function buildScenery(seed: string): Scenery {
     }
   }
 
-  place('tree', 7, LEAF_TINTS)
-  place('bush', 11, LEAF_TINTS)
-  place('rock', 8, ['#9ca3af', '#a8a29e', '#8b8f96'])
-  place('flower', 16, FLOWER_TINTS)
-  place('grass', 22, ['#67a95f'])
+  /*
+   * จำนวนของแต่ละชนิดมาจากสนาม ไม่ได้ตั้งไว้ตายตัวในไฟล์นี้แล้ว
+   * ป่าลึกจึงรกจริง และทะเลทรายจึงโล่งจริง ไม่ใช่แค่เปลี่ยนสี
+   *
+   * ยังสุ่มด้วย rng ตัวเดียวกันตามลำดับเดิม เพื่อให้ seed เดิมกับสนามเดิม
+   * ได้ผังเดิมเป๊ะ ซึ่งเป็นเงื่อนไขที่ชุดทดสอบพึ่งพาอยู่
+   */
+  place('tree', counts.tree, palette.leafTints)
+  place('bush', counts.bush, palette.leafTints)
+  place('rock', counts.rock, palette.rockTints)
+  place('flower', counts.flower, palette.flowerTints)
+  place('grass', counts.grass, [palette.leafTints[0] ?? '#67a95f'])
 
   /*
    * เรียงตามแกน y เพื่อให้ของที่อยู่ใกล้กว่าถูกวาดทับของที่อยู่ไกลกว่า
@@ -138,15 +144,21 @@ export function buildScenery(seed: string): Scenery {
 const CACHE = new Map<string, Scenery>()
 const CACHE_LIMIT = 4
 
-export function sceneryFor(seed: string): Scenery {
-  const cached = CACHE.get(seed)
+export function sceneryFor(seed: string, biomeId: string = DEFAULT_BIOME.id): Scenery {
+  /*
+   * คีย์รวมไอดีสนามด้วย ไม่ใช่ seed อย่างเดียว
+   * ถ้าใช้ seed อย่างเดียว รอบที่ seed ซ้ำแต่คนละสนามจะได้ผังของสนามผิด
+   * ซึ่งเป็นบั๊กที่มองไม่เห็นเพราะทั้งสองผังก็ดูสมเหตุสมผลของมันเอง
+   */
+  const key = `${seed}|${biomeId}`
+  const cached = CACHE.get(key)
   if (cached) return cached
 
-  const built = buildScenery(seed)
+  const built = buildScenery(seed, getBiome(biomeId))
   if (CACHE.size >= CACHE_LIMIT) {
     const oldest = CACHE.keys().next().value
     if (oldest !== undefined) CACHE.delete(oldest)
   }
-  CACHE.set(seed, built)
+  CACHE.set(key, built)
   return built
 }
