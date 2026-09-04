@@ -3093,6 +3093,323 @@ check('บอสตัวที่เรียกสมุนต้องเร�
 })
 
 /* ------------------------------------------------------------------ *
+ * สกิลชุดใหม่ และไอเทมที่ให้หน้าต่างเวลา
+ * ------------------------------------------------------------------ */
+
+/** ตุ๊กตาซ้อมที่ยืนนิ่งและเลือดเยอะพอจะไม่ตายระหว่างวัด */
+function dummyAt(x, y, over = {}) {
+  return enemyAt({
+    pos: { x, y },
+    hp: 40000,
+    maxHp: 40000,
+    speed: 0,
+    damage: 0,
+    ...over,
+  })
+}
+
+/** เก็บตัวเลขความเสียหายทุกก้อนที่โผล่ระหว่างเล่นไปกี่เฟรม */
+function damageSeen(skills, frames = 240, enemies) {
+  let world = {
+    ...E.createWorld('วัดความเสียหาย'),
+    skills,
+    enemies,
+    spawnCooldown: 9999,
+  }
+  const amounts = []
+  for (let i = 0; i < frames; i += 1) {
+    if (world.phase !== 'playing') break
+    world = E.step(world, STILL)
+    for (const entry of world.damageNumbers) amounts.push(Math.round(entry.amount))
+    world = { ...world, damageNumbers: [] }
+  }
+  return { amounts, world }
+}
+
+check('ตาแม่นต้องทำให้บางครั้งตีแรงกว่าปกติจริง', () => {
+  /*
+   * วัดที่ตัวเลขที่โผล่บนจอ ไม่ได้วัดที่ค่าในตารางสกิล
+   * เพราะจุดที่พังได้จริงคือการลืมส่งการโจมตีบางชิ้นผ่านทางที่ทอยคริติคอล
+   * ซึ่งตารางที่ถูกต้องทุกช่องก็ไม่ช่วยอะไรเลย
+   */
+  const plain = damageSeen({}, 240, [dummyAt(430, 300)])
+  const sharp = damageSeen({ crit: 5 }, 240, [dummyAt(430, 300)])
+
+  assert(plain.amounts.length > 0, 'ไม่มีตัวเลขความเสียหายโผล่เลย เทียบอะไรไม่ได้')
+  const plainMax = Math.max(...plain.amounts)
+  const sharpMax = Math.max(...sharp.amounts)
+  assert(
+    sharpMax > plainMax * 1.5,
+    `ไม่มีสกิลตีแรงสุด ${plainMax} มีตาแม่นเต็มตีแรงสุด ${sharpMax} ` +
+      'ซึ่งแทบไม่ต่างกัน แปลว่าคริติคอลไม่ได้ทำงาน',
+  )
+})
+
+check('ตาแม่นต้องยังมีการตีแบบธรรมดาปนอยู่ ไม่ใช่แรงทุกครั้ง', () => {
+  /*
+   * ถ้าคริติคอลทุกครั้ง มันก็คือสกิลเพิ่มความเสียหายธรรมดาที่ตั้งชื่อผิด
+   * ความสนุกของมันคือการลุ้น ซึ่งต้องมีทั้งครั้งที่ติดและครั้งที่ไม่ติด
+   */
+  const { amounts } = damageSeen({ crit: 5 }, 400, [dummyAt(430, 300)])
+  const distinct = new Set(amounts)
+  assert(distinct.size >= 2, `ตัวเลขความเสียหายมีค่าเดียวคือ ${[...distinct]}`)
+})
+
+check('สายฟ้าลามต้องทำให้มอนตัวข้าง ๆ เจ็บด้วย', () => {
+  const target = dummyAt(430, 300, { id: 1 })
+  const neighbour = dummyAt(460, 300, { id: 2 })
+  const stranger = dummyAt(760, 560, { id: 3 })
+
+  let world = {
+    ...E.createWorld('สายฟ้า'),
+    skills: { chain: 4 },
+    enemies: [target, neighbour, stranger],
+    spawnCooldown: 9999,
+  }
+  for (let i = 0; i < 120; i += 1) world = E.step(world, STILL)
+
+  /*
+   * ตรวจว่าตุ๊กตายังอยู่ก่อน แล้วค่อยดูเลือด
+   *
+   * ตอนทดสอบข้อนี้ด้วยการทำให้สายฟ้าลามต่อไม่รู้จบ ตุ๊กตาหายไปทั้งสนาม
+   * แล้วข้อนี้รายงานว่า "อ่าน hp ของ undefined ไม่ได้" ซึ่งไม่ได้บอกสาเหตุอะไรเลย
+   * ข้อทดสอบที่ล้มด้วยข้อความที่อ่านไม่รู้เรื่อง ทำให้คนที่มาเจอทีหลังเสียเวลาเปล่า
+   */
+  const after = (id) => {
+    const found = world.enemies.find((enemy) => enemy.id === id)
+    assert(found !== undefined, `ตุ๊กตาตัวที่ ${id} ตายไปแล้ว ทั้งที่มีเลือด 40000`)
+    return found
+  }
+  assert(after(2).hp < 40000, 'มอนที่อยู่ข้าง ๆ เป้าไม่เจ็บเลย')
+  assert(after(3).hp === 40000, 'มอนที่อยู่คนละมุมสนามกลับเจ็บด้วย')
+})
+
+check('สายฟ้าลามต้องไม่ลามต่อจากตัวที่มันเพิ่งลามไปโดน', () => {
+  /*
+   * ถ้าความเสียหายที่ลามไปนับเป็นการตีของผู้เล่นอีกครั้ง มันจะลามต่อไปเรื่อย ๆ
+   * เป็นลูกโซ่ที่ไม่มีจุดจบในเฟรมเดียว ซึ่งจะกวาดทั้งสนามทุกครั้งที่ตีโดน
+   *
+   * วัดโดยเทียบกับกรณีไม่มีสกิล ถ้าลามไม่รู้จบ ตัวที่ไกลที่สุดในแถวจะเจ็บพอ ๆ กับตัวแรก
+   */
+  const line = []
+  for (let i = 0; i < 6; i += 1) line.push(dummyAt(430 + i * 40, 300, { id: i + 1 }))
+
+  let world = {
+    ...E.createWorld('ลูกโซ่'),
+    skills: { chain: 4 },
+    enemies: line,
+    spawnCooldown: 9999,
+  }
+  for (let i = 0; i < 120; i += 1) world = E.step(world, STILL)
+
+  const lost = (id) => {
+    const found = world.enemies.find((enemy) => enemy.id === id)
+    assert(found !== undefined, `ตุ๊กตาตัวที่ ${id} ตายไปแล้ว ทั้งที่มีเลือด 40000 ` +
+      'ซึ่งเป็นอาการของการลามต่อไม่รู้จบจนกวาดทั้งแถวในเฟรมเดียว')
+    return 40000 - found.hp
+  }
+  assert(
+    lost(6) < lost(1) * 0.5,
+    `ตัวแรกเสียเลือด ${lost(1)} ตัวปลายแถวเสียเลือด ${lost(6)} ` +
+      'ซึ่งใกล้เคียงกันเกินไป แปลว่าลามต่อกันไปทั้งแถว',
+  )
+})
+
+check('ตัวลื่นต้องทำให้เจ็บน้อยลงจริง แต่ไม่ถึงกับอมตะ', () => {
+  /*
+   * นับจำนวนครั้งที่โดน ไม่ได้วัดเลือดที่เหลือตอนจบ
+   *
+   * เขียนครั้งแรกวัดเลือดที่เหลือ แล้วทั้งสองฝั่งได้ศูนย์เท่ากัน
+   * เพราะยืนให้มอนตีสามสิบวินาที ยังไงก็ตายทั้งคู่ ต่างกันแค่ตายเร็วหรือช้า
+   * เติมเลือดเต็มทุกเฟรมแล้วนับครั้งที่โดน จึงได้ตัวอย่างมากพอจะเทียบโอกาสได้จริง
+   */
+  const hitsTaken = (skills) => {
+    const base = E.createWorld('หลบ')
+    let world = {
+      ...base,
+      skills,
+      enemies: [enemyAt({ pos: { x: 400, y: 300 }, hp: 99999, maxHp: 99999, speed: 0, damage: 12 })],
+      spawnCooldown: 9999,
+    }
+    let taken = 0
+    for (let i = 0; i < 60 * 40; i += 1) {
+      if (world.phase === 'question') { world = E.resolveQuestion(world, true); continue }
+      if (world.phase === 'choosing') { world = E.skipSkill(world); continue }
+      world = E.step(world, STILL)
+      if (world.player.hp < world.player.maxHp) taken += 1
+      world = { ...world, player: { ...world.player, hp: world.player.maxHp } }
+    }
+    return taken
+  }
+
+  const plain = hitsTaken({})
+  const slippery = hitsTaken({ dodge: 5 })
+  assert(plain > 10, `ไม่มีสกิลโดนแค่ ${plain} ครั้ง น้อยเกินกว่าจะเทียบโอกาสได้`)
+  assert(
+    slippery < plain * 0.9,
+    `ไม่มีสกิลโดน ${plain} ครั้ง มีตัวลื่นเต็มโดน ${slippery} ครั้ง ซึ่งแทบไม่ต่างกัน`,
+  )
+})
+
+check('โอกาสของสกิลต้องไม่ทะลุร้อยเปอร์เซ็นต์แม้อัดเต็มทุกชั้น', () => {
+  /*
+   * ข้อนี้กันความผิดพลาดที่ทำให้เกมจบทันที คือผู้เล่นที่ไม่มีวันเจ็บ
+   * ตรวจที่เกินเพดานของสกิลไปด้วย เพราะวันที่ใครขยายเพดานชั้น
+   * สูตรต้องยังปลอดภัยอยู่ ไม่ใช่ปลอดภัยเพราะเพดานบังเอิญตั้งไว้ต่ำ
+   */
+  for (const level of [5, 20, 100]) {
+    const stats = S.statsFrom({ crit: level, dodge: level })
+    assert(stats.critChance < 1, `ตาแม่น ${level} ชั้นได้โอกาส ${stats.critChance}`)
+    assert(stats.dodgeChance < 0.8, `ตัวลื่น ${level} ชั้นได้โอกาส ${stats.dodgeChance}`)
+  }
+})
+
+check('คลื่นกระแทกต้องผลักมอนที่เข้ามาชนออกไป', () => {
+  const pushed = (skills) => {
+    const near = enemyAt({ pos: { x: 408, y: 300 }, hp: 99999, maxHp: 99999, speed: 0, damage: 5 })
+    let world = { ...E.createWorld('ผลัก'), skills, enemies: [near], spawnCooldown: 9999 }
+    for (let i = 0; i < 20; i += 1) world = E.step(world, STILL)
+    const enemy = world.enemies[0]
+    return Math.hypot(enemy.pos.x - world.player.pos.x, enemy.pos.y - world.player.pos.y)
+  }
+
+  const plain = pushed({})
+  const shock = pushed({ shockwave: 3 })
+  assert(
+    shock > plain + 40,
+    `ไม่มีสกิลมอนอยู่ห่าง ${plain.toFixed(0)} มีคลื่นกระแทกอยู่ห่าง ${shock.toFixed(0)}`,
+  )
+})
+
+check('ดูดพลังต้องคืนเลือดตอนเก็บคริสตัล และไม่ดันเกินหลอด', () => {
+  const gems = []
+  for (let i = 0; i < 12; i += 1) gems.push({ id: 900 + i, pos: { x: 400, y: 300 }, value: 1 })
+
+  const base = E.createWorld('ดูดพลัง')
+  const hurtPlayer = { ...base.player, hp: base.player.maxHp - 30 }
+  let world = { ...base, skills: { siphon: 4 }, gems, player: hurtPlayer, spawnCooldown: 9999 }
+  world = E.step(world, STILL)
+
+  assert(world.player.hp > hurtPlayer.hp, 'เก็บคริสตัลสิบสองเม็ดแล้วเลือดไม่ขึ้นเลย')
+  assert(world.player.hp <= world.player.maxHp, `เลือดพองไปถึง ${world.player.hp}`)
+})
+
+check('ของทุกชนิดต้องมีโอกาสตกได้จริง ไม่มีชนิดที่เขียนไว้แล้วไม่มีใครได้เจอ', () => {
+  const seen = new Set()
+  let world = {
+    ...E.createWorld('ของตก'),
+    skills: { luck: 3 },
+    time: 200,
+  }
+  for (let i = 0; i < 60 * 260; i += 1) {
+    if (world.phase === 'question') { world = E.resolveQuestion(world, true); continue }
+    if (world.phase === 'choosing') { world = E.skipSkill(world); continue }
+    world = E.step(world, { move: { x: 0.7, y: 0.5 } })
+    world = { ...world, player: { ...world.player, hp: world.player.maxHp } }
+    for (const pickup of world.pickups) seen.add(pickup.kind)
+  }
+
+  for (const kind of ['heart', 'bomb', 'magnet', 'shield', 'clock', 'rage']) {
+    assert(seen.has(kind), `เล่นไปสี่นาทีแล้วไม่เคยเห็น ${kind} ตกเลย`)
+  }
+})
+
+check('นาฬิกาต้องหยุดมอนทั้งสนามจริง', () => {
+  const walker = enemyAt({ pos: { x: 200, y: 300 }, speed: 140 })
+  const base = { ...E.createWorld('หยุดเวลา'), enemies: [walker], spawnCooldown: 9999 }
+
+  const moved = (freezeFor) => {
+    let world = { ...base, freezeFor }
+    for (let i = 0; i < 30; i += 1) world = E.step(world, STILL)
+    return world.enemies[0].pos.x - 200
+  }
+
+  const running = moved(0)
+  const frozen = moved(3)
+  assert(running > 5, `มอนที่ไม่ได้ถูกหยุดขยับแค่ ${running.toFixed(1)}`)
+  assert(
+    frozen < running * 0.25,
+    `มอนที่ถูกหยุดเวลาขยับ ${frozen.toFixed(1)} มอนปกติขยับ ${running.toFixed(1)}`,
+  )
+})
+
+check('โล่ต้องทำให้ไม่เจ็บเลยระหว่างที่ยังเปิดอยู่', () => {
+  const attacker = enemyAt({ pos: { x: 400, y: 300 }, hp: 99999, maxHp: 99999, speed: 0, damage: 30 })
+  const base = E.createWorld('โล่')
+
+  const hpAfter = (shieldFor) => {
+    let world = {
+      ...base,
+      shieldFor,
+      enemies: [attacker],
+      spawnCooldown: 9999,
+      player: { ...base.player, invulnerable: 0 },
+    }
+    for (let i = 0; i < 120; i += 1) world = E.step(world, STILL)
+    return world.player.hp
+  }
+
+  assert(hpAfter(0) < base.player.maxHp, 'ไม่มีโล่แล้วยังไม่เจ็บ วัดอะไรไม่ได้')
+  assert(hpAfter(5) === base.player.maxHp, 'มีโล่แล้วยังเจ็บ')
+})
+
+check('ตราพลังต้องทำให้ความเสียหายเพิ่มขึ้นจริง', () => {
+  const damageWith = (rageFor) => {
+    let world = {
+      ...E.createWorld('ตราพลัง'),
+      rageFor,
+      enemies: [dummyAt(430, 300)],
+      spawnCooldown: 9999,
+    }
+    const amounts = []
+    for (let i = 0; i < 60; i += 1) {
+      world = E.step(world, STILL)
+      for (const entry of world.damageNumbers) amounts.push(Math.round(entry.amount))
+      world = { ...world, damageNumbers: [], rageFor: rageFor > 0 ? rageFor : 0 }
+    }
+    return Math.max(0, ...amounts)
+  }
+
+  const plain = damageWith(0)
+  const raging = damageWith(8)
+  assert(plain > 0, 'ไม่มีตัวเลขความเสียหายโผล่เลย')
+  assert(raging > plain * 1.5, `ปกติตีแรงสุด ${plain} ตอนติดตราพลังตีแรงสุด ${raging}`)
+})
+
+check('เวลาของไอเทมต้องหยุดเดินตอนเกมหยุดถามโจทย์', () => {
+  /*
+   * เด็กที่ใช้เวลาอ่านโจทย์นานจะเสียเวลาของโล่ไปฟรี ๆ ถ้านาฬิกาเดินต่อ
+   * ซึ่งเป็นการลงโทษเด็กที่คิดช้า ในเกมที่ทั้งเกมสร้างมาเพื่อให้เด็กได้คิด
+   */
+  const world = { ...E.createWorld('หยุดถาม'), phase: 'question', shieldFor: 5, rageFor: 5 }
+  let after = world
+  for (let i = 0; i < 120; i += 1) after = E.step(after, STILL)
+
+  assert(after.shieldFor === 5, `เวลาโล่เดินไปเหลือ ${after.shieldFor} ทั้งที่เกมหยุดอยู่`)
+  assert(after.rageFor === 5, `เวลาตราพลังเดินไปเหลือ ${after.rageFor}`)
+})
+
+check('เก็บของชิ้นเดิมซ้ำต้องตั้งเวลาใหม่ ไม่ใช่บวกทบไปเรื่อย ๆ', () => {
+  /*
+   * ถ้าบวกทบ เด็กที่บังเอิญเจอโล่สามอันติดกันจะได้อมตะสิบห้าวินาที
+   * ซึ่งยาวพอจะเดินฝ่าบอสไปเฉย ๆ ได้ และไม่ใช่สิ่งที่ตั้งใจให้เกิด
+   */
+  const base = E.createWorld('ทับเวลา')
+  const world = {
+    ...base,
+    shieldFor: 4,
+    pickups: [{ id: 1, kind: 'shield', pos: { ...base.player.pos }, life: 10 }],
+    spawnCooldown: 9999,
+  }
+  const after = E.step(world, STILL)
+  assert(
+    after.shieldFor <= T.SHIELD_SECONDS,
+    `เก็บโล่ตอนยังเหลือ 4 วินาที แล้วได้ ${after.shieldFor} ซึ่งเกิน ${T.SHIELD_SECONDS}`,
+  )
+  assert(after.shieldFor > 4, 'เก็บโล่ตอนยังเหลือเวลาแล้วได้เวลาน้อยลง')
+})
+
+/* ------------------------------------------------------------------ *
  * สนามหลายแบบ
  * ------------------------------------------------------------------ */
 

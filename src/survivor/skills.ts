@@ -175,6 +175,51 @@ export const SKILLS: Skill[] = [
     weight: 3,
     icon: 'flame',
   },
+  /*
+   * ห้าใบล่างเพิ่มทีหลัง เพราะสิบเก้าใบบนเป็นตัวคูณคงที่เกือบทั้งหมด
+   * บิลด์ที่มีแต่ตัวคูณคงที่จะรู้สึกเหมือนกันหมดทุกรอบ ต่างกันแค่ตัวเลขบนจอ
+   * ห้าใบนี้ทำงานด้วยโอกาส หรือด้วยการกระทำต่อมอนตัวอื่น จึงเปลี่ยนจังหวะการเล่นจริง
+   */
+  {
+    id: 'crit',
+    name: 'ตาแม่น',
+    description: 'มีโอกาสตีแรงเป็นสองเท่ากว่าปกติ',
+    maxStacks: 5,
+    weight: 4,
+    icon: 'star',
+  },
+  {
+    id: 'dodge',
+    name: 'ตัวลื่น',
+    description: 'มีโอกาสหลบการโจมตีได้โดยไม่เจ็บเลย',
+    maxStacks: 5,
+    weight: 3,
+    icon: 'check',
+  },
+  {
+    id: 'chain',
+    name: 'สายฟ้าลาม',
+    description: 'ตีโดนแล้วความเสียหายกระเด็นไปโดนมอนตัวข้าง ๆ ด้วย',
+    maxStacks: 4,
+    weight: 3,
+    icon: 'flame',
+  },
+  {
+    id: 'shockwave',
+    name: 'คลื่นกระแทก',
+    description: 'มอนที่ชนเราจะถูกผลักกระเด็นออกไป',
+    maxStacks: 3,
+    weight: 3,
+    icon: 'shield',
+  },
+  {
+    id: 'siphon',
+    name: 'ดูดพลัง',
+    description: 'เก็บคริสตัลแล้วได้เลือดคืนเล็กน้อย',
+    maxStacks: 4,
+    weight: 3,
+    icon: 'heart',
+  },
 ]
 
 const SKILL_BY_ID = new Map(SKILLS.map((skill) => [skill.id, skill]))
@@ -205,6 +250,12 @@ export const BASE_STATS: CombatStats = {
   graceSeconds: 0.9,
   frostAuraRadius: 0,
   bloomDamage: 0,
+
+  critChance: 0,
+  dodgeChance: 0,
+  chainDamage: 0,
+  knockback: 0,
+  gemHeal: 0,
 }
 
 /**
@@ -259,6 +310,24 @@ export function statsFrom(
     graceSeconds: 0.9 + level('grace') * 0.35,
     frostAuraRadius: level('frost') > 0 ? 70 + level('frost') * 34 : 0,
     bloomDamage: level('bloom') * 30,
+
+    /*
+     * โอกาสสองตัวนี้เข้าหาเพดานแบบลดหลั่น ไม่ใช่บวกเข้าไปตรง ๆ
+     *
+     * ถ้าบวกตรง ๆ ชั้นละ 15% ห้าชั้นจะได้ 75% ซึ่งยังพอรับได้
+     * แต่วันที่ใครเพิ่มเพดานชั้นเป็นสิบ มันจะทะลุ 100% แล้วกลายเป็นอมตะถาวร
+     * การเข้าหาเพดานทีละส่วนจึงปลอดภัยกว่าโดยธรรมชาติ
+     * เป็นเหตุผลเดียวกับที่การลดความเสียหายใช้การคูณเข้าหาศูนย์
+     *
+     * การหลบยังคูณ 0.75 ทับอีกชั้น เพราะการหลบที่เข้าใกล้ 100%
+     * ทำให้ทั้งเกมกลายเป็นการรอลุ้น ไม่ใช่การเดินหลบ
+     * เพดานที่ 75% ทำให้มันเป็นสกิลที่ดีมาก แต่ยังต้องเดินหลบอยู่ดี
+     */
+    critChance: 1 - Math.pow(0.85, level('crit')),
+    dodgeChance: (1 - Math.pow(0.88, level('dodge'))) * 0.75,
+    chainDamage: level('chain') * 22,
+    knockback: level('shockwave') * 120,
+    gemHeal: level('siphon') * 0.9,
   }
 }
 

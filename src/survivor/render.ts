@@ -16,7 +16,14 @@
  * และเป็นข้อผิดพลาดชนิดที่ชุดทดสอบไม่มีทางจับได้เลย
  */
 
-import { ARENA_HEIGHT, ARENA_WIDTH, HEAL_RADIUS } from './types'
+import {
+  ARENA_HEIGHT,
+  ARENA_WIDTH,
+  CLOCK_SECONDS,
+  HEAL_RADIUS,
+  RAGE_SECONDS,
+  SHIELD_SECONDS,
+} from './types'
 import type { WorldState } from './types'
 import { getBiome } from './biomes'
 import { sceneryFor } from './scenery'
@@ -163,18 +170,30 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
       continue
     }
 
+    /*
+     * วงกลมสี บวกเครื่องหมายที่วาดทับตรงกลาง
+     *
+     * ตอนมีของแค่สามอย่าง สีอย่างเดียวก็แยกออก
+     * พอเป็นหกอย่าง วงกลมหกสีที่ต่างกันทีละนิดแยกไม่ออกจริง ๆ ในจังหวะที่กำลังหนีมอน
+     * และของสามอย่างใหม่มีผลต่างกันมาก การเก็บผิดตัวจึงเสียโอกาสจริง
+     * เครื่องหมายทำให้อ่านได้จากรูปทรง ซึ่งอ่านเร็วกว่าสีเสมอเมื่อจอมีของเยอะ
+     */
     const LOOK: Record<string, string> = {
       heart: '#fb7185',
       bomb: '#f8fafc',
       magnet: '#c084fc',
+      shield: '#60a5fa',
+      clock: '#67e8f9',
+      rage: '#fb923c',
     }
     ctx.fillStyle = LOOK[pickup.kind] ?? '#e2e8f0'
     ctx.beginPath()
-    ctx.arc(pickup.pos.x, pickup.pos.y, 9 * pulse, 0, Math.PI * 2)
+    ctx.arc(pickup.pos.x, pickup.pos.y, 10 * pulse, 0, Math.PI * 2)
     ctx.fill()
     ctx.strokeStyle = 'rgba(255,255,255,.85)'
     ctx.lineWidth = 2
     ctx.stroke()
+    drawPickupGlyph(ctx, pickup.kind, pickup.pos.x, pickup.pos.y)
   }
 
   // มอนสเตอร์ สีต่างกันตามชนิด
@@ -623,6 +642,30 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
     ctx.globalAlpha = 1
   }
 
+  /*
+   * วงของไอเทมที่กำลังออกฤทธิ์ วาดตรงจากสถานะเกม ไม่ได้ผ่าน hero.glow
+   *
+   * ที่ไม่ผ่าน hero.glow เพราะช่องนั้นมีได้ค่าเดียว
+   * แต่โล่กับตราพลังติดพร้อมกันได้ และถ้าเห็นแค่อันเดียวตอนติดสองอัน
+   * เด็กจะเดินเข้าไปกลางฝูงต่อหลังโล่หมด โดยคิดว่าวงที่ยังเห็นอยู่คือโล่
+   *
+   * รัศมีคนละขนาด ไม่ใช่คนละสีอย่างเดียว เพื่อให้แยกออกตอนติดพร้อมกัน
+   */
+  if (world.shieldFor > 0) {
+    ctx.strokeStyle = 'rgba(96,165,250,.9)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius * 2.15, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  if (world.rageFor > 0) {
+    ctx.strokeStyle = 'rgba(251,146,60,.9)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(pos.x, pos.y, radius * 2.55, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+
   // เงาใต้เท้า ทำให้ตัวละครดูยืนอยู่บนพื้น ไม่ใช่ลอยอยู่เฉย ๆ
   ctx.fillStyle = 'rgba(0,0,0,.38)'
   ctx.beginPath()
@@ -832,6 +875,50 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
    * ข้อความแจ้งเหตุการณ์สำคัญ วาดท้ายสุดให้อยู่บนสุดเสมอ
    * ลอยขึ้นและจางลงพร้อมกัน ตาจึงจับได้แม้กำลังโฟกัสที่การหลบมอนอยู่
    */
+  /*
+   * แถบเวลาที่เหลือของไอเทมชั่วคราว
+   *
+   * วงรอบตัวบอกว่า "ยังติดอยู่" แต่ไม่ได้บอกว่า "เหลืออีกเท่าไร"
+   * ซึ่งเป็นข้อมูลคนละอย่าง เด็กที่กำลังจะเดินฝ่าบอสต้องรู้ว่าโล่พอไหม
+   * ไม่ใช่แค่รู้ว่ายังมีโล่อยู่ตอนนี้
+   *
+   * วางไว้มุมซ้ายบน ไม่ใช่กลางจอ เพราะกลางจอเป็นที่ของข้อความแจ้งเหตุการณ์
+   * และเป็นที่ที่ตาเด็กจ้องอยู่แล้วระหว่างหลบมอน
+   */
+  const timers: { left: number; full: number; color: string; label: string }[] = []
+  if (world.shieldFor > 0) {
+    timers.push({ left: world.shieldFor, full: SHIELD_SECONDS, color: '#60a5fa', label: 'โล่' })
+  }
+  if (world.rageFor > 0) {
+    timers.push({ left: world.rageFor, full: RAGE_SECONDS, color: '#fb923c', label: 'พลัง' })
+  }
+  if (world.freezeFor > 0) {
+    timers.push({ left: world.freezeFor, full: CLOCK_SECONDS, color: '#67e8f9', label: 'หยุดเวลา' })
+  }
+
+  timers.forEach((timer, index) => {
+    const x = 12
+    const y = 12 + index * 20
+    ctx.fillStyle = 'rgba(15,23,42,.55)'
+    ctx.fillRect(x, y, 96, 15)
+    ctx.fillStyle = timer.color
+    ctx.fillRect(x, y, 96 * Math.max(0, Math.min(1, timer.left / timer.full)), 15)
+    /*
+     * ตัวหนังสือขาวมีขอบเข้ม ไม่ใช่ตัวหนังสือเข้มเฉย ๆ
+     *
+     * ตอนแรกใช้สีเข้ม ซึ่งอ่านออกดีตอนแถบยังยาว
+     * แต่พอแถบหดลงเหลือไม่ถึงครึ่ง ตัวหนังสือจะไปอยู่บนพื้นเข้มแล้วหายไป
+     * ซึ่งเป็นวินาทีสุดท้ายที่เด็กต้องการตัวเลขนี้มากที่สุดพอดี
+     */
+    ctx.font = 'bold 11px system-ui, sans-serif'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 3
+    ctx.strokeStyle = 'rgba(15,23,42,.9)'
+    ctx.strokeText(`${timer.label} ${timer.left.toFixed(1)}`, x + 5, y + 11)
+    ctx.fillStyle = '#ffffff'
+    ctx.fillText(`${timer.label} ${timer.left.toFixed(1)}`, x + 5, y + 11)
+  })
+
   ctx.textAlign = 'center'
   world.notices.forEach((notice, index) => {
     const fade = Math.max(0, Math.min(1, notice.life / notice.maxLife))
@@ -885,6 +972,88 @@ export function draw(canvas: HTMLCanvasElement | null, world: WorldState, hero: 
  * ใช้หลักเดียวกับเงาใต้เท้าตัวละคร คือรีแบน ๆ สีดำจาง
  * ถ้าไม่มีเงา ต้นไม้จะดูเหมือนสติกเกอร์ที่แปะทับพื้นไว้เฉย ๆ
  */
+/**
+ * เครื่องหมายกลางวงกลมของไอเทมแต่ละอย่าง
+ *
+ * วาดด้วยสีเข้มสีเดียวกันหมด ไม่ใช่สีของไอเทม
+ * เพราะสิ่งที่ต้องอ่านคือรูปทรง การให้เครื่องหมายเป็นสีตามไอเทมด้วย
+ * จะทำให้มันกลืนไปกับพื้นวงกลมของตัวเอง แล้วรูปทรงก็หายไป
+ */
+function drawPickupGlyph(
+  ctx: CanvasRenderingContext2D,
+  kind: string,
+  x: number,
+  y: number,
+): void {
+  ctx.strokeStyle = 'rgba(15,23,42,.85)'
+  ctx.fillStyle = 'rgba(15,23,42,.85)'
+  ctx.lineWidth = 2
+  ctx.lineCap = 'round'
+
+  if (kind === 'heart') {
+    // เครื่องหมายบวก อ่านเป็นการรักษาได้ทันทีโดยไม่ต้องเรียนรู้
+    ctx.fillRect(x - 1.5, y - 5, 3, 10)
+    ctx.fillRect(x - 5, y - 1.5, 10, 3)
+    return
+  }
+  if (kind === 'bomb') {
+    // ดาวกระจายสามเส้น อ่านเป็นการระเบิดออกทุกทิศ
+    for (let i = 0; i < 3; i += 1) {
+      const angle = (i / 3) * Math.PI
+      ctx.beginPath()
+      ctx.moveTo(x - Math.cos(angle) * 5.5, y - Math.sin(angle) * 5.5)
+      ctx.lineTo(x + Math.cos(angle) * 5.5, y + Math.sin(angle) * 5.5)
+      ctx.stroke()
+    }
+    return
+  }
+  if (kind === 'magnet') {
+    // ลูกศรชี้เข้าหาจุดกลาง อ่านเป็นการดูดเข้ามา
+    for (const dir of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(x + dir * 5.5, y - 4)
+      ctx.lineTo(x + dir * 1.5, y)
+      ctx.lineTo(x + dir * 5.5, y + 4)
+      ctx.stroke()
+    }
+    return
+  }
+  if (kind === 'shield') {
+    ctx.beginPath()
+    ctx.moveTo(x, y - 6)
+    ctx.lineTo(x + 5, y - 3)
+    ctx.lineTo(x + 5, y + 1)
+    ctx.lineTo(x, y + 6)
+    ctx.lineTo(x - 5, y + 1)
+    ctx.lineTo(x - 5, y - 3)
+    ctx.closePath()
+    ctx.stroke()
+    return
+  }
+  if (kind === 'clock') {
+    ctx.beginPath()
+    ctx.arc(x, y, 5.5, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(x, y)
+    ctx.lineTo(x, y - 4)
+    ctx.moveTo(x, y)
+    ctx.lineTo(x + 3, y + 1)
+    ctx.stroke()
+    return
+  }
+  if (kind === 'rage') {
+    // ลูกศรชี้ขึ้นสองชั้น อ่านเป็นการเพิ่มขึ้นแรง ๆ
+    for (const offset of [-3, 2]) {
+      ctx.beginPath()
+      ctx.moveTo(x - 5, y + offset + 2)
+      ctx.lineTo(x, y + offset - 3)
+      ctx.lineTo(x + 5, y + offset + 2)
+      ctx.stroke()
+    }
+  }
+}
+
 /**
  * วาดเครื่องหมายบอกพฤติกรรมของมอนที่ต้องรับมือเป็นพิเศษ
  *

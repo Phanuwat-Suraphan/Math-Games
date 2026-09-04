@@ -28,7 +28,11 @@ import { biomeFor, getBiome, NEUTRAL_RULES, type BiomeRules } from './biomes'
 import {
   ARENA_HEIGHT,
   ARENA_WIDTH,
+  CLOCK_SECONDS,
   HEAL_RADIUS,
+  RAGE_SECONDS,
+  SHIELD_SECONDS,
+  type CombatStats,
   type DamageNumber,
   type Effect,
   type EnemyBehavior,
@@ -103,6 +107,13 @@ const SUMMON_EVERY = 4.5
  * ถ้าลงโทษแรงกว่าการปล่อยให้มันเดินมาชน เด็กจะเรียนว่า "อย่าฆ่ามัน"
  * ซึ่งตรงข้ามกับทั้งเกม
  */
+/** ตัวคูณความเสียหายตอนตีแรงเป็นพิเศษ และตอนตราพลังทำงาน */
+const CRIT_MULTIPLIER = 2.2
+const RAGE_MULTIPLIER = 2
+
+/** ระยะที่ความเสียหายกระเด็นไปหามอนตัวถัดไปได้ */
+const CHAIN_RANGE = 130
+
 const BOMB_RADIUS = 108
 const BOMB_TO_PLAYER = 0.85
 const BOMB_TO_ENEMIES = 1.6
@@ -354,6 +365,9 @@ export function createWorld(
     chests: 0,
     weaponCooldowns: {},
     spawnCooldown: 1,
+    freezeFor: 0,
+    rageFor: 0,
+    shieldFor: 0,
     eliteCooldown: 45,
     bossCooldown: 60,
     bossesDown: 0,
@@ -634,7 +648,27 @@ export function step(world: WorldState, input: Input): WorldState {
   if (world.phase !== 'playing') return world
 
   const dt = FIXED_STEP
-  const stats = statsFrom(world.skills, world.perks)
+
+  /*
+   * นาฬิกาของไอเทมชั่วคราว เดินก่อนทุกอย่าง เพราะทั้งก้าวนี้ต้องรู้ว่ามันเปิดอยู่ไหม
+   * เดินด้วย dt ของเกม ไม่ใช่นาฬิกาจริง เวลาของมันจึงหยุดตอนเกมหยุดถามโจทย์
+   */
+  const freezeFor = Math.max(0, world.freezeFor - dt)
+  const rageFor = Math.max(0, world.rageFor - dt)
+  const shieldFor = Math.max(0, world.shieldFor - dt)
+
+  const baseStats = statsFrom(world.skills, world.perks)
+  /*
+   * ตราพลังคูณที่ค่ารวม ไม่ได้ไปคูณทีละจุดที่คิดความเสียหาย
+   *
+   * ที่ต้องทำแบบนี้เพราะความเสียหายถูกคิดอยู่สิบกว่าจุดในไฟล์นี้
+   * ถ้าไปคูณทีละจุด วันหนึ่งจะมีจุดที่ลืม แล้วอาวุธชิ้นนั้นชิ้นเดียวจะไม่ได้รับผล
+   * ซึ่งเป็นบั๊กที่แทบไม่มีทางสังเกตเห็น เพราะทุกอย่างยังทำงานปกติ
+   */
+  const stats: CombatStats =
+    rageFor > 0
+      ? { ...baseStats, damageMultiplier: baseStats.damageMultiplier * RAGE_MULTIPLIER }
+      : baseStats
 
   /*
    * สมุดบันทึกของก้าวนี้
@@ -730,7 +764,8 @@ export function step(world: WorldState, input: Input): WorldState {
   }
   const ultimateOn = ultimate.activeFor > 0
   /** ระหว่างใช้สกิลบางอย่างจะไม่เจ็บเลย ไม่ใช่แค่ลดความเสียหาย */
-  const ultimateGuard = ultimateOn && (ultSpec.kind === 'dash' || ultSpec.kind === 'shield')
+  const ultimateGuard =
+    (ultimateOn && (ultSpec.kind === 'dash' || ultSpec.kind === 'shield')) || shieldFor > 0
 
   const raw = input.move
   const rawLength = length(raw)
@@ -844,7 +879,11 @@ export function step(world: WorldState, input: Input): WorldState {
     // น้ำแข็งทำให้เดินช้าลงครึ่งหนึ่ง ส่วนสกิลหยุดเวลาแทบหยุดสนิท
     const slowed = enemy.slowFor > 0
     if (slowed) enemy.slowFor -= dt
-    const frozen = ultimateOn && ultSpec.kind === 'freeze'
+    /*
+     * นาฬิกาจากไอเทมกับสกิลหยุดเวลาใช้ทางเดียวกัน
+     * ถ้าแยกทาง จะมีสองที่ที่ตัดสินว่า "หยุด" แปลว่าอะไร แล้ววันหนึ่งจะไม่ตรงกัน
+     */
+    const frozen = (ultimateOn && ultSpec.kind === 'freeze') || freezeFor > 0
     // ไอเย็นรอบตัวทำงานตลอดเวลา ไม่ต้องยิงโดน จึงช่วยตอนโดนรุมได้จริง
     const chilled =
       stats.frostAuraRadius > 0 && distance(enemy.pos, player.pos) <= stats.frostAuraRadius
@@ -982,6 +1021,61 @@ export function step(world: WorldState, input: Input): WorldState {
   enemies.push(...summoned)
 
   /*
+   * ตัวสุ่มประจำก้าวนี้ ใช้ร่วมกันทุกการทอยในก้าวเดียวกัน
+   *
+   * สร้างตัวเดียวต่อก้าว ไม่ใช่ตัวเดียวต่อการทอย เพราะการสร้างตัวสุ่มหนึ่งตัว
+   * ต้องแฮชสตริงหนึ่งครั้ง และในก้าวที่มอนโดนตีพร้อมกันห้าสิบตัว
+   * นั่นคือการแฮชห้าสิบครั้งเพื่อทอยลูกเต๋าห้าสิบลูก
+   *
+   * ผูกกับเวลา ไม่ใช่กับเลขที่นับขึ้นเรื่อย ๆ เพื่อให้ seed เดิมได้ผลเดิมเสมอ
+   */
+  const roll = createRng(`${world.seed}-roll-${Math.round(time * 60)}`)
+
+  /**
+   * ความเสียหายหนึ่งครั้งที่มาจากฝั่งผู้เล่น
+   *
+   * ทุกจุดที่ผู้เล่นตีมอนต้องผ่านทางนี้ ไม่ใช่เรียก hurt ตรง ๆ
+   * เพราะคริติคอลกับสายฟ้าลามต้องทำงานกับอาวุธทุกชิ้นเท่ากัน
+   * ถ้าให้แต่ละจุดจัดการเอง วันหนึ่งจะมีอาวุธที่ลืมใส่ แล้วสกิลจะดูเหมือน
+   * "ได้ผลบ้างไม่ได้ผลบ้าง" ในสายตาเด็ก ซึ่งแย่กว่าไม่มีสกิลนั้นเลย
+   *
+   * ส่วนความเสียหายที่ไม่ได้มาจากการตีของผู้เล่นโดยตรง เช่น หนามสะท้อน
+   * ระเบิดลูกโซ่ และระเบิดของมอน ยังใช้ hurt ตรง ๆ
+   * ไม่งั้นสายฟ้าลามจะลามต่อจากตัวที่มันเพิ่งลามไปโดน กลายเป็นลูกโซ่ไม่รู้จบ
+   */
+  /**
+   * ทอยว่าหลบได้ไหม เรียกตอนที่กำลังจะเจ็บเท่านั้น
+   *
+   * ทอยตรงจุดที่จะเจ็บ ไม่ใช่ทอยไว้ล่วงหน้าทีเดียวต่อก้าว
+   * เพราะถ้าทอยล่วงหน้า ก้าวที่โดนกระสุนพร้อมกันสามนัดจะหลบได้ทั้งสามนัด
+   * หรือไม่หลบเลยทั้งสามนัด ซึ่งทำให้ความรู้สึกของสกิลนี้เหวี่ยงกว่าที่ตัวเลขบอกมาก
+   *
+   * ตั้งช่วงอมตะสั้น ๆ ให้ด้วยเมื่อหลบได้ ไม่งั้นตัวที่ยืนซ้อนกันอยู่
+   * จะเข้ามาตีซ้ำในเฟรมถัดไปทันที ทำให้การหลบสำเร็จแทบไม่ต่างจากการโดน
+   */
+  const dodged = (): boolean => stats.dodgeChance > 0 && roll.next() < stats.dodgeChance
+
+  const playerHit = (target: EnemyEntity, amount: number, log?: HitRecord[]): void => {
+    const crit = stats.critChance > 0 && roll.next() < stats.critChance
+    hurt(target, amount * (crit ? CRIT_MULTIPLIER : 1), log)
+    if (crit) sounds.push('crit')
+
+    if (stats.chainDamage <= 0) return
+    // ลามไปตัวที่ใกล้ที่สุดตัวเดียว ไม่ใช่ทุกตัวในระยะ
+    let nearest: EnemyEntity | undefined
+    let best = CHAIN_RANGE
+    for (const other of enemies) {
+      if (other.id === target.id || other.hp <= 0) continue
+      const gap = distance(other.pos, target.pos)
+      if (gap < best) {
+        best = gap
+        nearest = other
+      }
+    }
+    if (nearest) hurt(nearest, stats.chainDamage * stats.damageMultiplier, log)
+  }
+
+  /*
    * ---------- แอ่งบนพื้น ----------
    *
    * ตีเป็นความเสียหายต่อวินาที ไม่ใช่ต่อครั้งที่โดน
@@ -1038,7 +1132,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, player.pos) > radius + enemy.radius) continue
-        hurt(enemy, 130 * stats.damageMultiplier, hits)
+        playerHit(enemy, 130 * stats.damageMultiplier, hits)
       }
       effects.push({
         id: nextId,
@@ -1059,7 +1153,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, at) > radius + enemy.radius) continue
-        hurt(enemy, 120 * stats.damageMultiplier, hits)
+        playerHit(enemy, 120 * stats.damageMultiplier, hits)
         enemy.burnFor = Math.max(enemy.burnFor, 3)
         enemy.burnDps = Math.max(enemy.burnDps, 30)
       }
@@ -1086,7 +1180,7 @@ export function step(world: WorldState, input: Input): WorldState {
         if (enemy.hp <= 0) continue
         const gap = distance(enemy.pos, player.pos)
         if (gap > outer + enemy.radius || gap < inner) continue
-        hurt(enemy, 72 * stats.damageMultiplier, hits)
+        playerHit(enemy, 72 * stats.damageMultiplier, hits)
         enemy.slowFor = Math.max(enemy.slowFor, 1.2)
       }
 
@@ -1134,7 +1228,7 @@ export function step(world: WorldState, input: Input): WorldState {
         for (const enemy of enemies) {
           if (enemy.hp <= 0) continue
           if (distance(enemy.pos, player.pos) > radius + enemy.radius) continue
-          hurt(enemy, 260 * stats.damageMultiplier, hits)
+          playerHit(enemy, 260 * stats.damageMultiplier, hits)
         }
         effects.push({
           id: nextId,
@@ -1209,7 +1303,7 @@ export function step(world: WorldState, input: Input): WorldState {
       }
 
       if (target) {
-        hurt(target, 300 * stats.damageMultiplier, hits)
+        playerHit(target, 300 * stats.damageMultiplier, hits)
         effects.push({
           id: nextId,
           kind: 'slash',
@@ -1257,7 +1351,7 @@ export function step(world: WorldState, input: Input): WorldState {
       for (const enemy of enemies) {
         if (enemy.hp <= 0) continue
         if (distance(enemy.pos, player.pos) > range + enemy.radius) continue
-        hurt(enemy, damage, hits)
+        playerHit(enemy, damage, hits)
         hitAny = true
       }
       if (hitAny || enemies.length > 0) {
@@ -1291,7 +1385,7 @@ export function step(world: WorldState, input: Input): WorldState {
       let current: EnemyEntity | undefined = target
 
       for (let jump = 0; jump < spec.count && current; jump += 1) {
-        hurt(current, damage, hits)
+        playerHit(current, damage, hits)
         hitIds.add(current.id)
         effects.push({
           id: nextId,
@@ -1530,7 +1624,7 @@ export function step(world: WorldState, input: Input): WorldState {
       if (hitIds.includes(enemy.id)) continue
       if (distance(moved.pos, enemy.pos) > enemy.radius + moved.radius) continue
 
-      hurt(enemy, moved.damage, hits)
+      playerHit(enemy, moved.damage, hits)
       hitIds.push(enemy.id)
       hitsLeft -= 1
 
@@ -1566,7 +1660,7 @@ export function step(world: WorldState, input: Input): WorldState {
         for (const other of enemies) {
           if (other.id === enemy.id || other.hp <= 0) continue
           if (distance(other.pos, moved.pos) > moved.blastRadius + other.radius) continue
-          hurt(other, moved.damage * 0.6, hits)
+          playerHit(other, moved.damage * 0.6, hits)
           other.burnFor = Math.max(other.burnFor, moved.burnFor)
           other.burnDps = Math.max(other.burnDps, moved.damage * 0.25)
         }
@@ -1604,6 +1698,11 @@ export function step(world: WorldState, input: Input): WorldState {
       !ultimateGuard &&
       distance(moved.pos, player.pos) <= player.radius + moved.radius
     ) {
+      if (dodged()) {
+        sounds.push('zap')
+        invulnerable = stats.graceSeconds * 0.5
+        continue
+      }
       hp -= moved.damage * (1 - stats.damageReduction)
       sounds.push('hurt')
       addShake(0.35)
@@ -1739,10 +1838,15 @@ export function step(world: WorldState, input: Input): WorldState {
         !ultimateGuard &&
         distance(enemy.pos, player.pos) <= BOMB_RADIUS + player.radius
       ) {
-        hp -= enemy.damage * BOMB_TO_PLAYER * (1 - stats.damageReduction)
-        invulnerable = stats.graceSeconds
-        sounds.push('hurt')
-        addShake(0.5)
+        if (dodged()) {
+          sounds.push('zap')
+          invulnerable = stats.graceSeconds * 0.5
+        } else {
+          hp -= enemy.damage * BOMB_TO_PLAYER * (1 - stats.damageReduction)
+          invulnerable = stats.graceSeconds
+          sounds.push('hurt')
+          addShake(0.5)
+        }
       }
       effects.push({
         id: nextId,
@@ -1789,11 +1893,36 @@ export function step(world: WorldState, input: Input): WorldState {
        * ถ้าตกบ่อยกว่านี้ เลือดจะเต็มตลอดเวลาจนไม่มีความกดดันเหลือเลย
        * แต่ถ้าไม่มีเลย ช่วงกลางรอบจะเงียบสนิทเพราะไม่มีอะไรเกิดขึ้น
        */
-      const roll =
+      /*
+       * ทอยของตกด้วยตัวสุ่มของมอนตัวนั้นโดยเฉพาะ ไม่ใช่ตัวสุ่มประจำก้าว
+       * เพราะมอนที่ตายพร้อมกันสิบตัวในก้าวเดียวต้องทอยกันคนละครั้ง
+       * ถ้าใช้ตัวเดียวกัน ลำดับการทอยจะขึ้นกับลำดับที่มอนเรียงอยู่ในรายการ
+       */
+      const dropRoll =
         createRng(`${world.seed}-drop-${enemy.id}`).next() /
         (stats.luckMultiplier * biomeRules.dropChance)
+      /*
+       * ช่วงของแต่ละอย่างเรียงจากที่ต้องการบ่อยที่สุดไปหาที่หวือหวาที่สุด
+       *
+       * ยอดรวมขยับจาก 6.2% เป็น 9.5% ตอนเพิ่มสามอย่างใหม่
+       * ตั้งใจให้ขยับ ไม่ได้แบ่งช่วงเดิมให้เล็กลง เพราะถ้าแบ่งของเดิม
+       * หัวใจกับระเบิดจะตกน้อยลงทันทีที่เพิ่มของใหม่ ซึ่งเป็นการทำให้เกมแย่ลง
+       * โดยที่ไม่มีใครขอ และเป็นสิ่งที่ไม่มีใครสังเกตเห็นด้วย
+       */
       const kind: PickupKind | undefined =
-        roll < 0.028 ? 'heart' : roll < 0.045 ? 'bomb' : roll < 0.062 ? 'magnet' : undefined
+        dropRoll < 0.028
+          ? 'heart'
+          : dropRoll < 0.045
+            ? 'bomb'
+            : dropRoll < 0.062
+              ? 'magnet'
+              : dropRoll < 0.075
+                ? 'shield'
+                : dropRoll < 0.086
+                  ? 'clock'
+                  : dropRoll < 0.095
+                    ? 'rage'
+                    : undefined
 
       if (kind) {
         pickups.push({ id: nextId, kind, pos: { ...enemy.pos }, life: 12 })
@@ -1918,6 +2047,17 @@ export function step(world: WorldState, input: Input): WorldState {
    */
   if (gemsTaken > 0) sounds.push('pickup')
 
+  /*
+   * ดูดพลัง คืนเลือดตามจำนวนคริสตัลที่เก็บได้ในก้าวนี้
+   *
+   * คิดทีเดียวจากยอดรวม ไม่ได้คิดทีละเม็ดตอนเก็บ
+   * เพราะสกิลขุมทรัพย์กวาดคริสตัลทั้งสนามเข้ามาในเฟรมเดียวได้หลายสิบเม็ด
+   * ผลลัพธ์เท่ากันแต่เขียนไว้ที่เดียว จึงไม่มีทางลืมจุดใดจุดหนึ่ง
+   */
+  if (stats.gemHeal > 0 && gemsTaken > 0) {
+    hp = Math.min(stats.maxHp, hp + stats.gemHeal * gemsTaken)
+  }
+
   if (lifestealHeal > 0) hp = Math.min(stats.maxHp, hp + lifestealHeal)
   if (harvestNow) hp = Math.min(stats.maxHp, hp + stats.maxHp * 0.5)
 
@@ -1925,6 +2065,13 @@ export function step(world: WorldState, input: Input): WorldState {
   const remainingPickups: PickupEntity[] = []
   const evolved = [...world.evolved]
   let chests = world.chests
+  /*
+   * นาฬิกาสามตัวนี้ตั้งใหม่ได้ตอนเก็บของ จึงต้องแยกจากค่าที่นับถอยหลังไปแล้วต้นก้าว
+   * ตั้งชื่อไม่ซ้ำกับค่าต้นก้าว เพื่อไม่ให้เผลอใช้ค่าที่ยังไม่รวมของที่เพิ่งเก็บ
+   */
+  let clockFor = freezeFor
+  let guardFor = shieldFor
+  let fury = rageFor
   let gemsAfterPickups = remainingGems
 
   for (const pickup of pickups) {
@@ -1959,6 +2106,29 @@ export function step(world: WorldState, input: Input): WorldState {
       gemsAfterPickups = []
       notices.push({ id: nextId, text: 'ดูดคริสตัลทั้งสนาม!', life: 1.4, maxLife: 1.4 })
       sounds.push('pickup')
+      nextId += 1
+    } else if (pickup.kind === 'clock' || pickup.kind === 'shield' || pickup.kind === 'rage') {
+      /*
+       * สามอย่างนี้ให้ "หน้าต่างเวลา" แทนที่จะออกฤทธิ์แล้วจบทันที
+       *
+       * ตั้งเวลาใหม่ทับของเดิม ไม่ได้บวกเพิ่ม
+       * เพราะการบวกเพิ่มทำให้เด็กที่บังเอิญเจอโล่สามอันติดกันได้อมตะสิบห้าวินาที
+       * ซึ่งยาวพอจะเดินฝ่าบอสไปเฉย ๆ ได้ และไม่ใช่สิ่งที่ตั้งใจให้เกิด
+       * ส่วนการทับของเดิมยังคุ้มเสมอ เพราะได้เวลาเต็มกลับมาใหม่
+       */
+      if (pickup.kind === 'clock') {
+        clockFor = CLOCK_SECONDS
+        notices.push({ id: nextId, text: 'เวลาหยุด!', life: 1.6, maxLife: 1.6 })
+        sounds.push('freeze')
+      } else if (pickup.kind === 'shield') {
+        guardFor = SHIELD_SECONDS
+        notices.push({ id: nextId, text: 'โล่คุ้มกัน!', life: 1.6, maxLife: 1.6 })
+        sounds.push('heal')
+      } else {
+        fury = RAGE_SECONDS
+        notices.push({ id: nextId, text: 'พลังทวีคูณ!', life: 1.6, maxLife: 1.6 })
+        sounds.push('ultimate')
+      }
       nextId += 1
     } else {
       /*
@@ -2007,6 +2177,36 @@ export function step(world: WorldState, input: Input): WorldState {
   if (invulnerable <= 0 && !ultimateGuard) {
     for (const enemy of aliveEnemies) {
       if (distance(enemy.pos, player.pos) > enemy.radius + player.radius) continue
+
+      /*
+       * คลื่นกระแทกผลักตัวที่ชน ทำงานทั้งตอนที่หลบได้และตอนที่เจ็บ
+       *
+       * ที่ต้องผลักแม้ตอนหลบได้ เพราะสิ่งที่สกิลนี้ให้คือ "ที่ว่าง"
+       * ถ้าผลักเฉพาะตอนเจ็บ มันจะกลายเป็นรางวัลของการเล่นพลาด
+       * ผลักทุกตัวในระยะ ไม่ใช่เฉพาะตัวที่ชน เพราะตอนโดนรุม
+       * การผลักออกไปได้ตัวเดียวไม่ได้ช่วยอะไรเลย
+       */
+      if (stats.knockback > 0) {
+        for (const other of aliveEnemies) {
+          const gap = distance(other.pos, player.pos)
+          if (gap > 120 || gap < 0.001) continue
+          const away = normalize({
+            x: other.pos.x - player.pos.x,
+            y: other.pos.y - player.pos.y,
+          })
+          other.pos = {
+            x: clamp(other.pos.x + away.x * stats.knockback, 0, ARENA_WIDTH),
+            y: clamp(other.pos.y + away.y * stats.knockback, 0, ARENA_HEIGHT),
+          }
+        }
+      }
+
+      if (dodged()) {
+        sounds.push('zap')
+        invulnerable = stats.graceSeconds * 0.5
+        break
+      }
+
       hp -= enemy.damage * (1 - stats.damageReduction)
       sounds.push('hurt')
       addShake(0.4)
@@ -2133,6 +2333,9 @@ export function step(world: WorldState, input: Input): WorldState {
     chests,
     weaponCooldowns,
     spawnCooldown,
+    freezeFor: clockFor,
+    shieldFor: guardFor,
+    rageFor: fury,
     eliteCooldown,
     bossCooldown,
     bossesDown,
