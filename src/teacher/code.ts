@@ -29,10 +29,46 @@ import { INDICATOR_ORDER } from './indicators'
 import { createLog, emptyCounts } from './log'
 import type { StudentLog } from './log'
 
-const PREFIX = 'KRU1'
+/**
+ * คำนำหน้ารหัสรุ่นปัจจุบัน กับรุ่นเก่าที่ยังต้องอ่านได้
+ *
+ * ตัวอ่านรับทั้งสองรุ่น เพราะครูอาจเก็บรหัสของคาบก่อนไว้แล้วเพิ่งมาวางทีหลัง
+ * รหัสที่ครูเก็บไว้แล้วต้องอ่านได้ตลอดไป ไม่งั้นข้อมูลของเด็กหายไปเฉย ๆ
+ *
+ * ทำไมต้องขึ้นรุ่นใหม่ แทนที่จะใส่รูปแบบย่อลงในรุ่นเดิม
+ *
+ * ถ้าเบราว์เซอร์ของครูยังค้างไฟล์รุ่นเก่าอยู่ (ซึ่งเกิดขึ้นได้จริงกับเว็บนิ่ง)
+ * ตัวอ่านรุ่นเก่าจะอ่านรูปแบบย่อไม่ออก แต่จะไม่รู้ตัวว่าอ่านไม่ออก
+ * มันจะได้ตัวเลขที่ผิดแล้วแสดงในตารางของครูเหมือนเป็นตัวเลขที่ถูก
+ * การขึ้นรุ่นทำให้กรณีนั้นกลายเป็นข้อความว่าอ่านไม่ได้ ซึ่งครูเห็นและแก้ได้
+ * ตัวเลขผิดที่ดูเหมือนถูก แย่กว่าการอ่านไม่ได้เสมอ
+ */
+const PREFIX = 'KRU2'
+const LEGACY_PREFIXES = ['KRU1', 'KRU2']
+
 const SECTION = '~'
 const FIELD = '.'
 const PART = ':'
+
+/**
+ * เครื่องหมายย่อช่วงที่ยังไม่เคยทำ เขียนเป็น -N แทน 0:0 ที่ติดกัน N ช่อง
+ *
+ * ทำไมต้องมี
+ *
+ * ตอนทะเบียนมีเก้าตัว รหัสของเด็กที่เล่นโหมดเดียวยาวราว 69 ตัวอักษร
+ * พอเพิ่มเป็นสิบสองตัว ยาวขึ้นเป็น 85 และวัดแล้วพบว่า 58% ของส่วนตัวเลข
+ * เป็น 0:0 ล้วน ๆ คือช่องของตัวชี้วัดที่เด็กคนนั้นไม่ได้แตะเลย
+ * ทุกครั้งที่ทะเบียนโตขึ้นหนึ่งตัว รหัสของเด็ก "ทุกคน" จะยาวขึ้นสี่ตัวอักษร
+ * รวมทั้งเด็กที่ไม่มีวันได้แตะตัวชี้วัดนั้น
+ *
+ * ตัวตัดท้ายที่มีอยู่เดิมช่วยได้เฉพาะตอนช่องท้าย ๆ เป็นศูนย์
+ * ซึ่งไม่ช่วยเลยกับเด็กที่เล่นสนามรบ เพราะช่องที่เป็นศูนย์ของเขาอยู่ต้นแถว
+ * (ตัวชี้วัดแกนหกตัวแรก) ส่วนช่องท้ายมีเลขอยู่
+ *
+ * เครื่องหมายนี้แยกจากคู่ตัวเลขได้แน่นอน เพราะคู่ตัวเลขมี : เสมอ
+ * และไม่มีทางขึ้นต้นด้วยเครื่องหมายลบ
+ */
+const GAP = '-'
 
 /** จำนวนส่วนของรหัสที่ถูกต้อง: คำนำหน้า ชื่อ วันที่ ตัวเลข เลขตรวจสอบ */
 const SECTIONS = 5
@@ -68,7 +104,7 @@ export function encodeLog(log: StudentLog): string {
     const tally = log.counts[id] ?? { attempts: 0, correct: 0 }
     const attempts = Math.max(0, Math.round(tally.attempts))
     const correct = Math.max(0, Math.round(tally.correct))
-    return `${attempts}${PART}${correct}`
+    return { attempts, correct }
   })
 
   /*
@@ -78,9 +114,29 @@ export function encodeLog(log: StudentLog): string {
    * การตัดทิ้งทำให้รหัสสั้นลงเกือบครึ่ง ซึ่งสำคัญเพราะเด็ก ป.4 ต้องคัดลอกเอง
    * ตัวอ่านเติมศูนย์ให้ครบเองอยู่แล้ว จึงไม่เสียข้อมูลอะไร
    */
-  while (pairs.length > 0 && pairs[pairs.length - 1] === `0${PART}0`) pairs.pop()
+  while (pairs.length > 0 && (pairs[pairs.length - 1]?.attempts ?? 0) === 0
+    && (pairs[pairs.length - 1]?.correct ?? 0) === 0) {
+    pairs.pop()
+  }
 
-  const payload = [safeName(log.name), String(log.day), pairs.join(FIELD)].join(SECTION)
+  // ย่อช่องที่ยังไม่เคยทำซึ่งอยู่กลางแถวด้วย ไม่ใช่แค่ที่อยู่ท้ายแถว
+  const entries: string[] = []
+  let gap = 0
+  const flush = () => {
+    if (gap > 0) entries.push(`${GAP}${gap}`)
+    gap = 0
+  }
+  for (const pair of pairs) {
+    if (pair.attempts === 0 && pair.correct === 0) {
+      gap += 1
+      continue
+    }
+    flush()
+    entries.push(`${pair.attempts}${PART}${pair.correct}`)
+  }
+  flush()
+
+  const payload = [safeName(log.name), String(log.day), entries.join(FIELD)].join(SECTION)
   return `${PREFIX}${SECTION}${payload}${SECTION}${checksum(payload)}`
 }
 
@@ -104,7 +160,7 @@ export function decodeLog(code: string): DecodeLogResult {
   if (trimmed.length === 0) return { ok: false, reason: 'บรรทัดนี้ว่าง' }
 
   const sections = trimmed.split(SECTION)
-  if (sections[0] !== PREFIX) {
+  if (!LEGACY_PREFIXES.includes(sections[0] ?? '')) {
     return { ok: false, reason: 'ไม่ใช่รหัสผลการเรียน อาจเป็นรหัสฟาร์มที่ขึ้นต้นด้วย DOME' }
   }
   if (sections.length !== SECTIONS) {
@@ -120,16 +176,28 @@ export function decodeLog(code: string): DecodeLogResult {
   const day = toInt(sections[2])
   const counts = emptyCounts()
 
+  /*
+   * เดินทีละช่อง โดยที่เครื่องหมาย -N ข้ามไป N ช่องแทนที่จะกินหนึ่งช่อง
+   *
+   * รหัสรุ่นเก่าไม่มีเครื่องหมายนี้ จึงเดินทีละช่องเหมือนเดิมทุกประการ
+   * ตัวอ่านตัวเดียวจึงอ่านได้ทั้งสองรุ่น ไม่ต้องแยกทางเดินตามคำนำหน้า
+   */
   const entries = (sections[3] ?? '').split(FIELD).filter((entry) => entry.length > 0)
-  entries.forEach((entry, index) => {
-    const id = INDICATOR_ORDER[index]
-    if (!id) return
+  let slot = 0
+  for (const entry of entries) {
+    if (entry.startsWith(GAP)) {
+      slot += Math.max(1, toInt(entry.slice(GAP.length)))
+      continue
+    }
+    const id = INDICATOR_ORDER[slot]
+    slot += 1
+    if (!id) continue
     const parts = entry.split(PART)
     const attempts = toInt(parts[0])
     // ข้อถูกมากกว่าข้อที่ทำเป็นไปไม่ได้ ตัดลงมาแทนที่จะปฏิเสธทั้งรหัส
     const correct = Math.min(attempts, toInt(parts[1]))
     counts[id] = { attempts, correct }
-  })
+  }
 
   return { ok: true, log: { name, day, counts } }
 }
