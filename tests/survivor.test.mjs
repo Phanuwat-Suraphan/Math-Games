@@ -1815,18 +1815,64 @@ check('มอนต้องมีหลากหลายพอ และทุ
 })
 
 check('บอสทุกตัวต้องมีชื่อและภาพที่มีอยู่จริง', () => {
+  /*
+   * วนตามจำนวนบอสจริง ไม่ใช่เลขที่เขียนไว้ในข้อทดสอบ
+   *
+   * เดิมเขียนไว้ว่าวนหกตัว พอเพิ่มบอสตัวที่เจ็ดเข้าไป ข้อนี้ยังผ่านเหมือนเดิม
+   * แต่ไม่เคยตรวจบอสตัวใหม่เลยสักครั้ง และไม่มีอะไรบอกด้วยว่ามันหลุดไป
+   * เลขที่เขียนตายในข้อทดสอบจะกลายเป็นจุดบอดทันทีที่ของจริงเพิ่มขึ้น
+   */
   const ART = load('art/monsters')
   const names = new Set()
 
-  for (let index = 0; index < 6; index += 1) {
+  assert(E.BOSS_COUNT >= 6, `มีบอสแค่ ${E.BOSS_COUNT} ตัว`)
+
+  for (let index = 0; index < E.BOSS_COUNT; index += 1) {
     const name = E.bossNameAt(index)
     assert(name && name.length >= 3, `บอสตัวที่ ${index} ไม่มีชื่อ`)
     names.add(name)
+
+    const art = E.bossArtAt(index)
+    assert(ART.hasMonsterArt(art), `บอส "${name}" อ้างภาพ "${art}" ที่ไม่มีอยู่จริง`)
   }
-  assert(names.size === 6, 'ชื่อบอลซ้ำกันภายในรอบเดียว')
+  assert(names.size === E.BOSS_COUNT, 'ชื่อบอสซ้ำกันภายในรอบเดียว')
 
   // วนรอบที่สองต้องมีเครื่องหมายกำกับว่าแข็งกว่าเดิม
-  assert(E.bossNameAt(6) !== E.bossNameAt(0), 'บอสวนรอบสองใช้ชื่อเดิมเป๊ะ')
+  assert(
+    E.bossNameAt(E.BOSS_COUNT) !== E.bossNameAt(0),
+    'บอสวนรอบสองใช้ชื่อเดิมเป๊ะ',
+  )
+})
+
+check('มอนพฤติกรรมพิเศษต้องมีภาพของตัวเอง ไม่ใช้ร่วมกับพฤติกรรมอื่น', () => {
+  /*
+   * สี่พฤติกรรมนี้ต้องรับมือคนละวิธี
+   * ถ้าสองตัวที่ต้องรับมือคนละวิธีหน้าตาเหมือนกันเป๊ะ เด็กต้องอ่านจากเครื่องหมาย
+   * ที่เกมวาดทับอย่างเดียว ซึ่งเล็กกว่าตัวมอนมากและถูกมอนตัวอื่นบังได้
+   *
+   * ตอนเพิ่มพฤติกรรมพวกนี้ครั้งแรก ใช้ภาพร่วมกับมอนตัวอื่นไปก่อนจริง ๆ
+   * ข้อนี้จึงเป็นข้อที่ล็อกไว้ว่าอย่ากลับไปเป็นแบบนั้นอีก
+   */
+  const artOf = new Map()
+  for (let t = 0; t <= 320; t += 10) {
+    for (let i = 0; i < 60; i += 1) {
+      const enemy = E.spawnOne({ ...E.createWorld('ภาพ'), time: t, nextId: i + 1 }, `a${t}-${i}`)
+      if (!artOf.has(enemy.art)) artOf.set(enemy.art, new Set())
+      artOf.get(enemy.art).add(enemy.behavior)
+    }
+  }
+
+  for (const behavior of ['orbit', 'bomber', 'healer', 'summoner']) {
+    const arts = [...artOf].filter(([, kinds]) => kinds.has(behavior))
+    assert(arts.length > 0, `ไม่เจอมอนพฤติกรรม ${behavior} เลย`)
+    for (const [art, kinds] of arts) {
+      assert(
+        kinds.size === 1,
+        `ภาพ "${art}" ถูกใช้โดยพฤติกรรม ${[...kinds].join(' กับ ')} ` +
+          'ซึ่งแปลว่ามอนที่ต้องรับมือคนละวิธีหน้าตาเหมือนกันเป๊ะ',
+      )
+    }
+  }
 })
 
 

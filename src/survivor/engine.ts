@@ -217,13 +217,13 @@ const ENEMY_KINDS: EnemyKind[] = [
    * เพราะเด็กต้องมีเวลาเรียนรู้วิธีรับมือทีละอย่าง ไม่ใช่เจอสี่อย่างใหม่พร้อมกัน
    * แล้วตายโดยไม่รู้ว่าตายเพราะตัวไหน
    */
-  { kind: 'logic-orbiter', art: 'equation-wraith', hp: 60, speed: 130, damage: 12, radius: 17, xpValue: 5,
+  { kind: 'logic-orbiter', art: 'orbit-eye', hp: 60, speed: 130, damage: 12, radius: 17, xpValue: 5,
     behavior: 'orbit', splitInto: 0, fromTime: 80 },
-  { kind: 'bomb-bug', art: 'chaos-cube', hp: 40, speed: 120, damage: 14, radius: 18, xpValue: 5,
+  { kind: 'bomb-bug', art: 'bomb-bug', hp: 40, speed: 120, damage: 14, radius: 18, xpValue: 5,
     behavior: 'bomber', splitInto: 0, fromTime: 100 },
-  { kind: 'mender-wraith', art: 'equation-wraith', hp: 90, speed: 118, damage: 10, radius: 17, xpValue: 7,
+  { kind: 'mender-wraith', art: 'mender-wraith', hp: 90, speed: 118, damage: 10, radius: 17, xpValue: 7,
     behavior: 'healer', splitInto: 0, fromTime: 130 },
-  { kind: 'sum-summoner', art: 'math-guardian', hp: 130, speed: 96, damage: 14, radius: 21, xpValue: 8,
+  { kind: 'sum-summoner', art: 'swarm-mother', hp: 130, speed: 96, damage: 14, radius: 21, xpValue: 8,
     behavior: 'summoner', splitInto: 0, fromTime: 165 },
 ]
 
@@ -256,7 +256,7 @@ const BOSS_KINDS: EnemyKind[] = [
    * บอสตัวเดียวที่เรียกสมุน จึงเป็นบอสตัวเดียวที่ยิ่งยืดเวลายิ่งแย่
    * บอสตัวอื่นรอจังหวะได้ ตัวนี้รอไม่ได้ ซึ่งเป็นความรู้สึกที่ยังไม่เคยมีในเกม
    */
-  { kind: 'boss-swarm-mother', art: 'math-guardian', hp: 900, speed: 100, damage: 26,
+  { kind: 'boss-swarm-mother', art: 'swarm-mother', hp: 900, speed: 100, damage: 26,
     radius: 44, xpValue: 82, behavior: 'summoner', splitInto: 0, fromTime: 0 },
 ]
 
@@ -271,12 +271,27 @@ const BOSS_NAMES = [
   'แม่ทัพฝูงสมการ',
 ]
 
+/**
+ * จำนวนบอสหนึ่งรอบ ก่อนจะวนกลับไปตัวแรก
+ *
+ * ต้องบอกออกไป ไม่ให้ชุดทดสอบเขียนเลขนี้เอง
+ * ตอนเพิ่มบอสตัวที่เจ็ด ชุดทดสอบยังวนแค่หกตัวเหมือนเดิม
+ * บอสตัวใหม่จึงไม่เคยถูกตรวจเลยว่ามีชื่อและมีภาพจริงไหม
+ * และไม่มีอะไรบอกด้วย เพราะข้อทดสอบก็ยังผ่านอยู่
+ */
+export const BOSS_COUNT = BOSS_KINDS.length
+
 /** ชื่อบอสตัวที่เท่าไร ใช้ทั้งตอนประกาศและตอนสรุปผล */
 export function bossNameAt(index: number): string {
   const name = BOSS_NAMES[index % BOSS_NAMES.length]
   const lap = Math.floor(index / BOSS_NAMES.length)
   // วนรอบที่สองเป็นต้นไปใส่ดาวกำกับ ให้รู้ว่าตัวนี้แข็งกว่าตัวเดิมที่เคยเจอ
   return lap > 0 ? `${name} ${'★'.repeat(Math.min(3, lap))}` : name
+}
+
+/** ภาพของบอสตัวที่เท่าไร ไล่ตามลำดับเดียวกับชื่อ */
+export function bossArtAt(index: number): string {
+  return BOSS_KINDS[index % BOSS_KINDS.length]?.art ?? ''
 }
 
 /** ตัวเล็กที่แตกออกมาจากสไลม์ใหญ่ */

@@ -719,6 +719,250 @@ function decimalWorm(): string {
     </g>`
 }
 
+/**
+ * ตาโคจร — ตาลอยที่วนรอบเป้าหมายแทนที่จะพุ่งเข้าใส่
+ *
+ * รูปทรงคือ "ลูกกลมกับวงแหวนเอียง" ซึ่งบอกการโคจรได้โดยไม่ต้องอธิบาย
+ * เป็นมอนตัวเดียวที่มีวงแหวนอยู่ในตัวภาพเอง ไม่ใช่วงที่ตัวเรนเดอร์วาดเพิ่ม
+ * เด็กจึงแยกมันออกจากฝูงได้ตั้งแต่ยังไม่ทันเห็นวงประที่เกมวาดทับ
+ *
+ * ไม่มีขาและไม่มีเงาเข้ม เพราะมันลอย และการลอยคือเหตุผลที่มันวนได้
+ */
+function orbitEye(): string {
+  const p = 'oe'
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#cffafe', '#38bdf8', '#0c4a6e')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${glowFilter(`${p}-glow`, 2.4)}
+    </defs>
+
+    <!-- เงาจางมากเพราะลอยอยู่สูง เหมือนผีสมการ -->
+    <ellipse cx="50" cy="93" rx="18" ry="3.6" fill="#000" opacity=".18"
+      filter="url(#${p}-blur)"/>
+
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -3.6; 0 0" dur="3.2s" repeatCount="indefinite"/>
+
+      <!-- วงแหวนหลังตัว วาดก่อนลำตัว จึงดูลอดอยู่ข้างหลัง -->
+      <ellipse cx="50" cy="52" rx="34" ry="12" fill="none" stroke="#0ea5e9"
+        stroke-width="3" opacity=".45" transform="rotate(-18 50 52)"/>
+
+      <circle cx="50" cy="52" r="22" fill="url(#${p}-body)"/>
+      ${rimLight('M32 44 Q50 28 68 44', '#e0f2fe', 2.2)}
+      ${specular(41, 42, 6.5, 9, -24, 0.42)}
+
+      ${livingEye(50, 52, 12, '#0c4a6e', 0.5)}
+
+      <!-- วงแหวนหน้าตัว ปิดวงให้ครบ จึงอ่านเป็นวงที่ล้อมรอบจริง ๆ -->
+      <path d="M20 58 Q50 74 80 46" fill="none" stroke="#7dd3fc" stroke-width="3"
+        opacity=".8" stroke-linecap="round" filter="url(#${p}-glow)"/>
+
+      <!--
+        ดวงจันทร์สองดวงบนวง ดวงหนึ่งหน้าดวงหนึ่งหลัง
+
+        วางนิ่ง ไม่ได้ทำให้วิ่งรอบวง เพราะสนามรบวาดภาพนี้ลง canvas
+        ซึ่งอนิเมชันในภาพจะไม่ขยับเลย (บทเรียนเดียวกับตอนทำขาตัวละคร)
+        การเขียนอนิเมชันที่ไม่มีใครได้เห็น จึงมีแต่ความเสี่ยงที่จะเขียนผิด
+        สองดวงคนละฝั่งของวงบอกความเป็นวงโคจรได้ในภาพนิ่งอยู่แล้ว
+      -->
+      <circle cx="82" cy="45" r="4.5" fill="#f0f9ff" opacity=".95"/>
+      <circle cx="19" cy="60" r="3.4" fill="#bae6fd" opacity=".8"/>
+    </g>`
+}
+
+/**
+ * แมลงระเบิด — ตายแล้วบึ้ม
+ *
+ * ทรงกลมกับชนวนที่ติดไฟ เป็นภาษาภาพที่เด็กอ่านออกทันทีว่า "อันนี้จะระเบิด"
+ * ตั้งใจให้ชนวนเป็นส่วนที่สูงที่สุดของตัว มันจึงโผล่พ้นฝูงขึ้นมาให้เห็น
+ * แม้ตอนที่ตัวมันเองถูกมอนตัวอื่นบังอยู่
+ *
+ * ยิ้มกว้างและตาเบิก ไม่ใช่หน้าดุ เพราะเกมนี้เป็นเกมของเด็ก
+ * ความน่ากลัวของมันควรมาจากสิ่งที่มันทำ ไม่ใช่จากหน้าตาของมัน
+ */
+function bombBug(): string {
+  const p = 'bb'
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#fca5a5', '#dc2626', '#450a0a')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${glowFilter(`${p}-glow`, 3)}
+    </defs>
+
+    ${groundShadow(`${p}-blur`, 50, 91, 24)}
+
+    <g>
+      <!-- สั่นถี่ ๆ ไม่ใช่ลอยขึ้นลงช้า ๆ อ่านเป็นความไม่นิ่งของของที่กำลังจะระเบิด -->
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 1.4 -1; -1.4 0.6; 0 0" dur="0.42s" repeatCount="indefinite"/>
+
+      <!-- ขาหกข้าง วาดก่อนลำตัว จึงลอดอยู่ข้างหลัง -->
+      ${[26, 34, 42].map((x, i) => `
+        <path d="M${x + 8} 74 L${x - 4} ${86 + i * 2}" stroke="#7f1d1d"
+          stroke-width="3" stroke-linecap="round"/>
+        <path d="M${100 - x - 8} 74 L${100 - x + 4} ${86 + i * 2}" stroke="#7f1d1d"
+          stroke-width="3" stroke-linecap="round"/>`).join('')}
+
+      <circle cx="50" cy="62" r="26" fill="url(#${p}-body)"/>
+      ${rimLight('M28 56 Q50 34 72 56', '#fecaca', 2.4)}
+      ${specular(40, 50, 7, 9.5, -24, 0.4)}
+
+      <!-- ปากยิ้มกว้าง เห็นฟันสองซี่ -->
+      <path d="M40 72 Q50 82 60 72" fill="#450a0a" opacity=".9"/>
+      <path d="M44 74 L46 78 L48 74 Z" fill="#fff5f5"/>
+      <path d="M52 74 L54 78 L56 74 Z" fill="#fff5f5"/>
+
+      ${livingEye(42, 58, 7, '#7f1d1d', 0.2)}
+      ${livingEye(59, 58, 7, '#7f1d1d', 0.7)}
+
+      <!-- ชนวน โผล่พ้นหัวขึ้นไป เป็นส่วนที่สูงที่สุดของตัว -->
+      <path d="M50 37 Q54 28 62 25" fill="none" stroke="#57534e" stroke-width="3.4"
+        stroke-linecap="round"/>
+
+      <!-- ประกายไฟที่ปลายชนวน กะพริบเร็วกว่าทุกอย่างในภาพ -->
+      <circle cx="63" cy="24" r="6" fill="#fbbf24" opacity=".9"
+        filter="url(#${p}-glow)">
+        <animate attributeName="r" values="6;3.5;6.5;4;6" dur="0.34s"
+          repeatCount="indefinite"/>
+      </circle>
+      <circle cx="63" cy="24" r="2.6" fill="#fffbeb">
+        <animate attributeName="opacity" values="1;.45;1" dur="0.34s"
+          repeatCount="indefinite"/>
+      </circle>
+    </g>`
+}
+
+/**
+ * ผีพยาบาล — ฟื้นเลือดให้มอนตัวอื่นรอบตัว
+ *
+ * ใช้โครงร่างเดียวกับผีสมการโดยตั้งใจ เด็กจึงอ่านออกว่า "เป็นผีเหมือนกัน"
+ * แต่เปลี่ยนเป็นสีเขียวมิ้นต์และมีกากบาทอยู่กลางตัว
+ * ซึ่งเป็นสองสัญญาณที่ต่างกันคนละแกน คือทั้งสีและรูปทรง
+ * ถ้าต่างแค่สีอย่างเดียว มันจะแยกไม่ออกในจอที่มีมอนสามสิบตัว
+ *
+ * มีเม็ดพลังลอยขึ้นรอบตัว บอกว่ามันกำลังให้ ไม่ใช่กำลังรับ
+ */
+function menderWraith(): string {
+  const p = 'mw'
+  const mote = (x: number, delay: number) => `
+    <circle cx="${x}" cy="72" r="2.8" fill="#bbf7d0" opacity="0">
+      <animate attributeName="cy" values="72;40" dur="2.1s" begin="${delay}s"
+        repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0;.9;0" dur="2.1s" begin="${delay}s"
+        repeatCount="indefinite"/>
+    </circle>`
+
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#dcfce7', '#4ade80', '#14532d')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${blurFilter(`${p}-soft`, 2)}
+      ${glowFilter(`${p}-glow`, 2.6)}
+    </defs>
+
+    <ellipse cx="50" cy="94" rx="20" ry="4" fill="#000" opacity=".2"
+      filter="url(#${p}-blur)"/>
+
+    ${mote(30, 0)}
+    ${mote(70, 0.7)}
+    ${mote(50, 1.4)}
+
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -4.5; 0 0" dur="3.7s" repeatCount="indefinite"/>
+
+      <path d="M26 60 Q26 26 50 26 Q74 26 74 60 L74 82
+               Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z"
+        fill="url(#${p}-body)" opacity=".93">
+        <animate attributeName="d"
+          values="M26 60 Q26 26 50 26 Q74 26 74 60 L74 82 Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z;
+                  M26 60 Q26 26 50 26 Q74 26 74 60 L74 84 Q68 92 62 84 Q56 76 50 84 Q44 92 38 84 Q32 76 26 84 Z;
+                  M26 60 Q26 26 50 26 Q74 26 74 60 L74 82 Q68 74 62 82 Q56 90 50 82 Q44 74 38 82 Q32 90 26 82 Z"
+          dur="2.9s" repeatCount="indefinite"/>
+      </path>
+
+      ${rimLight('M50 26 Q74 26 74 60', '#f0fdf4', 2)}
+      ${specular(40, 40, 7, 9, -24, 0.4)}
+
+      <!--
+        กากบาทกลางตัว เป็นสัญญาณที่ต่างจากผีสมการคนละแกนกับสี
+        วางนิ่ง ด้วยเหตุผลเดียวกับดวงจันทร์ของตาโคจร
+      -->
+      <g filter="url(#${p}-glow)">
+        <rect x="46.5" y="60" width="7" height="20" rx="2" fill="#f0fdf4" opacity=".92"/>
+        <rect x="40" y="66.5" width="20" height="7" rx="2" fill="#f0fdf4" opacity=".92"/>
+      </g>
+
+      ${livingEye(42, 47, 7, '#14532d', 0.4)}
+      ${livingEye(58, 47, 7, '#14532d', 0.9)}
+    </g>`
+}
+
+/**
+ * แม่ฝูงสมการ — เรียกลูกสมุนออกมาเรื่อย ๆ
+ *
+ * ตัวใหญ่กว่ามอนธรรมดา และมีลูกเล็กเกาะอยู่รอบตัวสามตัว
+ * "ตัวใหญ่ที่มีตัวเล็กติดอยู่" คือภาพที่บอกว่ามันผลิตตัวเล็กออกมา
+ * โดยไม่ต้องรอให้เด็กเห็นมันเรียกสมุนจริง ๆ ก่อน
+ *
+ * ลูกเล็กแต่ละตัวเต้นคนละจังหวะ ถ้าเต้นพร้อมกันจะอ่านเป็นลวดลายบนตัวแม่
+ * ไม่ใช่ตัวเล็กที่มีชีวิตของตัวเอง
+ */
+function swarmMother(): string {
+  const p = 'sm'
+  const spawnling = (cx: number, cy: number, delay: number) => `
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -3; 0 0" dur="1.8s" begin="${delay}s" repeatCount="indefinite"/>
+      <circle cx="${cx}" cy="${cy}" r="7.5" fill="url(#${p}-egg)"/>
+      <circle cx="${cx - 2.4}" cy="${cy - 1}" r="2.2" fill="#0b0616" opacity=".85"/>
+      <circle cx="${cx + 2.4}" cy="${cy - 1}" r="2.2" fill="#0b0616" opacity=".85"/>
+      <circle cx="${cx - 2.8}" cy="${cy - 2}" r="0.9" fill="#fff"/>
+    </g>`
+
+  return `
+    <defs>
+      ${EYE_SHADE_DEF}
+      ${sphereGradient(`${p}-body`, '#e9d5ff', '#9333ea', '#3b0764')}
+      ${sphereGradient(`${p}-egg`, '#fef3c7', '#fbbf24', '#78350f')}
+      ${blurFilter(`${p}-blur`, 3)}
+      ${glowFilter(`${p}-glow`, 2.8)}
+    </defs>
+
+    ${groundShadow(`${p}-blur`, 50, 92, 28)}
+
+    <g>
+      <animateTransform attributeName="transform" type="translate"
+        values="0 0; 0 -2.4; 0 0" dur="2.6s" repeatCount="indefinite"/>
+
+      <!-- ลำตัวทรงหยดน้ำกลับหัว กว้างด้านล่าง อ่านเป็นตัวที่หนักและอุ้มของอยู่ -->
+      <path d="M50 22 Q76 34 78 62 Q78 86 50 86 Q22 86 22 62 Q24 34 50 22 Z"
+        fill="url(#${p}-body)"/>
+      ${rimLight('M30 40 Q50 22 70 40', '#f3e8ff', 2.4)}
+      ${specular(38, 42, 7.5, 10, -24, 0.4)}
+
+      <!-- วงพลังตรงท้อง เต้นตามจังหวะการเรียกสมุน -->
+      <ellipse cx="50" cy="66" rx="17" ry="13" fill="#c084fc" opacity=".45"
+        filter="url(#${p}-glow)">
+        <animate attributeName="rx" values="17;20;17" dur="2.2s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values=".45;.15;.45" dur="2.2s" repeatCount="indefinite"/>
+      </ellipse>
+
+      ${livingEye(41, 45, 7.5, '#3b0764', 0.3)}
+      ${livingEye(60, 45, 7.5, '#3b0764', 0.85)}
+
+      <!-- ลูกเล็กสามตัวเกาะรอบตัวแม่ คนละจังหวะกัน -->
+      ${spawnling(24, 76, 0)}
+      ${spawnling(76, 76, 0.6)}
+      ${spawnling(50, 84, 1.2)}
+    </g>`
+}
+
 const MONSTER_ART: Record<string, () => string> = {
   'goblin-calculator': goblinCalculator,
   'number-slime': numberSlime,
@@ -732,6 +976,18 @@ const MONSTER_ART: Record<string, () => string> = {
   'prime-knight': primeKnight,
   'chaos-cube': chaosCube,
   'decimal-worm': decimalWorm,
+
+  /*
+   * สี่ตัวล่างเป็นมอนพฤติกรรมใหม่ของสนามรบ
+   * ตอนเพิ่มพฤติกรรมพวกนี้เข้าไปครั้งแรก ใช้ภาพร่วมกับมอนตัวอื่นไปก่อน
+   * แล้วอาศัยเครื่องหมายที่ตัวเรนเดอร์วาดทับเป็นตัวแยก
+   * ซึ่งพอใช้ได้ แต่แปลว่ามอนสองตัวที่ต้องรับมือคนละวิธี หน้าตาเหมือนกันเป๊ะ
+   * ตอนนี้แต่ละตัวมีภาพของตัวเอง และรูปทรงของมันบอกพฤติกรรมได้เอง
+   */
+  'orbit-eye': orbitEye,
+  'bomb-bug': bombBug,
+  'mender-wraith': menderWraith,
+  'swarm-mother': swarmMother,
 }
 
 /**
