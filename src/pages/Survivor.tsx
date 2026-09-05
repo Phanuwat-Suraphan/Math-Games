@@ -13,6 +13,9 @@ import { recordSurvivorRun } from '../services/recordService'
 import { useMusic } from '../hooks/useMusic'
 import { PERKS, perkCost } from '../data/perks'
 import { biomeBlurb, getBiome, type Biome } from '../survivor/biomes'
+import { quizPlanFor } from '../survivor/quiz'
+import { survivorIndicator } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import {
   advance,
   createWorld,
@@ -38,21 +41,7 @@ import { draw } from '../survivor/render'
 import type { HeroView } from '../survivor/render'
 import type { Input, WorldState } from '../survivor/types'
 import type { Question } from '../questionEngine/types'
-import type { SkillId } from '../types/stats'
 import type { Player } from '../types/player'
-
-/** ทักษะที่โจทย์ตอนเลเวลอัปจะถาม ไล่ยากขึ้นตามเลเวล */
-const SKILL_BY_LEVEL: SkillId[] = [
-  'addition',
-  'subtraction',
-  'multiplication',
-  'division',
-  'fractions',
-  'decimals',
-  'percentages',
-  'geometry',
-  'wordProblems',
-]
 
 /** ท่าทางของตัวละครที่หน้าจอต้องรู้เพื่อวาด */
 /**
@@ -156,6 +145,7 @@ function useHeroFrames(avatarId: string): MutableRefObject<HTMLImageElement[]> {
  */
 export function Survivor({ player }: { player: Player }) {
   const { answerQuestion, patchPlayer } = useGame()
+  const { logIndicator } = useIndicatorLog(player.name)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const worldRef = useRef<WorldState>(
@@ -249,13 +239,13 @@ export function Survivor({ player }: { player: Player }) {
   const askQuestion = useCallback(() => {
     const world = worldRef.current
     const level = world.player.level
-    const skill = SKILL_BY_LEVEL[Math.min(SKILL_BY_LEVEL.length - 1, Math.floor(level / 2))]
+    const plan = quizPlanFor(level)
 
     setQuestion(
       generateQuestion({
-        type: skill,
-        grade: level <= 4 ? 4 : level <= 9 ? 5 : 6,
-        difficulty: level <= 3 ? 'easy' : level <= 8 ? 'medium' : 'hard',
+        type: plan.skill,
+        grade: plan.grade,
+        difficulty: plan.difficulty,
         seed: `${world.seed}-lv${level}`,
       }),
     )
@@ -492,22 +482,43 @@ export function Survivor({ player }: { player: Player }) {
       if (!question) return
       const correct = choiceText === question.correctAnswer
       const level = worldRef.current.player.level
-      const skill = SKILL_BY_LEVEL[Math.min(SKILL_BY_LEVEL.length - 1, Math.floor(level / 2))]
+      const plan = quizPlanFor(level)
 
       answerQuestion({
         questionId: `survivor-${worldRef.current.seed}-${level}`,
         stageId: 'survivor-arena',
-        skill,
+        skill: plan.skill,
         isCorrect: correct,
         timeMs: 0,
         isReplay: true,
       })
+
+      /*
+       * ส่งเข้าสมุดของครูด้วย
+       *
+       * โหมดนี้เป็นโหมดที่เด็กตอบโจทย์มากที่สุดในทั้งแอป รอบหนึ่งเลเวลอัปสิบกว่าครั้ง
+       * แต่เดิมไม่เคยส่งอะไรเข้าแผงคุณครูเลยสักข้อ
+       * ครูที่ห้องเล่นแต่โหมดนี้จึงเห็นตารางว่าง ทั้งที่เด็กตอบไปเป็นร้อยข้อ
+       *
+       * บันทึกทุกครั้งที่ตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       * เพราะข้อที่ตอบผิดคือข้อมูลที่ครูต้องการที่สุด
+       *
+       * ส่งรูปทรงกับจำนวนขั้นตอนไปด้วย เพื่อให้ปลายทางตัดสินได้ว่า
+       * ข้อนี้ตรงกับถ้อยคำของตัวชี้วัดจริงไหม ไม่ใช่ตัดสินจากชนิดทักษะอย่างเดียว
+       */
+      const indicator = survivorIndicator({
+        skill: plan.skill,
+        grade: plan.grade,
+        shape: question.metadata.geometryShape,
+        steps: question.metadata.steps,
+      })
+      if (indicator) logIndicator(indicator, correct)
       playSfx(correct ? 'correct' : 'wrong')
 
       worldRef.current = resolveQuestion(worldRef.current, correct)
       setPhase('choosing')
     },
-    [answerQuestion, question],
+    [answerQuestion, logIndicator, question],
   )
 
   const chooseSkill = useCallback((skillId: string) => {

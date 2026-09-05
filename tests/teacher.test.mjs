@@ -596,6 +596,215 @@ check('ตัวชี้วัด ป.4 ทุกข้อต้องมีท
   )
 })
 
+/* ------------------------------------------------------------------ *
+ * สนามรบตัวเลข กับสมุดของครู
+ * ------------------------------------------------------------------ */
+
+const QZ = load('survivor/quiz')
+const QE = load('questionEngine/index')
+
+/** สร้างโจทย์ของเลเวลหนึ่งจริง ๆ แล้วบอกว่ามันถูกนับเป็นตัวชี้วัดไหน */
+function askAtLevel(level, seed) {
+  const plan = QZ.quizPlanFor(level)
+  const question = QE.generateQuestion({
+    type: plan.skill,
+    grade: plan.grade,
+    difficulty: plan.difficulty,
+    seed,
+  })
+  return {
+    plan,
+    question,
+    indicator: I.survivorIndicator({
+      skill: plan.skill,
+      grade: plan.grade,
+      shape: question.metadata.geometryShape,
+      steps: question.metadata.steps,
+    }),
+  }
+}
+
+check('ลำดับตัวชี้วัดเก้าตัวแรกต้องไม่เปลี่ยน เพราะรหัสของครูอ่านตามตำแหน่ง', () => {
+  /*
+   * ตำแหน่งในทะเบียนคือตำแหน่งตัวเลขในรหัสผลการเรียนที่ครูเก็บไว้จากคาบก่อน
+   * การแทรกตัวใหม่ไว้กลางรายการจะทำให้ตัวเลขของเด็กในรหัสเก่าเลื่อนช่องกันหมด
+   * และไม่มีอะไรฟ้องเลย เพราะรหัสยังอ่านได้ปกติ แค่ความหมายเปลี่ยนไปทั้งใบ
+   *
+   * ข้อนี้มาจากความผิดพลาดจริง ตอนเพิ่มตัวชี้วัดคูณหารเข้าไป
+   * เขียนครั้งแรกแทรกไว้ก่อน percent เพราะอ่านแล้วเข้ากลุ่มกว่า
+   * ซึ่งจะทำให้รหัสเก่าทุกใบเลื่อนสองช่อง จับได้ตอนอ่านทวนเอง ไม่ใช่ตอนทดสอบ
+   * จึงเขียนข้อนี้ไว้ ไม่ให้ครั้งหน้าต้องอาศัยการอ่านทวน
+   */
+  const FROZEN = [
+    'estimate',
+    'unknownAddSub',
+    'unknownMulDiv',
+    'twoStep',
+    'buildProblem',
+    'areaPerimeter',
+    'basicAddSub',
+    'percent',
+    'average',
+  ]
+
+  const actual = I.INDICATOR_ORDER.slice(0, FROZEN.length)
+  assert(
+    actual.join(',') === FROZEN.join(','),
+    `ลำดับเก้าตัวแรกเปลี่ยนไปเป็น ${actual.join(',')} ` +
+      'ตัวชี้วัดใหม่ต้องต่อท้ายรายการเสมอ ห้ามแทรกกลาง',
+  )
+  assert(
+    I.INDICATOR_ORDER.length >= FROZEN.length,
+    'ตัวชี้วัดหายไปจากทะเบียน ซึ่งทำให้รหัสเก่าอ่านไม่ตรงเช่นกัน',
+  )
+})
+
+check('ทุกทักษะที่สนามรบถาม ต้องตัดสินไว้ชัดว่าโยงหรือไม่โยง', () => {
+  /*
+   * ช่องที่ลืมใส่จะกลายเป็น undefined ซึ่งวิ่งผ่านโค้ดไปได้เงียบ ๆ
+   * แล้วโจทย์ทั้งชนิดนั้นก็หายไปจากสมุดของครูโดยไม่มีใครรู้
+   * การเขียน null ไว้ตรง ๆ คือการบอกว่า "ตัดสินแล้วว่าไม่โยง" ไม่ใช่ "ลืม"
+   */
+  const skills = [
+    'addition', 'subtraction', 'multiplication', 'division',
+    'fractions', 'decimals', 'percentages', 'geometry', 'wordProblems',
+  ]
+  for (const skill of skills) {
+    assert(
+      skill in I.SURVIVOR_INDICATOR,
+      `ทักษะ ${skill} ไม่มีในตารางโยงของสนามรบ`,
+    )
+    const id = I.SURVIVOR_INDICATOR[skill]
+    assert(
+      id === null || I.findIndicator(id) !== null,
+      `ทักษะ ${skill} โยงไปหาตัวชี้วัด "${id}" ที่ไม่มีในทะเบียน`,
+    )
+  }
+})
+
+check('โจทย์เรขาคณิตที่ไม่ใช่สี่เหลี่ยมมุมฉาก ต้องไม่ถูกนับเป็น ค 2.1 ป.4/3', () => {
+  /*
+   * ตัวชี้วัดข้อนี้พูดถึง "รูปสี่เหลี่ยมมุมฉาก" เท่านั้น
+   * แต่เครื่องสร้างโจทย์ผลิตสามเหลี่ยมกับวงกลมออกมาด้วยในชั้นเดียวกัน
+   * ถ้านับรวมหมด ครูจะเห็นว่าเด็กผ่าน ค 2.1 ป.4/3 ด้วยข้อที่หาพื้นที่วงกลม
+   * ซึ่งไม่ใช่แค่โจทย์ที่ยากไปหรือง่ายไป แต่เป็นการรายงานผิดเรื่อง
+   *
+   * วัดจาก metadata ที่เครื่องสร้างโจทย์ใส่มาให้ ไม่ได้แกะจากข้อความในโจทย์
+   * เพราะการแกะข้อความจะพังเงียบ ๆ ในวันที่มีคนแก้คำในโจทย์
+   */
+  let rectangles = 0
+  let others = 0
+
+  for (let i = 0; i < 150; i += 1) {
+    const question = QE.generateQuestion({
+      type: 'geometry',
+      grade: 4,
+      difficulty: 'medium',
+      seed: `รูปทรง-${i}`,
+    })
+    const shape = question.metadata.geometryShape
+    const id = I.survivorIndicator({ skill: 'geometry', grade: 4, shape })
+
+    if (shape === 'square' || shape === 'rectangle') {
+      rectangles += 1
+      assert(id === 'areaPerimeter', `โจทย์ ${shape} ควรนับเป็น ป.4/3 แต่ได้ ${id}`)
+    } else {
+      others += 1
+      assert(id === null, `โจทย์ ${shape} ถูกนับเป็น ${id} ทั้งที่ไม่ใช่สี่เหลี่ยมมุมฉาก`)
+    }
+  }
+
+  assert(rectangles > 0, 'ไม่เจอโจทย์สี่เหลี่ยมมุมฉากเลย เทียบอะไรไม่ได้')
+  assert(others > 0, 'ไม่เจอโจทย์รูปอื่นเลย ข้อนี้จึงยังไม่ได้ตรวจสิ่งที่ตั้งใจตรวจ')
+})
+
+check('โจทย์ปัญหาขั้นตอนเดียว ต้องไม่ถูกนับเป็น ป.4/11 ซึ่งเป็นโจทย์สองขั้นตอน', () => {
+  let oneStep = 0
+  let twoStep = 0
+
+  for (let i = 0; i < 150; i += 1) {
+    const question = QE.generateQuestion({
+      type: 'wordProblems',
+      grade: 4,
+      difficulty: 'hard',
+      seed: `ขั้นตอน-${i}`,
+    })
+    const steps = question.metadata.steps
+    const id = I.survivorIndicator({ skill: 'wordProblems', grade: 4, steps })
+
+    if ((steps ?? 1) >= 2) {
+      twoStep += 1
+      assert(id === 'twoStep', `โจทย์ ${steps} ขั้นตอนควรนับเป็น ป.4/11 แต่ได้ ${id}`)
+    } else {
+      oneStep += 1
+      assert(id === null, `โจทย์ขั้นตอนเดียวถูกนับเป็น ${id}`)
+    }
+  }
+
+  assert(twoStep > 0, 'ไม่เจอโจทย์สองขั้นตอนเลย')
+  assert(oneStep > 0, 'ไม่เจอโจทย์ขั้นตอนเดียวเลย ข้อนี้จึงยังไม่ได้ตรวจสิ่งที่ตั้งใจตรวจ')
+})
+
+check('โจทย์ชั้นที่สูงกว่า ป.4 ต้องไม่ถูกนับเป็นตัวชี้วัดแกนของ ป.4', () => {
+  /*
+   * สนามรบไล่ชั้นขึ้นเป็น ป.5 และ ป.6 ตามเลเวล
+   * การนับข้อ ป.6 เป็นตัวชี้วัด ป.4 คือการบอกครูว่าเด็กผ่านตัวชี้วัดชั้นนี้
+   * ด้วยหลักฐานที่มาจากชั้นอื่น ซึ่งครูจะเอาไปใช้ตัดสินใจสอนซ่อมไม่ได้เลย
+   */
+  for (const grade of [5, 6]) {
+    const geometry = I.survivorIndicator({ skill: 'geometry', grade, shape: 'rectangle' })
+    const word = I.survivorIndicator({ skill: 'wordProblems', grade, steps: 2 })
+    assert(geometry === null, `โจทย์เรขาคณิต ป.${grade} ถูกนับเป็น ${geometry}`)
+    assert(word === null, `โจทย์ปัญหา ป.${grade} ถูกนับเป็น ${word}`)
+  }
+
+  // ส่วนตัวทบทวนกับตัวต่อยอดไม่มีรหัสชั้นกำกับ จึงรับได้ทุกชั้นตามที่ตั้งใจ
+  assert(
+    I.survivorIndicator({ skill: 'addition', grade: 6 }) === 'basicAddSub',
+    'ตัวชี้วัดทบทวนกลับถูกกันออกเพราะเรื่องชั้น ทั้งที่ไม่มีรหัสชั้นกำกับ',
+  )
+})
+
+check('เล่นสนามรบหนึ่งรอบต้องได้ข้อของตัวชี้วัด รวมทั้งตัวชี้วัดแกนอย่างน้อยหนึ่งตัว', () => {
+  /*
+   * ข้อนี้คือข้อที่จับปัญหาที่ใหญ่ที่สุดของเรื่องนี้ได้
+   *
+   * ตอนแรกโยงตารางเสร็จแล้วดูเหมือนเรียบร้อยดี แต่พอไล่เลเวลจริงออกมาดู
+   * พบว่าตอนที่โจทย์ยังเป็นชั้น ป.4 อยู่ สนามรบถามแค่บวก ลบ และคูณเท่านั้น
+   * ส่วนเรขาคณิตกับโจทย์ปัญหาโผล่ที่เลเวลสิบสี่ขึ้นไป ซึ่งเป็นชั้น ป.6 ไปแล้ว
+   * แปลว่าตัวชี้วัดแกนไม่มีวันถูกบันทึกจากโหมดนี้เลย
+   * ทั้งที่ตารางการโยงถูกต้องทุกช่อง และไม่มีอะไรผิดให้เห็น
+   *
+   * จึงต้องตรวจที่ "เล่นจริงแล้วได้อะไร" ไม่ใช่ตรวจที่ตารางว่าเขียนถูกไหม
+   */
+  const got = new Set()
+  for (let seed = 0; seed < 12; seed += 1) {
+    for (let level = 1; level <= 9; level += 1) {
+      const { indicator } = askAtLevel(level, `รอบ-${seed}-lv${level}`)
+      if (indicator) got.add(indicator)
+    }
+  }
+
+  assert(got.size >= 3, `เล่นครบช่วง ป.4 แล้วได้ตัวชี้วัดแค่ ${got.size} ตัว`)
+
+  const core = [...got].filter((id) => I.findIndicator(id)?.level === 'core')
+  assert(
+    core.length > 0,
+    'เล่นครบช่วง ป.4 แล้วไม่ได้ตัวชี้วัดแกนเลยสักตัว ' +
+      'แปลว่าโหมดนี้ไม่เคยถามโจทย์ที่ตรงกับตัวชี้วัดตอนที่ยังเป็นชั้น ป.4',
+  )
+})
+
+check('ช่วงชั้น ป.4 ของสนามรบต้องถามครบทุกทักษะ ไม่ใช่แค่สามอย่างแรก', () => {
+  const skills = new Set()
+  for (let level = 1; level <= 9; level += 1) {
+    const plan = QZ.quizPlanFor(level)
+    assert(plan.grade === 4, `เลเวล ${level} เป็นชั้น ป.${plan.grade} แล้ว`)
+    skills.add(plan.skill)
+  }
+  assert(skills.size === 9, `ช่วง ป.4 ถามแค่ ${skills.size} ทักษะ จากทั้งหมด 9`)
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
