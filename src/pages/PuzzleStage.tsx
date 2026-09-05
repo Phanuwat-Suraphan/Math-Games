@@ -26,6 +26,8 @@ import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
 import { NotFoundNotice } from './NotFoundNotice'
 import { NumberPad } from '../components/NumberPad'
+import { questionIndicator } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 
 /**
  * หน้าปริศนา
@@ -77,6 +79,7 @@ function PuzzleSession({
 }) {
   const navigate = useNavigate()
   const { answerQuestion, finishStage, isStageReplay } = useGame()
+  const { logIndicator } = useIndicatorLog(player.name)
 
   const [puzzle] = useState(() => {
     // ชนิดที่ด่านกำหนด ถ้าไม่มีหรือชื่อผิดก็ใช้ล็อกรหัสซึ่งเข้าใจง่ายที่สุด
@@ -143,6 +146,16 @@ function PuzzleSession({
           coins: earnedRef.current.coins + reward.gainedCoins,
         }
       }
+      /*
+       * ส่งเข้าสมุดของครูด้วย บันทึกทุกครั้งที่ตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       *
+       * โหมดนี้สร้างโจทย์ของตัวเอง ไม่ได้ผ่านเครื่องสร้างโจทย์กลาง
+       * จึงไม่มีรูปทรงกับจำนวนขั้นตอนให้ส่งไป ปลายทางจะตอบว่าไม่นับ
+       * สำหรับตัวชี้วัดที่ต้องรู้สองอย่างนั้น ซึ่งเป็นฝั่งที่ปลอดภัยของความไม่รู้
+       */
+      const indicator = questionIndicator({ skill: puzzle.skill, grade: puzzle.grade })
+      if (indicator) logIndicator(indicator, outcome.correct)
+
       slotStartedAtRef.current = Date.now()
 
       setProgress(outcome.progress)
@@ -160,7 +173,7 @@ function PuzzleSession({
         window.setTimeout(() => setShake(false), 400)
       }
     },
-    [answerQuestion, isReplay, progress, puzzle, stage.id],
+    [answerQuestion, isReplay, logIndicator, progress, puzzle, stage.id],
   )
 
   /** ปิดจบด่าน ส่งผลเข้าระบบความคืบหน้าของ Part 3 ตามเดิม */

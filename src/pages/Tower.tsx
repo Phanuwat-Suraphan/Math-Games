@@ -25,6 +25,8 @@ import type { Floor, RunState } from '../roguelike/types'
 import type { Question } from '../questionEngine/types'
 import type { Player } from '../types/player'
 import { useMusic } from '../hooks/useMusic'
+import { questionIndicator } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 
 type Phase = 'intro' | 'floor' | 'boon' | 'over'
 
@@ -43,6 +45,7 @@ export function Tower({ player }: { player: Player }) {
   useMusic('adventure')
 
   const { answerQuestion, patchPlayer } = useGame()
+  const { logIndicator } = useIndicatorLog(player.name)
 
   const [phase, setPhase] = useState<Phase>('intro')
   const [run, setRun] = useState<RunState>(() => startRun(`${Date.now()}`))
@@ -115,8 +118,15 @@ export function Tower({ player }: { player: Player }) {
         timeMs: 0,
         isReplay: true,
       })
+
+      /*
+       * ส่งเข้าสมุดของครูด้วย บันทึกทุกครั้งที่ตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       * เพราะข้อที่ตอบผิดคือข้อมูลที่ครูต้องการที่สุด
+       */
+      const indicator = questionIndicator({ skill: data.skill, grade: data.grade })
+      if (indicator) logIndicator(indicator, isCorrect)
     },
-    [answered, answerQuestion],
+    [answered, answerQuestion, logIndicator],
   )
 
   const submit = useCallback(

@@ -15,6 +15,8 @@ import { checkAnswer } from '../questionEngine'
 import { getRequiredCorrectAnswers, isStageUnlocked } from '../utils/stageSystem'
 import { playSfx } from '../services/audioService'
 import { NotFoundNotice } from './NotFoundNotice'
+import { questionIndicator } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 
 /**
  * ตัวห่อสำหรับตรวจสอบ URL และการปลดล็อก
@@ -64,6 +66,7 @@ interface ChallengeSessionProps {
 function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
   const navigate = useNavigate()
   const { answerQuestion, finishStage, isStageReplay } = useGame()
+  const { logIndicator } = useIndicatorLog(player.name)
 
   // สร้างชุดโจทย์ครั้งเดียวตอน mount ชุดโจทย์จึงไม่สลับระหว่างเล่น
   // Question Engine ของ Part 4 สร้างโจทย์จาก questionTypes และ difficulty ของด่าน
@@ -104,6 +107,18 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
         isReplay,
       })
 
+      /*
+       * ส่งเข้าสมุดของครูด้วย บันทึกทุกครั้งที่ตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       * เพราะข้อที่ตอบผิดคือข้อมูลที่ครูต้องการที่สุด
+       */
+      const indicator = questionIndicator({
+        skill: currentQuestion.skill,
+        grade: currentQuestion.grade,
+        shape: currentQuestion.metadata.geometryShape,
+        steps: currentQuestion.metadata.steps,
+      })
+      if (indicator) logIndicator(indicator, isCorrect)
+
       if (isCorrect) {
         playSfx('correct')
         setAnswerState('correct')
@@ -139,6 +154,7 @@ function ChallengeSession({ player, stage, world }: ChallengeSessionProps) {
       attemptedWrong,
       currentQuestion,
       isReplay,
+      logIndicator,
       stage.id,
     ],
   )

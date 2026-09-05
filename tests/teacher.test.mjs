@@ -22,6 +22,7 @@
  *   node tests/teacher.test.mjs /tmp/logic
  */
 
+import fs from 'fs'
 import path from 'path'
 import { createRequire } from 'module'
 
@@ -615,7 +616,7 @@ function askAtLevel(level, seed) {
   return {
     plan,
     question,
-    indicator: I.survivorIndicator({
+    indicator: I.questionIndicator({
       skill: plan.skill,
       grade: plan.grade,
       shape: question.metadata.geometryShape,
@@ -671,10 +672,10 @@ check('ทุกทักษะที่สนามรบถาม ต้อง
   ]
   for (const skill of skills) {
     assert(
-      skill in I.SURVIVOR_INDICATOR,
+      skill in I.QUESTION_INDICATOR,
       `ทักษะ ${skill} ไม่มีในตารางโยงของสนามรบ`,
     )
-    const id = I.SURVIVOR_INDICATOR[skill]
+    const id = I.QUESTION_INDICATOR[skill]
     assert(
       id === null || I.findIndicator(id) !== null,
       `ทักษะ ${skill} โยงไปหาตัวชี้วัด "${id}" ที่ไม่มีในทะเบียน`,
@@ -703,7 +704,7 @@ check('โจทย์เรขาคณิตที่ไม่ใช่สี�
       seed: `รูปทรง-${i}`,
     })
     const shape = question.metadata.geometryShape
-    const id = I.survivorIndicator({ skill: 'geometry', grade: 4, shape })
+    const id = I.questionIndicator({ skill: 'geometry', grade: 4, shape })
 
     if (shape === 'square' || shape === 'rectangle') {
       rectangles += 1
@@ -730,7 +731,7 @@ check('โจทย์ปัญหาขั้นตอนเดียว ต้
       seed: `ขั้นตอน-${i}`,
     })
     const steps = question.metadata.steps
-    const id = I.survivorIndicator({ skill: 'wordProblems', grade: 4, steps })
+    const id = I.questionIndicator({ skill: 'wordProblems', grade: 4, steps })
 
     if ((steps ?? 1) >= 2) {
       twoStep += 1
@@ -752,15 +753,15 @@ check('โจทย์ชั้นที่สูงกว่า ป.4 ต้อ
    * ด้วยหลักฐานที่มาจากชั้นอื่น ซึ่งครูจะเอาไปใช้ตัดสินใจสอนซ่อมไม่ได้เลย
    */
   for (const grade of [5, 6]) {
-    const geometry = I.survivorIndicator({ skill: 'geometry', grade, shape: 'rectangle' })
-    const word = I.survivorIndicator({ skill: 'wordProblems', grade, steps: 2 })
+    const geometry = I.questionIndicator({ skill: 'geometry', grade, shape: 'rectangle' })
+    const word = I.questionIndicator({ skill: 'wordProblems', grade, steps: 2 })
     assert(geometry === null, `โจทย์เรขาคณิต ป.${grade} ถูกนับเป็น ${geometry}`)
     assert(word === null, `โจทย์ปัญหา ป.${grade} ถูกนับเป็น ${word}`)
   }
 
   // ส่วนตัวทบทวนกับตัวต่อยอดไม่มีรหัสชั้นกำกับ จึงรับได้ทุกชั้นตามที่ตั้งใจ
   assert(
-    I.survivorIndicator({ skill: 'addition', grade: 6 }) === 'basicAddSub',
+    I.questionIndicator({ skill: 'addition', grade: 6 }) === 'basicAddSub',
     'ตัวชี้วัดทบทวนกลับถูกกันออกเพราะเรื่องชั้น ทั้งที่ไม่มีรหัสชั้นกำกับ',
   )
 })
@@ -803,6 +804,132 @@ check('ช่วงชั้น ป.4 ของสนามรบต้องถ
     skills.add(plan.skill)
   }
   assert(skills.size === 9, `ช่วง ป.4 ถามแค่ ${skills.size} ทักษะ จากทั้งหมด 9`)
+})
+
+
+check('ทุกหน้าจอที่บันทึกการตอบโจทย์ ต้องส่งเข้าสมุดของครูด้วย', () => {
+  /*
+   * ข้อนี้อ่านไฟล์ต้นฉบับตรง ๆ ไม่ได้เรียกโมดูลที่คอมไพล์แล้วเหมือนข้ออื่น
+   * เพราะสิ่งที่ต้องตรวจคือ "มีหน้าจอไหนลืมต่อสายบ้าง" ซึ่งเป็นคำถามเกี่ยวกับ
+   * โครงสร้างของโปรเจกต์ ไม่ใช่เกี่ยวกับพฤติกรรมของฟังก์ชันใดฟังก์ชันหนึ่ง
+   * และหน้าจอเป็นไฟล์ React ที่ชุดทดสอบเรียกใช้ไม่ได้อยู่แล้ว
+   *
+   * ทำไมต้องมีข้อนี้
+   *
+   * ตอนแรกมีแค่สองโหมดที่ส่งผลเข้าแผงคุณครู อีกหกโหมดไม่เคยส่งอะไรเลยสักข้อ
+   * ทั้งที่รวมกันแล้วเป็นโจทย์ส่วนใหญ่ที่เด็กตอบในหนึ่งคาบ
+   * และไม่มีอะไรฟ้องเลย เพราะทุกโหมดก็ทำงานถูกต้องของมันเอง แค่ครูไม่เห็น
+   *
+   * แล้วตอนแก้ก็ยังแก้เฉพาะโหมดที่เห็นก่อนโหมดเดียว ก่อนจะมาไล่ทั้งชุดทีหลัง
+   * ซึ่งเป็นความผิดพลาดแบบเดียวกับตอนแก้ ป.4/12 แล้วไม่ได้ไล่หาข้ออื่นที่เหมือนกัน
+   * ข้อนี้จึงมีไว้ไล่แทนคน เพื่อไม่ให้ครั้งหน้าต้องอาศัยการสังเกตเอา
+   */
+  const dir = path.resolve('src/pages')
+  const missing = []
+
+  for (const file of fs.readdirSync(dir)) {
+    if (!file.endsWith('.tsx')) continue
+    const source = fs.readFileSync(path.join(dir, file), 'utf8')
+    if (!source.includes('answerQuestion({')) continue
+    if (!source.includes('logIndicator(')) missing.push(file)
+  }
+
+  assert(
+    missing.length === 0,
+    `หน้าจอที่เด็กตอบโจทย์แล้วครูไม่เห็น: ${missing.join(' · ')} ` +
+      '(ต้องเรียก logIndicator ด้วย หรือถ้าตั้งใจไม่ส่ง ให้เขียนเหตุผลไว้แล้วแก้ข้อนี้)',
+  )
+})
+
+check('โจทย์ที่ไม่มี metadata ต้องไม่ถูกนับเป็นตัวชี้วัดที่ต้องรู้เนื้อโจทย์', () => {
+  /*
+   * ปริศนากับมินิเกมสร้างโจทย์ของตัวเอง ไม่ได้ผ่านเครื่องสร้างโจทย์กลาง
+   * จึงไม่มีรูปทรงกับจำนวนขั้นตอนให้ส่งมา
+   * เมื่อไม่รู้ ต้องตอบว่าไม่นับ ไม่ใช่เดาว่าน่าจะใช่
+   * เพราะการเดาผิดคือการรายงานให้ครูผิด ส่วนการไม่รายงานแค่ทำให้ข้อมูลน้อยลง
+   */
+  assert(
+    I.questionIndicator({ skill: 'geometry', grade: 4 }) === null,
+    'โจทย์เรขาคณิตที่ไม่รู้รูปทรง ถูกนับเป็นตัวชี้วัดสี่เหลี่ยมมุมฉาก',
+  )
+  assert(
+    I.questionIndicator({ skill: 'wordProblems', grade: 4 }) === null,
+    'โจทย์ปัญหาที่ไม่รู้จำนวนขั้นตอน ถูกนับเป็นตัวชี้วัดโจทย์สองขั้นตอน',
+  )
+  // ส่วนทักษะที่ไม่ต้องรู้เนื้อโจทย์ ยังนับได้ตามปกติ
+  assert(
+    I.questionIndicator({ skill: 'multiplication', grade: 4 }) === 'basicMulDiv',
+    'โจทย์คูณที่ไม่มี metadata กลับไม่ถูกนับ ทั้งที่ไม่ต้องรู้เนื้อโจทย์',
+  )
+})
+
+
+check('ตัวชี้วัดที่ไม่มีรหัส ต้องไม่ถูกนับเป็นเกณฑ์ของชั้น ป.4', () => {
+  /*
+   * เศษส่วนกับทศนิยมรายงานให้ครูดูเป็นข้อมูลประกอบ แต่ยังไม่มีรหัสตัวชี้วัด
+   * เพราะทะเบียนนี้ใส่รหัสเฉพาะที่ยืนยันถ้อยคำมาจากเอกสารแล้ว
+   *
+   * สิ่งที่ต้องกันคือมันหลุดไปอยู่ในกลุ่มที่ครูเอาไปกรอกคะแนน
+   * ซึ่งจะทำให้ครูกรอกคะแนนตัวชี้วัดจากเรื่องที่ยังไม่รู้ด้วยซ้ำว่ารหัสอะไร
+   */
+  for (const item of I.INDICATORS) {
+    if (item.level === 'core') {
+      assert(item.code !== '', `ตัวชี้วัดแกน ${item.id} ไม่มีรหัส`)
+    } else {
+      assert(
+        item.code === '',
+        `ตัวชี้วัด ${item.id} ไม่ใช่ระดับแกนแต่มีรหัส ${item.code} ` +
+          'ครูอาจเผลอเอาไปกรอกเป็นคะแนน',
+      )
+    }
+  }
+
+  // สองตัวที่เพิ่งเพิ่มต้องอยู่ในกลุ่มที่ไม่ถูกนับเป็นเกณฑ์จริง ๆ
+  for (const id of ['fractionSense', 'decimalSense']) {
+    const meta = I.findIndicator(id)
+    assert(meta !== null, `ไม่พบตัวชี้วัด ${id}`)
+    assert(meta.level !== 'core', `${id} ถูกนับเป็นตัวชี้วัดแกน`)
+  }
+})
+
+check('เรื่องที่ยังไม่ระบุรหัส ต้องไม่ทำให้ระบบบอกว่าควรสอนซ้ำ', () => {
+  /*
+   * การตัดสินว่าตัวชี้วัดไหนควรสอนซ้ำ นับเฉพาะตัวชี้วัดแกน
+   * ถ้าเศษส่วนหลุดเข้าไปในการนับนั้น ครูจะถูกบอกให้ไปสอนซ่อมเรื่องที่
+   * ทะเบียนนี้ยังไม่ได้ยืนยันด้วยซ้ำว่าเป็นตัวชี้วัดข้อไหน
+   *
+   * เขียนครั้งแรกใช้ชื่อช่องผิด (assessed แทน attempts) ผลคือสมุดที่ป้อนเข้าไป
+   * ไม่มีข้อมูลเลยสักข้อ ฟังก์ชันจึงคืนรายการว่าง แล้วข้อนี้ก็ผ่านไปเฉย ๆ
+   * โดยไม่ได้ตรวจอะไรจริง ๆ สักอย่าง
+   *
+   * จึงตรวจสองด้านคู่กัน คือตัวชี้วัดแกนที่อ่อนต้องถูกเสนอจริง
+   * ถ้าด้านนั้นไม่ผ่าน แปลว่าสมุดที่ป้อนเข้าไปไม่ถูกต้อง และอีกด้านก็เชื่อไม่ได้
+   */
+  const weakTally = { attempts: 10, correct: 1 }
+  const classLog = ['เด็กหนึ่ง', 'เด็กสอง', 'เด็กสาม'].map((name) => ({
+    name,
+    day: 20260101,
+    counts: {
+      estimate: { ...weakTally },
+      fractionSense: { ...weakTally },
+      decimalSense: { ...weakTally },
+    },
+  }))
+
+  const weak = L.needsReteaching(L.summarizeClass(classLog))
+  const ids = weak.map((row) => row.indicator)
+
+  assert(
+    ids.includes('estimate'),
+    'ตัวชี้วัดแกนที่ทั้งห้องทำได้ 10% กลับไม่ถูกเสนอให้สอนซ้ำ ' +
+      'แปลว่าสมุดที่ป้อนเข้าไปไม่ถูกต้อง ข้อนี้จึงยังไม่ได้ตรวจสิ่งที่ตั้งใจตรวจ',
+  )
+  for (const id of ['fractionSense', 'decimalSense']) {
+    assert(
+      !ids.includes(id),
+      `${id} ถูกเสนอให้สอนซ้ำ ทั้งที่ยังไม่ใช่ตัวชี้วัดที่มีรหัส`,
+    )
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

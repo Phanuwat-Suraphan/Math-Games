@@ -14,7 +14,7 @@ import { useMusic } from '../hooks/useMusic'
 import { PERKS, perkCost } from '../data/perks'
 import { biomeBlurb, getBiome, type Biome } from '../survivor/biomes'
 import { quizPlanFor } from '../survivor/quiz'
-import { survivorIndicator } from '../teacher/indicators'
+import { questionIndicator } from '../teacher/indicators'
 import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import {
   advance,
@@ -506,7 +506,7 @@ export function Survivor({ player }: { player: Player }) {
        * ส่งรูปทรงกับจำนวนขั้นตอนไปด้วย เพื่อให้ปลายทางตัดสินได้ว่า
        * ข้อนี้ตรงกับถ้อยคำของตัวชี้วัดจริงไหม ไม่ใช่ตัดสินจากชนิดทักษะอย่างเดียว
        */
-      const indicator = survivorIndicator({
+      const indicator = questionIndicator({
         skill: plan.skill,
         grade: plan.grade,
         shape: question.metadata.geometryShape,

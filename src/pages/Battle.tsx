@@ -31,6 +31,8 @@ import type { Stage, StageResult } from '../types/stage'
 import type { World } from '../types/world'
 import { NotFoundNotice } from './NotFoundNotice'
 import { useMusic } from '../hooks/useMusic'
+import { questionIndicator } from '../teacher/indicators'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 
 /**
  * หน้าต่อสู้
@@ -85,6 +87,7 @@ interface BattleSessionProps {
 function BattleSession({ player, stage, world }: BattleSessionProps) {
   const navigate = useNavigate()
   const { answerQuestion, finishStage, isStageReplay } = useGame()
+  const { logIndicator } = useIndicatorLog(player.name)
 
   const [state, setState] = useState<BattleState>(() =>
     startStageBattle({ player, stage }),
@@ -133,6 +136,18 @@ function BattleSession({ player, stage, world }: BattleSessionProps) {
         isReplay,
       })
 
+      /*
+       * ส่งเข้าสมุดของครูด้วย บันทึกทุกครั้งที่ตอบ ไม่ใช่เฉพาะตอนตอบถูก
+       * เพราะข้อที่ตอบผิดคือข้อมูลที่ครูต้องการที่สุด
+       */
+      const indicator = questionIndicator({
+        skill: question.skill,
+        grade: question.grade,
+        shape: question.metadata.geometryShape,
+        steps: question.metadata.steps,
+      })
+      if (indicator) logIndicator(indicator, outcome.correct)
+
       if (reward) {
         earnedRef.current = {
           exp: earnedRef.current.exp + reward.gainedExp,
@@ -169,7 +184,7 @@ function BattleSession({ player, stage, world }: BattleSessionProps) {
         }
       }
     },
-    [answerQuestion, answerState, hintShown, isReplay, question, stage.id, state],
+    [answerQuestion, answerState, hintShown, isReplay, logIndicator, question, stage.id, state],
   )
 
   const goNext = useCallback(() => {
