@@ -28,6 +28,27 @@ interface ShapeViewProps {
   showAngles: boolean
 }
 
+/**
+ * จุดปลายเส้น
+ *
+ * เด็กต้องเห็นว่า "เส้นนี้จบตรงไหน" ถึงจะเอาปลายเส้นถัดไปมาต่อให้ชนได้
+ * เส้นที่ไม่มีจุดปลายทำให้รูปที่ดูเหมือนปิดแล้ว จริง ๆ ยังมีช่องโหว่อยู่สองพิกเซล
+ * ซึ่งทำให้มุมภายในที่คำนวณได้ผิดไปทั้งรูปโดยไม่มีใครสังเกต
+ */
+function EndPoint({ at, color }: { at: Point; color: string }) {
+  return (
+    <circle
+      cx={at.x}
+      cy={at.y}
+      r={5}
+      fill="#ffffff"
+      stroke={color}
+      strokeWidth={2.5}
+      pointerEvents="none"
+    />
+  )
+}
+
 function LabelPill({
   at,
   text,
@@ -140,6 +161,8 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
             strokeWidth={shape.width}
             strokeLinecap="round"
           />
+          <EndPoint at={shape.a} color={shape.color} />
+          <EndPoint at={shape.b} color={shape.color} />
           {showLengths && length > 24 ? (
             <LabelPill
               at={midpoint(shape.a, shape.b)}
@@ -188,6 +211,11 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
             strokeLinecap="round"
           />
           <circle cx={shape.center.x} cy={shape.center.y} r={3.5} fill={shape.color} opacity={0.6} />
+          <EndPoint at={pointAt(shape.center, shape.radius, shape.start)} color={shape.color} />
+          <EndPoint
+            at={pointAt(shape.center, shape.radius, shape.start + shape.sweep)}
+            color={shape.color}
+          />
           {showAngles ? (
             <LabelPill
               at={pointAt(shape.center, shape.radius + 20, shape.start + shape.sweep / 2)}

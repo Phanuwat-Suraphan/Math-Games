@@ -287,3 +287,77 @@ export function pointLabel(index: number): string {
   const round = Math.floor(index / letters.length)
   return round === 0 ? letter : `${letter}${round}`
 }
+
+/**
+ * จุดตัดของวงกลมสองวง
+ *
+ * นี่คือหัวใจของงานวงเวียนทั้งหมด การสร้างสามเหลี่ยมด้านเท่า การแบ่งครึ่งมุม
+ * และการสร้างมุมฉาก ล้วนจบลงที่ "ลากเส้นไปยังจุดที่ส่วนโค้งสองเส้นตัดกัน"
+ * ถ้าเด็กต้องกะเอาเองด้วยสายตา รูปจะเพี้ยนทุกครั้งและบทเรียนจะเสียไปเปล่า ๆ
+ *
+ * คืนสองจุดเมื่อตัดกันจริง คืนจุดเดียวเมื่อสัมผัสกันพอดี
+ * และคืนรายการว่างเมื่อไม่แตะกันเลยหรือเป็นวงเดียวกันทั้งวง
+ */
+export function circleIntersections(
+  centerA: Point,
+  radiusA: number,
+  centerB: Point,
+  radiusB: number,
+): Point[] {
+  const dx = centerB.x - centerA.x
+  const dy = centerB.y - centerA.y
+  const span = Math.hypot(dx, dy)
+  if (span === 0) return []
+  if (span > radiusA + radiusB) return []
+  if (span < Math.abs(radiusA - radiusB)) return []
+
+  const along = (radiusA * radiusA - radiusB * radiusB + span * span) / (2 * span)
+  const height = Math.sqrt(Math.max(0, radiusA * radiusA - along * along))
+  const middle: Point = {
+    x: centerA.x + (along * dx) / span,
+    y: centerA.y + (along * dy) / span,
+  }
+  if (height === 0) return [middle]
+
+  const offsetX = (height * dy) / span
+  const offsetY = (height * dx) / span
+  return [
+    { x: middle.x + offsetX, y: middle.y - offsetY },
+    { x: middle.x - offsetX, y: middle.y + offsetY },
+  ]
+}
+
+/**
+ * จุดที่วงกลมตัดกับส่วนของเส้นตรง
+ *
+ * ใช้ตอนกางวงเวียนคร่อมเส้นแล้วขีดรอยตัดสองข้าง
+ * ซึ่งเป็นขั้นแรกของการสร้างเส้นแบ่งครึ่งที่ตั้งฉาก
+ */
+export function circleSegmentIntersections(
+  center: Point,
+  radius: number,
+  a: Point,
+  b: Point,
+): Point[] {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const quadratic = dx * dx + dy * dy
+  if (quadratic === 0) return []
+
+  const linear = 2 * (dx * (a.x - center.x) + dy * (a.y - center.y))
+  const constant =
+    (a.x - center.x) * (a.x - center.x) + (a.y - center.y) * (a.y - center.y) - radius * radius
+  const discriminant = linear * linear - 4 * quadratic * constant
+  if (discriminant < 0) return []
+
+  const root = Math.sqrt(discriminant)
+  const steps =
+    discriminant === 0
+      ? [-linear / (2 * quadratic)]
+      : [(-linear - root) / (2 * quadratic), (-linear + root) / (2 * quadratic)]
+
+  /* เอาเฉพาะจุดที่อยู่บนช่วงของเส้นจริง ไม่ใช่บนเส้นที่ต่อออกไปไม่สิ้นสุด */
+  return steps
+    .filter((step) => step >= 0 && step <= 1)
+    .map((step) => ({ x: a.x + step * dx, y: a.y + step * dy }))
+}

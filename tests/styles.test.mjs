@@ -92,6 +92,7 @@ const REQUIRED_CLASSES = [
   'geo-mascot-cheer',
   'geo-protractor',
   'geo-ruler',
+  'geo-compass',
 
   // ตัวอักษรและเส้นคั่น
   'title-hero',

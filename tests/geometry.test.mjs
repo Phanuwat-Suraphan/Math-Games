@@ -319,6 +319,88 @@ check('ปลายเส้นต้องวิ่งไปชนจุดเ�
   assert(S.nearestAnchor(shapes, { x: 400, y: 400 }, 16) === null, 'จุดไกลไม่ควรถูกดูด')
 })
 
+check('จุดตัดของวงกลมสองวง ต้องเป็นจุดที่ใช้สร้างสามเหลี่ยมด้านเท่าได้จริง', () => {
+  /* วงกลมรัศมีเท่ากันสองวง ที่เข็มปักอยู่ปลายเส้นคนละข้าง คือขั้นตอนสร้างสามเหลี่ยมด้านเท่า */
+  const side = 4 * G.PX_PER_CM
+  const points = G.circleIntersections({ x: 0, y: 0 }, side, { x: side, y: 0 }, side)
+  assert(points.length === 2, `ควรตัดกันสองจุด แต่ได้ ${points.length} จุด`)
+  for (const point of points) {
+    close(G.distance(point, { x: 0, y: 0 }), side, 0.0001, 'จุดตัดห่างจากเข็มข้างแรกไม่เท่ารัศมี')
+    close(G.distance(point, { x: side, y: 0 }), side, 0.0001, 'จุดตัดห่างจากเข็มข้างที่สองไม่เท่ารัศมี')
+  }
+
+  /* แตะกันพอดีได้จุดเดียว ห่างกันเกินไปไม่ได้เลย และวงในวงก็ไม่ได้เลย */
+  assert(G.circleIntersections({ x: 0, y: 0 }, 5, { x: 10, y: 0 }, 5).length === 1, 'สัมผัสกันพอดีควรได้จุดเดียว')
+  assert(G.circleIntersections({ x: 0, y: 0 }, 1, { x: 9, y: 0 }, 1).length === 0, 'ห่างกันเกินไปต้องไม่มีจุดตัด')
+  assert(G.circleIntersections({ x: 0, y: 0 }, 10, { x: 1, y: 0 }, 2).length === 0, 'วงเล็กอยู่ในวงใหญ่ต้องไม่มีจุดตัด')
+  assert(G.circleIntersections({ x: 0, y: 0 }, 5, { x: 0, y: 0 }, 5).length === 0, 'วงเดียวกันทั้งวงต้องไม่คืนจุดตัด')
+})
+
+check('จุดที่วงกลมตัดเส้นตรง ต้องอยู่บนช่วงของเส้นเท่านั้น', () => {
+  const across = G.circleSegmentIntersections({ x: 0, y: 0 }, 5, { x: -10, y: 0 }, { x: 10, y: 0 })
+  assert(across.length === 2, 'เส้นที่ผ่ากลางวงต้องตัดสองจุด')
+  /* เส้นสั้น ๆ ที่จบก่อนถึงเส้นรอบวง ต้องไม่นับว่าตัด */
+  assert(
+    G.circleSegmentIntersections({ x: 0, y: 0 }, 5, { x: 0, y: 0 }, { x: 3, y: 0 }).length === 0,
+    'เส้นที่ยังไปไม่ถึงเส้นรอบวงต้องไม่มีจุดตัด',
+  )
+  assert(
+    G.circleSegmentIntersections({ x: 0, y: 0 }, 5, { x: -10, y: 20 }, { x: 10, y: 20 }).length === 0,
+    'เส้นที่อยู่ห่างออกไปต้องไม่มีจุดตัด',
+  )
+})
+
+check('ปลายส่วนโค้งต้องเป็นจุดที่ปลายเส้นวิ่งไปชนได้', () => {
+  const arc = {
+    kind: 'arc',
+    id: 'r',
+    color: '#000',
+    width: 2,
+    center: { x: 0, y: 0 },
+    radius: 100,
+    start: 0,
+    sweep: 90,
+  }
+  const anchors = S.shapeAnchors(arc)
+  assert(anchors.length === 3, `ส่วนโค้งควรมีจุดสำคัญสามจุด แต่ได้ ${anchors.length}`)
+  const near = S.nearestAnchor([arc], { x: 4, y: -97 }, 16)
+  assert(near !== null, 'ปลายโค้งด้านบนไม่ถูกดูด')
+  close(near.x, 0, 0.0001, 'ปลายโค้งอยู่ผิดที่')
+  close(near.y, -100, 0.0001, 'ปลายโค้งอยู่ผิดที่')
+})
+
+check('แม่เหล็กต้องดูดเข้าจุดตัดของส่วนโค้ง ไม่ใช่แค่จุดที่วาดไว้', () => {
+  const side = 4 * G.PX_PER_CM
+  const shapes = [
+    { kind: 'circle', id: 'a', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: side },
+    { kind: 'circle', id: 'b', color: '#000', width: 2, center: { x: side, y: 0 }, radius: side },
+  ]
+  const apex = G.circleIntersections({ x: 0, y: 0 }, side, { x: side, y: 0 }, side)[0]
+  const snapped = S.nearestSnapPoint(shapes, { x: apex.x + 6, y: apex.y - 5 }, 16)
+  assert(snapped !== null, 'จุดตัดของสองวงไม่ถูกดูด ทั้งที่นิ้วอยู่ใกล้มาก')
+  close(snapped.x, apex.x, 0.0001, 'ดูดไปผิดจุด')
+  close(snapped.y, apex.y, 0.0001, 'ดูดไปผิดจุด')
+
+  /* จุดยอดที่มองเห็นต้องมาก่อนจุดตัดเสมอ ถ้าอยู่ใกล้กันทั้งคู่ */
+  const withDot = [
+    ...shapes,
+    { kind: 'dot', id: 'd', color: '#000', width: 2, at: { x: apex.x + 4, y: apex.y }, label: 'A' },
+  ]
+  const preferred = S.nearestSnapPoint(withDot, { x: apex.x + 5, y: apex.y }, 16)
+  close(preferred.x, apex.x + 4, 0.0001, 'ควรดูดเข้าจุดที่มองเห็นก่อนจุดตัด')
+})
+
+check('ส่วนโค้งครึ่งเดียว ต้องไม่แถมจุดตัดของฝั่งที่ไม่ได้วาด', () => {
+  const shapes = [
+    /* โค้งครึ่งบนของวงซ้าย กับโค้งครึ่งบนของวงขวา ตัดกันได้จุดเดียวคือด้านบน */
+    { kind: 'arc', id: 'a', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 100, start: 0, sweep: 180 },
+    { kind: 'arc', id: 'b', color: '#000', width: 2, center: { x: 100, y: 0 }, radius: 100, start: 0, sweep: 180 },
+  ]
+  const found = S.intersectionTargets(shapes)
+  assert(found.length === 1, `ควรได้จุดตัดจุดเดียว แต่ได้ ${found.length} จุด`)
+  assert(found[0].y < 0, 'จุดตัดต้องอยู่ครึ่งบนของกระดาษ ซึ่งเป็นฝั่งที่วาดไว้จริง')
+})
+
 /* ---------------------------------------------------------------- */
 /* คำอธิบายที่เด็กอ่าน                                                */
 /* ---------------------------------------------------------------- */
