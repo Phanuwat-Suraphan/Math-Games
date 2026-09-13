@@ -95,6 +95,12 @@ const REQUIRED_CLASSES = [
   'geo-compass',
   'geo-cursor',
   'geo-zoom',
+  'geo-sticker',
+  'geo-sticker-on',
+  'geo-theme',
+  'geo-theme-on',
+  'geo-spark',
+  'geo-blink',
 
   // ตัวอักษรและเส้นคั่น
   'title-hero',

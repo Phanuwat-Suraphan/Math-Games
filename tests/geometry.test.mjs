@@ -41,6 +41,7 @@ const T = load('geometry/tools')
 const M = load('geometry/missions')
 const I = load('geometry/input')
 const W = load('geometry/view')
+const C = load('geometry/cute')
 
 let passed = 0
 const failures = []
@@ -504,6 +505,161 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* ของน่ารัก สติกเกอร์ หน้าตา และประกาย                                 */
+/* ---------------------------------------------------------------- */
+
+check('จุดศูนย์ถ่วงต้องอยู่ในรูปจริง ไม่ใช่ค่าเฉลี่ยของจุดยอด', () => {
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ]
+  const middle = G.polygonCentroid(square)
+  close(middle.x, 50, 0.0001, 'จุดศูนย์ถ่วงของจัตุรัสผิด')
+  close(middle.y, 50, 0.0001, 'จุดศูนย์ถ่วงของจัตุรัสผิด')
+
+  /* สามเหลี่ยมมุมฉาก จุดศูนย์ถ่วงอยู่ที่หนึ่งในสามของแต่ละด้าน */
+  const triangle = G.polygonCentroid([
+    { x: 0, y: 0 },
+    { x: 120, y: 0 },
+    { x: 0, y: 90 },
+  ])
+  close(triangle.x, 40, 0.0001, 'จุดศูนย์ถ่วงของสามเหลี่ยมผิด')
+  close(triangle.y, 30, 0.0001, 'จุดศูนย์ถ่วงของสามเหลี่ยมผิด')
+
+  /* จุดยอดเรียงเป็นเส้นตรง พื้นที่เป็นศูนย์ ต้องไม่ได้ NaN หรือค่าอนันต์ */
+  const flat = G.polygonCentroid([
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 20, y: 0 },
+  ])
+  assert(Number.isFinite(flat.x) && Number.isFinite(flat.y), 'รูปแบนทำให้จุดศูนย์ถ่วงพัง')
+})
+
+check('หน้าตาการ์ตูนต้องใส่เฉพาะรูปปิดที่ใหญ่พอ และต้องไม่ล้นออกนอกรูป', () => {
+  const big = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 500, y: 400 }, 150, 5),
+  }
+  const face = S.faceOf(big)
+  assert(face !== null, 'ห้าเหลี่ยมใหญ่ควรมีหน้า')
+  assert(
+    face.size <= G.nearestVertexDistance(face.center, big.points) + 0.0001,
+    'หน้าถูกวางใหญ่เกินจนล้นออกนอกรูป',
+  )
+
+  /* รูปเล็กเกินไป หน้าจะกลายเป็นจุดมั่ว ๆ ที่บังป้ายบอกมุม */
+  const small = { ...big, points: G.regularPolygon({ x: 100, y: 100 }, 20, 5) }
+  assert(S.faceOf(small) === null, 'รูปเล็กต้องไม่มีหน้า')
+
+  /* รูปที่ยังไม่ปิด ยังไม่ใช่รูป จึงยังไม่มีหน้า */
+  assert(S.faceOf({ ...big, closed: false }) === null, 'รูปที่ยังไม่ปิดต้องไม่มีหน้า')
+
+  assert(
+    S.faceOf(segment('s', { x: 0, y: 0 }, { x: 300, y: 0 })) === null,
+    'เส้นตรงต้องไม่มีหน้า',
+  )
+
+  /* วงกลมใหญ่มีหน้าได้ วงกลมจิ๋วไม่มี */
+  const circle = { kind: 'circle', id: 'c', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 120 }
+  assert(S.faceOf(circle) !== null, 'วงกลมใหญ่ควรมีหน้า')
+  assert(S.faceOf({ ...circle, radius: 10 }) === null, 'วงกลมจิ๋วต้องไม่มีหน้า')
+})
+
+check('ใจกลางของรูปต้องหาได้ทุกชนิด ไว้ใช้เป็นจุดโปรยประกาย', () => {
+  const middle = S.shapeCenter(segment('s', { x: 0, y: 0 }, { x: 100, y: 40 }))
+  close(middle.x, 50, 0.0001, 'ใจกลางเส้นตรงผิด')
+  close(middle.y, 20, 0.0001, 'ใจกลางเส้นตรงผิด')
+
+  const arcCenter = S.shapeCenter({
+    kind: 'arc',
+    id: 'a',
+    color: '#000',
+    width: 2,
+    center: { x: 7, y: 9 },
+    radius: 50,
+    start: 0,
+    sweep: 90,
+  })
+  close(arcCenter.x, 7, 0.0001, 'ใจกลางส่วนโค้งควรเป็นจุดที่ปักเข็ม')
+
+  const stickerCenter = S.shapeCenter({
+    kind: 'sticker',
+    id: 'k',
+    color: '#000',
+    width: 2,
+    at: { x: 11, y: 22 },
+    emoji: '⭐',
+    size: 46,
+  })
+  close(stickerCenter.y, 22, 0.0001, 'ใจกลางสติกเกอร์ผิด')
+})
+
+check('สติกเกอร์ต้องจิ้มโดน ย้ายได้ แต่ต้องไม่ดูดปลายเส้น', () => {
+  const sticker = {
+    kind: 'sticker',
+    id: 'k',
+    color: '#000',
+    width: 2,
+    at: { x: 100, y: 100 },
+    emoji: '⭐',
+    size: 46,
+  }
+  assert(S.hitTest(sticker, { x: 110, y: 105 }), 'จิ้มกลางสติกเกอร์แล้วไม่โดน')
+  assert(!S.hitTest(sticker, { x: 200, y: 200 }), 'จิ้มไกลแล้วยังโดน')
+
+  const moved = S.translateShape(sticker, 10, -10)
+  assert(moved.at.x === 110 && moved.at.y === 90, 'ย้ายสติกเกอร์แล้วตำแหน่งผิด')
+
+  /*
+   * สติกเกอร์เป็นของตกแต่ง ถ้ามันดูดปลายเส้น เด็กที่แปะดาวไว้ใกล้จุดยอด
+   * จะลากเส้นไปชนดาวแทนที่จะชนจุดยอด แล้วรูปจะเพี้ยนโดยไม่รู้สาเหตุ
+   */
+  assert(S.shapeAnchors(sticker).length === 0, 'สติกเกอร์ต้องไม่เป็นเป้าให้ปลายเส้นมาชน')
+  assert(S.nearestSnapPoint([sticker], { x: 101, y: 101 }, 16) === null, 'สติกเกอร์ไม่ควรถูกดูด')
+})
+
+check('คำเชียร์ต้องมาเป็นหมุด ไม่ใช่ทุกครั้งที่วาด', () => {
+  assert(C.encouragementFor(1) !== null, 'รูปแรกควรมีคำเชียร์')
+  assert(C.encouragementFor(2) === null, 'รูปที่สองไม่ควรมีคำเชียร์ ไม่งั้นจะกลายเป็นเสียงรบกวน')
+  assert(C.encouragementFor(10) !== null, 'ครบสิบรูปควรมีคำเชียร์')
+  assert(C.encouragementFor(137) === null, 'จำนวนที่ไม่ใช่หมุดต้องเงียบ')
+})
+
+check('ธีมกระดาษต้องครบและไม่ซ้ำรหัส', () => {
+  assert(C.PAPER_THEMES.length >= 3, 'ธีมน้อยเกินไป')
+  const ids = new Set()
+  for (const theme of C.PAPER_THEMES) {
+    assert(!ids.has(theme.id), `รหัสธีม ${theme.id} ซ้ำ`)
+    ids.add(theme.id)
+    assert(/^#[0-9a-f]{6}$/i.test(theme.paper), `ธีม ${theme.id} สีกระดาษไม่ใช่รหัสสีที่ใช้ได้`)
+    assert(theme.label.length > 0, `ธีม ${theme.id} ไม่มีชื่อ`)
+  }
+  assert(C.findTheme('ไม่มีธีมนี้').id === C.PAPER_THEMES[0].id, 'ธีมที่ไม่รู้จักควรได้ธีมแรก')
+  assert(C.STICKERS.length >= 6, 'สติกเกอร์น้อยเกินไป')
+})
+
+check('ประกายต้องกระจายรอบทิศและไม่อยู่ห่างเท่ากันหมด', () => {
+  const offsets = C.sparkleOffsets(6, 40)
+  assert(offsets.length === 6, 'จำนวนประกายผิด')
+  const spans = offsets.map((offset) => Math.hypot(offset.x, offset.y))
+  assert(Math.max(...spans) <= 40.0001, 'ประกายกระเด็นไกลเกินที่กำหนด')
+  assert(
+    new Set(spans.map((value) => value.toFixed(3))).size > 1,
+    'ประกายอยู่ห่างเท่ากันหมด จะดูเหมือนวงกลมจุดไข่ปลา ไม่ใช่ประกาย',
+  )
+  /* กระจายทั้งซ้ายขวาบนล่าง ไม่ใช่กองอยู่ข้างเดียว */
+  assert(offsets.some((o) => o.x > 1) && offsets.some((o) => o.x < -1), 'ประกายไม่กระจายซ้ายขวา')
+  assert(offsets.some((o) => o.y > 1) && offsets.some((o) => o.y < -1), 'ประกายไม่กระจายบนล่าง')
 })
 
 /* ---------------------------------------------------------------- */

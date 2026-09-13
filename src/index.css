@@ -1276,6 +1276,82 @@ html[data-animations='off'] *::after {
   color: #6d28d9;
 }
 
+/* ปุ่มเลือกสติกเกอร์ ตัวอิโมจิใหญ่พอให้เห็นว่าเป็นรูปอะไร */
+.geo-sticker {
+  min-height: 46px;
+  border-radius: 14px;
+  border: 2px solid #e9d5ff;
+  background: #ffffff;
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.geo-sticker:hover {
+  transform: translateY(-2px) scale(1.06);
+}
+
+.geo-sticker-on {
+  border-color: #7c3aed;
+  box-shadow: 0 8px 14px -10px rgba(124, 58, 237, 0.9);
+}
+
+/* ปุ่มเลือกธีมกระดาษ พื้นปุ่มคือสีกระดาษจริงของธีมนั้น */
+.geo-theme {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  border: 2px solid #e2e8f0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #475569;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.geo-theme:hover {
+  transform: translateY(-2px);
+}
+
+.geo-theme-on {
+  border-color: #7c3aed;
+  color: #5b21b6;
+  box-shadow: 0 8px 14px -10px rgba(124, 58, 237, 0.9);
+}
+
+/*
+ * ประกายตอนวาดเสร็จ
+ *
+ * transform-box: fill-box จำเป็นสำหรับของใน SVG
+ * ไม่งั้นจุดหมุนจะไปอยู่ที่มุมบนซ้ายของทั้งผืนวาด แล้วประกายจะกระเด็นข้ามจอ
+ */
+.geo-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+  animation: geo-spark 900ms ease-out forwards;
+}
+
+@keyframes geo-spark {
+  0%   { opacity: 0; transform: scale(0.3); }
+  35%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(0.85) translateY(-8px); }
+}
+
+/* ตาของน้องวงเวียนกะพริบเป็นระยะ */
+.geo-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: geo-blink 4.2s ease-in-out infinite;
+}
+
+@keyframes geo-blink {
+  0%, 92%, 100% { transform: scaleY(1); }
+  95%           { transform: scaleY(0.1); }
+}
+
 .geo-notice {
   padding: 4px 12px;
   border-radius: 999px;
@@ -1341,7 +1417,14 @@ html[data-animations='off'] *::after {
 /* เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ไม่ควรมีอะไรกระดึ๊บอยู่ข้างจอตลอดเวลา */
 @media (prefers-reduced-motion: reduce) {
   .geo-mascot-idle,
-  .geo-mascot-cheer {
+  .geo-mascot-cheer,
+  .geo-blink {
     animation-name: none;
+  }
+
+  /* ประกายถูกซ่อนไปเลย ไม่ใช่แค่หยุดนิ่ง ไม่งั้นมันจะค้างอยู่บนจอหนึ่งวินาที */
+  .geo-spark {
+    animation-name: none;
+    opacity: 0;
   }
 }

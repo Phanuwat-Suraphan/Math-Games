@@ -50,6 +50,13 @@ import {
 import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
+import {
+  PAPER_THEMES,
+  STICKERS,
+  encouragementFor,
+  findTheme,
+  sparkleOffsets,
+} from '../geometry/cute'
 import { PENCIL_COLORS, PENCIL_WIDTHS, TOOLS, findTool } from '../geometry/tools'
 import type { ToolId } from '../geometry/tools'
 import {
@@ -57,6 +64,7 @@ import {
   describeBoard,
   describeShape,
   findShapeAt,
+  shapeCenter,
   nearestSnapPoint,
   translateShape,
 } from '../geometry/shapes'
@@ -140,6 +148,7 @@ export function GeometryStudio() {
   const [snapOn, setSnapOn] = useState(true)
   const [showLengths, setShowLengths] = useState(true)
   const [showAngles, setShowAngles] = useState(true)
+  const [showFaces, setShowFaces] = useState(true)
   const [showRuler, setShowRuler] = useState(false)
   const [showProtractor, setShowProtractor] = useState(false)
 
@@ -164,6 +173,12 @@ export function GeometryStudio() {
   const [cheering, setCheering] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [missionIndex, setMissionIndex] = useState(0)
+  const [themeId, setThemeId] = useState(PAPER_THEMES[0].id)
+  const [sticker, setSticker] = useState(STICKERS[0].emoji)
+  /** ประกายที่กระเด็นอยู่ตอนนี้ หายไปเองใน 1 วินาที */
+  const [sparkles, setSparkles] = useState<{ id: number; at: Point }[]>([])
+  /** คำเชียร์ที่น้องวงเวียนกำลังพูดอยู่ หมดเวลาแล้วกลับไปพูดเรื่องเครื่องมือตามเดิม */
+  const [praise, setPraise] = useState<string | null>(null)
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const idRef = useRef(1)
@@ -179,6 +194,9 @@ export function GeometryStudio() {
    * ถ้าเก็บเป็น state หน้าจอจะถูกวาดใหม่เพิ่มอีกรอบโดยที่ไม่มีอะไรบนจอเปลี่ยนเลย
    */
   const gateRef = useRef<PointerGate>(EMPTY_GATE)
+  const sparkleId = useRef(0)
+  const sparkleTimers = useRef<number[]>([])
+  const praiseTimer = useRef<number | null>(null)
   /* สำเนาของมุมมองล่าสุด ไว้ให้ตัวรับล้อเมาส์ซึ่งผูกไว้ครั้งเดียวอ่านค่าปัจจุบันได้ */
   const viewRef = useRef<View>(DEFAULT_VIEW)
   /** นิ้วที่แตะอยู่ตอนนี้ทั้งหมด ใช้ดูว่ามีสองนิ้วหนีบเพื่อซูมหรือเปล่า */
@@ -194,6 +212,7 @@ export function GeometryStudio() {
   const noticeTimer = useRef<number | null>(null)
 
   const toolInfo = findTool(tool)
+  const theme = findTheme(themeId)
   const mission = MISSIONS[missionIndex]
   const selected = board.shapes.find((shape) => shape.id === selectedId) ?? null
 
@@ -202,6 +221,8 @@ export function GeometryStudio() {
     return () => {
       if (cheerTimer.current !== null) window.clearTimeout(cheerTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
+      for (const timer of sparkleTimers.current) window.clearTimeout(timer)
+      if (praiseTimer.current !== null) window.clearTimeout(praiseTimer.current)
     }
   }, [])
 
@@ -226,6 +247,31 @@ export function GeometryStudio() {
     dispatch({ type: 'add', shape })
     playSfx('pickup')
     celebrate()
+    burstSparkles(shapeCenter(shape))
+
+    /*
+     * คำชมออกจากปากน้องวงเวียน ไม่ใช่ป้ายแจ้งเตือน
+     * เพราะป้ายแจ้งเตือนคือที่ที่เด็กเรียนรู้ว่าจะมองข้ามได้ ส่วนตัวการ์ตูนยังถูกอ่านอยู่
+     * และพูดเฉพาะตอนถึงหมุดที่ตั้งไว้ คำชมที่มาทุกครั้งจะกลายเป็นเสียงรบกวนใน 3 นาที
+     */
+    const praise = encouragementFor(board.shapes.length + 1)
+    if (praise) {
+      setPraise(praise)
+      if (praiseTimer.current !== null) window.clearTimeout(praiseTimer.current)
+      praiseTimer.current = window.setTimeout(() => setPraise(null), 5000)
+    }
+  }
+
+  /** โปรยประกายตรงใจกลางรูปที่เพิ่งวาดเสร็จ */
+  function burstSparkles(at: Point) {
+    sparkleId.current += 1
+    const id = sparkleId.current
+    setSparkles((current) => [...current, { id, at }])
+    const timer = window.setTimeout(() => {
+      setSparkles((current) => current.filter((item) => item.id !== id))
+      sparkleTimers.current = sparkleTimers.current.filter((value) => value !== timer)
+    }, 1000)
+    sparkleTimers.current.push(timer)
   }
 
   /* ------------------------------------------------------------------ */
@@ -557,6 +603,19 @@ export function GeometryStudio() {
           width,
           at: snapPoint(raw),
           label,
+        })
+        return
+      }
+
+      case 'sticker': {
+        addShape({
+          kind: 'sticker',
+          id: makeId(),
+          color,
+          width,
+          at: snapPoint(raw),
+          emoji: sticker,
+          size: 46,
         })
         return
       }
@@ -933,7 +992,7 @@ export function GeometryStudio() {
         say('เครื่องนี้บันทึกภาพไม่ได้ ลองแคปหน้าจอแทนนะ')
         return
       }
-      context.fillStyle = '#fffdf7'
+      context.fillStyle = theme.paper
       context.fillRect(0, 0, canvas.width, canvas.height)
       context.drawImage(image, 0, 0, canvas.width, canvas.height)
       const link = document.createElement('a')
@@ -1168,6 +1227,26 @@ export function GeometryStudio() {
             </button>
           ) : null}
 
+          {tool === 'sticker' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <p className="text-sm font-bold text-slate-600">เลือกสติกเกอร์</p>
+              <div className="mt-2 grid grid-cols-4 gap-2">
+                {STICKERS.map((item) => (
+                  <button
+                    key={item.emoji}
+                    type="button"
+                    onClick={() => setSticker(item.emoji)}
+                    aria-label={item.label}
+                    title={item.label}
+                    className={`geo-sticker ${sticker === item.emoji ? 'geo-sticker-on' : ''}`}
+                  >
+                    {item.emoji}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {tool === 'compass' ? (
             <div className="mt-3 rounded-2xl bg-white/70 p-3">
               <label
@@ -1239,6 +1318,25 @@ export function GeometryStudio() {
             ))}
           </div>
 
+          <h2 className="geo-heading mt-4">🎀 กระดาษ</h2>
+          <div className="grid grid-cols-2 gap-2">
+            {PAPER_THEMES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setThemeId(item.id)
+                  playSfx('click')
+                }}
+                style={{ backgroundColor: item.paper }}
+                className={`geo-theme ${themeId === item.id ? 'geo-theme-on' : ''}`}
+              >
+                <span aria-hidden="true">{item.emoji}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
+
           <h2 className="geo-heading mt-4">🔧 อุปกรณ์ช่วย</h2>
           <div className="grid gap-2">
             <ToggleRow
@@ -1259,6 +1357,11 @@ export function GeometryStudio() {
               onToggle={() => setShowLengths(!showLengths)}
             />
             <ToggleRow label="📐 โชว์มุม" on={showAngles} onToggle={() => setShowAngles(!showAngles)} />
+            <ToggleRow
+              label="👀 ใส่หน้าให้รูป"
+              on={showFaces}
+              onToggle={() => setShowFaces(!showFaces)}
+            />
           </div>
           <p className="mt-2 text-xs font-semibold text-slate-500">
             ไม้บรรทัดกับครึ่งวงกลมวางทับกระดาษเหมือนของจริง วาดตรงที่มันทับไม่ได้
@@ -1291,24 +1394,32 @@ export function GeometryStudio() {
             >
               <defs>
                 <pattern id="geo-grid-small" width={GRID_STEP} height={GRID_STEP} patternUnits="userSpaceOnUse">
-                  <path
-                    d={`M ${GRID_STEP} 0 L 0 0 0 ${GRID_STEP}`}
-                    fill="none"
-                    stroke="#e7e5e4"
-                    strokeWidth={1}
-                  />
+                  {theme.dotted ? (
+                    <circle cx={GRID_STEP / 2} cy={GRID_STEP / 2} r={1.3} fill={theme.minor} />
+                  ) : (
+                    <path
+                      d={`M ${GRID_STEP} 0 L 0 0 0 ${GRID_STEP}`}
+                      fill="none"
+                      stroke={theme.minor}
+                      strokeWidth={1}
+                    />
+                  )}
                 </pattern>
                 <pattern id="geo-grid-big" width={PX_PER_CM} height={PX_PER_CM} patternUnits="userSpaceOnUse">
-                  <path
-                    d={`M ${PX_PER_CM} 0 L 0 0 0 ${PX_PER_CM}`}
-                    fill="none"
-                    stroke="#d6d3d1"
-                    strokeWidth={1.6}
-                  />
+                  {theme.dotted ? (
+                    <circle cx={PX_PER_CM / 2} cy={PX_PER_CM / 2} r={2.6} fill={theme.major} />
+                  ) : (
+                    <path
+                      d={`M ${PX_PER_CM} 0 L 0 0 0 ${PX_PER_CM}`}
+                      fill="none"
+                      stroke={theme.major}
+                      strokeWidth={1.6}
+                    />
+                  )}
                 </pattern>
               </defs>
 
-              <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="#fffdf7" />
+              <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={theme.paper} />
               {showGrid ? (
                 <g pointerEvents="none">
                   <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#geo-grid-small)" />
@@ -1321,6 +1432,7 @@ export function GeometryStudio() {
                 selectedId={selectedId}
                 showLengths={showLengths}
                 showAngles={showAngles}
+                showFaces={showFaces}
               />
 
               {/* ของชั่วคราวระหว่างวาด ไม่ติดไปในไฟล์ภาพที่บันทึก */}
@@ -1438,6 +1550,30 @@ export function GeometryStudio() {
                   />
                 ) : null}
 
+                {/* ประกายตอนวาดเสร็จ หายไปเองในหนึ่งวินาที ไม่ติดไปในไฟล์ภาพ */}
+                {sparkles.map((sparkle) => (
+                  <g
+                    key={sparkle.id}
+                    transform={`translate(${sparkle.at.x} ${sparkle.at.y})`}
+                    pointerEvents="none"
+                  >
+                    {sparkleOffsets().map((offset, index) => (
+                      <text
+                        key={index}
+                        className="geo-spark"
+                        x={offset.x / view.scale}
+                        y={offset.y / view.scale}
+                        fontSize={22 / view.scale}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        style={{ animationDelay: `${offset.delay}ms` }}
+                      >
+                        ✨
+                      </text>
+                    ))}
+                  </g>
+                ))}
+
                 {/* วงแหวนเคอร์เซอร์อยู่บนสุดเสมอ ไม่งั้นไม้บรรทัดจะบังจุดที่กำลังเล็งอยู่ */}
                 {cursor ? (
                   <PointerCursor
@@ -1488,7 +1624,7 @@ export function GeometryStudio() {
 
         {/* แผงข้อมูลและภารกิจ */}
         <aside className="geo-panel order-3">
-          <Mascot message={toolInfo.hint} cheering={cheering} />
+          <Mascot message={praise ?? toolInfo.hint} cheering={cheering} />
 
           <h2 className="geo-heading mt-4">🔍 สิ่งที่วาดอยู่</h2>
           {report ? (
