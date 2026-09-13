@@ -31,8 +31,9 @@ export function Mascot({ message, cheering = false }: MascotProps) {
         <path d="M52 76 L56 84 L60 74 Z" fill="#f472b6" />
         {/* หัวกลม ๆ ที่เป็นข้อต่อของวงเวียน */}
         <circle cx="40" cy="26" r="20" fill="#c4b5fd" stroke="#7c3aed" strokeWidth="4" />
-        <circle cx="33" cy="24" r="3.2" fill="#1e1b4b" />
-        <circle cx="47" cy="24" r="3.2" fill="#1e1b4b" />
+        {/* ตากะพริบเป็นระยะ ทำให้ดูเหมือนมีชีวิตโดยไม่ต้องขยับทั้งตัวตลอดเวลา */}
+        <circle className="geo-blink" cx="33" cy="24" r="3.2" fill="#1e1b4b" />
+        <circle className="geo-blink" cx="47" cy="24" r="3.2" fill="#1e1b4b" />
         <circle cx="26" cy="31" r="3.4" fill="#fb7185" opacity="0.65" />
         <circle cx="54" cy="31" r="3.4" fill="#fb7185" opacity="0.65" />
         {cheering ? (

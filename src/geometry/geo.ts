@@ -361,3 +361,50 @@ export function circleSegmentIntersections(
     .filter((step) => step >= 0 && step <= 1)
     .map((step) => ({ x: a.x + step * dx, y: a.y + step * dy }))
 }
+
+/**
+ * จุดศูนย์ถ่วงของรูปหลายเหลี่ยม
+ *
+ * ใช้หาที่วางหน้าตาการ์ตูนบนรูป ไม่ใช้ค่าเฉลี่ยของจุดยอดธรรมดา
+ * เพราะรูปที่มีจุดยอดกระจุกอยู่มุมเดียว ค่าเฉลี่ยจะถูกดึงไปอยู่มุมนั้น
+ * แล้วหน้าจะไปโผล่ค่อนไปข้างใดข้างหนึ่งจนดูเหมือนรูปเอียงคอ
+ */
+export function polygonCentroid(points: Point[]): Point {
+  if (points.length === 0) return { x: 0, y: 0 }
+  if (points.length < 3) {
+    const sum = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), {
+      x: 0,
+      y: 0,
+    })
+    return { x: sum.x / points.length, y: sum.y / points.length }
+  }
+
+  let twiceArea = 0
+  let x = 0
+  let y = 0
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i]
+    const b = points[(i + 1) % points.length]
+    const cross = a.x * b.y - b.x * a.y
+    twiceArea += cross
+    x += (a.x + b.x) * cross
+    y += (a.y + b.y) * cross
+  }
+
+  /* รูปที่จุดยอดเรียงอยู่บนเส้นตรงเดียวกันจะได้พื้นที่ศูนย์ ใช้ค่าเฉลี่ยแทน */
+  if (Math.abs(twiceArea) < 1e-9) {
+    const sum = points.reduce((total, point) => ({ x: total.x + point.x, y: total.y + point.y }), {
+      x: 0,
+      y: 0,
+    })
+    return { x: sum.x / points.length, y: sum.y / points.length }
+  }
+
+  return { x: x / (3 * twiceArea), y: y / (3 * twiceArea) }
+}
+
+/** ระยะจากจุดหนึ่งถึงจุดยอดที่ใกล้ที่สุด ใช้กะว่าหน้าการ์ตูนวางได้ใหญ่แค่ไหน */
+export function nearestVertexDistance(from: Point, points: Point[]): number {
+  if (points.length === 0) return 0
+  return points.reduce((closest, point) => Math.min(closest, distance(from, point)), Infinity)
+}

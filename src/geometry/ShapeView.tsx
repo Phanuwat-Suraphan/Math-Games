@@ -19,6 +19,7 @@ import {
   angleBetween,
 } from './geo'
 import type { Point } from './geo'
+import { faceOf } from './shapes'
 import type { Shape } from './shapes'
 
 interface ShapeViewProps {
@@ -26,6 +27,8 @@ interface ShapeViewProps {
   selected: boolean
   showLengths: boolean
   showAngles: boolean
+  /** ใส่หน้าตาการ์ตูนให้รูปปิดที่ใหญ่พอ */
+  showFaces: boolean
 }
 
 /**
@@ -92,7 +95,43 @@ function vertexAngleMarks(previous: Point, vertex: Point, next: Point) {
   }
 }
 
-export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeViewProps) {
+/**
+ * หน้าตาการ์ตูนบนรูป
+ *
+ * ไม่ได้มีไว้ขำอย่างเดียว หนังสือเรียนไทยหลายเล่มวาดรูปทรงเป็นตัวละคร
+ * เพราะเด็กจำ "สามเหลี่ยมหน้ายิ้ม" ได้ง่ายกว่าจำคำว่ารูปสามเหลี่ยมด้านเท่า
+ * ขนาดทุกส่วนคิดจากขนาดรูป หน้าจึงพอดีตัวทั้งรูปเล็กและรูปใหญ่
+ */
+function ShapeFace({ center, size, color }: { center: Point; size: number; color: string }) {
+  const eye = Math.max(2.6, size * 0.1)
+  const gap = size * 0.3
+  return (
+    <g transform={`translate(${center.x} ${center.y})`} pointerEvents="none">
+      <circle cx={-gap} cy={-size * 0.12} r={eye} fill="#1e293b" />
+      <circle cx={gap} cy={-size * 0.12} r={eye} fill="#1e293b" />
+      <circle cx={-gap + eye * 0.35} cy={-size * 0.12 - eye * 0.35} r={eye * 0.34} fill="#ffffff" />
+      <circle cx={gap + eye * 0.35} cy={-size * 0.12 - eye * 0.35} r={eye * 0.34} fill="#ffffff" />
+      <circle cx={-gap - eye * 1.9} cy={size * 0.08} r={eye * 0.95} fill="#fb7185" opacity={0.45} />
+      <circle cx={gap + eye * 1.9} cy={size * 0.08} r={eye * 0.95} fill="#fb7185" opacity={0.45} />
+      <path
+        d={`M ${-size * 0.2} ${size * 0.1} Q 0 ${size * 0.33} ${size * 0.2} ${size * 0.1}`}
+        fill="none"
+        stroke={color}
+        strokeWidth={Math.max(2, size * 0.05)}
+        strokeLinecap="round"
+      />
+    </g>
+  )
+}
+
+export function ShapeView({
+  shape,
+  selected,
+  showLengths,
+  showAngles,
+  showFaces,
+}: ShapeViewProps) {
+  const face = showFaces ? faceOf(shape) : null
   const halo = selected ? (
     <g opacity={0.4} pointerEvents="none">
       {shape.kind === 'segment' ? (
@@ -143,6 +182,9 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
       {shape.kind === 'angle' ? (
         <circle cx={shape.vertex.x} cy={shape.vertex.y} r={16} fill="#f472b6" />
       ) : null}
+      {shape.kind === 'sticker' ? (
+        <circle cx={shape.at.x} cy={shape.at.y} r={shape.size * 0.62} fill="#f472b6" />
+      ) : null}
     </g>
   ) : null
 
@@ -188,6 +230,7 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
             strokeWidth={shape.width}
           />
           <circle cx={shape.center.x} cy={shape.center.y} r={3.5} fill={shape.color} />
+          {face ? <ShapeFace center={face.center} size={face.size} color={shape.color} /> : null}
           {showLengths ? (
             <LabelPill
               at={{ x: shape.center.x, y: shape.center.y - shape.radius - 4 }}
@@ -257,6 +300,8 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
           {points.map((point, index) => (
             <circle key={`v${index}`} cx={point.x} cy={point.y} r={4} fill={shape.color} />
           ))}
+
+          {face ? <ShapeFace center={face.center} size={face.size} color={shape.color} /> : null}
 
           {showAngles && angles.length > 0
             ? points.map((vertex, index) => {
@@ -353,6 +398,23 @@ export function ShapeView({ shape, selected, showLengths, showAngles }: ShapeVie
         </g>
       )
     }
+
+    case 'sticker':
+      return (
+        <g>
+          {halo}
+          <text
+            x={shape.at.x}
+            y={shape.at.y}
+            fontSize={shape.size}
+            textAnchor="middle"
+            dominantBaseline="central"
+            pointerEvents="none"
+          >
+            {shape.emoji}
+          </text>
+        </g>
+      )
 
     default:
       return null

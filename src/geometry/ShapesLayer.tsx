@@ -16,6 +16,7 @@ interface ShapesLayerProps {
   selectedId: string | null
   showLengths: boolean
   showAngles: boolean
+  showFaces: boolean
 }
 
 export const ShapesLayer = memo(function ShapesLayer({
@@ -23,6 +24,7 @@ export const ShapesLayer = memo(function ShapesLayer({
   selectedId,
   showLengths,
   showAngles,
+  showFaces,
 }: ShapesLayerProps) {
   return (
     <g>
@@ -33,6 +35,7 @@ export const ShapesLayer = memo(function ShapesLayer({
           selected={shape.id === selectedId}
           showLengths={showLengths}
           showAngles={showAngles}
+          showFaces={showFaces}
         />
       ))}
     </g>

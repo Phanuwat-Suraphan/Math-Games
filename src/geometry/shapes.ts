@@ -20,7 +20,9 @@ import {
   interiorAngles,
   isOnArc,
   polygonArea,
+  nearestVertexDistance,
   pointAt,
+  polygonCentroid,
   polygonName,
   polygonPerimeter,
   sumInteriorAngles,
@@ -80,6 +82,20 @@ export interface AngleShape extends Drawn {
   b: Point
 }
 
+/**
+ * สติกเกอร์ที่แปะลงกระดาษ
+ *
+ * ไม่ได้มีไว้สวยอย่างเดียว เด็กใช้มันทำเครื่องหมายบนงานตัวเองด้วย
+ * เช่น แปะดาวไว้ที่มุมที่ครูให้หา หรือแปะดอกไม้ที่จุดที่วงเวียนตัดกัน
+ * มันจึงย้ายได้ ลบได้ และติดไปในภาพที่บันทึกเหมือนรูปอื่นทุกประการ
+ */
+export interface StickerShape extends Drawn {
+  kind: 'sticker'
+  at: Point
+  emoji: string
+  size: number
+}
+
 export type Shape =
   | SegmentShape
   | CircleShape
@@ -87,6 +103,7 @@ export type Shape =
   | PolygonShape
   | DotShape
   | AngleShape
+  | StickerShape
 
 /** คำอธิบายรูปสำหรับแผงข้อมูลด้านข้าง */
 export interface ShapeReport {
@@ -141,6 +158,8 @@ export function hitTest(shape: Shape, p: Point, tolerance = HIT_TOLERANCE): bool
       return distance(p, shape.at) <= tolerance
     case 'angle':
       return distance(p, shape.vertex) <= tolerance * 2
+    case 'sticker':
+      return distance(p, shape.at) <= shape.size * 0.6
     default:
       return false
   }
@@ -174,6 +193,8 @@ export function translateShape(shape: Shape, dx: number, dy: number): Shape {
       return { ...shape, at: move(shape.at) }
     case 'angle':
       return { ...shape, vertex: move(shape.vertex), a: move(shape.a), b: move(shape.b) }
+    case 'sticker':
+      return { ...shape, at: move(shape.at) }
     default:
       return shape
   }
@@ -207,6 +228,9 @@ export function shapeAnchors(shape: Shape): Point[] {
       return [shape.at]
     case 'angle':
       return [shape.vertex]
+    case 'sticker':
+      /* สติกเกอร์เป็นของตกแต่ง ไม่ควรดูดปลายเส้นให้เบี้ยวไปจากจุดที่ตั้งใจ */
+      return []
     default:
       return []
   }
@@ -410,9 +434,55 @@ export function describeShape(shape: Shape): ShapeReport {
         lines: [`เป็น${angleName(size)}`],
       }
     }
+    case 'sticker':
+      return {
+        emoji: shape.emoji,
+        title: 'สติกเกอร์',
+        lines: ['ลากย้ายไปตรงไหนก็ได้ ใช้ทำเครื่องหมายบนงานของเราเอง'],
+      }
+
     default:
       return { emoji: '❔', title: 'รูป', lines: [] }
   }
+}
+
+/** ใจกลางของรูป ใช้เป็นที่ระเบิดประกายตอนวาดเสร็จ */
+export function shapeCenter(shape: Shape): Point {
+  switch (shape.kind) {
+    case 'segment':
+      return { x: (shape.a.x + shape.b.x) / 2, y: (shape.a.y + shape.b.y) / 2 }
+    case 'circle':
+    case 'arc':
+      return { ...shape.center }
+    case 'polygon':
+      return polygonCentroid(shape.points)
+    case 'dot':
+      return { ...shape.at }
+    case 'angle':
+      return { ...shape.vertex }
+    case 'sticker':
+      return { ...shape.at }
+    default:
+      return { x: 0, y: 0 }
+  }
+}
+
+/**
+ * ที่วางหน้าตาการ์ตูนบนรูป
+ *
+ * ใส่ให้เฉพาะรูปปิดที่ใหญ่พอ เพราะหน้าบนรูปเล็กจะกลายเป็นจุดสามจุดมั่ว ๆ
+ * ที่อ่านไม่ออกว่าเป็นอะไร และไปบังป้ายบอกมุมที่อยู่ตรงนั้นพอดี
+ */
+export function faceOf(shape: Shape): { center: Point; size: number } | null {
+  if (shape.kind === 'circle') {
+    return shape.radius >= 34 ? { center: { ...shape.center }, size: shape.radius } : null
+  }
+  if (shape.kind !== 'polygon' || !shape.closed || shape.points.length < 3) return null
+
+  const center = polygonCentroid(shape.points)
+  /* ใช้ระยะถึงจุดยอดที่ใกล้ที่สุด หน้าจะได้ไม่ล้นออกนอกรูปที่แบนหรือแหลม */
+  const size = nearestVertexDistance(center, shape.points)
+  return size >= 34 ? { center, size } : null
 }
 
 /** สรุปทั้งกระดาษ ใช้โชว์ตอนยังไม่ได้เลือกรูปไหน */
