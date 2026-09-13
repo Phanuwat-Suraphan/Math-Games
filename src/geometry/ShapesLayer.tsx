@@ -10,6 +10,8 @@
 import { memo } from 'react'
 import { ShapeView } from './ShapeView'
 import type { Shape } from './shapes'
+import type { LabelOffsets } from './labels'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 
 interface ShapesLayerProps {
   shapes: Shape[]
@@ -17,6 +19,8 @@ interface ShapesLayerProps {
   showLengths: boolean
   showAngles: boolean
   showFaces: boolean
+  offsets: LabelOffsets
+  onLabelGrab?: (key: string, event: ReactPointerEvent<SVGElement>) => void
 }
 
 export const ShapesLayer = memo(function ShapesLayer({
@@ -25,6 +29,8 @@ export const ShapesLayer = memo(function ShapesLayer({
   showLengths,
   showAngles,
   showFaces,
+  offsets,
+  onLabelGrab,
 }: ShapesLayerProps) {
   return (
     <g>
@@ -36,6 +42,8 @@ export const ShapesLayer = memo(function ShapesLayer({
           showLengths={showLengths}
           showAngles={showAngles}
           showFaces={showFaces}
+          offsets={offsets}
+          onLabelGrab={onLabelGrab}
         />
       ))}
     </g>
