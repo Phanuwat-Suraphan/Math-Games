@@ -7,6 +7,8 @@
 
 import {
   angleBetween,
+  circleIntersections,
+  circleSegmentIntersections,
   areaInCm,
   distance,
   distanceToCircle,
@@ -18,6 +20,7 @@ import {
   interiorAngles,
   isOnArc,
   polygonArea,
+  pointAt,
   polygonName,
   polygonPerimeter,
   sumInteriorAngles,
@@ -189,7 +192,15 @@ export function shapeAnchors(shape: Shape): Point[] {
     case 'circle':
       return [shape.center]
     case 'arc':
-      return [shape.center]
+      /*
+       * ปลายส่วนโค้งทั้งสองข้างเป็นจุดสำคัญไม่แพ้จุดศูนย์กลาง
+       * เพราะการสร้างรูปด้วยวงเวียนมักจบที่การลากเส้นไปยังปลายโค้งหรือจุดที่โค้งตัดกัน
+       */
+      return [
+        shape.center,
+        pointAt(shape.center, shape.radius, shape.start),
+        pointAt(shape.center, shape.radius, shape.start + shape.sweep),
+      ]
     case 'polygon':
       return [...shape.points]
     case 'dot':
@@ -219,6 +230,90 @@ export function nearestAnchor(
     }
   }
   return best ? { x: best.x, y: best.y } : null
+}
+
+/** เส้นตรงทุกเส้นบนกระดาษ ทั้งเส้นเดี่ยวและด้านของรูปหลายเหลี่ยม */
+function allEdges(shapes: Shape[]): { a: Point; b: Point }[] {
+  const edges: { a: Point; b: Point }[] = []
+  for (const shape of shapes) {
+    if (shape.kind === 'segment') {
+      edges.push({ a: shape.a, b: shape.b })
+      continue
+    }
+    if (shape.kind === 'polygon') {
+      const points = shape.points
+      const last = shape.closed ? points.length : points.length - 1
+      for (let i = 0; i < last; i += 1) {
+        edges.push({ a: points[i], b: points[(i + 1) % points.length] })
+      }
+    }
+  }
+  return edges
+}
+
+/**
+ * จุดที่เส้นโค้งตัดกับเส้นโค้ง และเส้นโค้งตัดกับเส้นตรง
+ *
+ * จุดพวกนี้ไม่ได้ถูกวาดไว้เป็นรูป มันเกิดขึ้นเองจากการที่รูปสองรูปพาดกัน
+ * แต่เป็นจุดที่เด็กต้องลากเส้นไปหาบ่อยที่สุดในงานวงเวียน
+ * ถ้าไม่มีแม่เหล็กดูดให้ เด็กจะกะเอาด้วยสายตาแล้วรูปเพี้ยนทุกครั้ง
+ */
+export function intersectionTargets(shapes: Shape[]): Point[] {
+  const rounds = shapes.filter(
+    (shape): shape is CircleShape | ArcShape => shape.kind === 'circle' || shape.kind === 'arc',
+  )
+  const edges = allEdges(shapes)
+  const found: Point[] = []
+
+  /** จุดนี้อยู่บนส่วนโค้งจริงไหม วงกลมเต็มวงถือว่าอยู่เสมอ */
+  const onShape = (shape: CircleShape | ArcShape, point: Point): boolean =>
+    shape.kind === 'circle' || isOnArc(angleOf(shape.center, point), shape.start, shape.sweep)
+
+  for (let i = 0; i < rounds.length; i += 1) {
+    for (let j = i + 1; j < rounds.length; j += 1) {
+      const first = rounds[i]
+      const second = rounds[j]
+      for (const point of circleIntersections(
+        first.center,
+        first.radius,
+        second.center,
+        second.radius,
+      )) {
+        if (onShape(first, point) && onShape(second, point)) found.push(point)
+      }
+    }
+
+    for (const edge of edges) {
+      const round = rounds[i]
+      for (const point of circleSegmentIntersections(round.center, round.radius, edge.a, edge.b)) {
+        if (onShape(round, point)) found.push(point)
+      }
+    }
+  }
+
+  return found
+}
+
+/**
+ * จุดที่ปลายดินสอควรวิ่งไปชน เรียงความสำคัญจากมากไปน้อย
+ *
+ * จุดยอดที่มีอยู่แล้วมาก่อนจุดตัดเสมอ เพราะถ้าทั้งสองอย่างอยู่ใกล้กัน
+ * สิ่งที่เด็กตั้งใจจะชนคือจุดที่มองเห็นอยู่ ไม่ใช่จุดที่เกิดจากเส้นพาดกัน
+ */
+export function nearestSnapPoint(shapes: Shape[], p: Point, radius: number): Point | null {
+  const anchor = nearestAnchor(shapes, p, radius)
+  if (anchor) return anchor
+
+  let best: Point | null = null
+  let bestDistance = radius
+  for (const point of intersectionTargets(shapes)) {
+    const away = distance(p, point)
+    if (away <= bestDistance) {
+      best = point
+      bestDistance = away
+    }
+  }
+  return best
 }
 
 /**

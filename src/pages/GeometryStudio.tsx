@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/useGame'
 import { playSfx } from '../services/audioService'
 import { CompassArt } from '../geometry/CompassArt'
+import type { CompassPart } from '../geometry/CompassArt'
 import { Mascot } from '../geometry/Mascot'
 import { ProtractorOverlay } from '../geometry/ProtractorOverlay'
 import type { ProtractorPart } from '../geometry/ProtractorOverlay'
@@ -32,7 +33,7 @@ import {
   describeBoard,
   describeShape,
   findShapeAt,
-  nearestAnchor,
+  nearestSnapPoint,
   translateShape,
 } from '../geometry/shapes'
 import type { Shape } from '../geometry/shapes'
@@ -54,6 +55,7 @@ import {
   snapDeg,
   snapEnd,
   snapToGrid,
+  toCm,
 } from '../geometry/geo'
 import type { Point } from '../geometry/geo'
 
@@ -70,22 +72,30 @@ const RULER_LENGTH_CM = 20
 /** ระยะจากขอบไม้บรรทัดที่ถือว่ากำลังลากดินสอตามไม้บรรทัด */
 const RULER_GUIDE_RANGE = 30
 
+/**
+ * วงเวียนที่วางค้างอยู่บนกระดาษ
+ *
+ * เก็บไว้ตลอด ไม่ได้หายไปหลังวาดเสร็จเหมือนเวอร์ชันแรก
+ * เพราะงานวงเวียนเกือบทุกอย่างต้องย้ายเข็มไปปักที่ใหม่โดยไม่เปลี่ยนระยะกาง
+ * เช่น การแบ่งเส้นรอบวงเป็นหกส่วนเพื่อสร้างหกเหลี่ยมด้านเท่า
+ */
 interface CompassState {
   center: Point
   radius: number
-  /** มุมที่เริ่มหมุนวาด */
-  start: number
-  /** กวาดไปแล้วกี่องศา บวกคือทวนเข็มนาฬิกา */
-  sweep: number
-  /** มุมล่าสุดของปลายนิ้ว ใช้ต่อยอดการกวาดให้เกินหนึ่งรอบได้ */
-  last: number
+  /** ทิศที่ปลายดินสอชี้อยู่ */
+  angle: number
 }
 
 type Drag =
   | { kind: 'none' }
   | { kind: 'pen'; start: Point; end: Point; guided: boolean }
   | { kind: 'regular'; center: Point; edge: Point }
-  | { kind: 'compass'; center: Point; edge: Point }
+  /** ลากเข็มเพื่อย้ายวงเวียน โดย grab คือระยะเยื้องจากปลายนิ้วถึงเข็ม */
+  | { kind: 'compass-move'; grab: Point }
+  /** ลากขาดินสอเพื่อกางรัศมี ไม่มีการวาดเกิดขึ้น */
+  | { kind: 'compass-spread' }
+  /** จับหัวหรือปลายดินสอหมุนวาด รัศมีถูกล็อกไว้ */
+  | { kind: 'compass-draw'; start: number; sweep: number; last: number }
   | { kind: 'move'; id: string; last: Point; marked: boolean }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
@@ -113,7 +123,11 @@ export function GeometryStudio() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Point[]>([])
   const [anglePicks, setAnglePicks] = useState<Point[]>([])
-  const [compass, setCompass] = useState<CompassState | null>(null)
+  const [compass, setCompass] = useState<CompassState>({
+    center: { x: 300, y: 340 },
+    radius: 3 * PX_PER_CM,
+    angle: 60,
+  })
   const [drag, setDrag] = useState<Drag>({ kind: 'none' })
   const [pointer, setPointer] = useState<Point | null>(null)
   const [cheering, setCheering] = useState(false)
@@ -195,20 +209,26 @@ export function GeometryStudio() {
     return showRuler && distanceToSegment(p, rulerStart, rulerEnd) <= RULER_GUIDE_RANGE
   }
 
-  /** ดูดจุดเข้าหาจุดเดิมก่อน ถ้าไม่มีค่อยดูดเข้าเส้นตาราง */
+  /**
+   * ดูดจุดเข้าหาสิ่งที่มีอยู่แล้วก่อน ถ้าไม่มีค่อยดูดเข้าเส้นตาราง
+   *
+   * ลำดับคือ จุดยอดที่มองเห็น แล้วจึงเป็นจุดที่เส้นโค้งสองเส้นตัดกัน
+   * จุดตัดสำคัญมากในงานวงเวียน เพราะเป็นปลายทางของเส้นที่ต้องลากเกือบทุกครั้ง
+   * แต่มันไม่ได้ถูกวาดไว้ให้เห็น ถ้าไม่ดูดให้ เด็กจะกะเอาเองแล้วรูปเพี้ยน
+   */
   function snapPoint(p: Point): Point {
-    const anchor = nearestAnchor(board.shapes, p, ANCHOR_RADIUS)
-    if (anchor) return anchor
+    const target = nearestSnapPoint(board.shapes, p, ANCHOR_RADIUS)
+    if (target) return target
     for (const point of draft) {
       if (distance(point, p) <= ANCHOR_RADIUS) return point
     }
     return snapOn ? snapToGrid(p, GRID_STEP) : p
   }
 
-  /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม มุมที่ลงตัว หรือขอบไม้บรรทัด */
+  /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
   function penEnd(start: Point, raw: Point, guided: boolean): Point {
-    const anchor = nearestAnchor(board.shapes, raw, ANCHOR_RADIUS)
-    const end = anchor ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
+    const target = nearestSnapPoint(board.shapes, raw, ANCHOR_RADIUS)
+    const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
     return guided ? projectOnLine(end, rulerStart, rulerEnd) : end
   }
 
@@ -216,30 +236,41 @@ export function GeometryStudio() {
   /* เครื่องมือแต่ละชิ้นตอนถูกใช้งาน                                        */
   /* ------------------------------------------------------------------ */
 
-  function commitCompassArc(fullCircle: boolean) {
-    if (!compass) return
-    if (fullCircle || Math.abs(compass.sweep) >= 358) {
-      addShape({
-        kind: 'circle',
-        id: makeId(),
-        color,
-        width,
-        center: compass.center,
-        radius: compass.radius,
-      })
-    } else {
-      addShape({
-        kind: 'arc',
-        id: makeId(),
-        color,
-        width,
-        center: compass.center,
-        radius: compass.radius,
-        start: compass.start,
-        sweep: compass.sweep,
-      })
+  /** วางวงกลมเต็มวงจากตำแหน่งและระยะกางของวงเวียนตอนนี้ */
+  function drawFullCircle() {
+    addShape({
+      kind: 'circle',
+      id: makeId(),
+      color,
+      width,
+      center: { ...compass.center },
+      radius: compass.radius,
+    })
+    say(`วาดวงกลมรัศมี ${formatCm(compass.radius)} แล้ว`)
+  }
+
+  /**
+   * วางส่วนโค้งที่เพิ่งหมุนวาดลงกระดาษ
+   *
+   * หมุนเกือบครบรอบถือว่าตั้งใจวาดวงกลม เพราะรอยต่อที่ขาดไปสององศา
+   * มองด้วยตาเหมือนวงกลมทุกประการ แต่เวลาเอาไปหาจุดตัดจะพลาดตรงรอยต่อพอดี
+   */
+  function commitSweep(start: number, sweep: number) {
+    if (Math.abs(sweep) < 3) return
+    if (Math.abs(sweep) >= 358) {
+      drawFullCircle()
+      return
     }
-    setCompass(null)
+    addShape({
+      kind: 'arc',
+      id: makeId(),
+      color,
+      width,
+      center: { ...compass.center },
+      radius: compass.radius,
+      start,
+      sweep,
+    })
   }
 
   function closeDraftPolygon() {
@@ -295,10 +326,13 @@ export function GeometryStudio() {
       }
 
       case 'compass': {
-        /* กำลังหมุนวาดอยู่ การกดครั้งนี้เป็นการเริ่มลากกวาด ไม่ใช่ปักเข็มใหม่ */
-        if (compass) return
-        const center = snapPoint(raw)
-        setDrag({ kind: 'compass', center, edge: center })
+        /*
+         * แตะที่ว่างบนกระดาษคือการย้ายเข็มไปปักที่ใหม่ ไม่ใช่การวาด
+         * การวาดเกิดขึ้นเฉพาะตอนจับหัววงเวียนหรือปลายดินสอหมุนเท่านั้น
+         * เวอร์ชันแรกวาดทันทีที่แตะกระดาษ ซึ่งทำให้ได้เส้นที่ไม่ได้ตั้งใจตลอดเวลา
+         */
+        setCompass({ ...compass, center: snapPoint(raw) })
+        playSfx('click')
         return
       }
 
@@ -380,9 +414,34 @@ export function GeometryStudio() {
         setDrag({ kind: 'regular', center: drag.center, edge: raw })
         return
 
-      case 'compass':
-        setDrag({ kind: 'compass', center: drag.center, edge: raw })
+      case 'compass-move':
+        setCompass({
+          ...compass,
+          center: snapPoint({ x: raw.x + drag.grab.x, y: raw.y + drag.grab.y }),
+        })
         return
+
+      case 'compass-spread':
+        /* กางหรือหุบขา ระยะเปลี่ยน ทิศของปลายดินสอเดินตามนิ้วไปด้วย แต่ยังไม่วาดอะไร */
+        setCompass({
+          ...compass,
+          radius: snappedRadius(compass.center, raw),
+          angle: angleOf(compass.center, raw),
+        })
+        return
+
+      case 'compass-draw': {
+        /* รัศมีถูกล็อกไว้เหมือนวงเวียนจริงที่ขันน็อตแล้ว มีแต่มุมที่เปลี่ยน */
+        const now = angleOf(compass.center, raw)
+        setCompass({ ...compass, angle: now })
+        setDrag({
+          kind: 'compass-draw',
+          start: drag.start,
+          sweep: accumulateSweep(drag.sweep, drag.last, now),
+          last: now,
+        })
+        return
+      }
 
       case 'move': {
         const dx = raw.x - drag.last.x
@@ -420,17 +479,8 @@ export function GeometryStudio() {
         }
         return
 
-      default: {
-        /* ไม่ได้ลากอะไรอยู่ ถ้าวงเวียนปักค้างไว้ ให้ปลายดินสอกวาดตามนิ้ว */
-        if (tool === 'compass' && compass) {
-          const now = angleOf(compass.center, raw)
-          setCompass({
-            ...compass,
-            sweep: accumulateSweep(compass.sweep, compass.last, now),
-            last: now,
-          })
-        }
-      }
+      default:
+        break
     }
   }
 
@@ -463,29 +513,45 @@ export function GeometryStudio() {
         break
       }
 
-      case 'compass': {
-        const radius = snappedRadius(drag.center, drag.edge)
-        if (radius >= 14) {
-          const startAngle = angleOf(drag.center, drag.edge)
-          setCompass({ center: drag.center, radius, start: startAngle, sweep: 0, last: startAngle })
-          say('กางวงเวียนแล้ว ทีนี้หมุนรอบเข็มเพื่อวาดส่วนโค้งได้เลย')
-        }
+      case 'compass-draw':
+        /* ปล่อยมือจากหัววงเวียน ถือว่าวางส่วนโค้งที่เพิ่งหมุนลงกระดาษ */
+        commitSweep(drag.start, drag.sweep)
         break
-      }
-
-      case 'none': {
-        /* ปล่อยนิ้วหลังกวาดส่วนโค้ง ถือว่าวางส่วนโค้งลงกระดาษ */
-        if (tool === 'compass' && compass && Math.abs(compass.sweep) >= 3) {
-          commitCompassArc(false)
-        }
-        break
-      }
 
       default:
         break
     }
 
     setDrag({ kind: 'none' })
+  }
+
+  /**
+   * จับวงเวียนตรงไหน ได้ผลต่างกันตามของจริง
+   *
+   * เข็มคือย้าย ขาดินสอคือกาง หัวกับปลายดินสอคือหมุนวาด
+   * การแยกแบบนี้ทำให้ "แตะแล้วมีเส้นโผล่มาโดยไม่ได้ตั้งใจ" หมดไป
+   */
+  function handleCompassGrab(part: CompassPart, event: ReactPointerEvent<SVGElement>) {
+    event.stopPropagation()
+    const raw = toPaper(event)
+    svgRef.current?.setPointerCapture(event.pointerId)
+
+    if (part === 'move') {
+      setDrag({
+        kind: 'compass-move',
+        grab: { x: compass.center.x - raw.x, y: compass.center.y - raw.y },
+      })
+      return
+    }
+
+    if (part === 'spread') {
+      setDrag({ kind: 'compass-spread' })
+      return
+    }
+
+    const startAngle = angleOf(compass.center, raw)
+    setCompass({ ...compass, angle: startAngle })
+    setDrag({ kind: 'compass-draw', start: startAngle, sweep: 0, last: startAngle })
   }
 
   function handleProtractorGrab(part: ProtractorPart, event: ReactPointerEvent<SVGElement>) {
@@ -556,7 +622,7 @@ export function GeometryStudio() {
     setTool(next)
     setDraft([])
     setAnglePicks([])
-    setCompass(null)
+    /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
     playSfx('click')
   }
 
@@ -574,7 +640,6 @@ export function GeometryStudio() {
     setSelectedId(null)
     setDraft([])
     setAnglePicks([])
-    setCompass(null)
     say('ล้างกระดาษแล้ว กดย้อนกลับได้ถ้าเปลี่ยนใจ')
   }
 
@@ -633,7 +698,8 @@ export function GeometryStudio() {
       if (event.key === 'Escape') {
         setDraft([])
         setAnglePicks([])
-        setCompass(null)
+        /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
+        setDrag({ kind: 'none' })
         return
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
@@ -668,11 +734,17 @@ export function GeometryStudio() {
       const points = regularPolygon(drag.center, radius, sides, regularRotation(drag.center, drag.edge))
       return `${polygonName(sides)}ด้านเท่า · ด้านละ ${formatCm(distance(points[0], points[1]))}`
     }
-    if (drag.kind === 'compass') {
-      return `กางวงเวียน ${formatCm(snappedRadius(drag.center, drag.edge))}`
+    if (drag.kind === 'compass-spread') {
+      return `กางวงเวียน ${formatCm(compass.radius)}`
     }
-    if (compass) {
-      return `รัศมี ${formatCm(compass.radius)} · กวาดไปแล้ว ${formatDeg(Math.abs(compass.sweep))}`
+    if (drag.kind === 'compass-draw') {
+      return `รัศมี ${formatCm(compass.radius)} · หมุนไปแล้ว ${formatDeg(Math.abs(drag.sweep))}`
+    }
+    if (drag.kind === 'compass-move') {
+      return 'ย้ายเข็มวงเวียน ปล่อยตรงที่จะปัก'
+    }
+    if (tool === 'compass') {
+      return `วงเวียนกางอยู่ ${formatCm(compass.radius)} · จับหัวหรือปลายดินสอแล้วหมุนเพื่อวาด`
     }
     if (draft.length > 0) {
       return `กำลังวาดรูปหลายเหลี่ยม มี ${draft.length} จุดแล้ว · จิ้มจุดแรกเพื่อปิดรูป`
@@ -795,18 +867,43 @@ export function GeometryStudio() {
             </button>
           ) : null}
 
-          {tool === 'compass' && compass ? (
-            <div className="mt-3 grid gap-2">
+          {tool === 'compass' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <label
+                htmlFor="compass-radius"
+                className="flex items-center justify-between text-sm font-bold text-slate-600"
+              >
+                ระยะกางวงเวียน
+                <span className="geo-badge">{formatCm(compass.radius)}</span>
+              </label>
+              <input
+                id="compass-radius"
+                type="range"
+                min={0.5}
+                max={8}
+                step={0.5}
+                value={Math.round(toCm(compass.radius) * 2) / 2}
+                onChange={(event) =>
+                  setCompass({ ...compass, radius: Number(event.target.value) * PX_PER_CM })
+                }
+                className="mt-2 w-full accent-violet-500"
+              />
               <button
                 type="button"
-                onClick={() => commitCompassArc(true)}
-                className="geo-chip geo-chip-strong w-full"
+                onClick={drawFullCircle}
+                className="geo-chip geo-chip-strong mt-2 w-full"
               >
                 ⭕ วาดวงกลมเต็มวง
               </button>
-              <button type="button" onClick={() => setCompass(null)} className="geo-chip w-full">
-                ✋ เก็บวงเวียน
-              </button>
+              {/*
+                ป้ายบอกที่จับ อยู่ตรงนี้แทนที่จะเขียนกำกับบนกระดาษ
+                เพราะตัวหนังสือบนกระดาษจะบังงานที่เด็กกำลังวาดอยู่พอดี
+              */}
+              <ul className="mt-3 space-y-1 text-xs font-semibold text-slate-500">
+                <li>⚪ เข็ม — ลากเพื่อย้ายไปปักที่ใหม่</li>
+                <li>↔ ปุ่มกางบนขาดินสอ — ลากเพื่อกางหรือหุบ</li>
+                <li>🟣 หัววงเวียน หรือ ✏️ ปลายดินสอ — ลากหมุนเพื่อวาด</li>
+              </ul>
             </div>
           ) : null}
 
@@ -992,32 +1089,25 @@ export function GeometryStudio() {
                   />
                 ) : null}
 
-                {drag.kind === 'compass' ? (
-                  <CompassArt
-                    center={drag.center}
-                    radius={snappedRadius(drag.center, drag.edge)}
-                    angle={angleOf(drag.center, drag.edge)}
-                    sweep={0}
-                    color={color}
-                  />
-                ) : null}
-
-                {compass ? (
+                {tool === 'compass' ? (
                   <g>
-                    <ArcPreview
-                      center={compass.center}
-                      radius={compass.radius}
-                      start={compass.start}
-                      sweep={compass.sweep}
-                      color={color}
-                      width={width}
-                    />
+                    {drag.kind === 'compass-draw' ? (
+                      <ArcPreview
+                        center={compass.center}
+                        radius={compass.radius}
+                        start={drag.start}
+                        sweep={drag.sweep}
+                        color={color}
+                        width={width}
+                      />
+                    ) : null}
                     <CompassArt
                       center={compass.center}
                       radius={compass.radius}
-                      angle={compass.start + compass.sweep}
-                      sweep={compass.sweep}
+                      angle={compass.angle}
+                      sweep={drag.kind === 'compass-draw' ? drag.sweep : 0}
                       color={color}
+                      onGrab={handleCompassGrab}
                     />
                   </g>
                 ) : null}
