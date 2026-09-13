@@ -1333,6 +1333,33 @@ html[data-animations='off'] *::after {
   background: #ede9fe;
 }
 
+/* ปุ่มเลือกแบบที่จะสั่งสร้าง */
+.geo-recipe {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 14px;
+  border: 2px solid #d1fae5;
+  background: #ffffff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #065f46;
+  text-align: left;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.geo-recipe:hover {
+  transform: translateY(-2px);
+}
+
+.geo-recipe-on {
+  border-color: #10b981;
+  background: #ecfdf5;
+  box-shadow: 0 8px 14px -10px rgba(16, 185, 129, 0.9);
+}
+
 /* ปุ่มเลือกสติกเกอร์ ตัวอิโมจิใหญ่พอให้เห็นว่าเป็นรูปอะไร */
 .geo-sticker {
   min-height: 46px;

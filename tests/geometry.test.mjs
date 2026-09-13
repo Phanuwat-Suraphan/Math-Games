@@ -44,6 +44,7 @@ const W = load('geometry/view')
 const C = load('geometry/cute')
 const B_LABELS = load('geometry/labels')
 const N = load('geometry/instruments')
+const R = load('geometry/recipes')
 
 let passed = 0
 const failures = []
@@ -507,6 +508,137 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* สั่งสร้างรูปด้วยตัวเลข                                               */
+/* ---------------------------------------------------------------- */
+
+const AT = { x: 500, y: 340 }
+const STYLE = { color: '#8b5cf6', width: 3 }
+const build = (id, values) => R.buildShapes(R.findRecipe(id), values, AT, STYLE)
+
+check('ทุกแบบต้องสร้างรูปออกมาได้จริงด้วยค่าตั้งต้นของมันเอง', () => {
+  /*
+   * ข้อนี้ดักกรณีที่เพิ่มแบบใหม่ในรายการแล้วลืมเขียนวิธีสร้างของมัน
+   * ซึ่งจะกลายเป็นปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น โดยไม่มี error อะไรเลย
+   */
+  const ids = new Set()
+  for (const recipe of R.RECIPES) {
+    assert(!ids.has(recipe.id), `รหัสแบบ ${recipe.id} ซ้ำ`)
+    ids.add(recipe.id)
+    assert(recipe.fields.length >= 1, `แบบ ${recipe.id} ไม่มีช่องให้ตั้งค่าเลย`)
+    assert(recipe.hint.length > 10, `แบบ ${recipe.id} ไม่ได้บอกว่าใช้ตอนไหน`)
+
+    const made = R.buildShapes(recipe, R.initialValues(recipe), AT, STYLE)
+    assert(made.length >= 1, `แบบ ${recipe.id} กดแล้วไม่ได้รูปอะไรเลย`)
+    for (const shape of made) {
+      assert(shape.color === STYLE.color, `แบบ ${recipe.id} ไม่ได้ใช้สีดินสอที่เลือกอยู่`)
+    }
+  }
+})
+
+check('สี่เหลี่ยมผืนผ้าต้องได้กว้างยาวตรงตามที่สั่ง', () => {
+  const rect = build('rect', { width: 3, height: 5 })[0]
+  const sides = rect.points.map((point, index) =>
+    G.distance(point, rect.points[(index + 1) % rect.points.length]),
+  )
+  close(sides[0] / G.PX_PER_CM, 3, 0.0001, 'ด้านกว้างไม่ตรง')
+  close(sides[1] / G.PX_PER_CM, 5, 0.0001, 'ด้านยาวไม่ตรง')
+  /* มุมทุกมุมต้องเป็นมุมฉาก ไม่งั้นมันไม่ใช่สี่เหลี่ยมผืนผ้า */
+  for (const angle of G.interiorAngles(rect.points)) {
+    close(angle, 90, 0.0001, 'สี่เหลี่ยมผืนผ้ามีมุมที่ไม่ใช่มุมฉาก')
+  }
+  /* พื้นที่ต้องตรงกับที่เด็กคำนวณเองได้ คือกว้างคูณยาว */
+  close(G.areaInCm(rect.points), 15, 0.0001, 'พื้นที่ไม่เท่ากับกว้างคูณยาว')
+})
+
+check('จัตุรัสต้องด้านเท่าจริงทั้งสี่ด้าน', () => {
+  const square = build('square', { side: 4 })[0]
+  const sides = square.points.map((point, index) =>
+    G.distance(point, square.points[(index + 1) % square.points.length]),
+  )
+  for (const side of sides) close(side / G.PX_PER_CM, 4, 0.0001, 'ด้านของจัตุรัสไม่เท่ากับที่สั่ง')
+  close(G.polygonPerimeter(square.points) / G.PX_PER_CM, 16, 0.0001, 'ความยาวรอบรูปไม่ตรง')
+})
+
+check('รูปด้านเท่าต้องได้ความยาวด้านตามที่สั่ง ตั้งแต่สามถึงสิบสองเหลี่ยม', () => {
+  for (let sides = 3; sides <= 12; sides += 1) {
+    const poly = build('regular', { sides, side: 3 })[0]
+    assert(poly.points.length === sides, `สั่ง ${sides} ด้าน แต่ได้ ${poly.points.length} จุด`)
+    close(
+      G.distance(poly.points[0], poly.points[1]) / G.PX_PER_CM,
+      3,
+      0.0001,
+      `${sides} เหลี่ยม ด้านไม่ยาว 3 ซม. ตามที่สั่ง`,
+    )
+    close(
+      G.interiorAngles(poly.points)[0],
+      ((sides - 2) * 180) / sides,
+      0.0001,
+      `${sides} เหลี่ยม มุมภายในไม่ตรงสูตร`,
+    )
+  }
+})
+
+check('เส้นตรงต้องได้ความยาวและมุมตามที่สั่ง และวางกลางที่จิ้ม', () => {
+  const line = build('line', { length: 4, tilt: 30 })[0]
+  close(G.distance(line.a, line.b) / G.PX_PER_CM, 4, 0.0001, 'ความยาวไม่ตรง')
+  close(G.angleOf(line.a, line.b), 30, 0.0001, 'มุมไม่ตรง')
+  const middle = G.midpoint(line.a, line.b)
+  close(middle.x, AT.x, 0.0001, 'เส้นไม่ได้วางให้กึ่งกลางอยู่ตรงที่จิ้ม')
+  close(middle.y, AT.y, 0.0001, 'เส้นไม่ได้วางให้กึ่งกลางอยู่ตรงที่จิ้ม')
+})
+
+check('วงกลมกับส่วนโค้งต้องได้ขนาดตามที่สั่ง', () => {
+  const circle = build('circle', { radius: 2.5 })[0]
+  close(circle.radius / G.PX_PER_CM, 2.5, 0.0001, 'รัศมีวงกลมไม่ตรง')
+  close(circle.center.x, AT.x, 0.0001, 'วงกลมไม่ได้วางตรงที่จิ้ม')
+
+  const arc = build('arc', { radius: 3, sweep: 120 })[0]
+  close(Math.abs(arc.sweep), 120, 0.0001, 'มุมที่จุดศูนย์กลางไม่ตรง')
+  close(arc.radius / G.PX_PER_CM, 3, 0.0001, 'รัศมีส่วนโค้งไม่ตรง')
+  /* กางสมมาตรรอบแนวนอน ปลายทั้งสองข้างจึงอยู่สูงเท่ากัน */
+  const from = G.pointAt(arc.center, arc.radius, arc.start)
+  const to = G.pointAt(arc.center, arc.radius, arc.start + arc.sweep)
+  close(from.y, 2 * arc.center.y - to.y, 0.0001, 'ส่วนโค้งกางไม่สมมาตร')
+})
+
+check('สั่งมุม 108 องศา ต้องได้แขนสองข้างที่กาง 108 องศาจริง', () => {
+  /* นี่คือทางลัดของการสร้างห้าเหลี่ยมด้านเท่า โดยไม่ต้องกะมุมเอง */
+  const made = build('angle', { angle: 108, arm: 5 })
+  assert(made.length === 3, 'มุมหนึ่งมุมควรได้แขนสองข้างกับป้ายองศา')
+  const mark = made.find((shape) => shape.kind === 'angle')
+  assert(mark, 'ไม่มีป้ายบอกองศา')
+  close(G.angleBetween(mark.a, mark.vertex, mark.b), 108, 0.0001, 'มุมที่ได้ไม่ใช่ 108 องศา')
+
+  const arms = made.filter((shape) => shape.kind === 'segment')
+  assert(arms.length === 2, 'ควรได้แขนสองข้าง')
+  close(
+    G.distance(arms[0].a, arms[0].b) / G.PX_PER_CM,
+    5,
+    0.0001,
+    'ความยาวแขนไม่ตรงกับที่สั่ง',
+  )
+  close(
+    G.distance(arms[0].a, arms[0].b),
+    G.distance(arms[1].a, arms[1].b),
+    0.0001,
+    'แขนสองข้างยาวไม่เท่ากัน',
+  )
+})
+
+check('ค่าที่ใส่เกินขอบเขตหรือใส่ผิด ต้องถูกดึงกลับให้อยู่ในช่วงที่สร้างได้', () => {
+  const recipe = R.findRecipe('circle')
+  const field = recipe.fields[0]
+  close(R.valueOf(recipe, { radius: 9999 }, 'radius'), field.max, 0.0001, 'ค่าเกินไม่ถูกดึงกลับ')
+  close(R.valueOf(recipe, { radius: -5 }, 'radius'), field.min, 0.0001, 'ค่าติดลบไม่ถูกดึงกลับ')
+  close(R.valueOf(recipe, {}, 'radius'), field.initial, 0.0001, 'ยังไม่ได้ใส่ค่าควรใช้ค่าตั้งต้น')
+  close(R.valueOf(recipe, { radius: Number.NaN }, 'radius'), field.initial, 0.0001, 'ค่า NaN ควรใช้ค่าตั้งต้น')
+
+  const values = R.initialValues(recipe)
+  assert(Object.keys(values).length === recipe.fields.length, 'ค่าตั้งต้นไม่ครบทุกช่อง')
+  assert(R.findRecipe('ไม่มีแบบนี้').id === R.RECIPES[0].id, 'แบบที่ไม่รู้จักควรได้แบบแรก')
 })
 
 /* ---------------------------------------------------------------- */

@@ -97,6 +97,8 @@ const REQUIRED_CLASSES = [
   'geo-zoom',
   'geo-label',
   'geo-field',
+  'geo-recipe',
+  'geo-recipe-on',
   'geo-sticker',
   'geo-sticker-on',
   'geo-theme',
