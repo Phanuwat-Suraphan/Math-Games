@@ -286,7 +286,7 @@ export function ShapeView({
             cx={shape.center.x}
             cy={shape.center.y}
             r={shape.radius}
-            fill="none"
+            fill={shape.fill}
             stroke={shape.color}
             strokeWidth={shape.width}
           />

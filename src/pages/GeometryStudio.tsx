@@ -84,6 +84,14 @@ import {
   sparkleOffsets,
 } from '../geometry/cute'
 import { PENCIL_COLORS, PENCIL_WIDTHS, TOOLS, findTool } from '../geometry/tools'
+import {
+  FILL_COLORS,
+  NO_FILL,
+  fillName,
+  fillOf,
+  findFillTarget,
+  paintShape,
+} from '../geometry/paint'
 import type { ToolId } from '../geometry/tools'
 import {
   HIT_TOLERANCE,
@@ -196,6 +204,7 @@ export function GeometryStudio() {
   const [color, setColor] = useState(PENCIL_COLORS[0].value)
   const [width, setWidth] = useState(PENCIL_WIDTHS[1].value)
   const [sides, setSides] = useState(6)
+  const [fillColor, setFillColor] = useState(FILL_COLORS[0].value)
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -489,6 +498,7 @@ export function GeometryStudio() {
       width,
       center: { ...compass.center },
       radius: compass.radius,
+      fill: 'none',
     })
     say(`วาดวงกลมรัศมี ${formatCm(compass.radius)} แล้ว`)
   }
@@ -858,6 +868,24 @@ export function GeometryStudio() {
         return
       }
 
+      case 'paint': {
+        const target = findFillTarget(board.shapes, raw)
+        if (!target) {
+          say('จิ้มข้างในรูปที่ปิดแล้วนะ ถังสีเทลงรูปที่ยังไม่ปิดไม่ได้')
+          return
+        }
+        /* จิ้มซ้ำสีเดิมไม่ควรกินช่องประวัติ ไม่งั้นกดย้อนกลับแล้วภาพไม่ขยับ */
+        if (fillOf(target) === fillColor) {
+          setSelectedId(target.id)
+          return
+        }
+        editSelected(paintShape(target, fillColor))
+        setSelectedId(target.id)
+        playSfx('click')
+        say(`${fillName(fillColor)}แล้ว`)
+        return
+      }
+
       case 'eraser': {
         const found = findShapeAt(board.shapes, raw, hitRange)
         if (!found) return
@@ -875,7 +903,9 @@ export function GeometryStudio() {
   /** ตำแหน่งและสถานะของวงแหวนเคอร์เซอร์ ณ จุดที่ปลายปากกาอยู่ */
   function cursorAt(raw: Point): { point: Point; onTarget: boolean } {
     /* สองเครื่องมือนี้ไม่ได้วาดอะไร จึงไม่ควรหลอกว่าปลายดินสอจะไปลงที่จุดอื่น */
-    if (tool === 'select' || tool === 'eraser') return { point: raw, onTarget: false }
+    if (tool === 'select' || tool === 'eraser' || tool === 'paint') {
+      return { point: raw, onTarget: false }
+    }
     return snapWithInfo(raw)
   }
 
@@ -1334,6 +1364,7 @@ export function GeometryStudio() {
     if (!saved) return
 
     setColor(saved.prefs.color)
+    setFillColor(saved.prefs.fillColor)
     setWidth(saved.prefs.width)
     setThemeId(saved.prefs.themeId)
     setShowGrid(saved.prefs.showGrid)
@@ -1365,6 +1396,7 @@ export function GeometryStudio() {
         encodeBoard(board.shapes, labelOffsets, {
           themeId,
           color,
+          fillColor,
           width,
           showGrid,
           snapOn,
@@ -1380,6 +1412,7 @@ export function GeometryStudio() {
     labelOffsets,
     themeId,
     color,
+    fillColor,
     width,
     showGrid,
     snapOn,
@@ -1581,7 +1614,7 @@ export function GeometryStudio() {
           <h2 className="geo-heading">🧰 กล่องเครื่องมือ</h2>
           {/*
             เรียงเป็นตารางสามช่อง ไม่ใช่รายการแถวยาว
-            เครื่องมือมีสิบเอ็ดชิ้น ถ้าเรียงเป็นแถวจะยาวเกินหนึ่งหน้าจอ
+            เครื่องมือมีสิบสองชิ้น ถ้าเรียงเป็นแถวจะยาวเกินหนึ่งหน้าจอ
             เด็กต้องเลื่อนหาเครื่องมือที่ใช้บ่อยที่สุดทุกครั้งที่จะเปลี่ยน
             ตัวเลขมุมบนคือปุ่มลัดบนแป้นพิมพ์ ครูที่ใช้คอมพิวเตอร์กดสลับได้เร็ว
           */}
@@ -1737,6 +1770,42 @@ export function GeometryStudio() {
                   </button>
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {tool === 'paint' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <p className="text-sm font-bold text-slate-600">เลือกสีระบาย</p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {FILL_COLORS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFillColor(item.value)}
+                    aria-label={`ระบายสี${item.label}`}
+                    title={item.label}
+                    style={{ backgroundColor: item.value }}
+                    className={`h-8 w-8 rounded-full border-[3px] transition ${
+                      fillColor === item.value
+                        ? 'border-white shadow-lg scale-110'
+                        : 'border-white/60'
+                    }`}
+                  />
+                ))}
+                {/* ปุ่มลบสีต้องอยู่ในแถวเดียวกับสี เพราะมันคือ "สีใส" ในมือเด็ก */}
+                <button
+                  type="button"
+                  onClick={() => setFillColor(NO_FILL)}
+                  aria-label="ไม่ระบาย"
+                  title="ไม่ระบาย"
+                  className={`geo-nofill ${fillColor === NO_FILL ? 'geo-nofill-on' : ''}`}
+                >
+                  🚫
+                </button>
+              </div>
+              <p className="mt-2 text-xs font-bold text-slate-500">
+                จิ้มข้างในรูปที่ปิดแล้ว รูปซ้อนกันจะระบายช่องเล็กที่สุดให้
+              </p>
             </div>
           ) : null}
 

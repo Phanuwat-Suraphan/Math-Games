@@ -46,6 +46,7 @@ const B_LABELS = load('geometry/labels')
 const N = load('geometry/instruments')
 const R = load('geometry/recipes')
 const D = load('geometry/storage')
+const P = load('geometry/paint')
 
 let passed = 0
 const failures = []
@@ -1467,6 +1468,144 @@ check('ตัวอักษรกำกับจุดต้องไม่ซ�
     assert(!labels.has(label), `ตัวอักษร ${label} ซ้ำที่จุดที่ ${index}`)
     labels.add(label)
   }
+})
+
+check('ถังสีต้องระบายได้เฉพาะรูปที่ปิดแล้ว', () => {
+  const square = {
+    id: 'sq',
+    kind: 'polygon',
+    color: '#000',
+    width: 3,
+    closed: true,
+    fill: 'none',
+    points: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
+    ],
+  }
+  const open = { ...square, id: 'open', closed: false }
+  const line = { id: 'ln', kind: 'segment', color: '#000', width: 3, a: { x: 0, y: 0 }, b: { x: 50, y: 0 } }
+  const circle = { id: 'ci', kind: 'circle', color: '#000', width: 3, center: { x: 300, y: 300 }, radius: 60, fill: 'none' }
+
+  assert(P.canFill(square), 'สี่เหลี่ยมที่ปิดแล้วต้องระบายได้')
+  assert(P.canFill(circle), 'วงกลมต้องระบายได้')
+  assert(!P.canFill(open), 'รูปที่ยังไม่ปิดต้องระบายไม่ได้ เพราะสีจะรั่วออกนอกรูป')
+  assert(!P.canFill(line), 'เส้นตรงไม่มีข้างในให้ระบาย')
+
+  const painted = P.paintShape(square, '#bbf7d0')
+  assert(painted.fill === '#bbf7d0', 'ระบายแล้วสีไม่เปลี่ยน')
+  assert(square.fill === 'none', 'รูปเดิมต้องไม่ถูกแก้ ไม่งั้นปุ่มย้อนกลับจะย้อนไม่ได้')
+  assert(P.paintShape(line, '#bbf7d0') === line, 'รูปที่ระบายไม่ได้ต้องคืนตัวเดิมไปเลย')
+  assert(P.paintShape(painted, P.NO_FILL).fill === 'none', 'ลบสีออกแล้วต้องกลับเป็นไม่ระบาย')
+  assert(P.fillOf(painted) === '#bbf7d0', 'อ่านสีที่ระบายอยู่ผิด')
+  assert(P.fillOf(line) === P.NO_FILL, 'รูปที่ระบายไม่ได้ต้องถือว่าไม่มีสี')
+})
+
+check('จิ้มระบายต้องโดนข้างในรูป ไม่ใช่แค่ใกล้เส้น', () => {
+  const square = {
+    id: 'sq',
+    kind: 'polygon',
+    color: '#000',
+    width: 3,
+    closed: true,
+    fill: 'none',
+    points: [
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 200 },
+      { x: 0, y: 200 },
+    ],
+  }
+  assert(P.findFillTarget([square], { x: 100, y: 100 }) === square, 'จิ้มกลางรูปต้องโดน')
+  assert(P.findFillTarget([square], { x: 260, y: 100 }) === null, 'จิ้มนอกรูปต้องไม่โดนอะไรเลย')
+
+  const circle = { id: 'ci', kind: 'circle', color: '#000', width: 3, center: { x: 0, y: 0 }, radius: 50, fill: 'none' }
+  assert(P.findFillTarget([circle], { x: 30, y: 30 }) === circle, 'จิ้มในวงกลมต้องโดน')
+  assert(P.findFillTarget([circle], { x: 45, y: 45 }) === null, 'จิ้มนอกวงกลมแต่ในกรอบสี่เหลี่ยมต้องไม่โดน')
+})
+
+check('รูปซ้อนกัน ถังสีต้องเทลงช่องเล็กที่สุด', () => {
+  /*
+   * นี่คือกรณีที่ครูใช้จริง แบ่งสี่เหลี่ยมเป็นสามเหลี่ยมสองรูปแล้วระบายคนละสี
+   * เพื่อให้เห็นว่าผลรวมมุมภายในของสี่เหลี่ยมคือสองเท่าของสามเหลี่ยม
+   * ถ้าถังสีเลือกรูปบนสุดแบบเครื่องมืออื่น จิ้มสามเหลี่ยมแล้วสี่เหลี่ยมจะเปลี่ยนสีแทน
+   */
+  const outer = {
+    id: 'outer',
+    kind: 'polygon',
+    color: '#000',
+    width: 3,
+    closed: true,
+    fill: 'none',
+    points: [
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 200, y: 200 },
+      { x: 0, y: 200 },
+    ],
+  }
+  const inner = {
+    ...outer,
+    id: 'inner',
+    points: [
+      { x: 0, y: 0 },
+      { x: 200, y: 0 },
+      { x: 0, y: 200 },
+    ],
+  }
+  /* สามเหลี่ยมวาดก่อน สี่เหลี่ยมวาดทีหลังจึงอยู่บนสุด */
+  const board = [inner, outer]
+  const picked = P.findFillTarget(board, { x: 40, y: 40 })
+  assert(picked === inner, 'จิ้มในสามเหลี่ยมต้องได้สามเหลี่ยม ไม่ใช่สี่เหลี่ยมที่ครอบอยู่')
+  assert(
+    P.findFillTarget(board, { x: 170, y: 170 }) === outer,
+    'จิ้มในส่วนที่มีแต่สี่เหลี่ยมต้องได้สี่เหลี่ยม',
+  )
+})
+
+check('ชื่อสีระบายต้องพูดกับเด็กได้', () => {
+  assert(P.FILL_COLORS.length >= 4, 'สีระบายน้อยเกินไป')
+  for (const choice of P.FILL_COLORS) {
+    assert(/^#[0-9a-f]{6}$/i.test(choice.value), `สี ${choice.value} ไม่ใช่รหัสสีที่ถูกต้อง`)
+    assert(choice.label.length > 0, 'สีระบายต้องมีชื่อภาษาไทย')
+    assert(P.fillName(choice.value) === choice.label, 'เรียกชื่อสีผิด')
+  }
+  const values = new Set(P.FILL_COLORS.map((choice) => choice.value))
+  assert(values.size === P.FILL_COLORS.length, 'มีสีระบายซ้ำกันในจาน')
+  assert(P.fillName(P.NO_FILL).length > 0, 'ปุ่มลบสีต้องมีคำอธิบาย')
+})
+
+check('งานที่ระบายสีไว้ต้องยังอยู่หลังรีเฟรช', () => {
+  const shapes = [
+    {
+      id: 'sq',
+      kind: 'polygon',
+      color: '#ec4899',
+      width: 3,
+      closed: true,
+      fill: '#bbf7d0',
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+        { x: 100, y: 100 },
+      ],
+    },
+    {
+      id: 'ci',
+      kind: 'circle',
+      color: '#ec4899',
+      width: 3,
+      center: { x: 300, y: 300 },
+      radius: 60,
+      fill: '#fef08a',
+    },
+  ]
+  const back = D.decodeBoard(D.encodeBoard(shapes, {}, SAMPLE_PREFS))
+  assert(back !== null, 'อ่านงานที่บันทึกไว้ไม่ได้')
+  assert(back.shapes[0].fill === '#bbf7d0', 'สีที่ระบายในรูปหลายเหลี่ยมหายไปหลังรีเฟรช')
+  assert(back.shapes[1].fill === '#fef08a', 'สีที่ระบายในวงกลมหายไปหลังรีเฟรช')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

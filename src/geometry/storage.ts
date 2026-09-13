@@ -18,6 +18,7 @@
 
 import { PENCIL_COLORS, PENCIL_WIDTHS } from './tools'
 import { PAPER_THEMES } from './cute'
+import { FILL_COLORS, NO_FILL } from './paint'
 import { clampLeash } from './labels'
 import type { LabelOffsets } from './labels'
 import type { Point } from './geo'
@@ -29,6 +30,8 @@ export const SAVE_VERSION = 1
 export interface SavedPrefs {
   themeId: string
   color: string
+  /** สีที่เลือกไว้ในถังสี */
+  fillColor: string
   width: number
   showGrid: boolean
   snapOn: boolean
@@ -47,6 +50,7 @@ export interface SavedBoard {
 export const DEFAULT_PREFS: SavedPrefs = {
   themeId: PAPER_THEMES[0].id,
   color: PENCIL_COLORS[0].value,
+  fillColor: FILL_COLORS[0].value,
   width: PENCIL_WIDTHS[1].value,
   showGrid: true,
   snapOn: true,
@@ -106,7 +110,7 @@ export function sanitizeShape(value: unknown): Shape | null {
       const center = point(value.center)
       const radius = num(value.radius)
       return center && radius !== null && radius > 0
-        ? { ...base, kind: 'circle', center, radius }
+        ? { ...base, kind: 'circle', center, radius, fill: text(value.fill, 'none') }
         : null
     }
     case 'arc': {
@@ -167,11 +171,17 @@ function sanitizePrefs(value: unknown): SavedPrefs {
   const bool = (raw: unknown, fallback: boolean) => (typeof raw === 'boolean' ? raw : fallback)
   const themeId = text(value.themeId, DEFAULT_PREFS.themeId)
   const color = text(value.color, DEFAULT_PREFS.color)
+  const fillColor = text(value.fillColor, DEFAULT_PREFS.fillColor)
   const width = num(value.width)
   return {
     /* ธีมหรือสีที่ไม่รู้จัก ให้กลับไปใช้ค่าตั้งต้น ไม่ใช่ปล่อยให้กระดาษกลายเป็นสีแปลก ๆ */
     themeId: PAPER_THEMES.some((theme) => theme.id === themeId) ? themeId : DEFAULT_PREFS.themeId,
     color: PENCIL_COLORS.some((item) => item.value === color) ? color : DEFAULT_PREFS.color,
+    /* ยอมรับ none ด้วย เพราะปุ่มไม่ระบายก็เป็นตัวเลือกหนึ่งในจานสี */
+    fillColor:
+      fillColor === NO_FILL || FILL_COLORS.some((item) => item.value === fillColor)
+        ? fillColor
+        : DEFAULT_PREFS.fillColor,
     width: width !== null && width > 0 && width <= 20 ? width : DEFAULT_PREFS.width,
     showGrid: bool(value.showGrid, DEFAULT_PREFS.showGrid),
     snapOn: bool(value.snapOn, DEFAULT_PREFS.snapOn),

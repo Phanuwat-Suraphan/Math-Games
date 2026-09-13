@@ -50,6 +50,8 @@ export interface CircleShape extends Drawn {
   kind: 'circle'
   center: Point
   radius: number
+  /** สีที่ระบายข้างใน ใช้คำว่า none เมื่อยังไม่ระบาย */
+  fill: string
 }
 
 /** ส่วนโค้งจากวงเวียน กวาดจากมุม start ไปเป็นระยะ sweep */

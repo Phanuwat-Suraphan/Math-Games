@@ -223,7 +223,16 @@ export function buildShapes(
     }
 
     case 'circle':
-      return [{ ...base, kind: 'circle', id: 'draft-circle', center: { ...at }, radius: cm(get('radius')) }]
+      return [
+        {
+          ...base,
+          kind: 'circle',
+          id: 'draft-circle',
+          center: { ...at },
+          radius: cm(get('radius')),
+          fill: 'none',
+        },
+      ]
 
     case 'arc': {
       const sweep = get('sweep')
