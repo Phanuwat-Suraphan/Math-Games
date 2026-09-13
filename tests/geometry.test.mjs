@@ -45,6 +45,7 @@ const C = load('geometry/cute')
 const B_LABELS = load('geometry/labels')
 const N = load('geometry/instruments')
 const R = load('geometry/recipes')
+const D = load('geometry/storage')
 
 let passed = 0
 const failures = []
@@ -514,6 +515,213 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* บันทึกงานและอ่านกลับ                                                */
+/* ---------------------------------------------------------------- */
+
+const SAMPLE_PREFS = {
+  themeId: 'mint',
+  color: '#3b82f6',
+  width: 3.5,
+  showGrid: false,
+  snapOn: true,
+  showLengths: false,
+  showAngles: true,
+  showFaces: false,
+}
+
+check('บันทึกแล้วอ่านกลับ ต้องได้งานเดิมทุกอย่าง', () => {
+  const shapes = [
+    segment('s1', { x: 10, y: 20 }, { x: 110, y: 20 }),
+    { kind: 'circle', id: 'c1', color: '#000', width: 2, center: { x: 50, y: 50 }, radius: 40 },
+    {
+      kind: 'polygon',
+      id: 'p1',
+      color: '#000',
+      width: 2,
+      closed: true,
+      fill: '#00000022',
+      points: G.regularPolygon({ x: 300, y: 300 }, 80, 5),
+    },
+    { kind: 'sticker', id: 'k1', color: '#000', width: 2, at: { x: 9, y: 9 }, emoji: '⭐', size: 46 },
+  ]
+  const labels = { 'p1:edge:0': { x: 12, y: -18 } }
+
+  const back = D.decodeBoard(D.encodeBoard(shapes, labels, SAMPLE_PREFS))
+  assert(back !== null, 'อ่านงานที่เพิ่งบันทึกกลับไม่ได้')
+  assert(back.shapes.length === shapes.length, 'จำนวนรูปหายไประหว่างบันทึก')
+  close(back.shapes[1].radius, 40, 0.0001, 'รัศมีเพี้ยนหลังอ่านกลับ')
+  assert(back.shapes[2].points.length === 5, 'จุดยอดของรูปหายไป')
+  assert(back.shapes[3].emoji === '⭐', 'สติกเกอร์เปลี่ยนรูป')
+  close(back.labels['p1:edge:0'].y, -18, 0.0001, 'ตำแหน่งป้ายที่ลากไว้หายไป')
+  assert(back.prefs.themeId === 'mint', 'ธีมกระดาษไม่ถูกจำ')
+  assert(back.prefs.showGrid === false, 'สวิตช์ที่ปิดไว้กลับมาเปิดเอง')
+})
+
+check('ข้อมูลที่ใช้ไม่ได้ ต้องไม่ทำให้หน้าพัง', () => {
+  /*
+   * ข้อมูลใน localStorage แก้ด้วยมือได้ ค้างจากเวอร์ชันเก่าได้ และเสียกลางทางได้
+   * ถ้าอ่านมาใช้ตรง ๆ หน้าจะพังตั้งแต่เปิด แล้วเด็กจะเข้าห้องนี้ไม่ได้อีกเลย
+   */
+  assert(D.decodeBoard(null) === null, 'ยังไม่เคยบันทึกต้องได้ null เฉย ๆ')
+  assert(D.decodeBoard('') === null, 'ข้อความว่างต้องได้ null')
+  assert(D.decodeBoard('ไม่ใช่ JSON เลย') === null, 'ข้อความที่อ่านไม่ออกต้องได้ null')
+  assert(D.decodeBoard('[1,2,3]') === null, 'JSON ที่ไม่ใช่งานของห้องนี้ต้องได้ null')
+  assert(
+    D.decodeBoard(JSON.stringify({ version: 999, shapes: [] })) === null,
+    'งานคนละเวอร์ชันต้องไม่ถูกนำมาใช้',
+  )
+  assert(
+    D.decodeBoard(JSON.stringify({ version: 1, shapes: 'ไม่ใช่รายการ' })) === null,
+    'รายการรูปที่ผิดชนิดต้องได้ null',
+  )
+})
+
+check('รูปที่เสียถูกทิ้งเฉพาะรูปนั้น ไม่ใช่ทิ้งทั้งกระดาษ', () => {
+  const raw = JSON.stringify({
+    version: 1,
+    shapes: [
+      segment('ดี', { x: 0, y: 0 }, { x: 10, y: 10 }),
+      { kind: 'segment', id: 'พิกัดพัง', color: '#000', width: 2, a: { x: 0, y: 'ห้า' }, b: { x: 1, y: 1 } },
+      { kind: 'circle', id: 'รัศมีติดลบ', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: -5 },
+      { kind: 'ไม่รู้จักชนิดนี้', id: 'แปลก', color: '#000', width: 2 },
+      { kind: 'dot', id: '', color: '#000', width: 2, at: { x: 1, y: 1 }, label: 'A' },
+      { kind: 'circle', id: 'ดีอีกอัน', color: '#000', width: 2, center: { x: 5, y: 5 }, radius: 20 },
+    ],
+  })
+  const back = D.decodeBoard(raw)
+  assert(back !== null, 'ทั้งกระดาษถูกทิ้งทั้งที่มีรูปดีอยู่')
+  assert(back.shapes.length === 2, `ควรเหลือรูปที่ใช้ได้สองรูป แต่ได้ ${back.shapes.length}`)
+  assert(back.shapes[0].id === 'ดี' && back.shapes[1].id === 'ดีอีกอัน', 'เก็บผิดรูป')
+})
+
+check('ค่าตั้งค่าที่ไม่รู้จัก ต้องกลับไปใช้ค่าตั้งต้น', () => {
+  const back = D.decodeBoard(
+    JSON.stringify({
+      version: 1,
+      shapes: [],
+      prefs: { themeId: 'ธีมที่ไม่มีอยู่', color: 'สีมั่ว', width: -3, showGrid: 'ไม่ใช่บูลีน' },
+      labels: { 'a:edge:0': { x: 9999, y: 0 }, 'b:edge:0': 'ไม่ใช่จุด' },
+    }),
+  )
+  assert(back !== null, 'ควรอ่านได้ ไม่ใช่ทิ้งทั้งงาน')
+  assert(back.prefs.themeId === D.DEFAULT_PREFS.themeId, 'ธีมที่ไม่รู้จักควรกลับไปใช้ค่าตั้งต้น')
+  assert(back.prefs.color === D.DEFAULT_PREFS.color, 'สีที่ไม่รู้จักควรกลับไปใช้ค่าตั้งต้น')
+  assert(back.prefs.width === D.DEFAULT_PREFS.width, 'ความหนาที่ติดลบควรกลับไปใช้ค่าตั้งต้น')
+  assert(back.prefs.showGrid === D.DEFAULT_PREFS.showGrid, 'ค่าที่ไม่ใช่บูลีนควรกลับไปใช้ค่าตั้งต้น')
+
+  /* ป้ายที่ถูกแก้มือให้ไกลเกินเชือก ต้องถูกดึงกลับตอนอ่าน ไม่ใช่ลอยอยู่กลางกระดาษ */
+  const leashed = back.labels['a:edge:0']
+  close(Math.hypot(leashed.x, leashed.y), B_LABELS.LABEL_LEASH, 0.0001, 'ป้ายที่ไกลเกินไม่ถูกดึงกลับ')
+  assert(back.labels['b:edge:0'] === undefined, 'ป้ายที่ผิดชนิดควรถูกทิ้ง')
+})
+
+/* ---------------------------------------------------------------- */
+/* ลากจุดบนรูป                                                        */
+/* ---------------------------------------------------------------- */
+
+check('รูปแต่ละชนิดต้องมีจุดให้ลากแก้ครบตามที่ควรมี', () => {
+  const poly = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 0, y: 0 }, 100, 6),
+  }
+  assert(S.shapeVertices(poly).length === 6, 'หกเหลี่ยมควรมีจุดให้ลากหกจุด')
+  assert(S.shapeVertices(segment('s', { x: 0, y: 0 }, { x: 1, y: 1 })).length === 2, 'เส้นตรงควรมีสองจุด')
+
+  const circle = { kind: 'circle', id: 'c', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 50 }
+  const spots = S.shapeVertices(circle)
+  assert(spots.length === 2, 'วงกลมควรมีจุดศูนย์กลางกับจุดบนเส้นรอบวง')
+  assert(spots[0].center === true, 'จุดศูนย์กลางต้องถูกทำเครื่องหมายไว้ให้วาดต่างจากจุดบนเส้น')
+})
+
+check('ลากจุดเดียว ต้องขยับแค่จุดนั้น', () => {
+  const poly = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 200, y: 200 }, 100, 4),
+  }
+  const moved = S.moveVertex(poly, 'v2', { x: 7, y: 9 })
+  close(moved.points[2].x, 7, 0.0001, 'จุดที่ลากไม่ไปที่ใหม่')
+  close(moved.points[0].x, poly.points[0].x, 0.0001, 'จุดอื่นขยับตามไปด้วย')
+  assert(poly.points[2].x !== 7, 'ของเดิมถูกแก้ ซึ่งทำให้ปุ่มย้อนกลับพัง')
+
+  /* ชื่อจุดที่ไม่มีอยู่ ต้องไม่ทำให้รูปเปลี่ยน */
+  assert(S.moveVertex(poly, 'v99', { x: 0, y: 0 }) === poly, 'จุดที่ไม่มีอยู่ไม่ควรเปลี่ยนอะไร')
+})
+
+check('ลากจุดของวงกลมและส่วนโค้ง ต้องได้ผลตามที่เห็น', () => {
+  const circle = { kind: 'circle', id: 'c', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 50 }
+  close(S.moveVertex(circle, 'edge', { x: 80, y: 0 }).radius, 80, 0.0001, 'ลากขอบวงกลมแล้วรัศมีไม่ตาม')
+  close(S.moveVertex(circle, 'center', { x: 10, y: 10 }).center.x, 10, 0.0001, 'ลากจุดศูนย์กลางแล้ววงไม่ย้าย')
+  assert(S.moveVertex(circle, 'edge', { x: 0, y: 0 }).radius > 0, 'รัศมีต้องไม่กลายเป็นศูนย์จนวงหายไป')
+
+  /* ลากปลายส่วนโค้ง ปลายอีกข้างต้องอยู่ที่เดิม */
+  const arc = {
+    kind: 'arc',
+    id: 'a',
+    color: '#000',
+    width: 2,
+    center: { x: 0, y: 0 },
+    radius: 100,
+    start: 0,
+    sweep: 90,
+  }
+  const pulled = S.moveVertex(arc, 'to', { x: -100, y: 0 })
+  close(pulled.start, 0, 0.0001, 'ลากปลายด้านหนึ่งแล้วปลายอีกข้างขยับตาม')
+  close(pulled.sweep, 180, 0.0001, 'มุมกวาดไม่ตรงกับจุดที่ลากไป')
+})
+
+check('ลากจุดยอดของมุม แขนทั้งสองต้องตามไปทั้งชุด', () => {
+  /* ถ้าแขนไม่ตาม มุมจะเปลี่ยนขนาดทั้งที่เด็กแค่อยากย้ายที่ */
+  const angle = {
+    kind: 'angle',
+    id: 'g',
+    color: '#000',
+    width: 2,
+    vertex: { x: 0, y: 0 },
+    a: { x: 100, y: 0 },
+    b: { x: 0, y: -100 },
+  }
+  const moved = S.moveVertex(angle, 'vertex', { x: 50, y: 50 })
+  close(
+    G.angleBetween(moved.a, moved.vertex, moved.b),
+    G.angleBetween(angle.a, angle.vertex, angle.b),
+    0.0001,
+    'ย้ายจุดยอดแล้วขนาดมุมเปลี่ยน',
+  )
+  close(moved.a.x, 150, 0.0001, 'แขนไม่ได้ตามจุดยอดไป')
+})
+
+check('จุดอ้างอิงตอนลากทั้งรูป ต้องเป็นจุดที่ใกล้นิ้วที่สุด', () => {
+  /* เด็กเล็งว่า "เอามุมนี้ไปแปะตรงนั้น" แม่เหล็กจึงต้องทำงานกับมุมที่เขาจับ */
+  const square = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: [
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+      { x: 100, y: 100 },
+      { x: 0, y: 100 },
+    ],
+  }
+  const handle = S.grabHandle(square, { x: 95, y: 96 })
+  close(handle.x, 100, 0.0001, 'จับมุมล่างขวาแล้วได้จุดอื่น')
+  close(handle.y, 100, 0.0001, 'จับมุมล่างขวาแล้วได้จุดอื่น')
 })
 
 /* ---------------------------------------------------------------- */

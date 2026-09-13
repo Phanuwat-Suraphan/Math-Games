@@ -799,3 +799,145 @@ export function applyField(shape: Shape, key: string, value: number): Shape {
 
   return shape
 }
+
+/* ------------------------------------------------------------------ */
+/* จุดบนรูปที่ลากแก้ได้ทีละจุด                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ทำไมต้องลากทีละจุดได้
+ *
+ * เด็กวาดสามเหลี่ยมเสร็จแล้วพบว่ามุมหนึ่งเบี้ยวไปนิดเดียว
+ * ถ้าแก้ได้แค่ย่อขยายทั้งรูปหรือหมุนทั้งรูป มุมนั้นก็ยังเบี้ยวอยู่ดี
+ * ทางเดียวคือลบทิ้งแล้ววาดใหม่ทั้งรูป ซึ่งเสียทั้งเวลาและกำลังใจ
+ *
+ * และจุดพวกนี้ต้องมีแม่เหล็กเหมือนตอนวาด ไม่งั้นการลากแก้จะได้ 3.97 ซม.
+ * ซึ่งแย่กว่าเดิมที่ 4.02 เพราะเด็กนึกว่าแก้แล้วมันจะตรง
+ */
+export interface ShapeVertex {
+  key: string
+  at: Point
+  /** จุดนี้เป็นจุดศูนย์กลาง ไม่ใช่จุดบนเส้น ใช้วาดให้ต่างกัน */
+  center?: boolean
+}
+
+export function shapeVertices(shape: Shape): ShapeVertex[] {
+  switch (shape.kind) {
+    case 'segment':
+      return [
+        { key: 'a', at: shape.a },
+        { key: 'b', at: shape.b },
+      ]
+    case 'circle':
+      return [
+        { key: 'center', at: shape.center, center: true },
+        { key: 'edge', at: pointAt(shape.center, shape.radius, 0) },
+      ]
+    case 'arc':
+      return [
+        { key: 'center', at: shape.center, center: true },
+        { key: 'from', at: pointAt(shape.center, shape.radius, shape.start) },
+        { key: 'to', at: pointAt(shape.center, shape.radius, shape.start + shape.sweep) },
+      ]
+    case 'polygon':
+      return shape.points.map((point, index) => ({ key: `v${index}`, at: point }))
+    case 'dot':
+      return [{ key: 'at', at: shape.at }]
+    case 'angle':
+      return [
+        { key: 'vertex', at: shape.vertex, center: true },
+        { key: 'a', at: shape.a },
+        { key: 'b', at: shape.b },
+      ]
+    case 'sticker':
+      return [{ key: 'at', at: shape.at, center: true }]
+    default:
+      return []
+  }
+}
+
+/** ย้ายจุดหนึ่งของรูปไปที่ใหม่ คืนรูปใหม่เสมอ */
+export function moveVertex(shape: Shape, key: string, to: Point): Shape {
+  const target = { x: to.x, y: to.y }
+
+  switch (shape.kind) {
+    case 'segment':
+      if (key === 'a') return { ...shape, a: target }
+      if (key === 'b') return { ...shape, b: target }
+      return shape
+
+    case 'circle':
+      if (key === 'center') return { ...shape, center: target }
+      if (key === 'edge') {
+        return { ...shape, radius: Math.max(4, distance(shape.center, target)) }
+      }
+      return shape
+
+    case 'arc': {
+      if (key === 'center') return { ...shape, center: target }
+      const radius = Math.max(4, distance(shape.center, target))
+      const angle = angleOf(shape.center, target)
+      if (key === 'from') {
+        /* ลากปลายด้านเริ่ม ปลายอีกข้างต้องอยู่ที่เดิม มุมกวาดจึงเปลี่ยนตาม */
+        const end = shape.start + shape.sweep
+        let sweep = end - angle
+        if (shape.sweep > 0 && sweep <= 0) sweep += 360
+        if (shape.sweep < 0 && sweep >= 0) sweep -= 360
+        return { ...shape, radius, start: angle, sweep }
+      }
+      if (key === 'to') {
+        let sweep = angle - shape.start
+        if (shape.sweep > 0 && sweep <= 0) sweep += 360
+        if (shape.sweep < 0 && sweep >= 0) sweep -= 360
+        return { ...shape, radius, sweep }
+      }
+      return shape
+    }
+
+    case 'polygon': {
+      const index = Number(key.slice(1))
+      if (!Number.isInteger(index) || index < 0 || index >= shape.points.length) return shape
+      const points = shape.points.map((point, at) => (at === index ? target : point))
+      return { ...shape, points }
+    }
+
+    case 'dot':
+      return key === 'at' ? { ...shape, at: target } : shape
+
+    case 'angle':
+      if (key === 'vertex') {
+        /* ลากจุดยอด แขนทั้งสองข้างต้องตามไปด้วย ไม่งั้นมุมจะเปลี่ยนโดยไม่ได้ตั้งใจ */
+        const shift = { x: target.x - shape.vertex.x, y: target.y - shape.vertex.y }
+        return {
+          ...shape,
+          vertex: target,
+          a: { x: shape.a.x + shift.x, y: shape.a.y + shift.y },
+          b: { x: shape.b.x + shift.x, y: shape.b.y + shift.y },
+        }
+      }
+      if (key === 'a') return { ...shape, a: target }
+      if (key === 'b') return { ...shape, b: target }
+      return shape
+
+    case 'sticker':
+      return key === 'at' ? { ...shape, at: target } : shape
+
+    default:
+      return shape
+  }
+}
+
+/**
+ * จุดอ้างอิงสำหรับลากทั้งรูปให้ดูดเข้าแม่เหล็ก
+ *
+ * เลือกจุดของรูปที่อยู่ใกล้นิ้วที่สุดตอนเริ่มลาก แล้วให้จุดนั้นเป็นตัวที่ไปชนเป้า
+ * เด็กจึงเล็งได้ว่า "เอามุมนี้ไปแปะตรงนั้น" ซึ่งเป็นสิ่งที่ตั้งใจจะทำจริง ๆ
+ * ถ้าใช้จุดกึ่งกลางรูปเสมอ การเล็งมุมจะทำไม่ได้เลย
+ */
+export function grabHandle(shape: Shape, near: Point): Point {
+  const spots = shapeVertices(shape).map((vertex) => vertex.at)
+  if (spots.length === 0) return shapeCenter(shape)
+  return spots.reduce((best, spot) =>
+    distance(spot, near) < distance(best, near) ? spot : best,
+  )
+}

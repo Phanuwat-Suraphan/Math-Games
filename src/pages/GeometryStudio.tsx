@@ -54,6 +54,7 @@ import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
+import { encodeBoard, forgetBoard, readBoard, writeBoard } from '../geometry/storage'
 import {
   RECIPES,
   buildShapes,
@@ -91,11 +92,14 @@ import {
   describeShape,
   editableFields,
   findShapeAt,
+  grabHandle,
+  moveVertex,
+  nearestSnapPoint,
   rotateShape,
   scaleShape,
   shapeCenter,
   shapeReach,
-  nearestSnapPoint,
+  shapeVertices,
   translateShape,
 } from '../geometry/shapes'
 import type { Shape, ShapeField } from '../geometry/shapes'
@@ -164,7 +168,22 @@ type Drag =
   | { kind: 'compass-spread' }
   /** จับหัวหรือปลายดินสอหมุนวาด รัศมีถูกล็อกไว้ */
   | { kind: 'compass-draw'; start: number; sweep: number; last: number }
-  | { kind: 'move'; id: string; last: Point; marked: boolean }
+  /**
+   * ลากทั้งรูป
+   *
+   * เก็บจุดอ้างอิงไว้ด้วย คือจุดของรูปที่อยู่ใกล้นิ้วที่สุดตอนเริ่มลาก
+   * แม่เหล็กจะทำงานกับจุดนั้น เด็กจึงเล็งได้ว่าเอามุมนี้ไปแปะตรงไหน
+   */
+  | {
+      kind: 'move'
+      id: string
+      start: Shape
+      handle: Point
+      grab: Point
+      marked: boolean
+    }
+  /** ลากจุดเดียวของรูปเพื่อแก้รูปทรง */
+  | { kind: 'vertex'; id: string; vertexKey: string; marked: boolean }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
 
@@ -183,6 +202,13 @@ export function GeometryStudio() {
   const [showLengths, setShowLengths] = useState(true)
   const [showAngles, setShowAngles] = useState(true)
   const [showFaces, setShowFaces] = useState(true)
+  /*
+   * พื้นที่กับรอบรูปปิดไว้ตั้งแต่แรกโดยตั้งใจ
+   * สองค่านี้ใช้เฉพาะบางบทเรียน ถ้าเปิดค้างไว้ตลอด กระดาษจะเต็มไปด้วยป้าย
+   * จนเด็กมองไม่เห็นรูปที่ตัวเองวาด ครูเปิดเมื่อถึงคาบที่สอนเรื่องนั้น
+   */
+  const [showArea, setShowArea] = useState(false)
+  const [showPerimeter, setShowPerimeter] = useState(false)
   const [showRuler, setShowRuler] = useState(false)
   const [showProtractor, setShowProtractor] = useState(false)
 
@@ -227,6 +253,8 @@ export function GeometryStudio() {
   const [openSections, setOpenSections] = useState({ pen: true, paper: false, helpers: true })
   /** การ์ดต้อนรับบนกระดาษเปล่า หายไปเองเมื่อวาดรูปแรก */
   const [showWelcome, setShowWelcome] = useState(true)
+  /** สถานะการบันทึกอัตโนมัติ ใช้บอกเด็กว่างานปลอดภัยแล้วหรือยัง */
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'failed'>('idle')
   const [polygonAsk, setPolygonAsk] = useState<Point | null>(null)
   const [askSideCm, setAskSideCm] = useState(3)
   const [recipeId, setRecipeId] = useState(RECIPES[0].id)
@@ -262,6 +290,13 @@ export function GeometryStudio() {
   const sparkleId = useRef(0)
   const sparkleTimers = useRef<number[]>([])
   const praiseTimer = useRef<number | null>(null)
+  /*
+   * กันไม่ให้เขียนทับงานเก่าก่อนที่จะอ่านมันกลับมา
+   * ถ้าไม่มีตัวนี้ การวาดหน้าจอรอบแรกซึ่งกระดาษยังว่างอยู่
+   * จะบันทึกกระดาษเปล่าทับงานของเมื่อวานทันทีที่เปิดหน้า
+   */
+  const restoredRef = useRef(false)
+  const saveTimer = useRef<number | null>(null)
   const labelOffsetsRef = useRef<LabelOffsets>({})
   labelOffsetsRef.current = labelOffsets
   /* สำเนาของมุมมองล่าสุด ไว้ให้ตัวรับล้อเมาส์ซึ่งผูกไว้ครั้งเดียวอ่านค่าปัจจุบันได้ */
@@ -290,6 +325,7 @@ export function GeometryStudio() {
       if (cheerTimer.current !== null) window.clearTimeout(cheerTimer.current)
       if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current)
       for (const timer of sparkleTimers.current) window.clearTimeout(timer)
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
       if (praiseTimer.current !== null) window.clearTimeout(praiseTimer.current)
     }
   }, [])
@@ -596,6 +632,18 @@ export function GeometryStudio() {
     })
   }
 
+  /** จับจุดหนึ่งของรูปที่เลือกอยู่ เพื่อลากแก้รูปทรงทีละจุด */
+  function handleVertexGrab(vertexKey: string, event: ReactPointerEvent<SVGElement>) {
+    event.stopPropagation()
+    if (!selected) return
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+    svgRef.current?.setPointerCapture(event.pointerId)
+    setDrag({ kind: 'vertex', id: selected.id, vertexKey, marked: false })
+  }
+
   /** ระยะและจุดกึ่งกลางของสองนิ้วที่แตะอยู่ หน่วยเป็นพิกเซลบนจอ */
   function touchSpan(): { distance: number; middle: Point } | null {
     const points = [...touchesRef.current.values()]
@@ -709,7 +757,15 @@ export function GeometryStudio() {
          * แล้วเด็กจะกดย้อนกลับสิบครั้งโดยที่ภาพบนจอไม่ขยับเลย
          */
         if (found) {
-          setDrag({ kind: 'move', id: found.id, last: raw, marked: false })
+          const handle = grabHandle(found, raw)
+          setDrag({
+            kind: 'move',
+            id: found.id,
+            start: found,
+            handle,
+            grab: { x: raw.x - handle.x, y: raw.y - handle.y },
+            marked: false,
+          })
         }
         return
       }
@@ -939,16 +995,35 @@ export function GeometryStudio() {
       }
 
       case 'move': {
-        const dx = raw.x - drag.last.x
-        const dy = raw.y - drag.last.y
+        /*
+         * แม่เหล็กทำงานกับจุดอ้างอิง ไม่ใช่กับปลายนิ้ว
+         * เด็กจึงเอามุมของรูปไปแปะให้ชนจุดอื่นได้พอดี ซึ่งเป็นสิ่งที่ตั้งใจจะทำจริง
+         */
+        const wanted = { x: raw.x - drag.grab.x, y: raw.y - drag.grab.y }
+        const landed = snapPoint(wanted)
         if (!drag.marked) dispatch({ type: 'mark' })
         dispatch({
           type: 'live',
           shapes: board.shapes.map((shape) =>
-            shape.id === drag.id ? translateShape(shape, dx, dy) : shape,
+            shape.id === drag.id
+              ? translateShape(drag.start, landed.x - drag.handle.x, landed.y - drag.handle.y)
+              : shape,
           ),
         })
-        setDrag({ kind: 'move', id: drag.id, last: raw, marked: true })
+        setDrag({ ...drag, marked: true })
+        return
+      }
+
+      case 'vertex': {
+        const landed = snapPoint(raw)
+        if (!drag.marked) dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: board.shapes.map((shape) =>
+            shape.id === drag.id ? moveVertex(shape, drag.vertexKey, landed) : shape,
+          ),
+        })
+        setDrag({ ...drag, marked: true })
         return
       }
 
@@ -1185,6 +1260,7 @@ export function GeometryStudio() {
     dispatch({ type: 'clear' })
     labelRef.current = 0
     setLabelOffsets({})
+    forgetBoard()
     setSelectedId(null)
     setDraft([])
     setAnglePicks([])
@@ -1244,6 +1320,73 @@ export function GeometryStudio() {
 
     image.src = url
   }
+
+  /**
+   * เอางานที่ค้างไว้กลับมาตอนเปิดหน้า
+   *
+   * ทำครั้งเดียวตอนเปิด ไม่ผูกกับอะไรเลย
+   * ของที่อ่านกลับมาผ่านการตรวจทีละช่องมาแล้วจาก storage.ts
+   * ตรงนี้จึงรับมาใช้ได้โดยไม่ต้องตรวจซ้ำ
+   */
+  useEffect(() => {
+    const saved = readBoard()
+    restoredRef.current = true
+    if (!saved) return
+
+    setColor(saved.prefs.color)
+    setWidth(saved.prefs.width)
+    setThemeId(saved.prefs.themeId)
+    setShowGrid(saved.prefs.showGrid)
+    setSnapOn(saved.prefs.snapOn)
+    setShowLengths(saved.prefs.showLengths)
+    setShowAngles(saved.prefs.showAngles)
+    setShowFaces(saved.prefs.showFaces)
+    setLabelOffsets(saved.labels)
+
+    if (saved.shapes.length > 0) {
+      dispatch({ type: 'restore', shapes: saved.shapes })
+      setShowWelcome(false)
+      say(`เปิดงานเดิมให้แล้ว มี ${saved.shapes.length} รูปค้างไว้จากครั้งก่อน`)
+    }
+  }, [])
+
+  /**
+   * บันทึกอัตโนมัติ
+   *
+   * หน่วงไว้ครู่หนึ่งก่อนเขียน เพราะการลากรูปหนึ่งครั้งเปลี่ยนสถานะหลายสิบรอบ
+   * ถ้าเขียนทุกรอบ เครื่องของโรงเรียนจะสะดุดตอนลากทุกครั้ง
+   */
+  useEffect(() => {
+    if (!restoredRef.current) return
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current)
+
+    saveTimer.current = window.setTimeout(() => {
+      const ok = writeBoard(
+        encodeBoard(board.shapes, labelOffsets, {
+          themeId,
+          color,
+          width,
+          showGrid,
+          snapOn,
+          showLengths,
+          showAngles,
+          showFaces,
+        }),
+      )
+      setSaveState(ok ? 'saved' : 'failed')
+    }, 700)
+  }, [
+    board.shapes,
+    labelOffsets,
+    themeId,
+    color,
+    width,
+    showGrid,
+    snapOn,
+    showLengths,
+    showAngles,
+    showFaces,
+  ])
 
   /**
    * ล้อเมาส์คือซูม
@@ -1752,6 +1895,18 @@ export function GeometryStudio() {
             />
             <ToggleChip label="มุม" emoji="📐" on={showAngles} onToggle={() => setShowAngles(!showAngles)} />
             <ToggleChip label="หน้าตา" emoji="👀" on={showFaces} onToggle={() => setShowFaces(!showFaces)} />
+            <ToggleChip
+              label="พื้นที่"
+              emoji="🟩"
+              on={showArea}
+              onToggle={() => setShowArea(!showArea)}
+            />
+            <ToggleChip
+              label="รอบรูป"
+              emoji="🧵"
+              on={showPerimeter}
+              onToggle={() => setShowPerimeter(!showPerimeter)}
+            />
           </div>
           {showProtractor ? (
             <div className="mt-2 rounded-2xl bg-white/70 p-3">
@@ -1881,6 +2036,8 @@ export function GeometryStudio() {
                 showLengths={showLengths}
                 showAngles={showAngles}
                 showFaces={showFaces}
+                showArea={showArea}
+                showPerimeter={showPerimeter}
                 offsets={labelOffsets}
                 /*
                  * ลากป้ายได้เฉพาะตอนใช้เครื่องมือเลือก
@@ -2019,6 +2176,27 @@ export function GeometryStudio() {
                       const spinAt = pointAt(origin, reach, 135)
                       return (
                         <g>
+                          {/*
+                            จุดบนรูป ลากทีละจุดเพื่อแก้รูปทรง
+                            จุดศูนย์กลางวาดเป็นวงกลมกลวง จุดบนเส้นวาดเป็นวงทึบ
+                            เด็กจะได้รู้ว่าลากอันไหนแล้วเกิดอะไรต่างกัน
+                          */}
+                          {shapeVertices(selected).map((vertex) => (
+                            <g
+                              key={vertex.key}
+                              transform={`translate(${vertex.at.x} ${vertex.at.y})`}
+                              onPointerDown={(event) => handleVertexGrab(vertex.key, event)}
+                              className="cursor-grab"
+                            >
+                              <circle r={18 / view.scale} fill="transparent" />
+                              <circle
+                                r={7 / view.scale}
+                                fill={vertex.center ? '#ffffff' : '#a78bfa'}
+                                stroke="#7c3aed"
+                                strokeWidth={3 / view.scale}
+                              />
+                            </g>
+                          ))}
                           <g
                             transform={`translate(${scaleAt.x} ${scaleAt.y})`}
                             onPointerDown={(event) => handleShapeHandleGrab('scale', event)}
@@ -2067,6 +2245,8 @@ export function GeometryStudio() {
                         showLengths={showLengths}
                         showAngles={showAngles}
                         showFaces={false}
+                        showArea={false}
+                        showPerimeter={false}
                         offsets={{}}
                       />
                     ))}
@@ -2297,6 +2477,16 @@ export function GeometryStudio() {
               </button>
             </div>
             <span className="geo-badge">{toolInfo.emoji} {toolInfo.label}</span>
+            {saveState === 'saved' ? (
+              <span className="geo-badge" title="งานถูกเก็บไว้ในเครื่องนี้ ปิดแล้วเปิดใหม่ก็ยังอยู่">
+                💾 บันทึกอัตโนมัติแล้ว
+              </span>
+            ) : null}
+            {saveState === 'failed' ? (
+              <span className="geo-notice" title="เครื่องนี้ไม่ให้เก็บข้อมูล เช่น เปิดในโหมดไม่ระบุตัวตน">
+                ⚠️ บันทึกอัตโนมัติไม่ได้ อย่าลืมกด 💾 บันทึกรูป
+              </span>
+            ) : null}
             {penMode ? (
               <span className="geo-badge" title="ฝ่ามือที่วางบนจอระหว่างเขียนจะไม่กลายเป็นเส้น">
                 🖊️ โหมดปากกา · กันฝ่ามือ

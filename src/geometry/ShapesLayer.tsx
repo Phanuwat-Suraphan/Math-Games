@@ -19,6 +19,8 @@ interface ShapesLayerProps {
   showLengths: boolean
   showAngles: boolean
   showFaces: boolean
+  showArea: boolean
+  showPerimeter: boolean
   offsets: LabelOffsets
   onLabelGrab?: (key: string, event: ReactPointerEvent<SVGElement>) => void
 }
@@ -29,6 +31,8 @@ export const ShapesLayer = memo(function ShapesLayer({
   showLengths,
   showAngles,
   showFaces,
+  showArea,
+  showPerimeter,
   offsets,
   onLabelGrab,
 }: ShapesLayerProps) {
@@ -42,6 +46,8 @@ export const ShapesLayer = memo(function ShapesLayer({
           showLengths={showLengths}
           showAngles={showAngles}
           showFaces={showFaces}
+          showArea={showArea}
+          showPerimeter={showPerimeter}
           offsets={offsets}
           onLabelGrab={onLabelGrab}
         />
