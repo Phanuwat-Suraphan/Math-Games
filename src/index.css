@@ -1290,6 +1290,49 @@ html[data-animations='off'] *::after {
   cursor: grabbing;
 }
 
+/*
+ * แถวตั้งค่าตัวเลขของรูปที่เลือก
+ *
+ * ช่องกรอกเป็น type=number เพื่อให้มือถือเด้งแป้นตัวเลขขึ้นมา
+ * แต่ยังมีปุ่มบวกลบข้าง ๆ เพราะเด็กหลายคนกดปุ่มถนัดกว่าพิมพ์
+ */
+.geo-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.geo-field input {
+  width: 62px;
+  min-height: 34px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  border: 2px solid #ddd6fe;
+  background: #ffffff;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #5b21b6;
+}
+
+.geo-field button {
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 999px;
+  border: 2px solid #ddd6fe;
+  background: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #5b21b6;
+}
+
+.geo-field button:hover {
+  background: #ede9fe;
+}
+
 /* ปุ่มเลือกสติกเกอร์ ตัวอิโมจิใหญ่พอให้เห็นว่าเป็นรูปอะไร */
 .geo-sticker {
   min-height: 46px;

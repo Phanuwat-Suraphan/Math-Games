@@ -11,9 +11,10 @@
 import { memo, useMemo } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { pointAt } from './geo'
+import { scaleUnit } from './instruments'
 import type { Point } from './geo'
 
-export type ProtractorPart = 'move' | 'rotate' | 'scale'
+export type ProtractorPart = 'move' | 'rotate' | 'scale' | 'resize'
 
 interface ProtractorOverlayProps {
   center: Point
@@ -45,15 +46,17 @@ const ProtractorScale = memo(function ProtractorScale({
   radius: number
   rotation: number
 }) {
+  /* ขีดและตัวเลขโตตามอันจริง ครึ่งวงกลมอันใหญ่ต้องมีขีดใหญ่ตาม ไม่ใช่ขนแมวเส้นเล็ก */
+  const unit = scaleUnit(radius)
   const ticks = useMemo<Tick[]>(() => {
     const list: Tick[] = []
     for (let deg = 0; deg <= 180; deg += 1) {
       const major = deg % 10 === 0
       const medium = deg % 5 === 0
-      list.push({ deg, inner: major ? 22 : medium ? 14 : 8, major })
+      list.push({ deg, inner: (major ? 22 : medium ? 14 : 8) * unit, major })
     }
     return list
-  }, [])
+  }, [unit])
 
   const origin: Point = { x: 0, y: 0 }
 
@@ -70,7 +73,7 @@ const ProtractorScale = memo(function ProtractorScale({
             x2={to.x}
             y2={to.y}
             stroke={tick.major ? '#be185d' : '#f472b6'}
-            strokeWidth={tick.major ? 2 : 1}
+            strokeWidth={(tick.major ? 2 : 1) * unit}
           />
         )
       })}
@@ -78,8 +81,8 @@ const ProtractorScale = memo(function ProtractorScale({
       {ticks
         .filter((tick) => tick.major)
         .map((tick) => {
-          const outerLabel = pointAt(origin, radius - 32, tick.deg)
-          const innerLabel = pointAt(origin, radius - 56, tick.deg)
+          const outerLabel = pointAt(origin, radius - 32 * unit, tick.deg)
+          const innerLabel = pointAt(origin, radius - 56 * unit, tick.deg)
           return (
             <g key={`label-${tick.deg}`}>
               <text
@@ -88,7 +91,7 @@ const ProtractorScale = memo(function ProtractorScale({
                 transform={`rotate(${rotation} ${outerLabel.x} ${outerLabel.y})`}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize={13}
+                fontSize={13 * unit}
                 fontWeight={700}
                 fill="#be185d"
               >
@@ -100,7 +103,7 @@ const ProtractorScale = memo(function ProtractorScale({
                 transform={`rotate(${rotation} ${innerLabel.x} ${innerLabel.y})`}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                fontSize={11}
+                fontSize={11 * unit}
                 fontWeight={600}
                 fill="#9d174d"
                 opacity={0.7}
@@ -121,7 +124,8 @@ export function ProtractorOverlay({
   highlight,
   onGrab,
 }: ProtractorOverlayProps) {
-  const bandInner = radius - 64
+  const unit = scaleUnit(radius)
+  const bandInner = radius - 64 * unit
   const origin: Point = { x: 0, y: 0 }
   const edge = (deg: number, r: number) => pointAt(origin, r, deg)
 
@@ -191,6 +195,28 @@ export function ProtractorOverlay({
       <line x1={-radius} y1={0} x2={radius} y2={0} stroke="#be185d" strokeWidth={2.5} pointerEvents="none" />
       <line x1={0} y1={-14} x2={0} y2={14} stroke="#be185d" strokeWidth={2.5} pointerEvents="none" />
       <circle cx={0} cy={0} r={6} fill="none" stroke="#be185d" strokeWidth={2.5} pointerEvents="none" />
+
+      {/*
+        ปุ่มย่อขยาย วางที่ขอบโค้งด้านบน ลากเข้าหาจุดกึ่งกลางคือย่อ ลากออกคือขยาย
+        มุมไม่ขึ้นกับขนาด ครึ่งวงกลมอันใหญ่กับอันเล็กจึงวัดได้ตรงกันเป๊ะ
+      */}
+      <g
+        transform={`translate(0 ${-radius - 26})`}
+        onPointerDown={(event) => onGrab('resize', event)}
+        className="cursor-grab"
+      >
+        <circle r={20} fill="transparent" />
+        <circle r={15} fill="#fbcfe8" stroke="#db2777" strokeWidth={2.5} />
+        <text
+          textAnchor="middle"
+          y={5}
+          fontSize={15}
+          transform={`rotate(${rotation})`}
+          fill="#9d174d"
+        >
+          ⤢
+        </text>
+      </g>
 
       {/* ปุ่มหมุน อยู่นอกตัวครึ่งวงกลมเพื่อไม่ให้บังสเกล */}
       <g

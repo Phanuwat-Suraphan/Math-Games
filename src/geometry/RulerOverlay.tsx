@@ -11,7 +11,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react'
 import { PX_PER_CM } from './geo'
 import type { Point } from './geo'
 
-export type RulerPart = 'move' | 'rotate'
+export type RulerPart = 'move' | 'rotate' | 'resize'
 
 interface RulerOverlayProps {
   /** ปลายซ้ายของขอบวัด ตรงกับเลข 0 บนไม้บรรทัด */
@@ -120,9 +120,26 @@ export function RulerOverlay({ origin, rotation, lengthCm, onGrab }: RulerOverla
         เซนติเมตร
       </text>
 
+      {/*
+        ปุ่มยืดหดที่ปลายไม้
+        ยืดคือได้ขีดเพิ่ม ไม่ใช่ขีดห่างขึ้น หนึ่งเซนติเมตรบนไม้บรรทัด
+        จึงยังเท่ากับหนึ่งเซนติเมตรบนกระดาษเสมอ ไม่ว่าจะยืดหรือหด
+      */}
+      <g
+        transform={`translate(${length + 22} ${height / 2})`}
+        onPointerDown={(event) => onGrab('resize', event)}
+        className="cursor-grab"
+      >
+        <circle r={20} fill="transparent" />
+        <circle r={15} fill="#fde68a" stroke="#d97706" strokeWidth={2.5} />
+        <text textAnchor="middle" y={5} fontSize={15} transform={`rotate(${rotation})`} fill="#92400e">
+          ↔
+        </text>
+      </g>
+
       {/* ปุ่มหมุนที่ปลายขวา */}
       <g
-        transform={`translate(${length + 44} ${height / 2})`}
+        transform={`translate(${length + 62} ${height / 2})`}
         onPointerDown={(event) => onGrab('rotate', event)}
         className="cursor-grab"
       >
