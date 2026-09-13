@@ -32,6 +32,7 @@ import {
   endPointer,
   isEraserTip,
   isPalmDuringPen,
+  isTap,
   noteInput,
   pointerKind,
   shouldIgnorePointer,
@@ -40,6 +41,7 @@ import type { PointerGate } from '../geometry/input'
 import {
   DEFAULT_VIEW,
   clampScale,
+  visibleSize,
   panBy,
   screenToPaper,
   viewBoxOf,
@@ -214,6 +216,9 @@ export function GeometryStudio() {
   const [missionIndex, setMissionIndex] = useState(0)
   const [themeId, setThemeId] = useState(PAPER_THEMES[0].id)
   const [sticker, setSticker] = useState(STICKERS[0].emoji)
+  /** กล่องถามจำนวนด้านกับความยาวด้าน ตอนจิ้มด้วยเครื่องมือรูปด้านเท่า */
+  const [polygonAsk, setPolygonAsk] = useState<Point | null>(null)
+  const [askSideCm, setAskSideCm] = useState(3)
   const [recipeId, setRecipeId] = useState(RECIPES[0].id)
   const [recipeValues, setRecipeValues] = useState<Record<string, number>>(() =>
     initialValues(RECIPES[0]),
@@ -991,6 +996,15 @@ export function GeometryStudio() {
       }
 
       case 'regular': {
+        /*
+         * จิ้มเฉย ๆ ไม่ใช่การลาก แปลว่าเด็กยังไม่ได้บอกขนาด
+         * ถามให้ชัดดีกว่าเดาขนาดให้ เพราะโจทย์มักกำหนดความยาวด้านมาแล้ว
+         */
+        if (isTap(distance(drag.center, drag.edge), view.scale)) {
+          setPolygonAsk(drag.center)
+          playSfx('click')
+          break
+        }
         const radius = snappedRadius(drag.center, drag.edge)
         if (radius >= 14) {
           addShape({
@@ -1143,6 +1157,7 @@ export function GeometryStudio() {
     setTool(next)
     setDraft([])
     setAnglePicks([])
+    setPolygonAsk(null)
     /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
     playSfx('click')
   }
@@ -1254,6 +1269,7 @@ export function GeometryStudio() {
       if (event.key === 'Escape') {
         setDraft([])
         setAnglePicks([])
+        setPolygonAsk(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
         setDrag({ kind: 'none' })
         return
@@ -1746,7 +1762,7 @@ export function GeometryStudio() {
 
         {/* กระดาษวาด */}
         <main className="order-1 lg:order-2">
-          <div className="geo-paper-frame">
+          <div className="geo-paper-frame relative">
             {/*
               onContextMenu ถูกปิดไว้เพราะการกดค้างด้วยปากกาหรือนิ้วบนวินโดวส์
               จะเด้งเมนูคลิกขวาขึ้นมากลางการวาด แล้วเส้นที่กำลังลากอยู่จะขาดตรงนั้นพอดี
@@ -2036,6 +2052,138 @@ export function GeometryStudio() {
                 ) : null}
               </g>
             </svg>
+
+            {polygonAsk ? (
+              <>
+                {/* ฉากหลังจาง ๆ จิ้มตรงไหนก็ปิดกล่องถาม */}
+                <div
+                  className="absolute inset-0 z-10 rounded-[26px] bg-slate-900/10"
+                  onPointerDown={() => setPolygonAsk(null)}
+                />
+                <div
+                  className="geo-ask"
+                  style={(() => {
+                    const size = visibleSize(view, VIEW_WIDTH, VIEW_HEIGHT)
+                    const x = ((polygonAsk.x - view.x) / size.width) * 100
+                    const y = ((polygonAsk.y - view.y) / size.height) * 100
+                    return {
+                      left: `${Math.min(88, Math.max(12, x))}%`,
+                      top: `${Math.min(82, Math.max(18, y))}%`,
+                    }
+                  })()}
+                >
+                  <p className="text-sm font-extrabold text-violet-700">
+                    🔷 จะวางรูปกี่เหลี่ยม ด้านละเท่าไร
+                  </p>
+
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {[3, 4, 5, 6, 8, 12].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => setSides(count)}
+                        className={`geo-ask-chip ${sides === count ? 'geo-ask-chip-on' : ''}`}
+                      >
+                        {count}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="geo-field mt-2">
+                    <span className="flex-1">จำนวนด้าน</span>
+                    <button type="button" onClick={() => setSides(Math.max(3, sides - 1))} aria-label="ลดจำนวนด้าน">
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={3}
+                      max={12}
+                      step={1}
+                      value={sides}
+                      onChange={(event) =>
+                        setSides(Math.min(12, Math.max(3, Math.round(Number(event.target.value)))))
+                      }
+                      aria-label="จำนวนด้าน"
+                    />
+                    <span className="w-8 text-left">ด้าน</span>
+                    <button type="button" onClick={() => setSides(Math.min(12, sides + 1))} aria-label="เพิ่มจำนวนด้าน">
+                      +
+                    </button>
+                  </div>
+
+                  <div className="geo-field mt-2">
+                    <span className="flex-1">ด้านละ</span>
+                    <button
+                      type="button"
+                      onClick={() => setAskSideCm(Math.max(0.5, askSideCm - 0.5))}
+                      aria-label="ลดความยาวด้าน"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={0.5}
+                      max={8}
+                      step={0.5}
+                      value={askSideCm}
+                      onChange={(event) =>
+                        setAskSideCm(Math.min(8, Math.max(0.5, Number(event.target.value))))
+                      }
+                      aria-label="ความยาวด้าน"
+                    />
+                    <span className="w-8 text-left">ซม.</span>
+                    <button
+                      type="button"
+                      onClick={() => setAskSideCm(Math.min(8, askSideCm + 0.5))}
+                      aria-label="เพิ่มความยาวด้าน"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={8}
+                    step={0.5}
+                    value={askSideCm}
+                    onChange={(event) => setAskSideCm(Number(event.target.value))}
+                    aria-label="เลื่อนตั้งความยาวด้าน"
+                    className="mt-1 w-full accent-violet-500"
+                  />
+
+                  {/* บอกผลลัพธ์ล่วงหน้า เด็กจะเห็นความสัมพันธ์ระหว่างจำนวนด้านกับมุมทันที */}
+                  <p className="mt-1 rounded-xl bg-violet-100/70 p-2 text-[11px] font-bold text-violet-700">
+                    {polygonName(sides)}ด้านเท่า · มุมภายในมุมละ{' '}
+                    {Math.round(((sides - 2) * 180) / sides)}° · รวมทั้งรูป {(sides - 2) * 180}° ·
+                    รอบรูป {(sides * askSideCm).toFixed(1)} ซม.
+                  </p>
+
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        placeShapes(
+                          buildShapes(
+                            findRecipe('regular'),
+                            { sides, side: askSideCm },
+                            polygonAsk,
+                            { color, width },
+                          ),
+                        )
+                        setPolygonAsk(null)
+                      }}
+                      className="geo-chip geo-chip-strong flex-1"
+                    >
+                      ✅ วางเลย
+                    </button>
+                    <button type="button" onClick={() => setPolygonAsk(null)} className="geo-chip">
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
