@@ -34,6 +34,17 @@ export const EMPTY_GATE: PointerGate = { activeId: null, lastPenAt: 0, penSeen: 
  */
 export const PEN_GUARD_MS = 1500
 
+/**
+ * นี่คือฝ่ามือที่วางบนจอระหว่างเขียนด้วยปากกาหรือเปล่า
+ *
+ * ต้องเช็ค penSeen ด้วย ไม่ใช่ดูแค่เวลาที่ผ่านไปจาก lastPenAt
+ * เพราะห้องที่ไม่มีปากกาเลย lastPenAt จะเป็นศูนย์ตลอด
+ * ถ้าเทียบเวลาอย่างเดียว นิ้วจะถูกกันทิ้งทั้งห้องโดยไม่มีปากกาสักด้าม
+ */
+export function isPalmDuringPen(gate: PointerGate, kind: PointerKind, now: number): boolean {
+  return kind === 'touch' && gate.penSeen && now - gate.lastPenAt < PEN_GUARD_MS
+}
+
 /** สัญญาณนี้ควรถูกทิ้งไปไหม */
 export function shouldIgnorePointer(
   gate: PointerGate,
@@ -41,14 +52,7 @@ export function shouldIgnorePointer(
   kind: PointerKind,
   now: number,
 ): boolean {
-  /*
-   * ฝ่ามือที่วางบนจอระหว่างเขียนด้วยปากกา
-   *
-   * ต้องเช็ค penSeen ด้วย ไม่ใช่ดูแค่เวลาที่ผ่านไปจาก lastPenAt
-   * เพราะห้องที่ไม่มีปากกาเลย lastPenAt จะเป็นศูนย์ตลอด
-   * ถ้าเทียบเวลาอย่างเดียว นิ้วจะถูกกันทิ้งทั้งห้องโดยไม่มีปากกาสักด้าม
-   */
-  if (kind === 'touch' && gate.penSeen && now - gate.lastPenAt < PEN_GUARD_MS) return true
+  if (isPalmDuringPen(gate, kind, now)) return true
   /* กำลังลากด้วยอย่างหนึ่งอยู่ นิ้วที่แตะเพิ่มเข้ามาต้องไม่แย่งงาน */
   if (gate.activeId !== null && pointerId !== gate.activeId) return true
   return false

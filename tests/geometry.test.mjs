@@ -40,6 +40,7 @@ const B = load('geometry/board')
 const T = load('geometry/tools')
 const M = load('geometry/missions')
 const I = load('geometry/input')
+const W = load('geometry/view')
 
 let passed = 0
 const failures = []
@@ -503,6 +504,90 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* ซูมและการเลื่อนกระดาษ                                              */
+/* ---------------------------------------------------------------- */
+
+const PAPER_W = 1000
+const PAPER_H = 680
+
+check('ซูมแล้วจุดที่เล็งอยู่ต้องอยู่ที่เดิม', () => {
+  /*
+   * ข้อนี้คือหัวใจของการซูม ถ้าจุดที่เล็งไว้ขยับ เด็กจะหาสิ่งที่กำลังดูอยู่ไม่เจอ
+   * ทุกครั้งที่ซูม ซึ่งแย่กว่าการไม่มีปุ่มซูมเสียอีก
+   */
+  const focus = { x: 700, y: 200 }
+  let view = W.DEFAULT_VIEW
+  /* หาว่าจุดนี้อยู่ตรงสัดส่วนไหนของจอก่อนซูม */
+  const before = { x: (focus.x - view.x) / PAPER_W, y: (focus.y - view.y) / PAPER_H }
+
+  view = W.zoomAt(view, 2, focus, PAPER_W, PAPER_H)
+  const size = W.visibleSize(view, PAPER_W, PAPER_H)
+  const after = { x: (focus.x - view.x) / size.width, y: (focus.y - view.y) / size.height }
+
+  close(after.x, before.x, 0.0001, 'จุดที่เล็งไว้เลื่อนไปทางแนวนอน')
+  close(after.y, before.y, 0.0001, 'จุดที่เล็งไว้เลื่อนไปทางแนวดิ่ง')
+  close(view.scale, 2, 0.0001, 'กำลังขยายไม่ตรง')
+})
+
+check('ซูมต้องไม่เกินขอบเขตที่ตั้งไว้', () => {
+  let view = W.DEFAULT_VIEW
+  for (let i = 0; i < 20; i += 1) view = W.zoomAt(view, 2, { x: 500, y: 340 }, PAPER_W, PAPER_H)
+  close(view.scale, W.MAX_SCALE, 0.0001, 'ขยายเกินเพดาน')
+
+  for (let i = 0; i < 40; i += 1) view = W.zoomAt(view, 0.5, { x: 500, y: 340 }, PAPER_W, PAPER_H)
+  close(view.scale, W.MIN_SCALE, 0.0001, 'ย่อเกินพื้น')
+})
+
+check('ย่อจนกระดาษเล็กกว่าจอ ต้องจัดกึ่งกลางให้เอง', () => {
+  /* กระดาษที่ลอยไปอยู่มุมจอ เป็นสิ่งที่เด็กแก้กลับเองไม่ได้ */
+  const view = W.clampView({ scale: 0.5, x: 900, y: -900 }, PAPER_W, PAPER_H)
+  close(view.x, (PAPER_W - PAPER_W / 0.5) / 2, 0.0001, 'ไม่ได้จัดกึ่งกลางแนวนอน')
+  close(view.y, (PAPER_H - PAPER_H / 0.5) / 2, 0.0001, 'ไม่ได้จัดกึ่งกลางแนวดิ่ง')
+})
+
+check('เลื่อนกระดาษต้องไม่หลุดไปจนมองไม่เห็นกระดาษ', () => {
+  let view = { scale: 2, x: 250, y: 170 }
+  view = W.panBy(view, 100000, 100000, PAPER_W, PAPER_H)
+  const size = W.visibleSize(view, PAPER_W, PAPER_H)
+  assert(view.x <= PAPER_W - size.width + W.PAN_MARGIN + 0.001, 'เลื่อนเลยขอบขวาไปไกลเกิน')
+  assert(view.y <= PAPER_H - size.height + W.PAN_MARGIN + 0.001, 'เลื่อนเลยขอบล่างไปไกลเกิน')
+
+  view = W.panBy(view, -100000, -100000, PAPER_W, PAPER_H)
+  assert(view.x >= -W.PAN_MARGIN - 0.001, 'เลื่อนเลยขอบซ้ายไปไกลเกิน')
+  assert(view.y >= -W.PAN_MARGIN - 0.001, 'เลื่อนเลยขอบบนไปไกลเกิน')
+})
+
+check('แปลงตำแหน่งบนจอเป็นพิกัดกระดาษ ต้องตรงกับ viewBox ที่ใช้วาดจริง', () => {
+  const view = W.zoomAt(W.DEFAULT_VIEW, 2, { x: 500, y: 340 }, PAPER_W, PAPER_H)
+  const box = W.viewBoxOf(view, PAPER_W, PAPER_H).split(' ').map(Number)
+
+  /* มุมบนซ้ายของจอ คือมุมบนซ้ายของ viewBox */
+  const topLeft = W.screenToPaper(view, 0, 0, PAPER_W, PAPER_H)
+  close(topLeft.x, box[0], 0.01, 'มุมบนซ้ายไม่ตรงกับ viewBox')
+  close(topLeft.y, box[1], 0.01, 'มุมบนซ้ายไม่ตรงกับ viewBox')
+
+  /* มุมล่างขวาของจอ คือมุมบนซ้ายบวกขนาดของ viewBox */
+  const bottomRight = W.screenToPaper(view, 1, 1, PAPER_W, PAPER_H)
+  close(bottomRight.x, box[0] + box[2], 0.01, 'มุมล่างขวาไม่ตรงกับ viewBox')
+  close(bottomRight.y, box[1] + box[3], 0.01, 'มุมล่างขวาไม่ตรงกับ viewBox')
+})
+
+check('หนีบสองนิ้วแล้ว จุดกึ่งกลางนิ้วต้องยังเป็นจุดเดิมบนกระดาษ', () => {
+  /* จำลองการหนีบ จุดกระดาษที่อยู่ใต้กึ่งกลางนิ้วตอนเริ่ม ต้องตามนิ้วไปเสมอ */
+  const held = { x: 620, y: 240 }
+  const view = W.viewPlacing(2.5, held, 0.3, 0.7, PAPER_W, PAPER_H)
+  const size = W.visibleSize(view, PAPER_W, PAPER_H)
+  close(view.x + 0.3 * size.width, held.x, 0.0001, 'จุดที่หนีบไว้เลื่อนไปทางแนวนอน')
+  close(view.y + 0.7 * size.height, held.y, 0.0001, 'จุดที่หนีบไว้เลื่อนไปทางแนวดิ่ง')
+})
+
+check('ป้ายเปอร์เซ็นต์ต้องอ่านง่าย', () => {
+  assert(W.zoomLabel({ scale: 1, x: 0, y: 0 }) === '100%', 'ขนาดปกติต้องเป็น 100%')
+  assert(W.zoomLabel({ scale: 2.5, x: 0, y: 0 }) === '250%', 'สองเท่าครึ่งต้องเป็น 250%')
+  assert(W.zoomLabel({ scale: 0.5, x: 0, y: 0 }) === '50%', 'ครึ่งหนึ่งต้องเป็น 50%')
 })
 
 /* ---------------------------------------------------------------- */
