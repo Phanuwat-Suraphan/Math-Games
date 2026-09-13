@@ -94,6 +94,7 @@ const REQUIRED_CLASSES = [
   'geo-ruler',
   'geo-compass',
   'geo-cursor',
+  'geo-zoom',
 
   // ตัวอักษรและเส้นคั่น
   'title-hero',

@@ -31,16 +31,29 @@ import {
   beginPointer,
   endPointer,
   isEraserTip,
+  isPalmDuringPen,
   noteInput,
   pointerKind,
   shouldIgnorePointer,
 } from '../geometry/input'
 import type { PointerGate } from '../geometry/input'
+import {
+  DEFAULT_VIEW,
+  clampScale,
+  panBy,
+  screenToPaper,
+  viewBoxOf,
+  viewPlacing,
+  zoomAt,
+  zoomLabel,
+} from '../geometry/view'
+import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
 import { PENCIL_COLORS, PENCIL_WIDTHS, TOOLS, findTool } from '../geometry/tools'
 import type { ToolId } from '../geometry/tools'
 import {
+  HIT_TOLERANCE,
   describeBoard,
   describeShape,
   findShapeAt,
@@ -102,6 +115,8 @@ type Drag =
   | { kind: 'pen'; start: Point; end: Point; guided: boolean }
   | { kind: 'regular'; center: Point; edge: Point }
   /** ลากเข็มเพื่อย้ายวงเวียน โดย grab คือระยะเยื้องจากปลายนิ้วถึงเข็ม */
+  /** ลากกระดาษไปมาตอนซูมเข้า เก็บจุดเริ่มเป็นพิกัดบนจอ เพราะพิกัดกระดาษขยับตามไปด้วย */
+  | { kind: 'pan'; startClient: Point; startView: View }
   | { kind: 'compass-move'; grab: Point }
   /** ลากขาดินสอเพื่อกางรัศมี ไม่มีการวาดเกิดขึ้น */
   | { kind: 'compass-spread' }
@@ -145,6 +160,7 @@ export function GeometryStudio() {
   const [cursor, setCursor] = useState<{ point: Point; onTarget: boolean } | null>(null)
   /** เคยเห็นปากกาในคาบนี้แล้ว ใช้บอกผู้ใช้ว่าโหมดกันฝ่ามือทำงานอยู่ */
   const [penMode, setPenMode] = useState(false)
+  const [view, setView] = useState<View>(DEFAULT_VIEW)
   const [cheering, setCheering] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [missionIndex, setMissionIndex] = useState(0)
@@ -163,6 +179,18 @@ export function GeometryStudio() {
    * ถ้าเก็บเป็น state หน้าจอจะถูกวาดใหม่เพิ่มอีกรอบโดยที่ไม่มีอะไรบนจอเปลี่ยนเลย
    */
   const gateRef = useRef<PointerGate>(EMPTY_GATE)
+  /* สำเนาของมุมมองล่าสุด ไว้ให้ตัวรับล้อเมาส์ซึ่งผูกไว้ครั้งเดียวอ่านค่าปัจจุบันได้ */
+  const viewRef = useRef<View>(DEFAULT_VIEW)
+  /** นิ้วที่แตะอยู่ตอนนี้ทั้งหมด ใช้ดูว่ามีสองนิ้วหนีบเพื่อซูมหรือเปล่า */
+  const touchesRef = useRef(new Map<number, { x: number; y: number }>())
+  /** ท่าหนีบสองนิ้วที่กำลังทำอยู่ */
+  const pinchRef = useRef<{
+    startDistance: number
+    startView: View
+    startPaper: Point
+  } | null>(null)
+
+  viewRef.current = view
   const noticeTimer = useRef<number | null>(null)
 
   const toolInfo = findTool(tool)
@@ -216,10 +244,39 @@ export function GeometryStudio() {
     if (!svg) return { x: 0, y: 0 }
     const rect = svg.getBoundingClientRect()
     if (rect.width === 0 || rect.height === 0) return { x: 0, y: 0 }
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * VIEW_WIDTH,
-      y: ((event.clientY - rect.top) / rect.height) * VIEW_HEIGHT,
-    }
+    return screenToPaper(
+      viewRef.current,
+      (event.clientX - rect.left) / rect.width,
+      (event.clientY - rect.top) / rect.height,
+      VIEW_WIDTH,
+      VIEW_HEIGHT,
+    )
+  }
+
+  /*
+   * ระยะดูดและระยะจิ้มโดน ต้องหารด้วยกำลังขยายเสมอ
+   *
+   * ค่าพวกนี้เป็นพิกัดกระดาษ แต่สิ่งที่ต้องคงที่คือระยะบนจอที่นิ้วเอื้อมถึง
+   * ถ้าไม่หาร ตอนย่อจอครึ่งหนึ่งจะจิ้มโดนยากขึ้นเท่าตัว
+   * และตอนขยายสี่เท่าจะดูดจุดที่อยู่ห่างออกไปตั้งสี่เซนติเมตรบนกระดาษจริง
+   */
+  const anchorRange = ANCHOR_RADIUS / view.scale
+  const hitRange = HIT_TOLERANCE / view.scale
+
+  /** จุดกระดาษที่อยู่กลางจอตอนนี้ ใช้เป็นจุดตรึงตอนซูมด้วยปุ่ม */
+  function centerOfView(): Point {
+    return screenToPaper(viewRef.current, 0.5, 0.5, VIEW_WIDTH, VIEW_HEIGHT)
+  }
+
+  /** ซูมโดยตรึงจุดที่เล็งอยู่ไว้กับที่ */
+  function zoomBy(factor: number) {
+    setView(zoomAt(viewRef.current, factor, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+    playSfx('click')
+  }
+
+  function resetView() {
+    setView(DEFAULT_VIEW)
+    playSfx('click')
   }
 
   const rulerStart = ruler.origin
@@ -237,10 +294,10 @@ export function GeometryStudio() {
    * แต่มันไม่ได้ถูกวาดไว้ให้เห็น ถ้าไม่ดูดให้ เด็กจะกะเอาเองแล้วรูปเพี้ยน
    */
   function snapWithInfo(p: Point): { point: Point; onTarget: boolean } {
-    const target = nearestSnapPoint(board.shapes, p, ANCHOR_RADIUS)
+    const target = nearestSnapPoint(board.shapes, p, anchorRange)
     if (target) return { point: target, onTarget: true }
     for (const point of draft) {
-      if (distance(point, p) <= ANCHOR_RADIUS) return { point, onTarget: true }
+      if (distance(point, p) <= anchorRange) return { point, onTarget: true }
     }
     return { point: snapOn ? snapToGrid(p, GRID_STEP) : p, onTarget: false }
   }
@@ -251,7 +308,7 @@ export function GeometryStudio() {
 
   /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
   function penEnd(start: Point, raw: Point, guided: boolean): Point {
-    const target = nearestSnapPoint(board.shapes, raw, ANCHOR_RADIUS)
+    const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
     return guided ? projectOnLine(end, rulerStart, rulerEnd) : end
   }
@@ -316,9 +373,77 @@ export function GeometryStudio() {
     setDraft([])
   }
 
+  /** ระยะและจุดกึ่งกลางของสองนิ้วที่แตะอยู่ หน่วยเป็นพิกเซลบนจอ */
+  function touchSpan(): { distance: number; middle: Point } | null {
+    const points = [...touchesRef.current.values()]
+    if (points.length < 2) return null
+    const [a, b] = points
+    return {
+      distance: Math.hypot(b.x - a.x, b.y - a.y),
+      middle: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+    }
+  }
+
+  /**
+   * เริ่มท่าหนีบสองนิ้ว
+   *
+   * เส้นที่กำลังลากค้างอยู่ด้วยนิ้วแรกถูกทิ้งไป เพราะนิ้วที่สองที่แตะเข้ามา
+   * แปลว่าเด็กเปลี่ยนใจไปซูมแล้ว ไม่ได้ตั้งใจจะได้เส้นนั้น
+   */
+  function startPinch() {
+    const span = touchSpan()
+    const svg = svgRef.current
+    if (!span || !svg) return
+    const rect = svg.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    pinchRef.current = {
+      startDistance: span.distance,
+      startView: viewRef.current,
+      startPaper: screenToPaper(
+        viewRef.current,
+        (span.middle.x - rect.left) / rect.width,
+        (span.middle.y - rect.top) / rect.height,
+        VIEW_WIDTH,
+        VIEW_HEIGHT,
+      ),
+    }
+    setDrag({ kind: 'none' })
+    setCursor(null)
+  }
+
+  /** ระหว่างหนีบ ระยะระหว่างนิ้วคือกำลังขยาย จุดกึ่งกลางคือจุดที่ตรึงไว้ */
+  function updatePinch() {
+    const pinch = pinchRef.current
+    const span = touchSpan()
+    const svg = svgRef.current
+    if (!pinch || !span || !svg || pinch.startDistance === 0) return
+    const rect = svg.getBoundingClientRect()
+    if (rect.width === 0 || rect.height === 0) return
+    setView(
+      viewPlacing(
+        clampScale(pinch.startView.scale * (span.distance / pinch.startDistance)),
+        pinch.startPaper,
+        (span.middle.x - rect.left) / rect.width,
+        (span.middle.y - rect.top) / rect.height,
+        VIEW_WIDTH,
+        VIEW_HEIGHT,
+      ),
+    )
+  }
+
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     const kind = pointerKind(event.pointerType)
     const now = Date.now()
+
+    /* จดนิ้วที่แตะไว้ก่อนเข้าด่านกรอง เพราะนิ้วที่สองคือสัญญาณว่าจะหนีบซูม ไม่ใช่สัญญาณที่ต้องทิ้ง */
+    if (kind === 'touch' && !isPalmDuringPen(gateRef.current, kind, now)) {
+      touchesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+      if (touchesRef.current.size >= 2) {
+        startPinch()
+        return
+      }
+    }
+
     /* ฝ่ามือที่วางบนจอระหว่างเขียนด้วยปากกา ต้องไม่กลายเป็นเส้นที่ไม่มีใครตั้งใจวาด */
     if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
     gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
@@ -329,9 +454,19 @@ export function GeometryStudio() {
     setPointer(raw)
     setCursor(cursorAt(raw))
 
+    /* ปุ่มกลางของเมาส์ใช้เลื่อนกระดาษได้ทุกเครื่องมือ เหมือนโปรแกรมวาดรูปทั่วไป */
+    if (tool === 'pan' || event.button === 1) {
+      setDrag({
+        kind: 'pan',
+        startClient: { x: event.clientX, y: event.clientY },
+        startView: viewRef.current,
+      })
+      return
+    }
+
     /* พลิกปากกาใช้ด้านยางลบ ลบได้เลยโดยไม่ต้องเปลี่ยนเครื่องมือ */
     if (isEraserTip(kind, event.buttons)) {
-      const found = findShapeAt(board.shapes, raw)
+      const found = findShapeAt(board.shapes, raw, hitRange)
       if (found) {
         dispatch({ type: 'remove', id: found.id })
         if (selectedId === found.id) setSelectedId(null)
@@ -342,7 +477,7 @@ export function GeometryStudio() {
 
     switch (tool) {
       case 'select': {
-        const found = findShapeAt(board.shapes, raw)
+        const found = findShapeAt(board.shapes, raw, hitRange)
         setSelectedId(found ? found.id : null)
         /*
          * ยังไม่จดประวัติตรงนี้ รอจนกว่านิ้วจะขยับจริง
@@ -382,7 +517,7 @@ export function GeometryStudio() {
 
       case 'polygon': {
         const point = snapPoint(raw)
-        if (draft.length >= 3 && distance(point, draft[0]) <= ANCHOR_RADIUS + 6) {
+        if (draft.length >= 3 && distance(point, draft[0]) <= anchorRange + 6 / view.scale) {
           closeDraftPolygon()
           return
         }
@@ -427,7 +562,7 @@ export function GeometryStudio() {
       }
 
       case 'eraser': {
-        const found = findShapeAt(board.shapes, raw)
+        const found = findShapeAt(board.shapes, raw, hitRange)
         if (!found) return
         dispatch({ type: 'remove', id: found.id })
         if (selectedId === found.id) setSelectedId(null)
@@ -450,6 +585,15 @@ export function GeometryStudio() {
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
     const kind = pointerKind(event.pointerType)
     const now = Date.now()
+
+    if (kind === 'touch' && touchesRef.current.has(event.pointerId)) {
+      touchesRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    }
+    if (pinchRef.current) {
+      updatePinch()
+      return
+    }
+
     if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
     gateRef.current = noteInput(gateRef.current, kind, now)
     if (kind === 'pen' && !penMode) setPenMode(true)
@@ -466,6 +610,25 @@ export function GeometryStudio() {
       case 'regular':
         setDrag({ kind: 'regular', center: drag.center, edge: raw })
         return
+
+      case 'pan': {
+        const svg = svgRef.current
+        if (!svg) return
+        const rect = svg.getBoundingClientRect()
+        if (rect.width === 0) return
+        /* หนึ่งพิกเซลบนจอ เท่ากับกี่หน่วยบนกระดาษ ขึ้นกับกำลังขยายตอนเริ่มลาก */
+        const perPixel = VIEW_WIDTH / drag.startView.scale / rect.width
+        setView(
+          panBy(
+            drag.startView,
+            -(event.clientX - drag.startClient.x) * perPixel,
+            -(event.clientY - drag.startClient.y) * perPixel,
+            VIEW_WIDTH,
+            VIEW_HEIGHT,
+          ),
+        )
+        return
+      }
 
       case 'compass-move':
         setCompass({
@@ -539,6 +702,13 @@ export function GeometryStudio() {
 
   function handlePointerUp(event: ReactPointerEvent<SVGSVGElement>) {
     const kind = pointerKind(event.pointerType)
+
+    /* ต้องเอานิ้วออกจากรายการก่อนด่านกรอง ไม่งั้นนิ้วที่สองจะค้างอยู่ตลอดกาล */
+    if (kind === 'touch') {
+      touchesRef.current.delete(event.pointerId)
+      if (touchesRef.current.size < 2) pinchRef.current = null
+    }
+
     if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, Date.now())) return
     gateRef.current = endPointer(gateRef.current, event.pointerId)
 
@@ -593,6 +763,8 @@ export function GeometryStudio() {
    * ต้องคืนสิทธิ์ให้ตัวถัดไป ไม่งั้นจะวาดอะไรไม่ได้อีกเลยจนกว่าจะรีเฟรช
    */
   function handlePointerCancel(event: ReactPointerEvent<SVGSVGElement>) {
+    touchesRef.current.delete(event.pointerId)
+    if (touchesRef.current.size < 2) pinchRef.current = null
     gateRef.current = endPointer(gateRef.current, event.pointerId)
     setDrag({ kind: 'none' })
     setCursor(null)
@@ -738,6 +910,11 @@ export function GeometryStudio() {
     const clone = svg.cloneNode(true) as SVGSVGElement
     clone.setAttribute('width', String(VIEW_WIDTH))
     clone.setAttribute('height', String(VIEW_HEIGHT))
+    /*
+     * ภาพที่บันทึกต้องเป็นกระดาษทั้งแผ่นเสมอ ไม่ใช่เฉพาะส่วนที่ซูมค้างไว้ตอนกดปุ่ม
+     * ไม่งั้นเด็กที่ซูมดูมุมหนึ่งอยู่ จะได้ไฟล์ที่มีแต่มุมนั้นโดยไม่รู้ตัว
+     */
+    clone.setAttribute('viewBox', `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`)
     for (const node of Array.from(clone.querySelectorAll('.geo-no-export'))) {
       node.remove()
     }
@@ -774,6 +951,35 @@ export function GeometryStudio() {
     image.src = url
   }
 
+  /**
+   * ล้อเมาส์คือซูม
+   *
+   * ต้องผูกเองด้วย passive: false เพราะตัวรับของ React เป็นแบบ passive
+   * ซึ่งสั่ง preventDefault ไม่ได้ แล้วหน้าเว็บทั้งหน้าจะเลื่อนตามล้อไปด้วย
+   * กลายเป็นซูมกระดาษพร้อมกับหน้าเลื่อนหนีไปข้างล่างในเวลาเดียวกัน
+   */
+  useEffect(() => {
+    const svg = svgRef.current
+    if (!svg) return
+
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const rect = svg.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+      const focus = screenToPaper(
+        viewRef.current,
+        (event.clientX - rect.left) / rect.width,
+        (event.clientY - rect.top) / rect.height,
+        VIEW_WIDTH,
+        VIEW_HEIGHT,
+      )
+      setView(zoomAt(viewRef.current, event.deltaY < 0 ? 1.15 : 1 / 1.15, focus, VIEW_WIDTH, VIEW_HEIGHT))
+    }
+
+    svg.addEventListener('wheel', onWheel, { passive: false })
+    return () => svg.removeEventListener('wheel', onWheel)
+  }, [])
+
   /* ปุ่มลัดสำหรับครูที่ใช้คีย์บอร์ด เด็กใช้ปุ่มบนจอได้เหมือนกัน */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -787,6 +993,19 @@ export function GeometryStudio() {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
         event.preventDefault()
         dispatch({ type: event.shiftKey ? 'redo' : 'undo' })
+        return
+      }
+      if (event.ctrlKey || event.metaKey) {
+        if (event.key === '+' || event.key === '=') {
+          event.preventDefault()
+          setView(zoomAt(viewRef.current, 1.25, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+        } else if (event.key === '-') {
+          event.preventDefault()
+          setView(zoomAt(viewRef.current, 1 / 1.25, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+        } else if (event.key === '0') {
+          event.preventDefault()
+          setView(DEFAULT_VIEW)
+        }
       }
     }
     window.addEventListener('keydown', onKeyDown)
@@ -1056,7 +1275,7 @@ export function GeometryStudio() {
             */}
             <svg
               ref={svgRef}
-              viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
+              viewBox={viewBoxOf(view, VIEW_WIDTH, VIEW_HEIGHT)}
               className="geo-canvas w-full"
               role="application"
               aria-label="กระดาษวาดรูปเรขาคณิต"
@@ -1226,6 +1445,7 @@ export function GeometryStudio() {
                     color={color}
                     onTarget={cursor.onTarget}
                     drawing={drag.kind !== 'none'}
+                    scale={view.scale}
                   />
                 ) : null}
               </g>
@@ -1233,6 +1453,28 @@ export function GeometryStudio() {
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <div className="geo-zoom">
+              <button
+                type="button"
+                onClick={() => zoomBy(1 / 1.25)}
+                aria-label="ย่อกระดาษ"
+                title="ย่อ (Ctrl และ -)"
+              >
+                −
+              </button>
+              <span aria-live="polite">{zoomLabel(view)}</span>
+              <button
+                type="button"
+                onClick={() => zoomBy(1.25)}
+                aria-label="ขยายกระดาษ"
+                title="ขยาย (Ctrl และ +)"
+              >
+                +
+              </button>
+              <button type="button" onClick={resetView} title="กลับมาเห็นทั้งแผ่น (Ctrl และ 0)">
+                พอดีจอ
+              </button>
+            </div>
             <span className="geo-badge">{toolInfo.emoji} {toolInfo.label}</span>
             {penMode ? (
               <span className="geo-badge" title="ฝ่ามือที่วางบนจอระหว่างเขียนจะไม่กลายเป็นเส้น">
