@@ -1219,8 +1219,21 @@ html[data-animations='off'] *::after {
   border-radius: 18px;
   background: #fffdf7;
   touch-action: none;
-  cursor: crosshair;
   user-select: none;
+  -webkit-touch-callout: none;
+  /*
+   * ซ่อนเคอร์เซอร์ของระบบ แล้ววาดวงแหวนของเราเองแทน
+   *
+   * กากบาทของระบบเป็นเส้นดำบาง ๆ ที่เด็กแถวหลังมองไม่เห็นบนจอโปรเจกเตอร์
+   * และมันไม่รู้เรื่องแม่เหล็ก จึงชี้คนละที่กับจุดที่ปลายดินสอจะลงจริง
+   * ตอนแม่เหล็กจับจุดตัดของส่วนโค้งไว้ ระยะต่างกันได้ถึงสิบกว่าพิกเซล
+   */
+  cursor: none;
+}
+
+/* วงแหวนเคอร์เซอร์ไม่ควรรับการคลิก มันเป็นแค่ภาพบอกตำแหน่ง */
+.geo-cursor {
+  pointer-events: none;
 }
 
 .geo-protractor,

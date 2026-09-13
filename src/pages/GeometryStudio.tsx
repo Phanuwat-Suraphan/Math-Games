@@ -24,7 +24,18 @@ import { ProtractorOverlay } from '../geometry/ProtractorOverlay'
 import type { ProtractorPart } from '../geometry/ProtractorOverlay'
 import { RulerOverlay } from '../geometry/RulerOverlay'
 import type { RulerPart } from '../geometry/RulerOverlay'
-import { ShapeView } from '../geometry/ShapeView'
+import { PointerCursor } from '../geometry/PointerCursor'
+import { ShapesLayer } from '../geometry/ShapesLayer'
+import {
+  EMPTY_GATE,
+  beginPointer,
+  endPointer,
+  isEraserTip,
+  noteInput,
+  pointerKind,
+  shouldIgnorePointer,
+} from '../geometry/input'
+import type { PointerGate } from '../geometry/input'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
 import { PENCIL_COLORS, PENCIL_WIDTHS, TOOLS, findTool } from '../geometry/tools'
@@ -130,6 +141,10 @@ export function GeometryStudio() {
   })
   const [drag, setDrag] = useState<Drag>({ kind: 'none' })
   const [pointer, setPointer] = useState<Point | null>(null)
+  /** ตำแหน่งที่ปลายดินสอจะลงจริง หลังผ่านแม่เหล็กแล้ว ใช้วาดวงแหวนเคอร์เซอร์ */
+  const [cursor, setCursor] = useState<{ point: Point; onTarget: boolean } | null>(null)
+  /** เคยเห็นปากกาในคาบนี้แล้ว ใช้บอกผู้ใช้ว่าโหมดกันฝ่ามือทำงานอยู่ */
+  const [penMode, setPenMode] = useState(false)
   const [cheering, setCheering] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [missionIndex, setMissionIndex] = useState(0)
@@ -143,6 +158,11 @@ export function GeometryStudio() {
    */
   const labelRef = useRef(0)
   const cheerTimer = useRef<number | null>(null)
+  /*
+   * ด่านกรองสัญญาณ เก็บใน ref ไม่ใช่ state เพราะมันเปลี่ยนทุกเหตุการณ์ของปลายปากกา
+   * ถ้าเก็บเป็น state หน้าจอจะถูกวาดใหม่เพิ่มอีกรอบโดยที่ไม่มีอะไรบนจอเปลี่ยนเลย
+   */
+  const gateRef = useRef<PointerGate>(EMPTY_GATE)
   const noticeTimer = useRef<number | null>(null)
 
   const toolInfo = findTool(tool)
@@ -216,13 +236,17 @@ export function GeometryStudio() {
    * จุดตัดสำคัญมากในงานวงเวียน เพราะเป็นปลายทางของเส้นที่ต้องลากเกือบทุกครั้ง
    * แต่มันไม่ได้ถูกวาดไว้ให้เห็น ถ้าไม่ดูดให้ เด็กจะกะเอาเองแล้วรูปเพี้ยน
    */
-  function snapPoint(p: Point): Point {
+  function snapWithInfo(p: Point): { point: Point; onTarget: boolean } {
     const target = nearestSnapPoint(board.shapes, p, ANCHOR_RADIUS)
-    if (target) return target
+    if (target) return { point: target, onTarget: true }
     for (const point of draft) {
-      if (distance(point, p) <= ANCHOR_RADIUS) return point
+      if (distance(point, p) <= ANCHOR_RADIUS) return { point, onTarget: true }
     }
-    return snapOn ? snapToGrid(p, GRID_STEP) : p
+    return { point: snapOn ? snapToGrid(p, GRID_STEP) : p, onTarget: false }
+  }
+
+  function snapPoint(p: Point): Point {
+    return snapWithInfo(p).point
   }
 
   /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
@@ -293,8 +317,28 @@ export function GeometryStudio() {
   }
 
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    /* ฝ่ามือที่วางบนจอระหว่างเขียนด้วยปากกา ต้องไม่กลายเป็นเส้นที่ไม่มีใครตั้งใจวาด */
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+    if (kind === 'pen' && !penMode) setPenMode(true)
+
     const raw = toPaper(event)
     svgRef.current?.setPointerCapture(event.pointerId)
+    setPointer(raw)
+    setCursor(cursorAt(raw))
+
+    /* พลิกปากกาใช้ด้านยางลบ ลบได้เลยโดยไม่ต้องเปลี่ยนเครื่องมือ */
+    if (isEraserTip(kind, event.buttons)) {
+      const found = findShapeAt(board.shapes, raw)
+      if (found) {
+        dispatch({ type: 'remove', id: found.id })
+        if (selectedId === found.id) setSelectedId(null)
+        playSfx('click')
+      }
+      return
+    }
 
     switch (tool) {
       case 'select': {
@@ -396,14 +440,23 @@ export function GeometryStudio() {
     }
   }
 
+  /** ตำแหน่งและสถานะของวงแหวนเคอร์เซอร์ ณ จุดที่ปลายปากกาอยู่ */
+  function cursorAt(raw: Point): { point: Point; onTarget: boolean } {
+    /* สองเครื่องมือนี้ไม่ได้วาดอะไร จึงไม่ควรหลอกว่าปลายดินสอจะไปลงที่จุดอื่น */
+    if (tool === 'select' || tool === 'eraser') return { point: raw, onTarget: false }
+    return snapWithInfo(raw)
+  }
+
   function handlePointerMove(event: ReactPointerEvent<SVGSVGElement>) {
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = noteInput(gateRef.current, kind, now)
+    if (kind === 'pen' && !penMode) setPenMode(true)
+
     const raw = toPaper(event)
-    /*
-     * เก็บตำแหน่งนิ้วเฉพาะตอนที่มีของรอใช้ค่านี้จริง ๆ
-     * คือเส้นยางยืดของรูปหลายเหลี่ยม กับขีดองศาที่สว่างขึ้นบนครึ่งวงกลม
-     * ถ้าเก็บทุกครั้ง หน้าจอจะวาดใหม่ทั้งหน้าทุกการขยับนิ้ว โดยไม่มีอะไรเปลี่ยน
-     */
-    if (tool === 'polygon' || showProtractor) setPointer(raw)
+    setPointer(raw)
+    setCursor(cursorAt(raw))
 
     switch (drag.kind) {
       case 'pen':
@@ -485,6 +538,10 @@ export function GeometryStudio() {
   }
 
   function handlePointerUp(event: ReactPointerEvent<SVGSVGElement>) {
+    const kind = pointerKind(event.pointerType)
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, Date.now())) return
+    gateRef.current = endPointer(gateRef.current, event.pointerId)
+
     const raw = toPaper(event)
 
     switch (drag.kind) {
@@ -531,8 +588,23 @@ export function GeometryStudio() {
    * เข็มคือย้าย ขาดินสอคือกาง หัวกับปลายดินสอคือหมุนวาด
    * การแยกแบบนี้ทำให้ "แตะแล้วมีเส้นโผล่มาโดยไม่ได้ตั้งใจ" หมดไป
    */
+  /**
+   * ระบบยึดสัญญาณไปเอง เช่น นิ้วที่สองแตะจอ หรือปากกาหลุดออกนอกจอ
+   * ต้องคืนสิทธิ์ให้ตัวถัดไป ไม่งั้นจะวาดอะไรไม่ได้อีกเลยจนกว่าจะรีเฟรช
+   */
+  function handlePointerCancel(event: ReactPointerEvent<SVGSVGElement>) {
+    gateRef.current = endPointer(gateRef.current, event.pointerId)
+    setDrag({ kind: 'none' })
+    setCursor(null)
+  }
+
   function handleCompassGrab(part: CompassPart, event: ReactPointerEvent<SVGElement>) {
     event.stopPropagation()
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+
     const raw = toPaper(event)
     svgRef.current?.setPointerCapture(event.pointerId)
 
@@ -556,6 +628,11 @@ export function GeometryStudio() {
 
   function handleProtractorGrab(part: ProtractorPart, event: ReactPointerEvent<SVGElement>) {
     event.stopPropagation()
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+
     const raw = toPaper(event)
     svgRef.current?.setPointerCapture(event.pointerId)
 
@@ -587,6 +664,11 @@ export function GeometryStudio() {
 
   function handleRulerGrab(part: RulerPart, event: ReactPointerEvent<SVGElement>) {
     event.stopPropagation()
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+
     const raw = toPaper(event)
     svgRef.current?.setPointerCapture(event.pointerId)
     setDrag({
@@ -968,6 +1050,10 @@ export function GeometryStudio() {
         {/* กระดาษวาด */}
         <main className="order-1 lg:order-2">
           <div className="geo-paper-frame">
+            {/*
+              onContextMenu ถูกปิดไว้เพราะการกดค้างด้วยปากกาหรือนิ้วบนวินโดวส์
+              จะเด้งเมนูคลิกขวาขึ้นมากลางการวาด แล้วเส้นที่กำลังลากอยู่จะขาดตรงนั้นพอดี
+            */}
             <svg
               ref={svgRef}
               viewBox={`0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`}
@@ -977,7 +1063,12 @@ export function GeometryStudio() {
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
-              onPointerLeave={() => setPointer(null)}
+              onPointerCancel={handlePointerCancel}
+              onPointerLeave={() => {
+                setPointer(null)
+                setCursor(null)
+              }}
+              onContextMenu={(event) => event.preventDefault()}
             >
               <defs>
                 <pattern id="geo-grid-small" width={GRID_STEP} height={GRID_STEP} patternUnits="userSpaceOnUse">
@@ -1006,15 +1097,12 @@ export function GeometryStudio() {
                 </g>
               ) : null}
 
-              {board.shapes.map((shape) => (
-                <ShapeView
-                  key={shape.id}
-                  shape={shape}
-                  selected={shape.id === selectedId}
-                  showLengths={showLengths}
-                  showAngles={showAngles}
-                />
-              ))}
+              <ShapesLayer
+                shapes={board.shapes}
+                selectedId={selectedId}
+                showLengths={showLengths}
+                showAngles={showAngles}
+              />
 
               {/* ของชั่วคราวระหว่างวาด ไม่ติดไปในไฟล์ภาพที่บันทึก */}
               <g className="geo-no-export">
@@ -1130,12 +1218,27 @@ export function GeometryStudio() {
                     onGrab={handleProtractorGrab}
                   />
                 ) : null}
+
+                {/* วงแหวนเคอร์เซอร์อยู่บนสุดเสมอ ไม่งั้นไม้บรรทัดจะบังจุดที่กำลังเล็งอยู่ */}
+                {cursor ? (
+                  <PointerCursor
+                    at={cursor.point}
+                    color={color}
+                    onTarget={cursor.onTarget}
+                    drawing={drag.kind !== 'none'}
+                  />
+                ) : null}
               </g>
             </svg>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="geo-badge">{toolInfo.emoji} {toolInfo.label}</span>
+            {penMode ? (
+              <span className="geo-badge" title="ฝ่ามือที่วางบนจอระหว่างเขียนจะไม่กลายเป็นเส้น">
+                🖊️ โหมดปากกา · กันฝ่ามือ
+              </span>
+            ) : null}
             <p className="flex-1 text-sm font-semibold text-slate-600">{liveReadout}</p>
             {notice ? <span className="geo-notice">{notice}</span> : null}
           </div>
