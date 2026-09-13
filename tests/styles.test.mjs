@@ -93,6 +93,7 @@ const REQUIRED_CLASSES = [
   'geo-protractor',
   'geo-ruler',
   'geo-compass',
+  'geo-cursor',
 
   // ตัวอักษรและเส้นคั่น
   'title-hero',

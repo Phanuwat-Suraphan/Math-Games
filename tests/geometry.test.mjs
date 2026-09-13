@@ -39,6 +39,7 @@ const S = load('geometry/shapes')
 const B = load('geometry/board')
 const T = load('geometry/tools')
 const M = load('geometry/missions')
+const I = load('geometry/input')
 
 let passed = 0
 const failures = []
@@ -502,6 +503,67 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* ปากกา นิ้ว และฝ่ามือ                                               */
+/* ---------------------------------------------------------------- */
+
+check('ฝ่ามือที่วางบนจอระหว่างเขียนด้วยปากกา ต้องไม่กลายเป็นเส้น', () => {
+  let gate = I.EMPTY_GATE
+  /* ปากกาแตะจอที่เวลา 1000 */
+  gate = I.beginPointer(gate, 1, 'pen', 1000)
+  assert(gate.penSeen, 'ควรจำได้ว่าเห็นปากกาแล้ว')
+
+  /* ฝ่ามือแตะตามมาทันที ต้องถูกทิ้ง */
+  assert(I.shouldIgnorePointer(gate, 2, 'touch', 1010), 'ฝ่ามือแตะตอนปากกาลงจอ ต้องถูกทิ้ง')
+
+  /* ยกปากกาแล้ว แต่ยังอยู่ในช่วงกัน ฝ่ามือก็ยังต้องถูกทิ้ง */
+  gate = I.endPointer(gate, 1)
+  assert(
+    I.shouldIgnorePointer(gate, 2, 'touch', 1000 + I.PEN_GUARD_MS - 1),
+    'ยกปากกาแป๊บเดียวแล้วฝ่ามือแตะ ยังต้องถูกทิ้ง',
+  )
+
+  /* พ้นช่วงกันแล้ว เด็กที่เปลี่ยนมาใช้นิ้วต้องวาดได้ตามปกติ */
+  assert(
+    !I.shouldIgnorePointer(gate, 2, 'touch', 1000 + I.PEN_GUARD_MS + 1),
+    'พ้นช่วงกันแล้วนิ้วต้องวาดได้ ไม่งั้นจอจะเหมือนค้าง',
+  )
+})
+
+check('กำลังลากอยู่ด้วยอะไร นิ้วที่แตะเพิ่มต้องไม่แย่งงาน', () => {
+  let gate = I.beginPointer(I.EMPTY_GATE, 7, 'touch', 500)
+  assert(I.shouldIgnorePointer(gate, 8, 'touch', 520), 'นิ้วที่สองต้องไม่แย่งเส้นที่กำลังลากอยู่')
+  assert(!I.shouldIgnorePointer(gate, 7, 'touch', 520), 'นิ้วที่กำลังลากอยู่ต้องทำงานต่อได้')
+
+  /* ปล่อยมือแล้วต้องคืนสิทธิ์ ไม่งั้นจะวาดอะไรไม่ได้อีกเลย */
+  gate = I.endPointer(gate, 7)
+  assert(!I.shouldIgnorePointer(gate, 8, 'touch', 540), 'ปล่อยมือแล้วนิ้วอื่นต้องวาดได้')
+
+  /* ปล่อยรหัสที่ไม่ได้ถืออยู่ ต้องไม่ไปคืนสิทธิ์ของตัวที่กำลังลาก */
+  let busy = I.beginPointer(I.EMPTY_GATE, 3, 'mouse', 100)
+  busy = I.endPointer(busy, 99)
+  assert(busy.activeId === 3, 'การปล่อยของตัวอื่นต้องไม่ทำให้ตัวที่ลากอยู่หลุดสิทธิ์')
+})
+
+check('เมาส์กับปากกาต้องใช้ได้ตามปกติ ไม่มีการกันใคร', () => {
+  const gate = I.EMPTY_GATE
+  assert(!I.shouldIgnorePointer(gate, 1, 'mouse', 0), 'เมาส์ต้องใช้ได้ตั้งแต่แรก')
+  assert(!I.shouldIgnorePointer(gate, 1, 'pen', 0), 'ปากกาต้องใช้ได้ตั้งแต่แรก')
+  assert(!I.shouldIgnorePointer(gate, 1, 'touch', 0), 'นิ้วต้องใช้ได้เมื่อยังไม่เคยเห็นปากกา')
+  /* เมาส์ไม่ควรไปตั้งเวลากันฝ่ามือ ไม่งั้นห้องที่ใช้เมาส์จะกันนิ้วทิ้งโดยไม่มีเหตุผล */
+  assert(I.noteInput(gate, 'mouse', 9999).lastPenAt === 0, 'เมาส์ต้องไม่ทำให้เข้าโหมดกันฝ่ามือ')
+  assert(I.noteInput(gate, 'pen', 9999).lastPenAt === 9999, 'ปากกาต้องอัปเดตเวลาที่เห็นล่าสุด')
+})
+
+check('ปลายยางลบของปากกา ต้องรู้จักเฉพาะตอนเป็นปากกาจริง', () => {
+  assert(I.isEraserTip('pen', 32), 'พลิกปากกาใช้ด้านยางลบต้องถูกจับได้')
+  assert(!I.isEraserTip('pen', 1), 'ปากกาปลายปกติต้องไม่ถูกนับเป็นยางลบ')
+  assert(!I.isEraserTip('mouse', 32), 'ปุ่มกลางของเมาส์ต้องไม่ถูกนับเป็นยางลบ')
+  assert(I.pointerKind('pen') === 'pen', 'อ่านชนิดปากกาผิด')
+  assert(I.pointerKind('touch') === 'touch', 'อ่านชนิดนิ้วผิด')
+  assert(I.pointerKind('') === 'mouse', 'ค่าที่ไม่รู้จักควรถือเป็นเมาส์')
 })
 
 check('ตัวอักษรกำกับจุดต้องไม่ซ้ำกัน', () => {
