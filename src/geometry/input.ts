@@ -96,3 +96,16 @@ export function pointerKind(value: string): PointerKind {
   if (value === 'touch') return 'touch'
   return 'mouse'
 }
+
+/**
+ * การกดครั้งนี้เป็นการ "จิ้ม" หรือ "ลาก"
+ *
+ * นิ้วเด็กไม่เคยอยู่นิ่งสนิท การจิ้มหนึ่งครั้งมักเลื่อนไปสองสามพิกเซลเสมอ
+ * ถ้าตัดสินที่ศูนย์พิกเซล จะไม่มีการจิ้มเกิดขึ้นเลยสักครั้งบนแท็บเล็ต
+ *
+ * ระยะที่รับได้คิดเป็นพิกเซลบนจอ จึงต้องหารด้วยกำลังขยายก่อนเทียบ
+ * ไม่งั้นตอนซูมเข้าสี่เท่า การขยับนิ้วนิดเดียวจะกลายเป็นการลากไกลบนกระดาษ
+ */
+export function isTap(paperDistance: number, scale: number, allowance = 9): boolean {
+  return paperDistance * scale <= allowance
+}

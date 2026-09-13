@@ -1333,6 +1333,40 @@ html[data-animations='off'] *::after {
   background: #ede9fe;
 }
 
+/*
+ * กล่องถามจำนวนด้าน ลอยอยู่เหนือกระดาษตรงจุดที่จิ้ม
+ *
+ * ตำแหน่งถูกบีบให้อยู่ในกรอบเสมอ กล่องจึงไม่มีวันโผล่ครึ่งเดียวที่ขอบจอ
+ * ซึ่งเป็นจุดที่ปุ่ม "วางเลย" จะหายไปพอดีและเด็กจะติดค้างอยู่ตรงนั้น
+ */
+.geo-ask {
+  position: absolute;
+  z-index: 20;
+  width: min(280px, 78vw);
+  transform: translate(-50%, -50%);
+  padding: 12px;
+  border-radius: 20px;
+  border: 2px solid #ddd6fe;
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px -18px rgba(76, 29, 149, 0.85);
+}
+
+.geo-ask-chip {
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 2px solid #ddd6fe;
+  background: #ffffff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #5b21b6;
+}
+
+.geo-ask-chip-on {
+  background: #ede9fe;
+  border-color: #7c3aed;
+}
+
 /* ปุ่มเลือกแบบที่จะสั่งสร้าง */
 .geo-recipe {
   display: flex;
