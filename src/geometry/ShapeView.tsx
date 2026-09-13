@@ -7,6 +7,7 @@
  */
 
 import {
+  areaInCm,
   angleOf,
   arcPath,
   distance,
@@ -16,6 +17,8 @@ import {
   normalizeDeg,
   pointAt,
   polygonCentroid,
+  polygonPerimeter,
+  toCm,
   angleBetween,
 } from './geo'
 import type { Point } from './geo'
@@ -32,6 +35,10 @@ interface ShapeViewProps {
   showAngles: boolean
   /** ใส่หน้าตาการ์ตูนให้รูปปิดที่ใหญ่พอ */
   showFaces: boolean
+  /** ป้ายพื้นที่กลางรูป */
+  showArea: boolean
+  /** ป้ายความยาวรอบรูป */
+  showPerimeter: boolean
   /** ป้ายไหนถูกลากหลบไปไว้ตรงไหนแล้วบ้าง */
   offsets: LabelOffsets
   /** ส่งมาเมื่ออนุญาตให้ลากป้ายได้ ไม่ส่งมาแปลว่าป้ายให้คลิกทะลุผ่านไปได้เลย */
@@ -177,6 +184,8 @@ export function ShapeView({
   showLengths,
   showAngles,
   showFaces,
+  showArea,
+  showPerimeter,
   offsets,
   onLabelGrab,
 }: ShapeViewProps) {
@@ -283,6 +292,29 @@ export function ShapeView({
           />
           <circle cx={shape.center.x} cy={shape.center.y} r={3.5} fill={shape.color} />
           {face ? <ShapeFace center={face.center} size={face.size} color={shape.color} /> : null}
+
+          {showArea ? (
+            <LabelPill
+              at={{ x: shape.center.x, y: shape.center.y + (face ? 34 : 0) }}
+              keyName={labelKey(shape.id, 'area')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
+              text={`พื้นที่ ≈ ${(Math.PI * toCm(shape.radius) * toCm(shape.radius)).toFixed(1)} ตร.ซม.`}
+              color="#0f766e"
+              background="#ccfbf1"
+            />
+          ) : null}
+          {showPerimeter ? (
+            <LabelPill
+              at={{ x: shape.center.x, y: shape.center.y + shape.radius + 20 }}
+              keyName={labelKey(shape.id, 'perimeter')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
+              text={`เส้นรอบวง ≈ ${(2 * Math.PI * toCm(shape.radius)).toFixed(1)} ซม.`}
+              color="#9a3412"
+              background="#ffedd5"
+            />
+          ) : null}
           {showLengths ? (
             <LabelPill
               at={{ x: shape.center.x, y: shape.center.y - shape.radius - 4 }}
@@ -404,6 +436,39 @@ export function ShapeView({
                 )
               })
             : null}
+
+          {/*
+            ป้ายพื้นที่กับรอบรูป ใช้สีคนละชุดกับป้ายความยาวด้านโดยตั้งใจ
+            เพราะสามอย่างนี้เป็นคนละเรื่องกัน และมักถูกถามพร้อมกันในโจทย์เดียว
+            ถ้าสีเหมือนกันหมด เด็กจะอ่านสลับกันแล้วตอบผิดทั้งที่รูปถูก
+          */}
+          {showArea && shape.closed && points.length >= 3 ? (
+            <LabelPill
+              at={{ x: center.x, y: center.y + (face ? 30 : 0) }}
+              keyName={labelKey(shape.id, 'area')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
+              text={`พื้นที่ ${areaInCm(points).toFixed(1)} ตร.ซม.`}
+              color="#0f766e"
+              background="#ccfbf1"
+            />
+          ) : null}
+
+          {showPerimeter && shape.closed && points.length >= 3 ? (
+            <LabelPill
+              at={{
+                x: center.x,
+                y: points.reduce((top, point) => Math.min(top, point.y), Infinity) - 22,
+              }}
+              keyName={labelKey(shape.id, 'perimeter')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
+              text={`รอบรูป ${toCm(polygonPerimeter(points)).toFixed(1)} ซม.`}
+              color="#9a3412"
+              background="#ffedd5"
+            />
+          ) : null}
+
         </g>
       )
     }

@@ -29,6 +29,8 @@ export type BoardAction =
   | { type: 'mark' }
   /** เปลี่ยนรูประหว่างลาก ไม่จดประวัติเพิ่ม */
   | { type: 'live'; shapes: Shape[] }
+  /** เอางานที่บันทึกไว้กลับมา เริ่มประวัติใหม่หมด */
+  | { type: 'restore'; shapes: Shape[] }
   | { type: 'undo' }
   | { type: 'redo' }
   | { type: 'clear' }
@@ -61,6 +63,14 @@ export function boardReducer(board: Board, action: BoardAction): Board {
 
     case 'live':
       return { ...board, shapes: action.shapes }
+
+    case 'restore':
+      /*
+       * ประวัติเริ่มใหม่ ไม่สืบทอดจากคาบก่อน
+       * ถ้าให้ย้อนกลับข้ามคาบได้ เด็กที่กดย้อนกลับรัว ๆ ตอนเปิดหน้า
+       * จะเห็นงานของเมื่อวานค่อย ๆ หายไปทีละชิ้นโดยไม่เข้าใจว่าเกิดอะไรขึ้น
+       */
+      return { shapes: action.shapes, past: [], future: [] }
 
     case 'undo': {
       if (board.past.length === 0) return board
