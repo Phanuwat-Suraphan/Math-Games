@@ -1037,3 +1037,263 @@ html[data-animations='off'] *::after {
   0%, 100% { filter: brightness(1); }
   50%      { filter: brightness(1.55); }
 }
+
+/* =====================================================================
+ * ห้องเรขาคณิต
+ *
+ * ทั้งเกมเป็นโทนกลางคืนสีน้ำเงินเข้ม แต่หน้านี้เป็นกระดาษสีครีมสว่าง
+ * ตั้งใจให้ต่างจากที่อื่นชัด ๆ เพราะมันไม่ใช่ด่านที่ต้องเอาชนะ
+ * แต่เป็นโต๊ะทำงานที่นั่งวาดได้นาน ๆ และพื้นเข้มทำให้เส้นดินสอสีอ่อนอ่านยาก
+ * เส้นที่เด็กวาดต้องเด่นที่สุดบนหน้าจอ ไม่ใช่ฉากหลัง
+ * ===================================================================== */
+
+.geo-page {
+  color: #334155;
+  background:
+    radial-gradient(900px 420px at 12% -8%, rgba(251, 207, 232, 0.75), transparent 70%),
+    radial-gradient(800px 460px at 92% 4%, rgba(191, 219, 254, 0.75), transparent 72%),
+    linear-gradient(180deg, #fef6ff 0%, #f2fbff 52%, #fffaf0 100%);
+}
+
+.geo-title {
+  color: #7c3aed;
+  text-shadow: 0 2px 0 rgba(255, 255, 255, 0.85);
+}
+
+.geo-panel {
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 24px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 14px 34px -20px rgba(79, 70, 229, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.geo-heading {
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #6d28d9;
+}
+
+.geo-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 2px solid #ddd6fe;
+  background: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #5b21b6;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.geo-chip:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px -10px rgba(91, 33, 182, 0.8);
+}
+
+.geo-chip:disabled {
+  opacity: 0.45;
+}
+
+.geo-chip-strong {
+  background: linear-gradient(180deg, #c4b5fd, #a78bfa);
+  border-color: #8b5cf6;
+  color: #ffffff;
+}
+
+.geo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #ede9fe;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #6d28d9;
+}
+
+/*
+ * ปุ่มเครื่องมือสูงอย่างน้อย 52px
+ *
+ * นิ้วของเด็ก ป.4 กว้างกว่าเคอร์เซอร์เมาส์มาก ปุ่มเล็กแปลว่ากดพลาด
+ * และการกดพลาดในหน้านี้แปลว่าวาดเส้นที่ไม่ได้ตั้งใจลงไปบนงานตัวเอง
+ */
+.geo-tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 12px;
+  border-radius: 18px;
+  border: 2px solid #e9d5ff;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #4c1d95;
+  text-align: left;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.geo-tool:hover {
+  transform: translateY(-2px);
+}
+
+.geo-tool-active {
+  border-color: #7c3aed;
+  box-shadow: 0 10px 18px -12px rgba(124, 58, 237, 0.9), inset 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+.geo-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 16px;
+  border: 2px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #475569;
+}
+
+.geo-toggle-dot {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background-color 0.15s ease;
+}
+
+.geo-toggle-dot::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: #ffffff;
+  transition: transform 0.15s ease;
+}
+
+.geo-toggle-on {
+  border-color: #86efac;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.geo-toggle-on .geo-toggle-dot {
+  background: #22c55e;
+}
+
+.geo-toggle-on .geo-toggle-dot::after {
+  transform: translateX(14px);
+}
+
+.geo-paper-frame {
+  border-radius: 26px;
+  padding: 10px;
+  background: linear-gradient(180deg, #ffffff, #fdf2f8);
+  border: 3px solid #ffffff;
+  box-shadow: 0 22px 45px -26px rgba(30, 41, 59, 0.8);
+}
+
+/*
+ * touch-action: none คือหัวใจของการใช้งานบนแท็บเล็ต
+ * ถ้าไม่ใส่ การลากนิ้วบนกระดาษจะกลายเป็นการเลื่อนหน้าจอ
+ * แล้วเด็กจะวาดอะไรไม่ได้เลยทั้งที่ทุกอย่างทำงานถูกต้อง
+ */
+.geo-canvas {
+  display: block;
+  border-radius: 18px;
+  background: #fffdf7;
+  touch-action: none;
+  cursor: crosshair;
+  user-select: none;
+}
+
+.geo-protractor,
+.geo-ruler {
+  filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.18));
+}
+
+.geo-notice {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: #fef9c3;
+  border: 2px solid #fde047;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #854d0e;
+}
+
+.geo-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 2px;
+  border-radius: 999px;
+  background: #ddd6fe;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #5b21b6;
+}
+
+/* กรอบคำพูดของน้องวงเวียน มีหางชี้ไปทางตัวการ์ตูน */
+.geo-bubble {
+  border: 2px solid #ddd6fe;
+  box-shadow: 0 10px 20px -16px rgba(76, 29, 149, 0.9);
+}
+
+.geo-bubble::before {
+  content: '';
+  position: absolute;
+  left: -9px;
+  bottom: 16px;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border-left: 2px solid #ddd6fe;
+  border-bottom: 2px solid #ddd6fe;
+  transform: rotate(45deg);
+}
+
+.geo-mascot-idle {
+  animation: geo-bob 3.2s ease-in-out infinite;
+}
+
+.geo-mascot-cheer {
+  animation: geo-cheer 0.45s ease-in-out 3;
+}
+
+@keyframes geo-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-5px) rotate(2deg); }
+}
+
+@keyframes geo-cheer {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40%      { transform: translateY(-10px) scale(1.08) rotate(-6deg); }
+  70%      { transform: translateY(-4px) scale(1.04) rotate(6deg); }
+}
+
+/* เครื่องที่ตั้งค่าลดการเคลื่อนไหวไว้ ไม่ควรมีอะไรกระดึ๊บอยู่ข้างจอตลอดเวลา */
+@media (prefers-reduced-motion: reduce) {
+  .geo-mascot-idle,
+  .geo-mascot-cheer {
+    animation-name: none;
+  }
+}

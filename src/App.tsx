@@ -12,6 +12,7 @@ import { PuzzleStage } from './pages/PuzzleStage'
 import { MinigameStage } from './pages/MinigameStage'
 import { Character } from './pages/Character'
 import { CreatePlayer } from './pages/CreatePlayer'
+import { GeometryStudio } from './pages/GeometryStudio'
 import { Home } from './pages/Home'
 import { MainMenu } from './pages/MainMenu'
 import { MathChallenge } from './pages/MathChallenge'
@@ -40,6 +41,12 @@ function GameRoutes() {
         <Route path="/" element={<Home />} />
         <Route path="/create" element={<CreatePlayer />} />
         <Route path="/settings" element={<Settings />} />
+        {/*
+          ห้องเรขาคณิตเปิดได้โดยไม่ต้องสร้างตัวละครก่อน
+          เพราะคุณครูมักเปิดหน้านี้ค้างไว้บนจอหน้าห้องเพื่อสาธิต
+          ไม่ได้เข้ามาเล่นเกม การบังคับให้ตั้งชื่อผู้เล่นก่อนจึงเป็นการกีดขวางเปล่า ๆ
+        */}
+        <Route path="/geometry" element={<GeometryStudio />} />
 
         <Route
           path="/menu"

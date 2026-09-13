@@ -28,6 +28,7 @@
     "src/data/**/*.ts",
     "src/utils/**/*.ts",
     "src/math/**/*.ts",
+    "src/geometry/**/*.ts",
     "src/art/**/*.ts",
     "src/audio/**/*.ts",
     "src/components/art/duelArt.ts",

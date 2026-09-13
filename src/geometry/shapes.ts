@@ -1,0 +1,343 @@
+/**
+ * รูปทรงที่วาดลงกระดาษ และสิ่งที่ทำกับมันได้
+ *
+ * แยกจาก geo.ts เพราะไฟล์นั้นเป็นสูตรล้วน ๆ ส่วนไฟล์นี้รู้จัก "ของบนกระดาษ"
+ * ทั้งสองไฟล์ยังไม่แตะ React เหมือนกัน ชุดทดสอบจึงเรียกได้ทั้งคู่
+ */
+
+import {
+  angleBetween,
+  areaInCm,
+  distance,
+  distanceToCircle,
+  distanceToSegment,
+  formatCm,
+  formatDeg,
+  angleName,
+  angleOf,
+  interiorAngles,
+  isOnArc,
+  polygonArea,
+  polygonName,
+  polygonPerimeter,
+  sumInteriorAngles,
+  toCm,
+} from './geo'
+import type { Point } from './geo'
+
+interface Drawn {
+  id: string
+  color: string
+  width: number
+}
+
+/** เส้นตรงหนึ่งเส้น ตั้งแต่จุด a ถึงจุด b */
+export interface SegmentShape extends Drawn {
+  kind: 'segment'
+  a: Point
+  b: Point
+}
+
+/** วงกลมเต็มวงจากวงเวียน */
+export interface CircleShape extends Drawn {
+  kind: 'circle'
+  center: Point
+  radius: number
+}
+
+/** ส่วนโค้งจากวงเวียน กวาดจากมุม start ไปเป็นระยะ sweep */
+export interface ArcShape extends Drawn {
+  kind: 'arc'
+  center: Point
+  radius: number
+  start: number
+  sweep: number
+}
+
+/** รูปหลายเหลี่ยม ปิดรูปแล้วหรือยังลากค้างอยู่ก็ได้ */
+export interface PolygonShape extends Drawn {
+  kind: 'polygon'
+  points: Point[]
+  closed: boolean
+  fill: string
+}
+
+/** จุดที่ปักไว้พร้อมตัวอักษรกำกับ */
+export interface DotShape extends Drawn {
+  kind: 'dot'
+  at: Point
+  label: string
+}
+
+/** ป้ายบอกขนาดมุม a-vertex-b ที่วัดไว้ */
+export interface AngleShape extends Drawn {
+  kind: 'angle'
+  vertex: Point
+  a: Point
+  b: Point
+}
+
+export type Shape =
+  | SegmentShape
+  | CircleShape
+  | ArcShape
+  | PolygonShape
+  | DotShape
+  | AngleShape
+
+/** คำอธิบายรูปสำหรับแผงข้อมูลด้านข้าง */
+export interface ShapeReport {
+  emoji: string
+  title: string
+  lines: string[]
+}
+
+/** ระยะที่ถือว่า "จิ้มโดน" รูป หน่วยเป็นพิกเซลของผืนวาด */
+export const HIT_TOLERANCE = 12
+
+/** จุดอยู่ในรูปหลายเหลี่ยมหรือไม่ ใช้วิธียิงรังสีไปทางขวา */
+export function isInsidePolygon(p: Point, points: Point[]): boolean {
+  if (points.length < 3) return false
+  let inside = false
+  for (let i = 0, j = points.length - 1; i < points.length; j = i, i += 1) {
+    const a = points[i]
+    const b = points[j]
+    const straddles = a.y > p.y !== b.y > p.y
+    if (!straddles) continue
+    const crossX = a.x + ((p.y - a.y) * (b.x - a.x)) / (b.y - a.y)
+    if (p.x < crossX) inside = !inside
+  }
+  return inside
+}
+
+/** จิ้มตรงนี้โดนรูปนี้ไหม ใช้ทั้งกับยางลบและการเลือก */
+export function hitTest(shape: Shape, p: Point, tolerance = HIT_TOLERANCE): boolean {
+  switch (shape.kind) {
+    case 'segment':
+      return distanceToSegment(p, shape.a, shape.b) <= tolerance
+    case 'circle':
+      return distanceToCircle(p, shape.center, shape.radius) <= tolerance
+    case 'arc':
+      return (
+        distanceToCircle(p, shape.center, shape.radius) <= tolerance &&
+        isOnArc(angleOf(shape.center, p), shape.start, shape.sweep)
+      )
+    case 'polygon': {
+      const points = shape.points
+      if (points.length === 0) return false
+      if (points.length === 1) return distance(p, points[0]) <= tolerance
+      const lastEdge = shape.closed ? points.length : points.length - 1
+      for (let i = 0; i < lastEdge; i += 1) {
+        const a = points[i]
+        const b = points[(i + 1) % points.length]
+        if (distanceToSegment(p, a, b) <= tolerance) return true
+      }
+      return shape.closed && isInsidePolygon(p, points)
+    }
+    case 'dot':
+      return distance(p, shape.at) <= tolerance
+    case 'angle':
+      return distance(p, shape.vertex) <= tolerance * 2
+    default:
+      return false
+  }
+}
+
+/** หารูปบนสุดที่ถูกจิ้ม (รูปที่วาดทีหลังอยู่บนสุด) */
+export function findShapeAt(
+  shapes: Shape[],
+  p: Point,
+  tolerance = HIT_TOLERANCE,
+): Shape | null {
+  for (let i = shapes.length - 1; i >= 0; i -= 1) {
+    if (hitTest(shapes[i], p, tolerance)) return shapes[i]
+  }
+  return null
+}
+
+/** ย้ายรูปทั้งรูปไปตามระยะที่ลาก */
+export function translateShape(shape: Shape, dx: number, dy: number): Shape {
+  const move = (p: Point): Point => ({ x: p.x + dx, y: p.y + dy })
+  switch (shape.kind) {
+    case 'segment':
+      return { ...shape, a: move(shape.a), b: move(shape.b) }
+    case 'circle':
+      return { ...shape, center: move(shape.center) }
+    case 'arc':
+      return { ...shape, center: move(shape.center) }
+    case 'polygon':
+      return { ...shape, points: shape.points.map(move) }
+    case 'dot':
+      return { ...shape, at: move(shape.at) }
+    case 'angle':
+      return { ...shape, vertex: move(shape.vertex), a: move(shape.a), b: move(shape.b) }
+    default:
+      return shape
+  }
+}
+
+/**
+ * จุดสำคัญของรูป ใช้เป็นเป้าให้ปลายดินสอดูดเข้าหา
+ *
+ * การต่อเส้นให้ชนจุดเดิมพอดีคือสิ่งที่เด็กทำพลาดบ่อยที่สุด
+ * ปลายเส้นห่างกันสองพิกเซลทำให้รูปไม่ปิด แล้วมุมภายในที่คำนวณได้ก็ผิดตามไปหมด
+ */
+export function shapeAnchors(shape: Shape): Point[] {
+  switch (shape.kind) {
+    case 'segment':
+      return [shape.a, shape.b]
+    case 'circle':
+      return [shape.center]
+    case 'arc':
+      return [shape.center]
+    case 'polygon':
+      return [...shape.points]
+    case 'dot':
+      return [shape.at]
+    case 'angle':
+      return [shape.vertex]
+    default:
+      return []
+  }
+}
+
+/** หาจุดสำคัญที่ใกล้ที่สุดในระยะที่กำหนด ไม่เจอก็คืน null */
+export function nearestAnchor(
+  shapes: Shape[],
+  p: Point,
+  radius: number,
+): Point | null {
+  let best: Point | null = null
+  let bestDistance = radius
+  for (const shape of shapes) {
+    for (const anchor of shapeAnchors(shape)) {
+      const d = distance(p, anchor)
+      if (d <= bestDistance) {
+        best = anchor
+        bestDistance = d
+      }
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null
+}
+
+/**
+ * คำอธิบายของรูปที่เลือกอยู่
+ *
+ * นี่คือส่วนที่ทำให้เครื่องมือชุดนี้เป็นของสำหรับสอน ไม่ใช่โปรแกรมวาดรูปเฉย ๆ
+ * เด็กวาดห้าเหลี่ยมเสร็จแล้วต้องอ่านได้ทันทีว่ามุมภายในรวมกันได้ 540°
+ * โดยไม่ต้องมีใครมาบอก
+ */
+export function describeShape(shape: Shape): ShapeReport {
+  switch (shape.kind) {
+    case 'segment': {
+      const length = distance(shape.a, shape.b)
+      return {
+        emoji: '📏',
+        title: 'ส่วนของเส้นตรง',
+        lines: [
+          `ความยาว ${formatCm(length)}`,
+          `ทำมุมกับแนวนอน ${formatDeg(angleOf(shape.a, shape.b))}`,
+        ],
+      }
+    }
+    case 'circle': {
+      const radiusCm = toCm(shape.radius)
+      return {
+        emoji: '⭕',
+        title: 'วงกลม',
+        lines: [
+          `รัศมี ${formatCm(shape.radius)}`,
+          `เส้นผ่านศูนย์กลาง ${formatCm(shape.radius * 2)}`,
+          `เส้นรอบวง ≈ ${(2 * Math.PI * radiusCm).toFixed(1)} ซม.`,
+          `พื้นที่ ≈ ${(Math.PI * radiusCm * radiusCm).toFixed(1)} ตร.ซม.`,
+        ],
+      }
+    }
+    case 'arc': {
+      const sweep = Math.abs(shape.sweep)
+      const arcLength = (sweep / 360) * 2 * Math.PI * toCm(shape.radius)
+      return {
+        emoji: '🌙',
+        title: 'ส่วนโค้ง',
+        lines: [
+          `รัศมี ${formatCm(shape.radius)}`,
+          `มุมที่จุดศูนย์กลาง ${formatDeg(sweep)}`,
+          `ความยาวส่วนโค้ง ≈ ${arcLength.toFixed(1)} ซม.`,
+        ],
+      }
+    }
+    case 'polygon': {
+      const points = shape.points
+      if (!shape.closed || points.length < 3) {
+        return {
+          emoji: '✏️',
+          title: 'เส้นหลายท่อน',
+          lines: [
+            `มี ${points.length} จุด`,
+            'จิ้มจุดแรกอีกครั้งเพื่อปิดรูป',
+          ],
+        }
+      }
+      const angles = interiorAngles(points)
+      const measured = angles.reduce((total, value) => total + value, 0)
+      const sides = points.map((point, index) =>
+        distance(point, points[(index + 1) % points.length]),
+      )
+      const shortest = Math.min(...sides)
+      const longest = Math.max(...sides)
+      const equalSides = longest - shortest < 2
+      return {
+        emoji: '🔷',
+        title: polygonName(points.length),
+        lines: [
+          `มี ${points.length} ด้าน และ ${points.length} มุม`,
+          `ความยาวรอบรูป ${formatCm(polygonPerimeter(points))}`,
+          `พื้นที่ ≈ ${areaInCm(points).toFixed(1)} ตร.ซม.`,
+          `มุมภายในรวมกันได้ ${formatDeg(measured)} (สูตร (${points.length}-2)×180 = ${sumInteriorAngles(
+            points.length,
+          )}°)`,
+          equalSides ? 'ด้านทุกด้านยาวเท่ากัน 🎉' : `ด้านสั้นสุด ${formatCm(shortest)} ยาวสุด ${formatCm(longest)}`,
+        ],
+      }
+    }
+    case 'dot':
+      return {
+        emoji: '📍',
+        title: `จุด ${shape.label}`,
+        lines: ['ลากไปวางตรงไหนก็ได้ ใช้เป็นหมุดให้เส้นมาชนพอดี'],
+      }
+    case 'angle': {
+      const size = angleBetween(shape.a, shape.vertex, shape.b)
+      return {
+        emoji: '📐',
+        title: `มุมที่วัดไว้ ${formatDeg(size)}`,
+        lines: [`เป็น${angleName(size)}`],
+      }
+    }
+    default:
+      return { emoji: '❔', title: 'รูป', lines: [] }
+  }
+}
+
+/** สรุปทั้งกระดาษ ใช้โชว์ตอนยังไม่ได้เลือกรูปไหน */
+export function describeBoard(shapes: Shape[]): string[] {
+  const polygons = shapes.filter(
+    (shape): shape is PolygonShape => shape.kind === 'polygon' && shape.closed,
+  )
+  const circles = shapes.filter((shape) => shape.kind === 'circle' || shape.kind === 'arc')
+  const segments = shapes.filter((shape) => shape.kind === 'segment')
+  const lines: string[] = []
+  if (polygons.length > 0) {
+    const biggest = polygons.reduce((best, shape) =>
+      polygonArea(shape.points) > polygonArea(best.points) ? shape : best,
+    )
+    lines.push(
+      `รูปหลายเหลี่ยม ${polygons.length} รูป ใหญ่ที่สุดคือ${polygonName(biggest.points.length)}`,
+    )
+  }
+  if (circles.length > 0) lines.push(`วงกลมและส่วนโค้งจากวงเวียน ${circles.length} ชิ้น`)
+  if (segments.length > 0) lines.push(`ส่วนของเส้นตรง ${segments.length} เส้น`)
+  if (lines.length === 0) lines.push('กระดาษยังว่างอยู่ เลือกเครื่องมือทางซ้ายแล้วเริ่มวาดได้เลย')
+  return lines
+}
