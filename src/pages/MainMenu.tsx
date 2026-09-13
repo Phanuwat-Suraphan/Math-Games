@@ -93,6 +93,13 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-arcane-500/30 to-ember-600/10',
   },
   {
+    to: '/geometry',
+    emoji: '🎨',
+    label: 'ห้องเรขาคณิต',
+    description: 'วงเวียน ครึ่งวงกลม ไม้บรรทัด ไว้วาดรูปหลายเหลี่ยมด้วยตัวเอง',
+    accent: 'from-sky-500/25 to-arcane-600/10',
+  },
+  {
     to: '/journal',
     emoji: '📖',
     label: 'สมุดบันทึก',
