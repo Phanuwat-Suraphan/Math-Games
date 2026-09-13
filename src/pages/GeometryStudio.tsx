@@ -12,7 +12,7 @@
  * ส่วนปุ่มสำเร็จรูปยังมีอยู่ (รูปด้านเท่า) ไว้ใช้ตอนครูอยากยกตัวอย่างเร็ว ๆ
  */
 
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/useGame'
@@ -50,6 +50,8 @@ import {
 import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
+import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
+import type { LabelOffsets } from '../geometry/labels'
 import {
   PAPER_THEMES,
   STICKERS,
@@ -125,6 +127,8 @@ type Drag =
   /** ลากเข็มเพื่อย้ายวงเวียน โดย grab คือระยะเยื้องจากปลายนิ้วถึงเข็ม */
   /** ลากกระดาษไปมาตอนซูมเข้า เก็บจุดเริ่มเป็นพิกัดบนจอ เพราะพิกัดกระดาษขยับตามไปด้วย */
   | { kind: 'pan'; startClient: Point; startView: View }
+  /** ลากป้ายตัวเลขหลบไม่ให้บังเส้น เก็บจุดเริ่มไว้เพื่อให้ป้ายไม่กระโดดตอนจับ */
+  | { kind: 'label'; key: string; startOffset: Point; startPoint: Point }
   | { kind: 'compass-move'; grab: Point }
   /** ลากขาดินสอเพื่อกางรัศมี ไม่มีการวาดเกิดขึ้น */
   | { kind: 'compass-spread' }
@@ -179,6 +183,13 @@ export function GeometryStudio() {
   const [sparkles, setSparkles] = useState<{ id: number; at: Point }[]>([])
   /** คำเชียร์ที่น้องวงเวียนกำลังพูดอยู่ หมดเวลาแล้วกลับไปพูดเรื่องเครื่องมือตามเดิม */
   const [praise, setPraise] = useState<string | null>(null)
+  /**
+   * ป้ายตัวเลขถูกลากหลบไปไว้ตรงไหนแล้วบ้าง
+   *
+   * เก็บแยกจากประวัติการย้อนกลับโดยตั้งใจ การขยับป้ายไม่ใช่การแก้รูป
+   * ถ้าเอาไปปนกัน เด็กที่กดย้อนกลับเพื่อลบเส้นจะได้ป้ายกระโดดกลับที่เดิมแถมมาด้วย
+   */
+  const [labelOffsets, setLabelOffsets] = useState<LabelOffsets>({})
 
   const svgRef = useRef<SVGSVGElement | null>(null)
   const idRef = useRef(1)
@@ -197,6 +208,8 @@ export function GeometryStudio() {
   const sparkleId = useRef(0)
   const sparkleTimers = useRef<number[]>([])
   const praiseTimer = useRef<number | null>(null)
+  const labelOffsetsRef = useRef<LabelOffsets>({})
+  labelOffsetsRef.current = labelOffsets
   /* สำเนาของมุมมองล่าสุด ไว้ให้ตัวรับล้อเมาส์ซึ่งผูกไว้ครั้งเดียวอ่านค่าปัจจุบันได้ */
   const viewRef = useRef<View>(DEFAULT_VIEW)
   /** นิ้วที่แตะอยู่ตอนนี้ทั้งหมด ใช้ดูว่ามีสองนิ้วหนีบเพื่อซูมหรือเปล่า */
@@ -418,6 +431,38 @@ export function GeometryStudio() {
     say(`ปิดรูปแล้ว ได้${polygonName(draft.length)}เรียบร้อย`)
     setDraft([])
   }
+
+  /**
+   * จับป้ายตัวเลขเพื่อลากหลบ
+   *
+   * ทำเป็น useCallback ที่ไม่ขึ้นกับอะไรเลย เพราะมันถูกส่งลงไปให้ชั้นรูปที่จำผลไว้
+   * ถ้าสร้างใหม่ทุกครั้งที่วาดจอ การจำผลจะใช้ไม่ได้ และรูปทั้งกระดาษ
+   * จะถูกคิดใหม่ทุกครั้งที่ปลายปากกาขยับหนึ่งพิกเซล
+   */
+  const handleLabelGrab = useCallback(
+    (key: string, event: ReactPointerEvent<SVGElement>) => {
+      event.stopPropagation()
+      const svg = svgRef.current
+      if (!svg) return
+      svg.setPointerCapture(event.pointerId)
+      const rect = svg.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+      const start = screenToPaper(
+        viewRef.current,
+        (event.clientX - rect.left) / rect.width,
+        (event.clientY - rect.top) / rect.height,
+        VIEW_WIDTH,
+        VIEW_HEIGHT,
+      )
+      setDrag({
+        kind: 'label',
+        key,
+        startOffset: offsetOf(labelOffsetsRef.current, key),
+        startPoint: start,
+      })
+    },
+    [],
+  )
 
   /** ระยะและจุดกึ่งกลางของสองนิ้วที่แตะอยู่ หน่วยเป็นพิกเซลบนจอ */
   function touchSpan(): { distance: number; middle: Point } | null {
@@ -669,6 +714,17 @@ export function GeometryStudio() {
       case 'regular':
         setDrag({ kind: 'regular', center: drag.center, edge: raw })
         return
+
+      case 'label': {
+        setLabelOffsets((current) => ({
+          ...current,
+          [drag.key]: clampLeash({
+            x: drag.startOffset.x + (raw.x - drag.startPoint.x),
+            y: drag.startOffset.y + (raw.y - drag.startPoint.y),
+          }),
+        }))
+        return
+      }
 
       case 'pan': {
         const svg = svgRef.current
@@ -950,6 +1006,7 @@ export function GeometryStudio() {
     if (board.shapes.length === 0) return
     dispatch({ type: 'clear' })
     labelRef.current = 0
+    setLabelOffsets({})
     setSelectedId(null)
     setDraft([])
     setAnglePicks([])
@@ -1287,6 +1344,26 @@ export function GeometryStudio() {
             </div>
           ) : null}
 
+          {tool === 'select' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <p className="text-xs font-semibold text-slate-500">
+                ตัวเลขบังเส้นอยู่ใช่ไหม ลากตัวเลขหลบได้เลย ไกลสุด {formatCm(LABEL_LEASH)}{' '}
+                จากที่เดิม และมีเส้นประบอกว่าตัวเลขนั้นเป็นของด้านไหน
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setLabelOffsets({})
+                  playSfx('click')
+                }}
+                disabled={Object.keys(labelOffsets).length === 0}
+                className="geo-chip mt-2 w-full"
+              >
+                ↩️ จัดตัวเลขกลับที่เดิม
+              </button>
+            </div>
+          ) : null}
+
           <h2 className="geo-heading mt-4">🖍️ สีดินสอ</h2>
           <div className="flex flex-wrap gap-2">
             {PENCIL_COLORS.map((item) => (
@@ -1433,6 +1510,13 @@ export function GeometryStudio() {
                 showLengths={showLengths}
                 showAngles={showAngles}
                 showFaces={showFaces}
+                offsets={labelOffsets}
+                /*
+                 * ลากป้ายได้เฉพาะตอนใช้เครื่องมือเลือก
+                 * ตอนกำลังวาด ป้ายต้องให้คลิกทะลุผ่านไปได้ ไม่งั้นเด็กที่ลากเส้น
+                 * ผ่านป้ายพอดี จะกลายเป็นลากป้ายแทนที่จะได้เส้น
+                 */
+                onLabelGrab={tool === 'select' ? handleLabelGrab : undefined}
               />
 
               {/* ของชั่วคราวระหว่างวาด ไม่ติดไปในไฟล์ภาพที่บันทึก */}

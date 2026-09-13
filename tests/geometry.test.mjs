@@ -42,6 +42,7 @@ const M = load('geometry/missions')
 const I = load('geometry/input')
 const W = load('geometry/view')
 const C = load('geometry/cute')
+const B_LABELS = load('geometry/labels')
 
 let passed = 0
 const failures = []
@@ -505,6 +506,93 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* ป้ายตัวเลขที่ลากหลบได้                                              */
+/* ---------------------------------------------------------------- */
+
+check('ป้ายลากหลบได้ แต่ต้องไม่หลุดไปไกลจนไม่รู้ว่าเป็นของใคร', () => {
+  /* ใกล้ ๆ ลากได้ตามปกติ */
+  const near = B_LABELS.clampLeash({ x: 20, y: -15 })
+  close(near.x, 20, 0.0001, 'ป้ายที่ยังอยู่ในระยะต้องไม่ถูกดึงกลับ')
+  close(near.y, -15, 0.0001, 'ป้ายที่ยังอยู่ในระยะต้องไม่ถูกดึงกลับ')
+
+  /* ลากไกลเกิน ต้องถูกดึงกลับมาที่ปลายเชือกพอดี และยังอยู่ในทิศเดิม */
+  const far = B_LABELS.clampLeash({ x: 600, y: 800 })
+  close(Math.hypot(far.x, far.y), B_LABELS.LABEL_LEASH, 0.0001, 'ป้ายหลุดเชือกไปไกลเกิน')
+  close(far.x / far.y, 600 / 800, 0.0001, 'ดึงกลับแล้วทิศเปลี่ยน ป้ายจะกระโดดไปอีกทาง')
+
+  /* ไม่ขยับเลยต้องไม่ได้ NaN จากการหารด้วยศูนย์ */
+  const still = B_LABELS.clampLeash({ x: 0, y: 0 })
+  assert(Number.isFinite(still.x) && Number.isFinite(still.y), 'ป้ายที่ไม่ขยับทำให้ได้ NaN')
+})
+
+check('ขยับป้ายหนึ่งอัน ต้องไม่ไปแตะป้ายอื่นและไม่แก้ของเดิม', () => {
+  const before = { 'a:edge:0': { x: 5, y: 5 } }
+  const after = B_LABELS.moveLabel(before, 'a:edge:1', { x: 10, y: 0 })
+  assert(after['a:edge:0'].x === 5, 'ป้ายอื่นถูกแก้ไปด้วย')
+  assert(after['a:edge:1'].x === 10, 'ป้ายที่ขยับไม่ได้ถูกบันทึก')
+  assert(before['a:edge:1'] === undefined, 'ตารางเดิมถูกแก้ ซึ่งทำให้ React ไม่วาดใหม่')
+
+  /* ขยับไกลเกินต้องถูกล่ามไว้เหมือนกัน */
+  const leashed = B_LABELS.moveLabel({}, 'k', { x: 999, y: 0 })
+  close(leashed.k.x, B_LABELS.LABEL_LEASH, 0.0001, 'ขยับผ่าน moveLabel แล้วไม่ถูกล่าม')
+})
+
+check('ชื่อป้ายต้องไม่ซ้ำกันข้ามรูป ข้ามชนิด และข้ามด้าน', () => {
+  const names = new Set()
+  for (const shapeId of ['s1', 's2']) {
+    for (const role of ['edge', 'angle', 'len']) {
+      for (let index = 0; index < 3; index += 1) {
+        const key = B_LABELS.labelKey(shapeId, role, index)
+        assert(!names.has(key), `ชื่อป้าย ${key} ซ้ำ`)
+        names.add(key)
+      }
+    }
+  }
+  assert(names.size === 18, 'จำนวนชื่อป้ายไม่ครบ')
+  assert(B_LABELS.offsetOf({}, 'ยังไม่เคยขยับ').x === 0, 'ป้ายที่ยังไม่เคยขยับต้องอยู่ที่เดิม')
+})
+
+check('ป้ายความยาวด้านต้องออกไปอยู่นอกรูป ไม่ทับเส้น', () => {
+  /*
+   * นี่คือครึ่งหนึ่งของการแก้ปัญหาป้ายบังเส้น อีกครึ่งคือการลากเอง
+   * ถ้าค่าเริ่มต้นวางดีอยู่แล้ว เด็กส่วนใหญ่จะไม่ต้องลากเลย
+   */
+  const square = [
+    { x: 0, y: 0 },
+    { x: 100, y: 0 },
+    { x: 100, y: 100 },
+    { x: 0, y: 100 },
+  ]
+  const middle = G.polygonCentroid(square)
+  for (let i = 0; i < square.length; i += 1) {
+    const a = square[i]
+    const b = square[(i + 1) % square.length]
+    const anchor = B_LABELS.edgeLabelAnchor(a, b, middle)
+    const onEdge = G.distanceToSegment(anchor, a, b)
+    assert(onEdge > 10, `ป้ายของด้านที่ ${i} ยังทับเส้นอยู่ (ห่างแค่ ${onEdge.toFixed(1)})`)
+    assert(
+      G.distance(anchor, middle) > G.distance(G.midpoint(a, b), middle),
+      `ป้ายของด้านที่ ${i} เลื่อนเข้าข้างในรูปแทนที่จะออกข้างนอก`,
+    )
+  }
+
+  /* เส้นเดี่ยวไม่มีข้างในข้างนอก ป้ายต้องเลื่อนขึ้นด้านบนของจอ */
+  const lone = B_LABELS.edgeLabelAnchor({ x: 0, y: 0 }, { x: 100, y: 0 }, null)
+  assert(lone.y < 0, 'ป้ายของเส้นเดี่ยวควรอยู่เหนือเส้น')
+  close(lone.x, 50, 0.0001, 'ป้ายของเส้นเดี่ยวควรอยู่กลางเส้น')
+
+  /* จุดสองจุดซ้อนกันต้องไม่ทำให้ได้ NaN */
+  const degenerate = B_LABELS.edgeLabelAnchor({ x: 5, y: 5 }, { x: 5, y: 5 }, null)
+  assert(Number.isFinite(degenerate.x) && Number.isFinite(degenerate.y), 'เส้นยาวศูนย์ทำให้ป้ายพัง')
+})
+
+check('เส้นประจะขึ้นก็ต่อเมื่อป้ายถูกลากออกมาจริง', () => {
+  assert(!B_LABELS.isMoved({ x: 0, y: 0 }), 'ป้ายที่อยู่ที่เดิมไม่ควรมีเส้นประ')
+  assert(!B_LABELS.isMoved({ x: 3, y: 2 }), 'ขยับนิดเดียวไม่ควรมีเส้นประ')
+  assert(B_LABELS.isMoved({ x: 30, y: 0 }), 'ป้ายที่ลากออกมาไกลต้องมีเส้นประบอกที่มา')
 })
 
 /* ---------------------------------------------------------------- */

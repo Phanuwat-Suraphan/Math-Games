@@ -95,6 +95,7 @@ const REQUIRED_CLASSES = [
   'geo-compass',
   'geo-cursor',
   'geo-zoom',
+  'geo-label',
   'geo-sticker',
   'geo-sticker-on',
   'geo-theme',

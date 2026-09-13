@@ -13,14 +13,17 @@ import {
   formatCm,
   formatDeg,
   interiorAngles,
-  midpoint,
   normalizeDeg,
   pointAt,
+  polygonCentroid,
   angleBetween,
 } from './geo'
 import type { Point } from './geo'
 import { faceOf } from './shapes'
 import type { Shape } from './shapes'
+import { edgeLabelAnchor, isMoved, labelKey, offsetOf } from './labels'
+import type { LabelOffsets } from './labels'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 
 interface ShapeViewProps {
   shape: Shape
@@ -29,6 +32,10 @@ interface ShapeViewProps {
   showAngles: boolean
   /** ใส่หน้าตาการ์ตูนให้รูปปิดที่ใหญ่พอ */
   showFaces: boolean
+  /** ป้ายไหนถูกลากหลบไปไว้ตรงไหนแล้วบ้าง */
+  offsets: LabelOffsets
+  /** ส่งมาเมื่ออนุญาตให้ลากป้ายได้ ไม่ส่งมาแปลว่าป้ายให้คลิกทะลุผ่านไปได้เลย */
+  onLabelGrab?: (key: string, event: ReactPointerEvent<SVGElement>) => void
 }
 
 /**
@@ -52,31 +59,71 @@ function EndPoint({ at, color }: { at: Point; color: string }) {
   )
 }
 
+/**
+ * ป้ายตัวเลขหนึ่งอัน ลากหลบได้เมื่อมันไปบังเส้น
+ *
+ * ตอนถูกลากออกมาจากที่เดิม จะมีเส้นประลากจากที่เดิมไปหาป้าย
+ * ไม่งั้นป้าย "3.5 ซม." ที่ลอยอยู่ จะไม่มีใครรู้ว่าบอกความยาวของด้านไหน
+ */
 function LabelPill({
   at,
+  keyName,
+  offsets,
+  onGrab,
   text,
   color,
   background,
 }: {
   at: Point
+  keyName: string
+  offsets: LabelOffsets
+  onGrab?: (key: string, event: ReactPointerEvent<SVGElement>) => void
   text: string
   color: string
   background: string
 }) {
   const width = Math.max(34, text.length * 8.2 + 14)
+  const offset = offsetOf(offsets, keyName)
+  const spot = { x: at.x + offset.x, y: at.y + offset.y }
+
   return (
-    <g transform={`translate(${at.x} ${at.y})`} pointerEvents="none">
-      <rect x={-width / 2} y={-12} width={width} height={23} rx={11} fill={background} opacity={0.95} />
-      <text
-        textAnchor="middle"
-        y={4}
-        fontSize={13}
-        fontWeight={700}
-        fill={color}
-        fontFamily="Kanit, sans-serif"
+    <g>
+      {isMoved(offset) ? (
+        <line
+          x1={at.x}
+          y1={at.y}
+          x2={spot.x}
+          y2={spot.y}
+          stroke={color}
+          strokeWidth={1.3}
+          strokeDasharray="4 4"
+          opacity={0.6}
+          pointerEvents="none"
+        />
+      ) : null}
+      <g
+        transform={`translate(${spot.x} ${spot.y})`}
+        pointerEvents={onGrab ? 'auto' : 'none'}
+        className={onGrab ? 'geo-label' : undefined}
+        onPointerDown={onGrab ? (event) => onGrab(keyName, event) : undefined}
       >
-        {text}
-      </text>
+        {/* พื้นที่กดกว้างกว่าตัวป้าย ให้นิ้วเด็กจับป้ายเล็ก ๆ ได้ */}
+        {onGrab ? (
+          <rect x={-width / 2 - 6} y={-18} width={width + 12} height={35} rx={16} fill="transparent" />
+        ) : null}
+        <rect x={-width / 2} y={-12} width={width} height={23} rx={11} fill={background} opacity={0.95} />
+        <text
+          textAnchor="middle"
+          y={4}
+          fontSize={13}
+          fontWeight={700}
+          fill={color}
+          fontFamily="Kanit, sans-serif"
+          pointerEvents="none"
+        >
+          {text}
+        </text>
+      </g>
     </g>
   )
 }
@@ -130,6 +177,8 @@ export function ShapeView({
   showLengths,
   showAngles,
   showFaces,
+  offsets,
+  onLabelGrab,
 }: ShapeViewProps) {
   const face = showFaces ? faceOf(shape) : null
   const halo = selected ? (
@@ -207,7 +256,10 @@ export function ShapeView({
           <EndPoint at={shape.b} color={shape.color} />
           {showLengths && length > 24 ? (
             <LabelPill
-              at={midpoint(shape.a, shape.b)}
+              at={edgeLabelAnchor(shape.a, shape.b, null)}
+              keyName={labelKey(shape.id, 'len')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
               text={formatCm(length)}
               color={shape.color}
               background="#ffffff"
@@ -234,6 +286,9 @@ export function ShapeView({
           {showLengths ? (
             <LabelPill
               at={{ x: shape.center.x, y: shape.center.y - shape.radius - 4 }}
+              keyName={labelKey(shape.id, 'radius')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
               text={`รัศมี ${formatCm(shape.radius)}`}
               color={shape.color}
               background="#ffffff"
@@ -262,6 +317,9 @@ export function ShapeView({
           {showAngles ? (
             <LabelPill
               at={pointAt(shape.center, shape.radius + 20, shape.start + shape.sweep / 2)}
+              keyName={labelKey(shape.id, 'arc')}
+              offsets={offsets}
+              onGrab={onLabelGrab}
               text={formatDeg(Math.abs(shape.sweep))}
               color={shape.color}
               background="#ffffff"
@@ -273,6 +331,8 @@ export function ShapeView({
     case 'polygon': {
       const points = shape.points
       const pointsText = points.map((point) => `${point.x},${point.y}`).join(' ')
+      /* ใช้เป็นทิศ "ข้างนอกรูป" ให้ป้ายความยาวด้านเลื่อนออกไปไม่ให้ทับเส้น */
+      const center = polygonCentroid(points)
       const angles = shape.closed && points.length >= 3 ? interiorAngles(points) : []
       const edgeCount = shape.closed ? points.length : points.length - 1
       return (
@@ -313,6 +373,9 @@ export function ShapeView({
                     <path d={mark.path} fill="none" stroke="#db2777" strokeWidth={2} />
                     <LabelPill
                       at={mark.labelAt}
+                      keyName={labelKey(shape.id, 'angle', index)}
+                      offsets={offsets}
+                      onGrab={onLabelGrab}
                       text={formatDeg(mark.size)}
                       color="#be185d"
                       background="#fce7f3"
@@ -330,7 +393,10 @@ export function ShapeView({
                 return (
                   <LabelPill
                     key={`e${index}`}
-                    at={midpoint(point, next)}
+                    at={edgeLabelAnchor(point, next, shape.closed ? center : null)}
+                    keyName={labelKey(shape.id, 'edge', index)}
+                    offsets={offsets}
+                    onGrab={onLabelGrab}
                     text={formatCm(length)}
                     color={shape.color}
                     background="#ffffff"
@@ -391,6 +457,9 @@ export function ShapeView({
           <path d={mark.path} fill="none" stroke={shape.color} strokeWidth={2.5} />
           <LabelPill
             at={mark.labelAt}
+            keyName={labelKey(shape.id, 'deg')}
+            offsets={offsets}
+            onGrab={onLabelGrab}
             text={formatDeg(mark.size)}
             color="#be185d"
             background="#fce7f3"
