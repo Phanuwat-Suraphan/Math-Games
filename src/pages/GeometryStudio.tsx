@@ -52,6 +52,14 @@ import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
 import {
+  RECIPES,
+  buildShapes,
+  findRecipe,
+  initialValues,
+  valueOf,
+} from '../geometry/recipes'
+import { ShapeView } from '../geometry/ShapeView'
+import {
   PROTRACTOR_DEFAULT,
   RULER_DEFAULT_CM,
   RULER_MAX_CM,
@@ -206,6 +214,10 @@ export function GeometryStudio() {
   const [missionIndex, setMissionIndex] = useState(0)
   const [themeId, setThemeId] = useState(PAPER_THEMES[0].id)
   const [sticker, setSticker] = useState(STICKERS[0].emoji)
+  const [recipeId, setRecipeId] = useState(RECIPES[0].id)
+  const [recipeValues, setRecipeValues] = useState<Record<string, number>>(() =>
+    initialValues(RECIPES[0]),
+  )
   /** ประกายที่กระเด็นอยู่ตอนนี้ หายไปเองใน 1 วินาที */
   const [sparkles, setSparkles] = useState<{ id: number; at: Point }[]>([])
   /** คำเชียร์ที่น้องวงเวียนกำลังพูดอยู่ หมดเวลาแล้วกลับไปพูดเรื่องเครื่องมือตามเดิม */
@@ -253,6 +265,7 @@ export function GeometryStudio() {
 
   const toolInfo = findTool(tool)
   const theme = findTheme(themeId)
+  const recipe = findRecipe(recipeId)
   const mission = MISSIONS[missionIndex]
   const selected = board.shapes.find((shape) => shape.id === selectedId) ?? null
 
@@ -284,17 +297,29 @@ export function GeometryStudio() {
   }
 
   function addShape(shape: Shape) {
-    dispatch({ type: 'add', shape })
+    placeShapes([shape])
+  }
+
+  /**
+   * วางรูปลงกระดาษ ครั้งละหนึ่งชิ้นหรือหลายชิ้นก็ได้
+   *
+   * แบบที่สั่งสร้างบางแบบได้หลายชิ้นพร้อมกัน เช่น มุมหนึ่งมุมได้แขนสองข้างกับป้ายองศา
+   * ทั้งชุดต้องฉลองครั้งเดียวและโปรยประกายจุดเดียว ไม่ใช่สามรอบซ้อนกัน
+   */
+  function placeShapes(drafts: Shape[]) {
+    if (drafts.length === 0) return
+    const ready = drafts.map((draft) => ({ ...draft, id: makeId() }))
+    for (const shape of ready) dispatch({ type: 'add', shape })
     playSfx('pickup')
     celebrate()
-    burstSparkles(shapeCenter(shape))
+    burstSparkles(shapeCenter(ready[0]))
 
     /*
      * คำชมออกจากปากน้องวงเวียน ไม่ใช่ป้ายแจ้งเตือน
      * เพราะป้ายแจ้งเตือนคือที่ที่เด็กเรียนรู้ว่าจะมองข้ามได้ ส่วนตัวการ์ตูนยังถูกอ่านอยู่
      * และพูดเฉพาะตอนถึงหมุดที่ตั้งไว้ คำชมที่มาทุกครั้งจะกลายเป็นเสียงรบกวนใน 3 นาที
      */
-    const praise = encouragementFor(board.shapes.length + 1)
+    const praise = encouragementFor(board.shapes.length + ready.length)
     if (praise) {
       setPraise(praise)
       if (praiseTimer.current !== null) window.clearTimeout(praiseTimer.current)
@@ -740,6 +765,11 @@ export function GeometryStudio() {
           at: snapPoint(raw),
           label,
         })
+        return
+      }
+
+      case 'build': {
+        placeShapes(buildShapes(recipe, recipeValues, snapPoint(raw), { color, width }))
         return
       }
 
@@ -1407,6 +1437,94 @@ export function GeometryStudio() {
             </button>
           ) : null}
 
+          {tool === 'build' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <p className="text-sm font-bold text-slate-600">เลือกแบบที่จะสร้าง</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {RECIPES.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setRecipeId(item.id)
+                      setRecipeValues(initialValues(item))
+                      playSfx('click')
+                    }}
+                    className={`geo-recipe ${recipeId === item.id ? 'geo-recipe-on' : ''}`}
+                  >
+                    <span aria-hidden="true">{item.emoji}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-2 text-[11px] font-semibold text-slate-500">{recipe.hint}</p>
+
+              <div className="mt-3 space-y-3">
+                {recipe.fields.map((field) => {
+                  const value = valueOf(recipe, recipeValues, field.key)
+                  const set = (next: number) =>
+                    setRecipeValues({
+                      ...recipeValues,
+                      [field.key]: Math.min(field.max, Math.max(field.min, next)),
+                    })
+                  return (
+                    <div key={field.key}>
+                      <div className="geo-field">
+                        <span className="flex-1">{field.label}</span>
+                        <button type="button" onClick={() => set(value - field.step)} aria-label={`ลด${field.label}`}>
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          value={value}
+                          min={field.min}
+                          max={field.max}
+                          step={field.step}
+                          onChange={(event) => set(Number(event.target.value))}
+                          aria-label={field.label}
+                        />
+                        <span className="w-10 text-left">{field.unit}</span>
+                        <button type="button" onClick={() => set(value + field.step)} aria-label={`เพิ่ม${field.label}`}>
+                          +
+                        </button>
+                      </div>
+                      {/* แถบเลื่อน สำหรับคนที่ถนัดเลื่อนมากกว่าพิมพ์ */}
+                      <input
+                        type="range"
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        value={value}
+                        onChange={(event) => set(Number(event.target.value))}
+                        aria-label={`เลื่อนตั้ง${field.label}`}
+                        className="mt-1 w-full accent-emerald-500"
+                      />
+                    </div>
+                  )
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  placeShapes(
+                    buildShapes(recipe, recipeValues, screenToPaper(viewRef.current, 0.5, 0.5, VIEW_WIDTH, VIEW_HEIGHT), {
+                      color,
+                      width,
+                    }),
+                  )
+                }
+                className="geo-chip geo-chip-strong mt-3 w-full"
+              >
+                ⬇️ วางกลางจอ
+              </button>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                หรือจิ้มบนกระดาษตรงที่อยากวางก็ได้ เงาจาง ๆ ที่ปลายเคอร์เซอร์คือรูปที่กำลังจะได้
+              </p>
+            </div>
+          ) : null}
+
           {tool === 'sticker' ? (
             <div className="mt-3 rounded-2xl bg-white/70 p-3">
               <p className="text-sm font-bold text-slate-600">เลือกสติกเกอร์</p>
@@ -1864,6 +1982,23 @@ export function GeometryStudio() {
                       )
                     })()
                   : null}
+
+                {/* เงาจาง ๆ ของรูปที่สั่งไว้ ตามปลายเคอร์เซอร์ไปจนกว่าจะจิ้มวาง */}
+                {tool === 'build' && cursor ? (
+                  <g opacity={0.5} pointerEvents="none">
+                    {buildShapes(recipe, recipeValues, cursor.point, { color, width }).map((draft) => (
+                      <ShapeView
+                        key={draft.id}
+                        shape={draft}
+                        selected={false}
+                        showLengths={showLengths}
+                        showAngles={showAngles}
+                        showFaces={false}
+                        offsets={{}}
+                      />
+                    ))}
+                  </g>
+                ) : null}
 
                 {/* ประกายตอนวาดเสร็จ หายไปเองในหนึ่งวินาที ไม่ติดไปในไฟล์ภาพ */}
                 {sparkles.map((sparkle) => (
