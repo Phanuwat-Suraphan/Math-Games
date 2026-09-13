@@ -6,6 +6,9 @@ on:
     branches:
       - main
       - claude/math-adventure-part-1-n7zxcx
+      # branch ของห้องเรขาคณิต ใส่ไว้ให้เปิดใช้งานจากลิงก์ได้ก่อนรวมเข้า branch หลัก
+      # รวมเข้า branch หลักเมื่อไรแล้วลบบรรทัดนี้ทิ้งได้เลย
+      - claude/focused-noether-4t8neb
   workflow_dispatch:
 
 # สิทธิ์ที่ GitHub Pages ต้องใช้
