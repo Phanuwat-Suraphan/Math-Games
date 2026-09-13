@@ -51,6 +51,18 @@ import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
+import {
+  PROTRACTOR_DEFAULT,
+  RULER_DEFAULT_CM,
+  RULER_MAX_CM,
+  RULER_MIN_CM,
+  PROTRACTOR_MAX,
+  PROTRACTOR_MIN,
+  clampProtractorRadius,
+  clampRulerLength,
+  protractorRadiusFromPointer,
+  rulerLengthFromPointer,
+} from '../geometry/instruments'
 import type { LabelOffsets } from '../geometry/labels'
 import {
   PAPER_THEMES,
@@ -63,14 +75,19 @@ import { PENCIL_COLORS, PENCIL_WIDTHS, TOOLS, findTool } from '../geometry/tools
 import type { ToolId } from '../geometry/tools'
 import {
   HIT_TOLERANCE,
+  applyField,
   describeBoard,
   describeShape,
+  editableFields,
   findShapeAt,
+  rotateShape,
+  scaleShape,
   shapeCenter,
+  shapeReach,
   nearestSnapPoint,
   translateShape,
 } from '../geometry/shapes'
-import type { Shape } from '../geometry/shapes'
+import type { Shape, ShapeField } from '../geometry/shapes'
 import {
   PX_PER_CM,
   accumulateSweep,
@@ -101,8 +118,6 @@ const VIEW_HEIGHT = 680
 const GRID_STEP = PX_PER_CM / 2
 /** ระยะที่ปลายดินสอจะวิ่งไปชนจุดเดิมที่มีอยู่แล้ว */
 const ANCHOR_RADIUS = 16
-const PROTRACTOR_RADIUS = 200
-const RULER_LENGTH_CM = 20
 /** ระยะจากขอบไม้บรรทัดที่ถือว่ากำลังลากดินสอตามไม้บรรทัด */
 const RULER_GUIDE_RANGE = 30
 
@@ -129,6 +144,10 @@ type Drag =
   | { kind: 'pan'; startClient: Point; startView: View }
   /** ลากป้ายตัวเลขหลบไม่ให้บังเส้น เก็บจุดเริ่มไว้เพื่อให้ป้ายไม่กระโดดตอนจับ */
   | { kind: 'label'; key: string; startOffset: Point; startPoint: Point }
+  /** ลากปุ่มย่อขยายรูปที่เลือกอยู่ */
+  | { kind: 'scale-shape'; id: string; origin: Point; startReach: number; start: Shape; marked: boolean }
+  /** ลากปุ่มหมุนรูปที่เลือกอยู่ */
+  | { kind: 'rotate-shape'; id: string; origin: Point; startAngle: number; start: Shape; marked: boolean }
   | { kind: 'compass-move'; grab: Point }
   /** ลากขาดินสอเพื่อกางรัศมี ไม่มีการวาดเกิดขึ้น */
   | { kind: 'compass-spread' }
@@ -156,8 +175,16 @@ export function GeometryStudio() {
   const [showRuler, setShowRuler] = useState(false)
   const [showProtractor, setShowProtractor] = useState(false)
 
-  const [ruler, setRuler] = useState({ origin: { x: 110, y: 560 }, rotation: 0 })
-  const [protractor, setProtractor] = useState({ center: { x: 520, y: 430 }, rotation: 0 })
+  const [ruler, setRuler] = useState({
+    origin: { x: 110, y: 560 },
+    rotation: 0,
+    lengthCm: RULER_DEFAULT_CM,
+  })
+  const [protractor, setProtractor] = useState({
+    center: { x: 520, y: 430 },
+    rotation: 0,
+    radius: PROTRACTOR_DEFAULT,
+  })
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Point[]>([])
@@ -339,7 +366,7 @@ export function GeometryStudio() {
   }
 
   const rulerStart = ruler.origin
-  const rulerEnd = pointAt(ruler.origin, RULER_LENGTH_CM * PX_PER_CM, ruler.rotation)
+  const rulerEnd = pointAt(ruler.origin, ruler.lengthCm * PX_PER_CM, ruler.rotation)
 
   function alongRuler(p: Point): boolean {
     return showRuler && distanceToSegment(p, rulerStart, rulerEnd) <= RULER_GUIDE_RANGE
@@ -463,6 +490,70 @@ export function GeometryStudio() {
     },
     [],
   )
+
+  /**
+   * แทนที่รูปที่เลือกด้วยรูปที่แก้แล้ว
+   *
+   * จดประวัติหนึ่งขั้นต่อการแก้หนึ่งครั้ง เด็กจึงกดย้อนกลับทีละขั้นได้
+   * เหมือนกับการลบเส้นทีละเส้น ไม่ใช่ย้อนกลับทีเดียวหายทั้งชุด
+   */
+  function editSelected(next: Shape) {
+    dispatch({ type: 'mark' })
+    dispatch({
+      type: 'live',
+      shapes: board.shapes.map((shape) => (shape.id === next.id ? next : shape)),
+    })
+  }
+
+  function changeField(field: ShapeField, raw: number) {
+    if (!selected) return
+    const value = Math.min(field.max, Math.max(field.min, Math.round(raw * 100) / 100))
+    editSelected(applyField(selected, field.key, value))
+  }
+
+  function spinSelected(deg: number) {
+    if (!selected) return
+    editSelected(rotateShape(selected, deg, shapeCenter(selected)))
+    playSfx('click')
+  }
+
+  /** จับปุ่มย่อขยายหรือปุ่มหมุนของรูปที่เลือกอยู่ */
+  function handleShapeHandleGrab(
+    part: 'scale' | 'rotate',
+    event: ReactPointerEvent<SVGElement>,
+  ) {
+    event.stopPropagation()
+    if (!selected) return
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+
+    const raw = toPaper(event)
+    svgRef.current?.setPointerCapture(event.pointerId)
+    const origin = shapeCenter(selected)
+
+    if (part === 'scale') {
+      setDrag({
+        kind: 'scale-shape',
+        id: selected.id,
+        origin,
+        startReach: Math.max(12, distance(origin, raw)),
+        start: selected,
+        marked: false,
+      })
+      return
+    }
+
+    setDrag({
+      kind: 'rotate-shape',
+      id: selected.id,
+      origin,
+      startAngle: angleOf(origin, raw),
+      start: selected,
+      marked: false,
+    })
+  }
 
   /** ระยะและจุดกึ่งกลางของสองนิ้วที่แตะอยู่ หน่วยเป็นพิกเซลบนจอ */
   function touchSpan(): { distance: number; middle: Point } | null {
@@ -715,6 +806,33 @@ export function GeometryStudio() {
         setDrag({ kind: 'regular', center: drag.center, edge: raw })
         return
 
+      case 'scale-shape': {
+        /* ย่อขยายรอบใจกลางรูปเอง รูปจึงไม่วิ่งหนีออกจากที่เดิมตอนลาก */
+        const factor = Math.min(6, Math.max(0.15, distance(drag.origin, raw) / drag.startReach))
+        if (!drag.marked) dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: board.shapes.map((shape) =>
+            shape.id === drag.id ? scaleShape(drag.start, factor, drag.origin) : shape,
+          ),
+        })
+        setDrag({ ...drag, marked: true })
+        return
+      }
+
+      case 'rotate-shape': {
+        const turned = angleOf(drag.origin, raw) - drag.startAngle
+        if (!drag.marked) dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: board.shapes.map((shape) =>
+            shape.id === drag.id ? rotateShape(drag.start, turned, drag.origin) : shape,
+          ),
+        })
+        setDrag({ ...drag, marked: true })
+        return
+      }
+
       case 'label': {
         setLabelOffsets((current) => ({
           ...current,
@@ -789,7 +907,9 @@ export function GeometryStudio() {
       }
 
       case 'protractor':
-        if (drag.part === 'rotate') {
+        if (drag.part === 'resize') {
+          setProtractor({ ...protractor, radius: protractorRadiusFromPointer(protractor.center, raw) })
+        } else if (drag.part === 'rotate') {
           setProtractor({
             ...protractor,
             rotation: snapDeg(angleOf(protractor.center, raw), snapOn ? 5 : 1),
@@ -803,7 +923,9 @@ export function GeometryStudio() {
         return
 
       case 'ruler':
-        if (drag.part === 'rotate') {
+        if (drag.part === 'resize') {
+          setRuler({ ...ruler, lengthCm: rulerLengthFromPointer(ruler.origin, ruler.rotation, raw) })
+        } else if (drag.part === 'rotate') {
           setRuler({ ...ruler, rotation: snapDeg(angleOf(ruler.origin, raw), snapOn ? 5 : 1) })
         } else {
           setRuler({ ...ruler, origin: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y } })
@@ -933,7 +1055,7 @@ export function GeometryStudio() {
         color,
         width,
         a: { ...protractor.center },
-        b: pointAt(protractor.center, PROTRACTOR_RADIUS, protractor.rotation + deg),
+        b: pointAt(protractor.center, protractor.radius, protractor.rotation + deg),
       })
       say(`ยิงเส้นที่มุม ${deg}° ออกไปแล้ว`)
       return
@@ -1135,7 +1257,7 @@ export function GeometryStudio() {
   const protractorHighlight = (() => {
     if (!showProtractor || !pointer) return null
     const away = distance(pointer, protractor.center)
-    if (away < PROTRACTOR_RADIUS - 70 || away > PROTRACTOR_RADIUS + 34) return null
+    if (away < protractor.radius - 70 || away > protractor.radius + 34) return null
     const local = normalizeDeg(angleOf(protractor.center, pointer) - protractor.rotation)
     return local <= 180 ? local : null
   })()
@@ -1173,6 +1295,7 @@ export function GeometryStudio() {
   })()
 
   const report = selected ? describeShape(selected) : null
+  const fields = selected ? editableFields(selected) : []
   const boardLines = describeBoard(board.shapes)
 
   const previewPolygon =
@@ -1440,6 +1563,63 @@ export function GeometryStudio() {
               onToggle={() => setShowFaces(!showFaces)}
             />
           </div>
+          {showProtractor ? (
+            <div className="mt-2 rounded-2xl bg-white/70 p-3">
+              <label
+                htmlFor="protractor-size"
+                className="flex items-center justify-between text-xs font-bold text-slate-600"
+              >
+                📐 ขนาดครึ่งวงกลม
+                <span className="geo-badge">{formatCm(protractor.radius)}</span>
+              </label>
+              <input
+                id="protractor-size"
+                type="range"
+                min={PROTRACTOR_MIN}
+                max={PROTRACTOR_MAX}
+                step={10}
+                value={Math.round(protractor.radius)}
+                onChange={(event) =>
+                  setProtractor({
+                    ...protractor,
+                    radius: clampProtractorRadius(Number(event.target.value)),
+                  })
+                }
+                className="mt-1 w-full accent-pink-500"
+              />
+              <p className="text-[11px] font-semibold text-slate-500">
+                อันใหญ่อ่านง่ายบนจอหน้าห้อง อันเล็กไม่บังงาน · มุมไม่ขึ้นกับขนาด วัดได้ตรงกันทุกอัน
+              </p>
+            </div>
+          ) : null}
+
+          {showRuler ? (
+            <div className="mt-2 rounded-2xl bg-white/70 p-3">
+              <label
+                htmlFor="ruler-size"
+                className="flex items-center justify-between text-xs font-bold text-slate-600"
+              >
+                📏 ความยาวไม้บรรทัด
+                <span className="geo-badge">{ruler.lengthCm} ซม.</span>
+              </label>
+              <input
+                id="ruler-size"
+                type="range"
+                min={RULER_MIN_CM}
+                max={RULER_MAX_CM}
+                step={0.5}
+                value={ruler.lengthCm}
+                onChange={(event) =>
+                  setRuler({ ...ruler, lengthCm: clampRulerLength(Number(event.target.value)) })
+                }
+                className="mt-1 w-full accent-amber-500"
+              />
+              <p className="text-[11px] font-semibold text-slate-500">
+                ยืดแล้วได้ขีดเพิ่ม ไม่ใช่ขีดห่างขึ้น หนึ่งเซนติเมตรบนไม้บรรทัดเท่ากับหนึ่งเซนติเมตรบนกระดาษเสมอ
+              </p>
+            </div>
+          ) : null}
+
           <p className="mt-2 text-xs font-semibold text-slate-500">
             ไม้บรรทัดกับครึ่งวงกลมวางทับกระดาษเหมือนของจริง วาดตรงที่มันทับไม่ได้
             ใช้เสร็จแล้วปิดสวิตช์เก็บเข้ากล่องก่อนนะ
@@ -1619,7 +1799,7 @@ export function GeometryStudio() {
                   <RulerOverlay
                     origin={ruler.origin}
                     rotation={ruler.rotation}
-                    lengthCm={RULER_LENGTH_CM}
+                    lengthCm={ruler.lengthCm}
                     onGrab={handleRulerGrab}
                   />
                 ) : null}
@@ -1628,11 +1808,62 @@ export function GeometryStudio() {
                   <ProtractorOverlay
                     center={protractor.center}
                     rotation={protractor.rotation}
-                    radius={PROTRACTOR_RADIUS}
+                    radius={protractor.radius}
                     highlight={protractorHighlight}
                     onGrab={handleProtractorGrab}
                   />
                 ) : null}
+
+                {/*
+                  ปุ่มย่อขยายกับปุ่มหมุนของรูปที่เลือกอยู่
+                  ขนาดปุ่มหารด้วยกำลังขยาย ปุ่มจึงเท่าเดิมบนจอทุกระดับซูม
+                */}
+                {selected && tool === 'select'
+                  ? (() => {
+                      const origin = shapeCenter(selected)
+                      const reach = shapeReach(selected) + 30 / view.scale
+                      const knob = 15 / view.scale
+                      const grip = 24 / view.scale
+                      const scaleAt = pointAt(origin, reach, 45)
+                      const spinAt = pointAt(origin, reach, 135)
+                      return (
+                        <g>
+                          <g
+                            transform={`translate(${scaleAt.x} ${scaleAt.y})`}
+                            onPointerDown={(event) => handleShapeHandleGrab('scale', event)}
+                            className="cursor-grab"
+                          >
+                            <circle r={grip} fill="transparent" />
+                            <circle r={knob} fill="#ede9fe" stroke="#7c3aed" strokeWidth={3 / view.scale} />
+                            <text
+                              textAnchor="middle"
+                              y={5 / view.scale}
+                              fontSize={15 / view.scale}
+                              fill="#5b21b6"
+                            >
+                              ⤢
+                            </text>
+                          </g>
+                          <g
+                            transform={`translate(${spinAt.x} ${spinAt.y})`}
+                            onPointerDown={(event) => handleShapeHandleGrab('rotate', event)}
+                            className="cursor-grab"
+                          >
+                            <circle r={grip} fill="transparent" />
+                            <circle r={knob} fill="#fce7f3" stroke="#db2777" strokeWidth={3 / view.scale} />
+                            <text
+                              textAnchor="middle"
+                              y={5 / view.scale}
+                              fontSize={15 / view.scale}
+                              fill="#9d174d"
+                            >
+                              ↻
+                            </text>
+                          </g>
+                        </g>
+                      )
+                    })()
+                  : null}
 
                 {/* ประกายตอนวาดเสร็จ หายไปเองในหนึ่งวินาที ไม่ติดไปในไฟล์ภาพ */}
                 {sparkles.map((sparkle) => (
@@ -1721,6 +1952,54 @@ export function GeometryStudio() {
                   <li key={line}>• {line}</li>
                 ))}
               </ul>
+              {fields.length > 0 ? (
+                <div className="mt-3 space-y-2">
+                  {fields.map((field) => (
+                    <div key={field.key} className="geo-field">
+                      <span className="flex-1">{field.label}</span>
+                      <button
+                        type="button"
+                        onClick={() => changeField(field, field.value - field.step)}
+                        aria-label={`ลด${field.label}`}
+                      >
+                        −
+                      </button>
+                      <input
+                        type="number"
+                        value={field.value}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        onChange={(event) => changeField(field, Number(event.target.value))}
+                        aria-label={field.label}
+                      />
+                      <span className="w-8 text-left">{field.unit}</span>
+                      <button
+                        type="button"
+                        onClick={() => changeField(field, field.value + field.step)}
+                        aria-label={`เพิ่ม${field.label}`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => spinSelected(15)} className="geo-chip flex-1">
+                  ↺ 15°
+                </button>
+                <button type="button" onClick={() => spinSelected(-15)} className="geo-chip flex-1">
+                  ↻ 15°
+                </button>
+              </div>
+
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                บนกระดาษมีปุ่ม ⤢ ไว้ลากย่อขยาย และปุ่ม ↻ ไว้ลากหมุน
+                ทั้งสองอย่างทำรอบใจกลางรูป รูปจึงอยู่ที่เดิม
+              </p>
+
               <button type="button" onClick={removeSelected} className="geo-chip mt-3 w-full">
                 🗑️ ลบรูปนี้
               </button>

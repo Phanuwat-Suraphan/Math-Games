@@ -6,6 +6,7 @@
  */
 
 import {
+  PX_PER_CM,
   angleBetween,
   circleIntersections,
   circleSegmentIntersections,
@@ -27,6 +28,7 @@ import {
   polygonPerimeter,
   sumInteriorAngles,
   toCm,
+  normalizeDeg,
 } from './geo'
 import type { Point } from './geo'
 
@@ -505,4 +507,295 @@ export function describeBoard(shapes: Shape[]): string[] {
   if (segments.length > 0) lines.push(`ส่วนของเส้นตรง ${segments.length} เส้น`)
   if (lines.length === 0) lines.push('กระดาษยังว่างอยู่ เลือกเครื่องมือทางซ้ายแล้วเริ่มวาดได้เลย')
   return lines
+}
+
+/* ------------------------------------------------------------------ */
+/* การย่อขยาย หมุน และตั้งค่าตัวเลขของรูปที่วาดไปแล้ว                      */
+/* ------------------------------------------------------------------ */
+
+/**
+ * ทำไมรูปที่วาดไปแล้วต้องแก้ได้
+ *
+ * เด็กวาดสามเหลี่ยมเสร็จแล้วอ่านค่าได้ว่าด้านยาว 3.7 ซม. ทั้งที่ครูสั่ง 4 ซม.
+ * ถ้าแก้ไม่ได้ ทางเดียวคือลบทิ้งแล้ววาดใหม่ ซึ่งได้ 3.9 แล้วก็ลบอีก
+ * เด็กจะสรุปว่าตัวเองวาดไม่เก่ง ทั้งที่ปัญหาคือเครื่องมือไม่ให้แก้
+ *
+ * การย่อขยายกับหมุนทุกแบบทำรอบใจกลางของรูปเอง รูปจึงไม่วิ่งหนีออกจากที่เดิม
+ */
+
+/** ย่อขยายรูปรอบจุดหนึ่ง */
+export function scaleShape(shape: Shape, factor: number, origin: Point): Shape {
+  const pull = (p: Point): Point => ({
+    x: origin.x + (p.x - origin.x) * factor,
+    y: origin.y + (p.y - origin.y) * factor,
+  })
+
+  switch (shape.kind) {
+    case 'segment':
+      return { ...shape, a: pull(shape.a), b: pull(shape.b) }
+    case 'circle':
+      return { ...shape, center: pull(shape.center), radius: shape.radius * factor }
+    case 'arc':
+      return { ...shape, center: pull(shape.center), radius: shape.radius * factor }
+    case 'polygon':
+      return { ...shape, points: shape.points.map(pull) }
+    case 'dot':
+      return { ...shape, at: pull(shape.at) }
+    case 'angle':
+      return { ...shape, vertex: pull(shape.vertex), a: pull(shape.a), b: pull(shape.b) }
+    case 'sticker':
+      return {
+        ...shape,
+        at: pull(shape.at),
+        size: Math.min(160, Math.max(16, shape.size * factor)),
+      }
+    default:
+      return shape
+  }
+}
+
+/** หมุนรูปรอบจุดหนึ่ง ทวนเข็มนาฬิกาเป็นบวกเหมือนที่เรียนในห้อง */
+export function rotateShape(shape: Shape, deg: number, origin: Point): Shape {
+  const spin = (p: Point): Point => pointAt(origin, distance(origin, p), angleOf(origin, p) + deg)
+
+  switch (shape.kind) {
+    case 'segment':
+      return { ...shape, a: spin(shape.a), b: spin(shape.b) }
+    case 'circle':
+      return { ...shape, center: spin(shape.center) }
+    case 'arc':
+      return { ...shape, center: spin(shape.center), start: normalizeDeg(shape.start + deg) }
+    case 'polygon':
+      return { ...shape, points: shape.points.map(spin) }
+    case 'dot':
+      return { ...shape, at: spin(shape.at) }
+    case 'angle':
+      return { ...shape, vertex: spin(shape.vertex), a: spin(shape.a), b: spin(shape.b) }
+    case 'sticker':
+      return { ...shape, at: spin(shape.at) }
+    default:
+      return shape
+  }
+}
+
+/** ระยะจากใจกลางรูปถึงขอบนอกสุด ใช้วางปุ่มย่อขยายให้ไม่ทับตัวรูป */
+export function shapeReach(shape: Shape): number {
+  switch (shape.kind) {
+    case 'segment':
+      return distance(shape.a, shape.b) / 2
+    case 'circle':
+    case 'arc':
+      return shape.radius
+    case 'polygon': {
+      const center = polygonCentroid(shape.points)
+      return shape.points.reduce((far, point) => Math.max(far, distance(center, point)), 0)
+    }
+    case 'dot':
+      return 10
+    case 'angle':
+      return Math.max(distance(shape.vertex, shape.a), distance(shape.vertex, shape.b))
+    case 'sticker':
+      return shape.size * 0.6
+    default:
+      return 30
+  }
+}
+
+/**
+ * ช่องตั้งค่าตัวเลขของรูปที่เลือกอยู่
+ *
+ * เปิดเฉพาะค่าที่เด็กได้ยินจากปากครูจริง ๆ เช่น "ยาว 4 เซนติเมตร" "มุม 108 องศา"
+ * ไม่ใช่ค่าภายในอย่างพิกัดหรือตัวคูณ ซึ่งเด็กไม่มีทางรู้ว่าควรใส่เท่าไร
+ */
+export interface ShapeField {
+  key: string
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  unit: string
+}
+
+export function editableFields(shape: Shape): ShapeField[] {
+  switch (shape.kind) {
+    case 'segment':
+      return [
+        {
+          key: 'length',
+          label: 'ความยาว',
+          value: Math.round(toCm(distance(shape.a, shape.b)) * 10) / 10,
+          min: 0.5,
+          max: 24,
+          step: 0.5,
+          unit: 'ซม.',
+        },
+        {
+          key: 'tilt',
+          label: 'ทำมุมกับแนวนอน',
+          value: Math.round(angleOf(shape.a, shape.b)),
+          min: 0,
+          max: 359,
+          step: 5,
+          unit: '°',
+        },
+      ]
+
+    case 'circle':
+      return [
+        {
+          key: 'radius',
+          label: 'รัศมี',
+          value: Math.round(toCm(shape.radius) * 10) / 10,
+          min: 0.5,
+          max: 10,
+          step: 0.5,
+          unit: 'ซม.',
+        },
+      ]
+
+    case 'arc':
+      return [
+        {
+          key: 'radius',
+          label: 'รัศมี',
+          value: Math.round(toCm(shape.radius) * 10) / 10,
+          min: 0.5,
+          max: 10,
+          step: 0.5,
+          unit: 'ซม.',
+        },
+        {
+          key: 'sweep',
+          label: 'มุมที่จุดศูนย์กลาง',
+          value: Math.round(Math.abs(shape.sweep)),
+          min: 5,
+          max: 360,
+          step: 5,
+          unit: '°',
+        },
+      ]
+
+    case 'polygon': {
+      if (!shape.closed || shape.points.length < 3) return []
+      const sides = shape.points.map((point, index) =>
+        distance(point, shape.points[(index + 1) % shape.points.length]),
+      )
+      const equal = Math.max(...sides) - Math.min(...sides) < 2
+      /*
+       * ด้านเท่ากันหมด ใช้ความยาวด้านซึ่งเป็นตัวเลขที่ครูสั่งจริง
+       * ด้านไม่เท่ากัน ใช้ความยาวรอบรูปแทน เพราะเป็นค่าเดียวที่นิยามได้กับทุกรูป
+       */
+      return equal
+        ? [
+            {
+              key: 'side',
+              label: 'ด้านละ',
+              value: Math.round(toCm(sides[0]) * 10) / 10,
+              min: 0.5,
+              max: 12,
+              step: 0.5,
+              unit: 'ซม.',
+            },
+          ]
+        : [
+            {
+              key: 'perimeter',
+              label: 'ความยาวรอบรูป',
+              value: Math.round(toCm(polygonPerimeter(shape.points)) * 10) / 10,
+              min: 2,
+              max: 80,
+              step: 1,
+              unit: 'ซม.',
+            },
+          ]
+    }
+
+    case 'angle':
+      return [
+        {
+          key: 'angle',
+          label: 'ขนาดมุม',
+          value: Math.round(angleBetween(shape.a, shape.vertex, shape.b)),
+          min: 1,
+          max: 179,
+          step: 1,
+          unit: '°',
+        },
+      ]
+
+    case 'sticker':
+      return [
+        {
+          key: 'size',
+          label: 'ขนาด',
+          value: Math.round(toCm(shape.size) * 10) / 10,
+          min: 0.5,
+          max: 4,
+          step: 0.5,
+          unit: 'ซม.',
+        },
+      ]
+
+    default:
+      return []
+  }
+}
+
+/** ใส่ค่าใหม่ให้รูป คืนรูปใหม่เสมอ ไม่แก้ของเดิม */
+export function applyField(shape: Shape, key: string, value: number): Shape {
+  if (!Number.isFinite(value)) return shape
+
+  if (shape.kind === 'segment' && key === 'length') {
+    const length = Math.max(4, value * PX_PER_CM)
+    /* ยึดปลายข้างแรกไว้ เพราะเด็กคิดว่า "ลากจากจุด A ไป 4 เซนติเมตร" */
+    return { ...shape, b: pointAt(shape.a, length, angleOf(shape.a, shape.b)) }
+  }
+
+  if (shape.kind === 'segment' && key === 'tilt') {
+    return { ...shape, b: pointAt(shape.a, distance(shape.a, shape.b), value) }
+  }
+
+  if (shape.kind === 'circle' && key === 'radius') {
+    return { ...shape, radius: Math.max(4, value * PX_PER_CM) }
+  }
+
+  if (shape.kind === 'arc' && key === 'radius') {
+    return { ...shape, radius: Math.max(4, value * PX_PER_CM) }
+  }
+
+  if (shape.kind === 'arc' && key === 'sweep') {
+    const size = Math.min(360, Math.max(1, value))
+    /* คงทิศการกวาดเดิมไว้ ส่วนโค้งจะได้ไม่กระโดดไปอีกฝั่งของวงกลม */
+    return { ...shape, sweep: shape.sweep < 0 ? -size : size }
+  }
+
+  if (shape.kind === 'polygon' && (key === 'side' || key === 'perimeter')) {
+    const points = shape.points
+    const current =
+      key === 'side'
+        ? distance(points[0], points[1 % points.length])
+        : polygonPerimeter(points)
+    if (current <= 0) return shape
+    const factor = (value * PX_PER_CM) / current
+    if (!Number.isFinite(factor) || factor <= 0) return shape
+    return scaleShape(shape, factor, polygonCentroid(points))
+  }
+
+  if (shape.kind === 'angle' && key === 'angle') {
+    const size = Math.min(179, Math.max(1, value))
+    const from = angleOf(shape.vertex, shape.a)
+    /* หมุนแขนข้างที่สองไปให้ได้มุมตามที่ขอ โดยหมุนไปทางเดิมที่มันเคยกางอยู่ */
+    const turn = normalizeDeg(angleOf(shape.vertex, shape.b) - from) <= 180 ? 1 : -1
+    return {
+      ...shape,
+      b: pointAt(shape.vertex, distance(shape.vertex, shape.b), from + turn * size),
+    }
+  }
+
+  if (shape.kind === 'sticker' && key === 'size') {
+    return { ...shape, size: Math.min(160, Math.max(16, value * PX_PER_CM)) }
+  }
+
+  return shape
 }

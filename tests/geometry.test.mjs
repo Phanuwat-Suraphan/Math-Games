@@ -43,6 +43,7 @@ const I = load('geometry/input')
 const W = load('geometry/view')
 const C = load('geometry/cute')
 const B_LABELS = load('geometry/labels')
+const N = load('geometry/instruments')
 
 let passed = 0
 const failures = []
@@ -506,6 +507,206 @@ check('บัตรภารกิจต้องบอกขั้นตอน�
     assert(mission.learn.length > 10, `ภารกิจ ${mission.id} ไม่ได้บอกว่าได้เรียนรู้อะไร`)
   }
   assert(M.nextMissionIndex(M.MISSIONS.length - 1) === 0, 'ภารกิจใบสุดท้ายต้องวนกลับใบแรก')
+})
+
+/* ---------------------------------------------------------------- */
+/* ย่อขยาย หมุน และตั้งค่าตัวเลขของรูป                                   */
+/* ---------------------------------------------------------------- */
+
+check('ย่อขยายรูปรอบใจกลาง รูปต้องอยู่ที่เดิมและสัดส่วนต้องคงเดิม', () => {
+  const poly = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 500, y: 400 }, 100, 5),
+  }
+  const middle = G.polygonCentroid(poly.points)
+  const bigger = S.scaleShape(poly, 2, middle)
+  const after = G.polygonCentroid(bigger.points)
+
+  close(after.x, middle.x, 0.0001, 'ขยายแล้วรูปวิ่งหนีไปทางแนวนอน')
+  close(after.y, middle.y, 0.0001, 'ขยายแล้วรูปวิ่งหนีไปทางแนวดิ่ง')
+  close(
+    G.distance(bigger.points[0], bigger.points[1]) / G.distance(poly.points[0], poly.points[1]),
+    2,
+    0.0001,
+    'ด้านไม่ได้ขยายเป็นสองเท่า',
+  )
+  /* มุมภายในต้องไม่เปลี่ยนเลย นี่คือสิ่งที่ทำให้การย่อขยายปลอดภัยต่อบทเรียน */
+  const before = G.interiorAngles(poly.points)
+  const now = G.interiorAngles(bigger.points)
+  for (let i = 0; i < before.length; i += 1) {
+    close(now[i], before[i], 0.0001, 'ขยายแล้วมุมภายในเปลี่ยน ซึ่งผิดหลักคณิตศาสตร์')
+  }
+})
+
+check('หมุนรูปแล้วขนาดทุกอย่างต้องเท่าเดิม', () => {
+  const poly = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 300, y: 300 }, 80, 4),
+  }
+  const middle = G.polygonCentroid(poly.points)
+  const spun = S.rotateShape(poly, 37, middle)
+  close(
+    G.polygonPerimeter(spun.points),
+    G.polygonPerimeter(poly.points),
+    0.0001,
+    'หมุนแล้วความยาวรอบรูปเปลี่ยน',
+  )
+  close(G.polygonCentroid(spun.points).x, middle.x, 0.0001, 'หมุนแล้วรูปเลื่อนที่')
+
+  /* ส่วนโค้งต้องหมุนมุมเริ่มตามไปด้วย ไม่งั้นโค้งจะกระโดดไปอีกฝั่ง */
+  const arc = {
+    kind: 'arc',
+    id: 'a',
+    color: '#000',
+    width: 2,
+    center: { x: 0, y: 0 },
+    radius: 100,
+    start: 0,
+    sweep: 90,
+  }
+  const spunArc = S.rotateShape(arc, 45, { x: 0, y: 0 })
+  close(spunArc.start, 45, 0.0001, 'ส่วนโค้งไม่ได้หมุนมุมเริ่มตาม')
+  close(spunArc.sweep, 90, 0.0001, 'หมุนแล้วขนาดของส่วนโค้งเปลี่ยน')
+})
+
+check('ตั้งความยาวเส้นเป็นตัวเลข ต้องได้ตรงเป๊ะและปลายข้างแรกอยู่ที่เดิม', () => {
+  const line = segment('s', { x: 100, y: 100 }, { x: 220, y: 100 })
+  const fixed = S.applyField(line, 'length', 4)
+  close(G.distance(fixed.a, fixed.b) / G.PX_PER_CM, 4, 0.0001, 'ความยาวไม่ตรงกับที่ตั้ง')
+  close(fixed.a.x, 100, 0.0001, 'ปลายข้างแรกขยับ ทั้งที่ควรยึดไว้')
+  close(
+    G.angleOf(fixed.a, fixed.b),
+    G.angleOf(line.a, line.b),
+    0.0001,
+    'ตั้งความยาวแล้วทิศของเส้นเปลี่ยน',
+  )
+
+  const tilted = S.applyField(line, 'tilt', 30)
+  close(G.angleOf(tilted.a, tilted.b), 30, 0.0001, 'ตั้งมุมแล้วไม่ได้ 30 องศา')
+  close(
+    G.distance(tilted.a, tilted.b),
+    G.distance(line.a, line.b),
+    0.0001,
+    'ตั้งมุมแล้วความยาวเปลี่ยน',
+  )
+})
+
+check('ตั้งขนาดมุมที่วัดไว้ ต้องได้องศาตามที่ขอจริง', () => {
+  /* นี่คือวิธีสร้างมุม 108 องศาสำหรับห้าเหลี่ยมด้านเท่า โดยไม่ต้องกะเอา */
+  const angle = {
+    kind: 'angle',
+    id: 'g',
+    color: '#000',
+    width: 2,
+    vertex: { x: 0, y: 0 },
+    a: { x: 100, y: 0 },
+    b: { x: 70, y: -70 },
+  }
+  for (const want of [30, 90, 108, 170]) {
+    const fixed = S.applyField(angle, 'angle', want)
+    close(
+      G.angleBetween(fixed.a, fixed.vertex, fixed.b),
+      want,
+      0.0001,
+      `ตั้งมุม ${want} องศาแล้วไม่ได้ตามนั้น`,
+    )
+    close(
+      G.distance(fixed.vertex, fixed.b),
+      G.distance(angle.vertex, angle.b),
+      0.0001,
+      'ตั้งมุมแล้วความยาวแขนเปลี่ยน',
+    )
+  }
+})
+
+check('ตั้งด้านของรูปด้านเท่า และรอบรูปของรูปเบี้ยว', () => {
+  const regular = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 400, y: 300 }, 90, 6),
+  }
+  const sized = S.applyField(regular, 'side', 3)
+  close(
+    G.distance(sized.points[0], sized.points[1]) / G.PX_PER_CM,
+    3,
+    0.0001,
+    'ตั้งด้านละ 3 ซม. แล้วไม่ได้ 3',
+  )
+  assert(S.editableFields(regular)[0].key === 'side', 'รูปด้านเท่าควรให้ตั้งความยาวด้าน')
+
+  const bent = {
+    ...regular,
+    id: 'q',
+    points: [
+      { x: 0, y: 0 },
+      { x: 200, y: 20 },
+      { x: 160, y: 180 },
+    ],
+  }
+  assert(S.editableFields(bent)[0].key === 'perimeter', 'รูปด้านไม่เท่าควรให้ตั้งความยาวรอบรูป')
+  const scaled = S.applyField(bent, 'perimeter', 20)
+  close(
+    G.polygonPerimeter(scaled.points) / G.PX_PER_CM,
+    20,
+    0.0001,
+    'ตั้งความยาวรอบรูปแล้วไม่ตรง',
+  )
+})
+
+check('ค่าที่ใส่ผิด ๆ ต้องไม่ทำให้รูปพัง', () => {
+  const circle = { kind: 'circle', id: 'c', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 100 }
+  assert(S.applyField(circle, 'radius', Number.NaN) === circle, 'ค่า NaN ต้องไม่ถูกนำไปใช้')
+  assert(S.applyField(circle, 'ไม่มีช่องนี้', 5) === circle, 'ช่องที่ไม่รู้จักต้องไม่เปลี่ยนอะไร')
+  assert(S.applyField(circle, 'radius', 0).radius > 0, 'รัศมีต้องไม่กลายเป็นศูนย์จนรูปหายไป')
+})
+
+check('ปุ่มย่อขยายต้องวางนอกตัวรูปเสมอ', () => {
+  const circle = { kind: 'circle', id: 'c', color: '#000', width: 2, center: { x: 0, y: 0 }, radius: 100 }
+  close(S.shapeReach(circle), 100, 0.0001, 'ระยะขอบนอกของวงกลมควรเท่ารัศมี')
+  close(S.shapeReach(segment('s', { x: 0, y: 0 }, { x: 100, y: 0 })), 50, 0.0001, 'เส้นตรงควรได้ครึ่งความยาว')
+  const poly = {
+    kind: 'polygon',
+    id: 'p',
+    color: '#000',
+    width: 2,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 0, y: 0 }, 120, 5),
+  }
+  close(S.shapeReach(poly), 120, 0.0001, 'รูปหลายเหลี่ยมควรได้ระยะถึงจุดยอดที่ไกลสุด')
+})
+
+check('อุปกรณ์ย่อขยายได้ในช่วงที่อ่านค่าได้จริง', () => {
+  assert(N.clampProtractorRadius(10) === N.PROTRACTOR_MIN, 'ครึ่งวงกลมเล็กเกินต้องถูกดึงกลับ')
+  assert(N.clampProtractorRadius(9999) === N.PROTRACTOR_MAX, 'ครึ่งวงกลมใหญ่เกินต้องถูกดึงกลับ')
+  assert(N.clampRulerLength(0) === N.RULER_MIN_CM, 'ไม้บรรทัดสั้นเกินต้องถูกดึงกลับ')
+  assert(N.clampRulerLength(99) === N.RULER_MAX_CM, 'ไม้บรรทัดยาวเกินต้องถูกดึงกลับ')
+  /* ความยาวไม้บรรทัดต้องเป็นครึ่งเซนติเมตรลงตัวเสมอ จะได้อ่านเป็นตัวเลขกลม ๆ */
+  close(N.clampRulerLength(12.3), 12.5, 0.0001, 'ความยาวไม้บรรทัดไม่ถูกปัดเป็นครึ่งเซนติเมตร')
+
+  /* ลากปุ่มยืดไม้บรรทัด ใช้เงาที่ตกบนแนวไม้ นิ้วที่เลื่อนออกนอกแนวจึงไม่ทำให้ยืดเกินจริง */
+  const straight = N.rulerLengthFromPointer({ x: 0, y: 0 }, 0, { x: 10 * G.PX_PER_CM, y: 0 })
+  close(straight, 10, 0.0001, 'ลากตรง ๆ แล้วความยาวไม่ตรง')
+  const offAxis = N.rulerLengthFromPointer({ x: 0, y: 0 }, 0, { x: 10 * G.PX_PER_CM, y: 300 })
+  close(offAxis, 10, 0.0001, 'นิ้วเลื่อนออกนอกแนวไม้แล้วไม้ยืดเกินจริง')
+
+  /* ไม้บรรทัดที่หมุนไปแล้วก็ต้องยืดตามแนวของตัวเอง ไม่ใช่ตามแนวนอนของจอ */
+  const turned = N.rulerLengthFromPointer({ x: 0, y: 0 }, 90, { x: 0, y: -8 * G.PX_PER_CM })
+  close(turned, 8, 0.0001, 'ไม้บรรทัดที่หมุนแล้วยืดผิดแนว')
 })
 
 /* ---------------------------------------------------------------- */
