@@ -495,6 +495,12 @@ check('ทุกเครื่องมือต้องมีคำแนะ�
   for (const tool of T.TOOLS) {
     assert(tool.hint.length > 10, `${tool.id} ไม่มีคำแนะนำให้น้องวงเวียนพูด`)
     assert(tool.steps.length >= 2, `${tool.id} มีขั้นตอนไม่ครบ`)
+    /*
+     * ชื่อสั้นใช้บนปุ่มที่กว้างแค่หนึ่งในสามของแผง
+     * ชื่อยาวเกินจะตัดบรรทัดจนปุ่มสูงไม่เท่ากันทั้งตาราง แล้วตารางจะดูเบี้ยว
+     */
+    assert(tool.short.length > 0, `${tool.id} ไม่มีชื่อสั้นสำหรับปุ่มในตาราง`)
+    assert(tool.short.length <= 12, `${tool.id} ชื่อสั้นยาวเกินไป (${tool.short})`)
     assert(T.findTool(tool.id).id === tool.id, `หาเครื่องมือ ${tool.id} ไม่เจอ`)
   }
   assert(T.PENCIL_COLORS.length >= 4, 'สีดินสอน้อยเกินไป')

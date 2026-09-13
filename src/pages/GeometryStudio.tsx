@@ -13,6 +13,7 @@
  */
 
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGame } from '../context/useGame'
@@ -217,6 +218,15 @@ export function GeometryStudio() {
   const [themeId, setThemeId] = useState(PAPER_THEMES[0].id)
   const [sticker, setSticker] = useState(STICKERS[0].emoji)
   /** กล่องถามจำนวนด้านกับความยาวด้าน ตอนจิ้มด้วยเครื่องมือรูปด้านเท่า */
+  /**
+   * หมวดไหนกางอยู่บ้าง
+   *
+   * สีกับเส้นและตัวช่วยกางไว้ตั้งแต่แรก เพราะเป็นสองอย่างที่เปลี่ยนบ่อยที่สุด
+   * ส่วนกระดาษพับไว้ เพราะเลือกครั้งเดียวตอนต้นคาบแล้วไม่ยุ่งอีกเลย
+   */
+  const [openSections, setOpenSections] = useState({ pen: true, paper: false, helpers: true })
+  /** การ์ดต้อนรับบนกระดาษเปล่า หายไปเองเมื่อวาดรูปแรก */
+  const [showWelcome, setShowWelcome] = useState(true)
   const [polygonAsk, setPolygonAsk] = useState<Point | null>(null)
   const [askSideCm, setAskSideCm] = useState(3)
   const [recipeId, setRecipeId] = useState(RECIPES[0].id)
@@ -314,6 +324,7 @@ export function GeometryStudio() {
   function placeShapes(drafts: Shape[]) {
     if (drafts.length === 0) return
     const ready = drafts.map((draft) => ({ ...draft, id: makeId() }))
+    setShowWelcome(false)
     for (const shape of ready) dispatch({ type: 'add', shape })
     playSfx('pickup')
     celebrate()
@@ -1266,6 +1277,23 @@ export function GeometryStudio() {
   /* ปุ่มลัดสำหรับครูที่ใช้คีย์บอร์ด เด็กใช้ปุ่มบนจอได้เหมือนกัน */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
+      /*
+       * ไม่แตะปุ่มลัดเลย ถ้าเด็กกำลังพิมพ์ตัวเลขอยู่ในช่องตั้งค่า
+       * ไม่งั้นการพิมพ์เลข 5 จะกลายเป็นการสลับเครื่องมือกลางคัน
+       */
+      const target = event.target as HTMLElement | null
+      const typing =
+        target !== null && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+
+      if (!typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const slot = Number(event.key)
+        if (Number.isInteger(slot) && slot >= 1 && slot <= Math.min(9, TOOLS.length)) {
+          event.preventDefault()
+          chooseTool(TOOLS[slot - 1].id)
+          return
+        }
+      }
+
       if (event.key === 'Escape') {
         setDraft([])
         setAnglePicks([])
@@ -1408,19 +1436,27 @@ export function GeometryStudio() {
         {/* กล่องดินสอ */}
         <aside className="geo-panel order-2 lg:order-1">
           <h2 className="geo-heading">🧰 กล่องเครื่องมือ</h2>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
-            {TOOLS.map((item) => (
+          {/*
+            เรียงเป็นตารางสามช่อง ไม่ใช่รายการแถวยาว
+            เครื่องมือมีสิบเอ็ดชิ้น ถ้าเรียงเป็นแถวจะยาวเกินหนึ่งหน้าจอ
+            เด็กต้องเลื่อนหาเครื่องมือที่ใช้บ่อยที่สุดทุกครั้งที่จะเปลี่ยน
+            ตัวเลขมุมบนคือปุ่มลัดบนแป้นพิมพ์ ครูที่ใช้คอมพิวเตอร์กดสลับได้เร็ว
+          */}
+          <div className="grid grid-cols-3 gap-1.5">
+            {TOOLS.map((item, index) => (
               <button
                 key={item.id}
                 type="button"
                 onClick={() => chooseTool(item.id)}
                 style={tool === item.id ? { backgroundColor: item.tint } : undefined}
-                className={`geo-tool ${tool === item.id ? 'geo-tool-active' : ''}`}
+                className={`geo-tile ${tool === item.id ? 'geo-tile-on' : ''}`}
+                title={`${item.label} (กดปุ่ม ${index + 1})`}
               >
-                <span className="text-xl" aria-hidden="true">
+                {index < 9 ? <span className="geo-tile-key">{index + 1}</span> : null}
+                <span className="text-2xl leading-none" aria-hidden="true">
                   {item.emoji}
                 </span>
-                <span>{item.label}</span>
+                <span className="geo-tile-name">{item.short}</span>
               </button>
             ))}
           </div>
@@ -1621,8 +1657,12 @@ export function GeometryStudio() {
             </div>
           ) : null}
 
-          <h2 className="geo-heading mt-4">🖍️ สีดินสอ</h2>
-          <div className="flex flex-wrap gap-2">
+          <Section
+            title="🖍️ สีและเส้น"
+            open={openSections.pen}
+            onToggle={() => setOpenSections({ ...openSections, pen: !openSections.pen })}
+          >
+          <div className="flex flex-wrap gap-1.5">
             {PENCIL_COLORS.map((item) => (
               <button
                 key={item.value}
@@ -1631,15 +1671,15 @@ export function GeometryStudio() {
                 aria-label={`สี${item.label}`}
                 title={item.label}
                 style={{ backgroundColor: item.value }}
-                className={`h-9 w-9 rounded-full border-4 transition ${
+                className={`h-8 w-8 rounded-full border-[3px] transition ${
                   color === item.value ? 'border-white shadow-lg scale-110' : 'border-white/60'
                 }`}
               />
             ))}
           </div>
 
-          <h2 className="geo-heading mt-4">✒️ ความหนา</h2>
-          <div className="flex gap-2">
+          <p className="mt-3 text-xs font-bold text-slate-500">ความหนาเส้น</p>
+          <div className="mt-1 flex gap-2">
             {PENCIL_WIDTHS.map((item) => (
               <button
                 key={item.value}
@@ -1652,7 +1692,13 @@ export function GeometryStudio() {
             ))}
           </div>
 
-          <h2 className="geo-heading mt-4">🎀 กระดาษ</h2>
+          </Section>
+
+          <Section
+            title="🎀 กระดาษ"
+            open={openSections.paper}
+            onToggle={() => setOpenSections({ ...openSections, paper: !openSections.paper })}
+          >
           <div className="grid grid-cols-2 gap-2">
             {PAPER_THEMES.map((item) => (
               <button
@@ -1671,31 +1717,41 @@ export function GeometryStudio() {
             ))}
           </div>
 
-          <h2 className="geo-heading mt-4">🔧 อุปกรณ์ช่วย</h2>
-          <div className="grid gap-2">
-            <ToggleRow
-              label="📐 ครึ่งวงกลมวัดมุม"
+          </Section>
+
+          <Section
+            title="🔧 ตัวช่วยบนกระดาษ"
+            open={openSections.helpers}
+            onToggle={() => setOpenSections({ ...openSections, helpers: !openSections.helpers })}
+          >
+          {/*
+            เปลี่ยนจากสวิตช์เต็มความกว้างเจ็ดแถว มาเป็นชิปเล็ก ๆ ที่เรียงต่อกัน
+            เจ็ดแถวกินพื้นที่เกือบครึ่งแผงทั้งที่เป็นแค่การเปิดปิด
+            ชิปที่ติดจะมีสีเขียว มองปราดเดียวก็รู้ว่าตอนนี้เปิดอะไรอยู่บ้าง
+          */}
+          <div className="flex flex-wrap gap-1.5">
+            <ToggleChip
+              label="ครึ่งวงกลม"
+              emoji="📐"
               on={showProtractor}
               onToggle={() => setShowProtractor(!showProtractor)}
             />
-            <ToggleRow
-              label="📏 ไม้บรรทัด"
+            <ToggleChip
+              label="ไม้บรรทัด"
+              emoji="📏"
               on={showRuler}
               onToggle={() => setShowRuler(!showRuler)}
             />
-            <ToggleRow label="🔲 เส้นตาราง" on={showGrid} onToggle={() => setShowGrid(!showGrid)} />
-            <ToggleRow label="🧲 แม่เหล็กดูดจุด" on={snapOn} onToggle={() => setSnapOn(!snapOn)} />
-            <ToggleRow
-              label="🔢 โชว์ความยาว"
+            <ToggleChip label="เส้นตาราง" emoji="🔲" on={showGrid} onToggle={() => setShowGrid(!showGrid)} />
+            <ToggleChip label="แม่เหล็ก" emoji="🧲" on={snapOn} onToggle={() => setSnapOn(!snapOn)} />
+            <ToggleChip
+              label="ความยาว"
+              emoji="🔢"
               on={showLengths}
               onToggle={() => setShowLengths(!showLengths)}
             />
-            <ToggleRow label="📐 โชว์มุม" on={showAngles} onToggle={() => setShowAngles(!showAngles)} />
-            <ToggleRow
-              label="👀 ใส่หน้าให้รูป"
-              on={showFaces}
-              onToggle={() => setShowFaces(!showFaces)}
-            />
+            <ToggleChip label="มุม" emoji="📐" on={showAngles} onToggle={() => setShowAngles(!showAngles)} />
+            <ToggleChip label="หน้าตา" emoji="👀" on={showFaces} onToggle={() => setShowFaces(!showFaces)} />
           </div>
           {showProtractor ? (
             <div className="mt-2 rounded-2xl bg-white/70 p-3">
@@ -1758,6 +1814,7 @@ export function GeometryStudio() {
             ไม้บรรทัดกับครึ่งวงกลมวางทับกระดาษเหมือนของจริง วาดตรงที่มันทับไม่ได้
             ใช้เสร็จแล้วปิดสวิตช์เก็บเข้ากล่องก่อนนะ
           </p>
+          </Section>
         </aside>
 
         {/* กระดาษวาด */}
@@ -2053,6 +2110,36 @@ export function GeometryStudio() {
               </g>
             </svg>
 
+            {showWelcome && board.shapes.length === 0 ? (
+              /*
+                การ์ดนี้ไม่รับการคลิกเลย ยกเว้นปุ่มปิด
+                เด็กที่ลากเส้นทับการ์ดจึงได้เส้น ไม่ใช่ติดค้างอยู่ที่การ์ด
+              */
+              <div className="geo-welcome" aria-live="polite">
+                <p className="text-base font-extrabold text-violet-700">
+                  🎨 ยินดีต้อนรับสู่ห้องเรขาคณิต
+                </p>
+                <ol className="mt-2 space-y-1 text-sm font-semibold text-slate-600">
+                  <li>
+                    <span className="geo-step">1</span> เลือกเครื่องมือจากกล่องทางซ้าย
+                  </li>
+                  <li>
+                    <span className="geo-step">2</span> ลากหรือจิ้มบนกระดาษได้เลย
+                  </li>
+                  <li>
+                    <span className="geo-step">3</span> จิ้มรูปด้วย 🤏 เพื่อดูความยาวและมุม
+                  </li>
+                </ol>
+                <button
+                  type="button"
+                  onClick={() => setShowWelcome(false)}
+                  className="geo-chip mt-3"
+                >
+                  เริ่มวาดเลย
+                </button>
+              </div>
+            ) : null}
+
             {polygonAsk ? (
               <>
                 {/* ฉากหลังจาง ๆ จิ้มตรงไหนก็ปิดกล่องถาม */}
@@ -2332,13 +2419,51 @@ export function GeometryStudio() {
   )
 }
 
-/** สวิตช์เปิดปิดอุปกรณ์ช่วย ทำเป็นแถวยาวให้นิ้วเด็กกดง่าย */
-function ToggleRow({
+/**
+ * หมวดที่พับเก็บได้ในกล่องเครื่องมือ
+ *
+ * แผงนี้ยาวขึ้นทุกครั้งที่เพิ่มความสามารถ จนตอนนี้เลื่อนหลายหน้าจอ
+ * การพับเก็บทำให้เห็นเฉพาะสิ่งที่กำลังใช้ ไม่ใช่ทุกอย่างที่ทำได้พร้อมกันหมด
+ */
+function Section({
+  title,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string
+  open: boolean
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="geo-section">
+      <button
+        type="button"
+        onClick={() => {
+          playSfx('click')
+          onToggle()
+        }}
+        aria-expanded={open}
+        className="geo-section-head"
+      >
+        <span>{title}</span>
+        <span aria-hidden="true">{open ? '▾' : '▸'}</span>
+      </button>
+      {open ? <div className="mt-2">{children}</div> : null}
+    </div>
+  )
+}
+
+/** สวิตช์เล็ก ๆ ของตัวช่วยบนกระดาษ ติดแล้วเป็นสีเขียว มองปราดเดียวรู้ */
+function ToggleChip({
   label,
+  emoji,
   on,
   onToggle,
 }: {
   label: string
+  emoji: string
   on: boolean
   onToggle: () => void
 }) {
@@ -2350,10 +2475,10 @@ function ToggleRow({
         onToggle()
       }}
       aria-pressed={on}
-      className={`geo-toggle ${on ? 'geo-toggle-on' : ''}`}
+      className={`geo-switch ${on ? 'geo-switch-on' : ''}`}
     >
+      <span aria-hidden="true">{emoji}</span>
       <span>{label}</span>
-      <span className="geo-toggle-dot" aria-hidden="true" />
     </button>
   )
 }
