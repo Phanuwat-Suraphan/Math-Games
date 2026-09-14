@@ -64,6 +64,17 @@ import {
   streakCheer,
 } from '../geometry/practice'
 import type { AngleQuestion, Judgement } from '../geometry/practice'
+import {
+  ITEM_ARM,
+  ITEM_KINDS,
+  SHEET_COUNTS,
+  answerLine,
+  itemArms,
+  itemPrompt,
+  makeSheet,
+  sheetSubtitle,
+} from '../geometry/worksheet'
+import type { ItemKind, WorksheetItem } from '../geometry/worksheet'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
 import { encodeBoard, forgetBoard, readBoard, writeBoard } from '../geometry/storage'
 import {
@@ -228,6 +239,11 @@ export function GeometryStudio() {
   const [quizShown, setQuizShown] = useState(false)
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
+
+  /* ใบงานสำหรับพิมพ์ ครูสุ่มชุดใหม่ได้ทุกคาบโดยไม่ต้องนั่งวาดมุมทีละข้อ */
+  const [sheetCount, setSheetCount] = useState(SHEET_COUNTS[1])
+  const [sheetKinds, setSheetKinds] = useState<ItemKind[]>(['measure'])
+  const [sheet, setSheet] = useState<WorksheetItem[] | null>(null)
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -1366,6 +1382,28 @@ export function GeometryStudio() {
     setQuizJudge(null)
     setQuizShown(false)
     setQuizGuess('')
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* ใบงานพิมพ์                                                           */
+  /* ------------------------------------------------------------------ */
+
+  function buildSheet() {
+    const items = makeSheet(
+      { count: sheetCount, kinds: sheetKinds, level: findLevel(quizLevel) },
+      Math.random,
+    )
+    setSheet(items)
+    playSfx('click')
+  }
+
+  function toggleSheetKind(kind: ItemKind) {
+    const on = sheetKinds.includes(kind)
+    /* ต้องเหลืออย่างน้อยหนึ่งแบบ ใบงานที่ไม่มีโจทย์เลยคือกระดาษเปล่า */
+    const next = on ? sheetKinds.filter((item) => item !== kind) : [...sheetKinds, kind]
+    if (next.length === 0) return
+    setSheetKinds(next)
+    playSfx('click')
   }
 
   function clearBoard() {
@@ -2900,6 +2938,57 @@ export function GeometryStudio() {
             </p>
           </div>
 
+          <h2 className="geo-heading mt-4">🖨️ ใบงานพิมพ์</h2>
+          <div className="rounded-2xl bg-white/80 p-3">
+            <p className="text-sm font-semibold text-slate-600">
+              สุ่มโจทย์ลงกระดาษ A4 ให้เด็กทำพร้อมกันทั้งห้อง มีเฉลยแนบอีกหน้า
+            </p>
+
+            <p className="mt-2 text-xs font-bold text-slate-500">จำนวนข้อ</p>
+            <div className="mt-1 flex gap-2">
+              {SHEET_COUNTS.map((count) => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => {
+                    setSheetCount(count)
+                    playSfx('click')
+                  }}
+                  className={`geo-chip flex-1 ${sheetCount === count ? 'geo-chip-strong' : ''}`}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+
+            <p className="mt-2 text-xs font-bold text-slate-500">แบบของโจทย์</p>
+            <div className="mt-1 flex flex-col gap-1.5">
+              {ITEM_KINDS.map((kind) => (
+                <button
+                  key={kind.id}
+                  type="button"
+                  onClick={() => toggleSheetKind(kind.id)}
+                  aria-pressed={sheetKinds.includes(kind.id)}
+                  className={`geo-switch ${sheetKinds.includes(kind.id) ? 'geo-switch-on' : ''}`}
+                >
+                  <span aria-hidden="true">{sheetKinds.includes(kind.id) ? '✅' : '⬜'}</span>
+                  <span>{kind.label}</span>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={buildSheet}
+              className="geo-chip geo-chip-strong mt-3 w-full"
+            >
+              🖨️ สร้างใบงาน
+            </button>
+            <p className="mt-2 text-xs text-slate-500">
+              ความยากของมุมใช้ระดับเดียวกับที่เลือกไว้ในกล่องฝึกวัดมุม
+            </p>
+          </div>
+
           <h2 className="geo-heading mt-4">🎯 ภารกิจวันนี้</h2>
           <div className="rounded-2xl bg-white/80 p-3">
             <p className="text-base font-extrabold text-slate-700">
@@ -2928,6 +3017,97 @@ export function GeometryStudio() {
           </div>
         </aside>
       </div>
+
+      {/*
+        ใบงานที่พิมพ์ได้
+        เป็นลูกโดยตรงของหน้าเพจ เพราะ CSS ตอนสั่งพิมพ์ซ่อนพี่น้องทุกตัวที่ไม่ใช่ใบงาน
+        ถ้าซ้อนลึกกว่านี้ กระดาษที่พิมพ์ออกมาจะติดหัวเว็บกับกล่องเครื่องมือไปด้วย
+      */}
+      {sheet ? (
+        <div className="geo-sheet-view">
+          <div className="geo-sheet-bar geo-no-print">
+            <button type="button" onClick={() => window.print()} className="geo-chip geo-chip-strong">
+              🖨️ พิมพ์
+            </button>
+            <button type="button" onClick={buildSheet} className="geo-chip">
+              🔄 สุ่มชุดใหม่
+            </button>
+            <button type="button" onClick={() => setSheet(null)} className="geo-chip">
+              ✖️ ปิด
+            </button>
+            <span className="text-xs font-semibold text-slate-500">
+              ในกล่องพิมพ์ให้เลือกกระดาษ A4 แนวตั้ง
+            </span>
+          </div>
+
+          <section className="geo-sheet">
+            <header className="geo-sheet-head">
+              <h3>ใบงานเรขาคณิต · {sheetSubtitle(sheet)}</h3>
+              <p>ชื่อ ............................................ ชั้น .......... เลขที่ ....... วันที่ ..................</p>
+            </header>
+
+            <div className="geo-sheet-grid">
+              {sheet.map((item, index) => {
+                const vertex = { x: 100, y: 112 }
+                const ends = itemArms(item, vertex, ITEM_ARM)
+                return (
+                  <article key={`${item.kind}-${item.answer}`} className="geo-sheet-item">
+                    <p className="geo-sheet-ask">
+                      <b>ข้อ {index + 1}.</b> {itemPrompt(item)}
+                    </p>
+                    <svg viewBox="0 0 200 150" role="img" aria-label={itemPrompt(item)}>
+                      <line
+                        x1={vertex.x}
+                        y1={vertex.y}
+                        x2={ends.a.x}
+                        y2={ends.a.y}
+                        stroke="#1e293b"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                      />
+                      {item.kind === 'measure' ? (
+                        <>
+                          <line
+                            x1={vertex.x}
+                            y1={vertex.y}
+                            x2={ends.b.x}
+                            y2={ends.b.y}
+                            stroke="#1e293b"
+                            strokeWidth={2}
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d={arcPath(vertex, 26, item.start, item.answer)}
+                            fill="none"
+                            stroke="#64748b"
+                            strokeWidth={1.2}
+                          />
+                        </>
+                      ) : null}
+                      <circle cx={vertex.x} cy={vertex.y} r={2.6} fill="#1e293b" />
+                    </svg>
+                    <p className="geo-sheet-blank">
+                      {item.kind === 'measure' ? 'คำตอบ ..................... องศา' : 'วาดในกรอบนี้'}
+                    </p>
+                  </article>
+                )
+              })}
+            </div>
+          </section>
+
+          {/* เฉลยแยกหน้า ครูจึงแจกเฉพาะหน้าแรกให้เด็กได้ */}
+          <section className="geo-sheet geo-sheet-key">
+            <header className="geo-sheet-head">
+              <h3>เฉลย · ใบงานเรขาคณิต</h3>
+            </header>
+            <ol className="geo-sheet-answers">
+              {sheet.map((item, index) => (
+                <li key={`key-${item.kind}-${item.answer}`}>{answerLine(item, index)}</li>
+              ))}
+            </ol>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
