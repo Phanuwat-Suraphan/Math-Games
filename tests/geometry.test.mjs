@@ -48,6 +48,7 @@ const R = load('geometry/recipes')
 const D = load('geometry/storage')
 const P = load('geometry/paint')
 const Q = load('geometry/practice')
+const SH = load('geometry/worksheet')
 
 let passed = 0
 const failures = []
@@ -1691,6 +1692,94 @@ check('ครึ่งวงกลมตอนเริ่มข้อใหม�
     G.distance(placing.center, question.vertex) > 40,
     'ถ้าวางจุดกึ่งกลางให้ตรงจุดยอดเลย เด็กจะไม่ได้ฝึกสิ่งที่โหมดนี้ตั้งใจให้ฝึก',
   )
+})
+
+check('ใบงานต้องได้จำนวนข้อครบ และไม่มีองศาซ้ำกันในใบเดียว', () => {
+  const level = Q.findLevel('medium')
+  for (let round = 0; round < 30; round += 1) {
+    let seed = round + 1
+    /* ตัวสุ่มปลอมแบบวนซ้ำ ๆ เพื่อบังคับให้เจอองศาซ้ำบ่อย ๆ ตั้งใจกดดันตัวกันซ้ำ */
+    const random = () => {
+      seed = (seed * 48271) % 2147483647
+      return (seed % 1000) / 1000
+    }
+    const items = SH.makeSheet({ count: 12, kinds: ['measure', 'draw'], level }, random)
+
+    assert(items.length === 12, `ได้ ${items.length} ข้อ แทนที่จะเป็น 12 ข้อ`)
+    const answers = new Set(items.map((item) => item.answer))
+    assert(answers.size === items.length, 'มีองศาซ้ำกันในใบเดียว เด็กจะลอกข้ามข้อแทนที่จะวัด')
+    for (const item of items) {
+      assert(
+        item.answer >= level.min && item.answer <= level.max,
+        `องศา ${item.answer} หลุดช่วงของระดับที่เลือก`,
+      )
+      assert(item.kind === 'measure' || item.kind === 'draw', 'ได้แบบโจทย์ที่ไม่รู้จัก')
+    }
+  }
+})
+
+check('ใบงานต้องไม่ค้างเมื่อขอข้อมากกว่าองศาที่มีให้เลือก', () => {
+  /*
+   * ระดับง่ายมีองศาให้เลือกแค่สิบห้าค่า ถ้าขอยี่สิบข้อโดยห้ามซ้ำ
+   * การวนจนกว่าจะครบจะวนไม่รู้จบ แล้วหน้าเว็บจะค้างทั้งหน้าในมือครูกลางคาบ
+   */
+  const level = Q.findLevel('easy')
+  const items = SH.makeSheet({ count: 20, kinds: ['measure'], level }, Math.random)
+  assert(items.length > 0, 'ต้องยังได้โจทย์อยู่บ้าง')
+  assert(items.length <= 15, 'ระดับง่ายมีองศาให้เลือกแค่สิบห้าค่า จะได้มากกว่านั้นไม่ได้')
+  assert(new Set(items.map((item) => item.answer)).size === items.length, 'ยังซ้ำกันอยู่')
+})
+
+check('ใบงานต้องสลับแบบโจทย์ตามที่เลือกไว้เท่านั้น', () => {
+  const level = Q.findLevel('hard')
+  const only = SH.makeSheet({ count: 6, kinds: ['draw'], level }, Math.random)
+  assert(only.every((item) => item.kind === 'draw'), 'เลือกแบบเดียวแต่ได้แบบอื่นปนมา')
+
+  const both = SH.makeSheet({ count: 6, kinds: ['measure', 'draw'], level }, Math.random)
+  assert(
+    both.some((item) => item.kind === 'measure') && both.some((item) => item.kind === 'draw'),
+    'เลือกสองแบบแล้วต้องได้ทั้งสองแบบ',
+  )
+
+  /* ไม่เลือกอะไรเลยต้องไม่ได้กระดาษเปล่า */
+  const fallback = SH.makeSheet({ count: 4, kinds: [], level }, Math.random)
+  assert(fallback.length === 4, 'ใบงานที่ไม่มีโจทย์เลยคือกระดาษเปล่า')
+})
+
+check('รูปในใบงานต้องตรงกับเฉลยของข้อนั้น', () => {
+  const level = Q.findLevel('medium')
+  const items = SH.makeSheet({ count: 8, kinds: ['measure', 'draw'], level }, Math.random)
+  const vertex = { x: 100, y: 112 }
+
+  items.forEach((item, index) => {
+    const ends = SH.itemArms(item, vertex)
+    close(
+      G.angleBetween(ends.a, vertex, ends.b),
+      item.answer,
+      0.0001,
+      'มุมที่วาดในใบงานไม่ตรงกับเฉลย',
+    )
+    /* ทุกเส้นต้องอยู่ในกรอบ 200x150 ของข้อนั้น ไม่งั้นรูปจะโดนตัดตอนพิมพ์ */
+    for (const point of [ends.a, ends.b]) {
+      assert(
+        point.x > 0 && point.x < 200 && point.y > 0 && point.y < 150,
+        `เส้นของข้อ ${index + 1} ล้นกรอบที่ (${Math.round(point.x)}, ${Math.round(point.y)})`,
+      )
+    }
+
+    const line = SH.answerLine(item, index)
+    assert(line.includes(String(item.answer)), 'บรรทัดเฉลยไม่มีตัวเลขคำตอบ')
+    assert(line.includes(`ข้อ ${index + 1}`), 'บรรทัดเฉลยไม่บอกว่าเป็นข้อที่เท่าไร')
+
+    const ask = SH.itemPrompt(item)
+    if (item.kind === 'draw') {
+      assert(ask.includes(String(item.answer)), 'โจทย์วาดมุมต้องบอกด้วยว่าให้วาดกี่องศา')
+    } else {
+      assert(!ask.includes(String(item.answer)), 'โจทย์วัดมุมต้องไม่มีเฉลยติดไปในคำสั่ง')
+    }
+  })
+
+  assert(SH.sheetSubtitle(items).includes('ข้อ'), 'หัวใบงานต้องบอกว่ามีกี่ข้อ')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

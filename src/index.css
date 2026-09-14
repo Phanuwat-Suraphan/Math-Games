@@ -1478,6 +1478,129 @@ html[data-animations='off'] *::after {
   box-shadow: 0 8px 14px -10px rgba(15, 23, 42, 0.9);
 }
 
+/*
+ * ใบงานที่พิมพ์ลงกระดาษ
+ *
+ * บนจอมันคือแผ่นกระดาษสีขาวลอยอยู่เหนือหน้าเว็บ ครูจึงตรวจดูก่อนพิมพ์ได้
+ * ตอนสั่งพิมพ์ ทุกอย่างที่ไม่ใช่ใบงานถูกซ่อน เหลือแต่กระดาษขนาด A4 จริง
+ */
+.geo-sheet-view {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  overflow: auto;
+  padding: 16px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.geo-sheet-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 200mm;
+  margin: 0 auto 12px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.geo-sheet {
+  width: 100%;
+  max-width: 200mm;
+  margin: 0 auto 16px;
+  padding: 14mm 12mm;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+}
+
+.geo-sheet-head h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.geo-sheet-head p {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.geo-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.geo-sheet-item {
+  padding: 8px 10px 10px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  /* กันไม่ให้ข้อหนึ่งข้อถูกตัดครึ่งคาบหน้ากระดาษ */
+  break-inside: avoid;
+}
+
+.geo-sheet-ask {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.geo-sheet-item svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.geo-sheet-blank {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.geo-sheet-answers {
+  /* บรรทัดเฉลยบอกเลขข้ออยู่ในตัวแล้ว ถ้าปล่อยให้รายการใส่เลขให้อีกจะกลายเป็น "1. ข้อ 1 = ..." */
+  list-style: none;
+  padding-left: 0;
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+@media print {
+  /* หน้าเว็บทั้งหน้าไม่ต้องพิมพ์ เหลือแค่ใบงาน */
+  .geo-page > *:not(.geo-sheet-view) {
+    display: none !important;
+  }
+
+  .geo-no-print {
+    display: none !important;
+  }
+
+  .geo-sheet-view {
+    position: static;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .geo-sheet {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    /* เฉลยขึ้นหน้าใหม่เสมอ ครูจะได้แจกเฉพาะหน้าแรก */
+    break-after: page;
+  }
+
+  .geo-sheet-key {
+    break-after: auto;
+  }
+}
+
 /* ปุ่มเลือกธีมกระดาษ พื้นปุ่มคือสีกระดาษจริงของธีมนั้น */
 .geo-theme {
   display: flex;
