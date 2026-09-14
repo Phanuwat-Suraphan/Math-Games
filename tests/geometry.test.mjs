@@ -47,6 +47,7 @@ const N = load('geometry/instruments')
 const R = load('geometry/recipes')
 const D = load('geometry/storage')
 const P = load('geometry/paint')
+const Q = load('geometry/practice')
 
 let passed = 0
 const failures = []
@@ -1606,6 +1607,90 @@ check('งานที่ระบายสีไว้ต้องยังอ�
   assert(back !== null, 'อ่านงานที่บันทึกไว้ไม่ได้')
   assert(back.shapes[0].fill === '#bbf7d0', 'สีที่ระบายในรูปหลายเหลี่ยมหายไปหลังรีเฟรช')
   assert(back.shapes[1].fill === '#fef08a', 'สีที่ระบายในวงกลมหายไปหลังรีเฟรช')
+})
+
+check('โจทย์ฝึกวัดมุมต้องอยู่ในช่วงของระดับ และวางบนกระดาษเสมอ', () => {
+  /* ตัวสุ่มปลอมที่ไล่ค่าตั้งแต่ 0 ถึงเกือบ 1 เพื่อกวาดให้ครบทุกมุมที่เป็นไปได้ */
+  for (const level of Q.PRACTICE_LEVELS) {
+    for (let i = 0; i < 200; i += 1) {
+      const feed = [i / 200, ((i * 7) % 200) / 200, ((i * 13) % 200) / 200, ((i * 29) % 200) / 200]
+      let at = 0
+      const question = Q.makeQuestion(level, () => feed[at++ % feed.length])
+
+      assert(
+        question.answer >= level.min && question.answer <= level.max,
+        `ระดับ ${level.id} ได้คำตอบ ${question.answer} ซึ่งหลุดช่วง`,
+      )
+      assert(
+        (question.answer - level.min) % level.step === 0,
+        `ระดับ ${level.id} ได้คำตอบ ${question.answer} ซึ่งไม่ใช่จำนวนเท่าของ ${level.step}`,
+      )
+
+      const ends = Q.armEnds(question)
+      /* มุมที่วัดจากปลายแขนจริงต้องเท่ากับคำตอบ ไม่งั้นเฉลยจะไม่ตรงกับรูปที่เด็กเห็น */
+      close(G.angleBetween(ends.a, question.vertex, ends.b), question.answer, 0.0001, 'มุมในรูปไม่ตรงกับเฉลย')
+      close(G.distance(question.vertex, ends.a), Q.ARM_LENGTH, 0.0001, 'แขนข้างแรกยาวผิด')
+      close(G.distance(question.vertex, ends.b), Q.ARM_LENGTH, 0.0001, 'แขนข้างที่สองยาวผิด')
+
+      for (const point of [ends.a, ends.b, question.vertex]) {
+        assert(
+          point.x > 0 && point.x < 1000 && point.y > 0 && point.y < 680,
+          `โจทย์หลุดออกนอกกระดาษที่ (${Math.round(point.x)}, ${Math.round(point.y)})`,
+        )
+      }
+    }
+  }
+})
+
+check('ตรวจคำตอบต้องแยก "ถูก" กับ "อ่านสลับแถว" ออกจากกัน', () => {
+  const level = Q.findLevel('medium')
+  const question = { vertex: { x: 300, y: 400 }, start: 0, answer: 130, arm: Q.ARM_LENGTH }
+
+  assert(Q.judgeAnswer(question, 130, level).verdict === 'correct', 'ตอบตรงเป๊ะต้องถูก')
+  assert(Q.judgeAnswer(question, 132, level).verdict === 'correct', 'คลาดสององศายังต้องถือว่าถูก')
+
+  /*
+   * 180 − 130 = 50 คือเลขที่เด็กอ่านได้เมื่อดูผิดแถวของครึ่งวงกลม
+   * ต้องบอกให้ตรงจุด ไม่ใช่บอกแค่ว่าผิด ไม่งั้นเด็กจะวัดผิดแบบเดิมทั้งคาบ
+   */
+  const flipped = Q.judgeAnswer(question, 50, level)
+  assert(flipped.verdict === 'flipped', 'ต้องจับได้ว่าอ่านสลับแถว')
+  assert(flipped.say.includes('130'), 'ตอนบอกว่าอ่านสลับแถวต้องบอกคำตอบจริงด้วย')
+
+  assert(Q.judgeAnswer(question, 138, level).verdict === 'close', 'ห่างแปดองศาควรเป็น "เกือบแล้ว"')
+  assert(Q.judgeAnswer(question, 20, level).verdict === 'wrong', 'ห่างเกินร้อยองศาต้องเป็นผิด')
+})
+
+check('มุมฉากต้องนับว่าถูก ไม่ใช่ว่าอ่านสลับแถว', () => {
+  /*
+   * กรณีนี้คือเหตุผลที่ลำดับการตรวจต้องเช็ก "ถูก" ก่อนเสมอ
+   * เพราะ 180 − 90 ก็คือ 90 เท่ากัน ถ้าเช็กสลับลำดับ เด็กที่ตอบถูกเป๊ะจะโดนบอกว่าอ่านผิด
+   */
+  const level = Q.findLevel('easy')
+  const question = { vertex: { x: 300, y: 400 }, start: 0, answer: 90, arm: Q.ARM_LENGTH }
+  assert(Q.judgeAnswer(question, 90, level).verdict === 'correct', 'ตอบ 90 องศาต้องถูก')
+  assert(Q.judgeAnswer(question, 92, level).verdict === 'correct', 'ตอบ 92 องศายังอยู่ในเกณฑ์')
+})
+
+check('ตอบผิดต้องได้คำใบ้ชนิดของมุม และสถิติต้องเริ่มนับใหม่', () => {
+  assert(Q.angleFamily(45) === 'มุมแหลม', 'สี่สิบห้าองศาคือมุมแหลม')
+  assert(Q.angleFamily(90) === 'มุมฉาก', 'เก้าสิบองศาคือมุมฉาก')
+  assert(Q.angleFamily(120) === 'มุมป้าน', 'ร้อยยี่สิบองศาคือมุมป้าน')
+
+  assert(Q.nextStreak(4, 'correct') === 5, 'ตอบถูกต้องนับเพิ่ม')
+  assert(Q.nextStreak(4, 'wrong') === 0, 'ตอบผิดต้องเริ่มนับใหม่')
+  assert(Q.nextStreak(4, 'flipped') === 0, 'อ่านสลับแถวยังไม่นับว่าถูก')
+  assert(Q.streakCheer(1) === null, 'ข้อเดียวยังไม่ต้องชม')
+  assert(typeof Q.streakCheer(5) === 'string', 'ห้าข้อติดต้องมีคำชม')
+})
+
+check('ครึ่งวงกลมตอนเริ่มข้อใหม่ ต้องไม่วางทับจุดยอดให้ฟรี', () => {
+  const question = { vertex: { x: 300, y: 400 }, start: 0, answer: 60, arm: Q.ARM_LENGTH }
+  const placing = Q.protractorStart(question)
+  assert(
+    G.distance(placing.center, question.vertex) > 40,
+    'ถ้าวางจุดกึ่งกลางให้ตรงจุดยอดเลย เด็กจะไม่ได้ฝึกสิ่งที่โหมดนี้ตั้งใจให้ฝึก',
+  )
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

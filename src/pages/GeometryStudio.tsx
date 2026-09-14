@@ -53,6 +53,17 @@ import {
 import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
+import {
+  PRACTICE_LEVELS,
+  armEnds,
+  findLevel,
+  judgeAnswer,
+  makeQuestion,
+  nextStreak,
+  protractorStart,
+  streakCheer,
+} from '../geometry/practice'
+import type { AngleQuestion, Judgement } from '../geometry/practice'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
 import { encodeBoard, forgetBoard, readBoard, writeBoard } from '../geometry/storage'
 import {
@@ -205,6 +216,18 @@ export function GeometryStudio() {
   const [width, setWidth] = useState(PENCIL_WIDTHS[1].value)
   const [sides, setSides] = useState(6)
   const [fillColor, setFillColor] = useState(FILL_COLORS[0].value)
+
+  /*
+   * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
+   * โจทย์ไม่ใช่รูปที่เด็กวาด จึงต้องลบด้วยยางลบไม่ได้ ย้อนกลับไม่โดน และไม่ถูกบันทึกทับงาน
+   */
+  const [quizLevel, setQuizLevel] = useState(PRACTICE_LEVELS[0].id)
+  const [quiz, setQuiz] = useState<AngleQuestion | null>(null)
+  const [quizGuess, setQuizGuess] = useState('')
+  const [quizJudge, setQuizJudge] = useState<Judgement | null>(null)
+  const [quizShown, setQuizShown] = useState(false)
+  const [streak, setStreak] = useState(0)
+  const [bestStreak, setBestStreak] = useState(0)
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -1285,6 +1308,66 @@ export function GeometryStudio() {
     playSfx('click')
   }
 
+  /* ------------------------------------------------------------------ */
+  /* โหมดฝึกวัดมุม                                                        */
+  /* ------------------------------------------------------------------ */
+
+  function startQuiz() {
+    const level = findLevel(quizLevel)
+    const question = makeQuestion(level, Math.random)
+    setQuiz(question)
+    setQuizGuess('')
+    setQuizJudge(null)
+    setQuizShown(false)
+    /*
+     * เปิดครึ่งวงกลมให้เลย แต่วางไว้ข้าง ๆ ไม่ใช่ทับจุดยอดพอดี
+     * การเล็งจุดกึ่งกลางให้ตรงจุดยอดคือทักษะที่กำลังฝึก ถ้าวางให้ฟรีก็ไม่ได้ฝึก
+     */
+    setShowProtractor(true)
+    setProtractor({ ...protractor, ...protractorStart(question) })
+    say('วางจุดกึ่งกลางของครึ่งวงกลมให้ตรงจุดยอด แล้วอ่านองศาที่แขนอีกข้าง')
+    playSfx('click')
+  }
+
+  function checkQuiz() {
+    if (!quiz) return
+    const guess = Number(quizGuess)
+    if (!Number.isFinite(guess) || quizGuess.trim() === '') {
+      say('ใส่ตัวเลของศาที่วัดได้ก่อนนะ')
+      return
+    }
+    const judged = judgeAnswer(quiz, guess, findLevel(quizLevel))
+    setQuizJudge(judged)
+    if (judged.verdict === 'correct') {
+      const run = nextStreak(streak, judged.verdict)
+      setStreak(run)
+      setBestStreak(Math.max(bestStreak, run))
+      setQuizShown(true)
+      celebrate()
+      playSfx('correct')
+    } else {
+      setStreak(0)
+      playSfx('wrong')
+    }
+    say(judged.say)
+  }
+
+  /** ยอมแพ้ข้อนี้ ขอดูเฉลย */
+  function revealQuiz() {
+    if (!quiz) return
+    setQuizShown(true)
+    setStreak(0)
+    setQuizJudge(null)
+    say(`เฉลยคือ ${quiz.answer}° ลองวางครึ่งวงกลมทาบดูว่าตรงกันไหม`)
+  }
+
+  function stopQuiz() {
+    setQuiz(null)
+    setQuizJudge(null)
+    setQuizShown(false)
+    setQuizGuess('')
+  }
+
   function clearBoard() {
     if (board.shapes.length === 0) return
     dispatch({ type: 'clear' })
@@ -2212,6 +2295,80 @@ export function GeometryStudio() {
                   </g>
                 ) : null}
 
+                {/*
+                  โจทย์ของโหมดฝึกวัดมุม
+                  วาดใต้ครึ่งวงกลมเสมอ เด็กจะได้เอาครึ่งวงกลมทาบทับแขนได้เหมือนของจริง
+                */}
+                {quiz ? (
+                  <g pointerEvents="none">
+                    {(() => {
+                      const ends = armEnds(quiz)
+                      const label = pointAt(quiz.vertex, 78, quiz.start + quiz.answer / 2)
+                      return (
+                        <>
+                          <line
+                            x1={quiz.vertex.x}
+                            y1={quiz.vertex.y}
+                            x2={ends.a.x}
+                            y2={ends.a.y}
+                            stroke="#4338ca"
+                            strokeWidth={5}
+                            strokeLinecap="round"
+                          />
+                          <line
+                            x1={quiz.vertex.x}
+                            y1={quiz.vertex.y}
+                            x2={ends.b.x}
+                            y2={ends.b.y}
+                            stroke="#4338ca"
+                            strokeWidth={5}
+                            strokeLinecap="round"
+                          />
+                          <path
+                            d={arcPath(quiz.vertex, 46, quiz.start, quiz.answer)}
+                            fill="none"
+                            stroke="#6366f1"
+                            strokeWidth={3}
+                            strokeDasharray="7 5"
+                          />
+                          <circle
+                            cx={quiz.vertex.x}
+                            cy={quiz.vertex.y}
+                            r={6}
+                            fill="#4338ca"
+                            stroke="#ffffff"
+                            strokeWidth={2}
+                          />
+                          <g>
+                            <rect
+                              x={label.x - 26}
+                              y={label.y - 16}
+                              width={52}
+                              height={32}
+                              rx={14}
+                              fill="#e0e7ff"
+                              stroke="#6366f1"
+                              strokeWidth={2}
+                            />
+                            <text
+                              x={label.x}
+                              y={label.y}
+                              fontSize={17}
+                              fontWeight={800}
+                              fill="#3730a3"
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontFamily="Kanit, sans-serif"
+                            >
+                              {quizShown ? `${quiz.answer}°` : '?'}
+                            </text>
+                          </g>
+                        </>
+                      )
+                    })()}
+                  </g>
+                ) : null}
+
                 {showRuler ? (
                   <RulerOverlay
                     origin={ruler.origin}
@@ -2645,6 +2802,103 @@ export function GeometryStudio() {
               </p>
             </div>
           )}
+
+          <h2 className="geo-heading mt-4">📐 ฝึกวัดมุม</h2>
+          <div className="rounded-2xl bg-white/80 p-3">
+            <div className="flex gap-1.5">
+              {PRACTICE_LEVELS.map((level) => (
+                <button
+                  key={level.id}
+                  type="button"
+                  onClick={() => {
+                    setQuizLevel(level.id)
+                    playSfx('click')
+                  }}
+                  className={`geo-chip flex-1 ${quizLevel === level.id ? 'geo-chip-strong' : ''}`}
+                >
+                  {level.label}
+                </button>
+              ))}
+            </div>
+
+            {quiz ? (
+              <>
+                <p className="mt-3 text-sm font-bold text-slate-600">
+                  วัดมุมสีน้ำเงินบนกระดาษ แล้วใส่ตัวเลขที่อ่านได้
+                </p>
+                <div className="geo-field mt-2">
+                  <span className="flex-1">องศาที่วัดได้</span>
+                  <input
+                    type="number"
+                    value={quizGuess}
+                    min={0}
+                    max={180}
+                    step={1}
+                    onChange={(event) => setQuizGuess(event.target.value)}
+                    onKeyDown={(event) => {
+                      /* กด Enter ตรวจได้เลย เด็กที่พิมพ์เสร็จจะได้ไม่ต้องละมือไปหาปุ่ม */
+                      if (event.key === 'Enter') checkQuiz()
+                    }}
+                    aria-label="องศาที่วัดได้"
+                  />
+                  <span className="w-8 text-left">°</span>
+                </div>
+
+                {quizJudge ? (
+                  <p
+                    className={`mt-2 rounded-xl p-2 text-xs font-bold ${
+                      quizJudge.verdict === 'correct'
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}
+                    aria-live="polite"
+                  >
+                    {quizJudge.verdict === 'correct' ? '✅ ' : '💡 '}
+                    {quizJudge.say}
+                  </p>
+                ) : null}
+
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={checkQuiz}
+                    className="geo-chip geo-chip-strong flex-1"
+                  >
+                    ✅ ตรวจ
+                  </button>
+                  <button type="button" onClick={revealQuiz} className="geo-chip flex-1">
+                    👀 เฉลย
+                  </button>
+                </div>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={startQuiz} className="geo-chip flex-1">
+                    🔄 ข้อใหม่
+                  </button>
+                  <button type="button" onClick={stopQuiz} className="geo-chip flex-1">
+                    ✖️ เลิกฝึก
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm font-semibold text-slate-600">
+                  กดเริ่มแล้วจะมีมุมขึ้นบนกระดาษให้วัดด้วยครึ่งวงกลม ตรวจให้ทันทีว่าถูกไหม
+                </p>
+                <button
+                  type="button"
+                  onClick={startQuiz}
+                  className="geo-chip geo-chip-strong mt-2 w-full"
+                >
+                  📐 เริ่มฝึกวัดมุม
+                </button>
+              </>
+            )}
+
+            <p className="mt-2 text-xs font-bold text-indigo-600">
+              ถูกติดกัน {streak} ข้อ · สถิติสูงสุด {bestStreak} ข้อ
+              {streakCheer(streak) ? ` · ${streakCheer(streak)}` : ''}
+            </p>
+          </div>
 
           <h2 className="geo-heading mt-4">🎯 ภารกิจวันนี้</h2>
           <div className="rounded-2xl bg-white/80 p-3">
