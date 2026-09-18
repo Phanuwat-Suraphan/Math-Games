@@ -2618,23 +2618,29 @@ export function GeometryStudio() {
                             เพราะรูปในหนังสือหมุนไม่ได้อยู่แล้ว ปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น
                             ทำให้เด็กคิดว่าโปรแกรมค้าง แล้วกดซ้ำอีกสิบครั้ง
                           */}
-                          <g
-                            transform={`translate(${spinAt.x} ${spinAt.y})`}
-                            onPointerDown={(event) => handleShapeHandleGrab('rotate', event)}
-                            className="cursor-grab"
-                            hidden={selected.kind === 'photo'}
-                          >
-                            <circle r={grip} fill="transparent" />
-                            <circle r={knob} fill="#fce7f3" stroke="#db2777" strokeWidth={3 / view.scale} />
-                            <text
-                              textAnchor="middle"
-                              y={5 / view.scale}
-                              fontSize={15 / view.scale}
-                              fill="#9d174d"
+                          {selected.kind === 'photo' ? null : (
+                            <g
+                              transform={`translate(${spinAt.x} ${spinAt.y})`}
+                              onPointerDown={(event) => handleShapeHandleGrab('rotate', event)}
+                              className="cursor-grab"
                             >
-                              ↻
-                            </text>
-                          </g>
+                              <circle r={grip} fill="transparent" />
+                              <circle
+                                r={knob}
+                                fill="#fce7f3"
+                                stroke="#db2777"
+                                strokeWidth={3 / view.scale}
+                              />
+                              <text
+                                textAnchor="middle"
+                                y={5 / view.scale}
+                                fontSize={15 / view.scale}
+                                fill="#9d174d"
+                              >
+                                ↻
+                              </text>
+                            </g>
+                          )}
                         </g>
                       )
                     })()
