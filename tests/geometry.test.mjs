@@ -49,6 +49,7 @@ const D = load('geometry/storage')
 const P = load('geometry/paint')
 const Q = load('geometry/practice')
 const SH = load('geometry/worksheet')
+const PH = load('geometry/photos')
 
 let passed = 0
 const failures = []
@@ -1780,6 +1781,135 @@ check('รูปในใบงานต้องตรงกับเฉลย�
   })
 
   assert(SH.sheetSubtitle(items).includes('ข้อ'), 'หัวใบงานต้องบอกว่ามีกี่ข้อ')
+})
+
+check('รูปจากแบบฝึกต้องย่อลงโดยไม่เสียสัดส่วน', () => {
+  /*
+   * สัดส่วนคือหัวใจของฟีเจอร์นี้ ถ้ารูปยืดแม้แต่นิดเดียว
+   * มุมในหนังสือที่เด็กเอาครึ่งวงกลมไปทาบวัดจะเปลี่ยนไปด้วย แล้วคำตอบจะผิดทั้งข้อ
+   */
+  const before = 4032 / 3024
+  const small = PH.shrinkTo(4032, 3024)
+  assert(Math.max(small.width, small.height) <= PH.MAX_PHOTO_SIDE, 'ย่อแล้วยังใหญ่เกินที่กำหนด')
+  close(small.width / small.height, before, 0.01, 'สัดส่วนเพี้ยนหลังย่อ')
+
+  const tall = PH.shrinkTo(600, 2400)
+  assert(tall.height <= PH.MAX_PHOTO_SIDE, 'รูปแนวตั้งไม่ถูกย่อตามด้านที่ยาวที่สุด')
+  close(tall.width / tall.height, 600 / 2400, 0.01, 'สัดส่วนรูปแนวตั้งเพี้ยน')
+
+  /* รูปเล็กอยู่แล้วต้องไม่ถูกขยาย ขยายมีแต่ทำให้เบลอและไฟล์ใหญ่ขึ้นเปล่า ๆ */
+  const tiny = PH.shrinkTo(300, 200)
+  assert(tiny.width === 300 && tiny.height === 200, 'รูปเล็กไม่ควรถูกขยาย')
+
+  /* ค่าพังต้องไม่ทำให้ได้ขนาดศูนย์หรือค่าติดลบ ซึ่งจะทำให้รูปหายไปเงียบ ๆ */
+  const broken = PH.shrinkTo(0, 0)
+  assert(broken.width > 0 && broken.height > 0, 'ขนาดที่พังต้องไม่กลายเป็นศูนย์')
+})
+
+check('รูปที่วางใหม่ต้องพอดีกระดาษ ไม่ล้นออกไป', () => {
+  const paperWidth = 1000
+  const paperHeight = 680
+  for (const size of [[4032, 3024], [800, 2400], [1000, 1000], [2400, 600]]) {
+    const box = PH.fitOnPaper(size[0], size[1], paperWidth, paperHeight)
+    assert(box.width <= paperWidth && box.height <= paperHeight, 'รูปที่วางล้นกระดาษ')
+    close(box.width / box.height, size[0] / size[1], 0.01, 'สัดส่วนเพี้ยนตอนวางลงกระดาษ')
+    assert(box.width > 40 && box.height > 40, 'รูปที่วางเล็กจนมองไม่เห็น')
+  }
+})
+
+check('รับเฉพาะไฟล์ที่เป็นรูปภาพ', () => {
+  assert(PH.isImageType('image/png'), 'PNG ต้องวางได้')
+  assert(PH.isImageType('image/jpeg'), 'JPEG ต้องวางได้')
+  assert(!PH.isImageType('application/pdf'), 'PDF ไม่ใช่รูปภาพ')
+  assert(!PH.isImageType('text/plain'), 'ข้อความที่ก็อปมาต้องไม่กลายเป็นรูป')
+  assert(PH.approxBytes('data:image/jpeg;base64,AAAAAAAA') === 6, 'คำนวณขนาดข้อมูลผิด')
+})
+
+check('รูปจากแบบฝึกต้องอยู่ล่างสุด ทั้งตอนวาดและตอนจิ้ม', () => {
+  const photo = {
+    id: 'photo',
+    kind: 'photo',
+    color: '#000',
+    width: 3,
+    at: { x: 200, y: 200 },
+    imageWidth: 400,
+    imageHeight: 300,
+    src: 'data:image/jpeg;base64,AAAA',
+    fade: 0,
+  }
+  const line = {
+    id: 'line',
+    kind: 'segment',
+    color: '#000',
+    width: 3,
+    a: { x: 120, y: 200 },
+    b: { x: 280, y: 200 },
+  }
+
+  /*
+   * รูปวางทีหลังเส้น ตามลำดับปกติมันจะอยู่บนสุด
+   * แต่ถ้าจิ้มแล้วได้รูป เด็กจะลากรูปแบบฝึกเคลื่อนทุกครั้งที่ตั้งใจจะเลือกเส้นของตัวเอง
+   */
+  assert(S.findShapeAt([line, photo], { x: 200, y: 200 }).id === 'line', 'จิ้มบนเส้นต้องได้เส้น')
+  assert(
+    S.findShapeAt([line, photo], { x: 320, y: 120 }).id === 'photo',
+    'จิ้มที่ว่างในรูปต้องได้รูป',
+  )
+  assert(S.findShapeAt([line, photo], { x: 900, y: 600 }) === null, 'จิ้มนอกรูปต้องไม่โดนอะไร')
+})
+
+check('ย่อขยายรูปจากแบบฝึกต้องคงสัดส่วน และหมุนไม่ได้', () => {
+  const photo = {
+    id: 'photo',
+    kind: 'photo',
+    color: '#000',
+    width: 3,
+    at: { x: 300, y: 300 },
+    imageWidth: 400,
+    imageHeight: 300,
+    src: 'data:image/jpeg;base64,AAAA',
+    fade: 0,
+  }
+
+  const bigger = S.scaleShape(photo, 1.5, { x: 300, y: 300 })
+  close(bigger.imageWidth / bigger.imageHeight, 4 / 3, 0.0001, 'ย่อขยายแล้วสัดส่วนเพี้ยน')
+  close(bigger.imageWidth, 600, 0.0001, 'ขนาดหลังขยายไม่ถูกต้อง')
+
+  /* หมุนรูปในหนังสือได้เมื่อไร มุมที่วัดได้ก็ผิดเมื่อนั้น จึงต้องไม่ขยับเลย */
+  const turned = S.rotateShape(photo, 30, { x: 0, y: 0 })
+  assert(turned === photo, 'รูปจากแบบฝึกต้องหมุนไม่ได้')
+
+  const narrow = S.applyField(photo, 'width', 5)
+  close(narrow.imageWidth / narrow.imageHeight, 4 / 3, 0.0001, 'ตั้งความกว้างแล้วสัดส่วนเพี้ยน')
+  close(narrow.imageWidth, 5 * G.PX_PER_CM, 0.0001, 'ตั้งความกว้างเป็นเซนติเมตรแล้วได้ขนาดผิด')
+
+  const faded = S.applyField(photo, 'fade', 40)
+  close(faded.fade, 0.6, 0.0001, 'ปรับความจางแล้วได้ค่าผิด')
+})
+
+check('งานที่มีรูปจากแบบฝึกต้องอ่านกลับได้ และกันที่อยู่รูปจากภายนอก', () => {
+  const good = {
+    id: 'photo',
+    kind: 'photo',
+    color: '#000',
+    width: 3,
+    at: { x: 300, y: 300 },
+    imageWidth: 400,
+    imageHeight: 300,
+    src: 'data:image/jpeg;base64,AAAA',
+    fade: 0.2,
+  }
+  const back = D.decodeBoard(D.encodeBoard([good], {}, SAMPLE_PREFS))
+  assert(back !== null && back.shapes.length === 1, 'รูปจากแบบฝึกหายหลังรีเฟรช')
+  close(back.shapes[0].fade, 0.2, 0.0001, 'ความจางที่ตั้งไว้หายไป')
+
+  /*
+   * ค่าที่อ่านกลับมาจากเครื่องถูกแก้มือได้ ถ้ารับที่อยู่รูปอะไรก็ได้
+   * หน้าเว็บจะยิงไปโหลดรูปจากปลายทางนั้นให้เองทุกครั้งที่เปิดห้องเรขาคณิต
+   */
+  const sneaky = { ...good, src: 'https://example.com/tracker.png' }
+  const blocked = D.decodeBoard(D.encodeBoard([sneaky], {}, SAMPLE_PREFS))
+  assert(blocked.shapes.length === 0, 'ต้องรับเฉพาะรูปที่ฝังมาเป็น data URL เท่านั้น')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

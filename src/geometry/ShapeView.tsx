@@ -550,6 +550,38 @@ export function ShapeView({
         </g>
       )
 
+    case 'photo':
+      return (
+        <g>
+          <image
+            href={shape.src}
+            x={shape.at.x - shape.imageWidth / 2}
+            y={shape.at.y - shape.imageHeight / 2}
+            width={shape.imageWidth}
+            height={shape.imageHeight}
+            opacity={1 - shape.fade}
+            preserveAspectRatio="none"
+            pointerEvents="none"
+          />
+          {/*
+            กรอบบาง ๆ รอบรูป ไม่ใช่เพื่อความสวย
+            รูปจากหนังสือมักมีพื้นขาวเหมือนกระดาษ ถ้าไม่มีกรอบ เด็กจะไม่รู้ว่า
+            ขอบรูปอยู่ตรงไหน แล้วลากรูปเคลื่อนตอนที่ตั้งใจจะวาดเส้นบนกระดาษ
+          */}
+          <rect
+            x={shape.at.x - shape.imageWidth / 2}
+            y={shape.at.y - shape.imageHeight / 2}
+            width={shape.imageWidth}
+            height={shape.imageHeight}
+            fill="none"
+            stroke={selected ? '#f472b6' : '#cbd5e1'}
+            strokeWidth={selected ? 4 : 2}
+            strokeDasharray={selected ? undefined : '8 6'}
+            pointerEvents="none"
+          />
+        </g>
+      )
+
     default:
       return null
   }

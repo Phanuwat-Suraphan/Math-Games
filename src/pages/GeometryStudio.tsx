@@ -75,6 +75,13 @@ import {
   sheetSubtitle,
 } from '../geometry/worksheet'
 import type { ItemKind, WorksheetItem } from '../geometry/worksheet'
+import {
+  PHOTO_QUALITY,
+  approxBytes,
+  fitOnPaper,
+  isImageType,
+  shrinkTo,
+} from '../geometry/photos'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
 import { encodeBoard, forgetBoard, readBoard, writeBoard } from '../geometry/storage'
 import {
@@ -244,6 +251,10 @@ export function GeometryStudio() {
   const [sheetCount, setSheetCount] = useState(SHEET_COUNTS[1])
   const [sheetKinds, setSheetKinds] = useState<ItemKind[]>(['measure'])
   const [sheet, setSheet] = useState<WorksheetItem[] | null>(null)
+
+  /* ช่องเลือกไฟล์ที่ซ่อนไว้ สำหรับแท็บเล็ตที่กด Ctrl+V ไม่ได้ */
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
+  const pasteRef = useRef<(file: File) => void>(() => {})
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -1385,6 +1396,76 @@ export function GeometryStudio() {
   }
 
   /* ------------------------------------------------------------------ */
+  /* รูปจากแบบฝึก                                                         */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * วางรูปลงกลางจอที่มองเห็นอยู่
+   *
+   * ย่อรูปก่อนเก็บเสมอ รูปจากกล้องมือถือกว้างสามสี่พันพิกเซล
+   * ถ้าเก็บทั้งดุ้น ที่เก็บของเบราว์เซอร์จะเต็มตั้งแต่รูปที่สอง
+   * แล้วงานทั้งกระดาษจะบันทึกอัตโนมัติไม่ได้อีกเลยโดยที่ครูไม่รู้ตัว
+   */
+  function placePhoto(dataUrl: string) {
+    const image = new Image()
+
+    image.onload = () => {
+      const small = shrinkTo(image.naturalWidth, image.naturalHeight)
+      const canvas = document.createElement('canvas')
+      canvas.width = small.width
+      canvas.height = small.height
+      const context = canvas.getContext('2d')
+      if (!context) {
+        say('เครื่องนี้วางรูปไม่ได้ ลองเปิดด้วยเบราว์เซอร์อื่นนะ')
+        return
+      }
+      /* ทาพื้นขาวก่อน รูปโปร่งใสที่บีบเป็น JPEG จะได้ไม่กลายเป็นพื้นดำ */
+      context.fillStyle = '#ffffff'
+      context.fillRect(0, 0, canvas.width, canvas.height)
+      context.drawImage(image, 0, 0, canvas.width, canvas.height)
+
+      const src = canvas.toDataURL('image/jpeg', PHOTO_QUALITY)
+      const box = fitOnPaper(small.width, small.height, VIEW_WIDTH, VIEW_HEIGHT)
+
+      addShape({
+        kind: 'photo',
+        id: makeId(),
+        color,
+        width,
+        at: centerOfView(),
+        imageWidth: box.width,
+        imageHeight: box.height,
+        src,
+        fade: 0,
+      })
+      setTool('select')
+      setShowProtractor(true)
+      say(
+        approxBytes(src) > 900000
+          ? 'วางรูปแล้ว รูปนี้ใหญ่หน่อย ถ้าบันทึกอัตโนมัติไม่ได้ให้กด 💾 บันทึกรูปเก็บไว้เอง'
+          : 'วางรูปแล้ว ลากย้ายหรือย่อขยายได้ แล้วเอาครึ่งวงกลมทาบวัดได้เลย',
+      )
+      playSfx('pickup')
+    }
+
+    image.onerror = () => say('รูปนี้เปิดไม่ได้ ลองรูปอื่นนะ')
+    image.src = dataUrl
+  }
+
+  function addPhotoFile(file: File) {
+    if (!isImageType(file.type)) {
+      say('ไฟล์นี้ไม่ใช่รูปภาพนะ')
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => placePhoto(String(reader.result))
+    reader.onerror = () => say('อ่านไฟล์รูปไม่สำเร็จ ลองใหม่อีกครั้งนะ')
+    reader.readAsDataURL(file)
+  }
+
+  pasteRef.current = addPhotoFile
+
+  /* ------------------------------------------------------------------ */
   /* ใบงานพิมพ์                                                           */
   /* ------------------------------------------------------------------ */
 
@@ -1541,6 +1622,30 @@ export function GeometryStudio() {
     showAngles,
     showFaces,
   ])
+
+  /**
+   * วางรูปด้วย Ctrl+V
+   *
+   * ผูกที่ตัวหน้าต่าง ไม่ใช่ที่กระดาษ เพราะเด็กที่เพิ่งก็อปรูปมาจากอีกแท็บ
+   * จะกดวางทันทีที่กลับมา โดยยังไม่ได้คลิกที่กระดาษให้มันได้โฟกัสก่อน
+   * ถ้าผูกไว้ที่กระดาษ การกดวางครั้งแรกจะเงียบหายไปเฉย ๆ แล้วครูจะคิดว่าใช้ไม่ได้
+   */
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items
+      if (!items) return
+      for (const item of Array.from(items)) {
+        if (!isImageType(item.type)) continue
+        const file = item.getAsFile()
+        if (!file) continue
+        event.preventDefault()
+        pasteRef.current(file)
+        return
+      }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [])
 
   /**
    * ล้อเมาส์คือซูม
@@ -1756,6 +1861,37 @@ export function GeometryStudio() {
                 <span className="geo-tile-name">{item.short}</span>
               </button>
             ))}
+          </div>
+
+          {/*
+            ช่องวางรูปจากแบบฝึก
+            อยู่ใต้กล่องเครื่องมือตลอดเวลา ไม่ซ่อนไว้ในหมวดที่ต้องกดเปิด
+            เพราะครูที่ไม่รู้ว่ามีความสามารถนี้ จะไม่มีวันไปกดหาเจอ
+          */}
+          <div className="mt-3 rounded-2xl bg-white/70 p-3">
+            <p className="text-sm font-bold text-slate-600">🖼️ รูปจากแบบฝึก</p>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              ก็อปรูปมาแล้วกด Ctrl+V วางลงกระดาษได้เลย แล้วเอาครึ่งวงกลมทาบวัดได้เหมือนวัดในหนังสือ
+            </p>
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="geo-chip mt-2 w-full"
+            >
+              📂 เลือกรูปจากเครื่อง
+            </button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) addPhotoFile(file)
+                /* ล้างค่าไว้ เผื่อครูเลือกไฟล์เดิมซ้ำอีกครั้ง จะได้ยังวางได้ */
+                event.target.value = ''
+              }}
+            />
           </div>
 
           {tool === 'regular' ? (
@@ -2477,10 +2613,16 @@ export function GeometryStudio() {
                               ⤢
                             </text>
                           </g>
+                          {/*
+                            ปุ่มหมุนไม่ขึ้นกับรูปจากแบบฝึก
+                            เพราะรูปในหนังสือหมุนไม่ได้อยู่แล้ว ปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น
+                            ทำให้เด็กคิดว่าโปรแกรมค้าง แล้วกดซ้ำอีกสิบครั้ง
+                          */}
                           <g
                             transform={`translate(${spinAt.x} ${spinAt.y})`}
                             onPointerDown={(event) => handleShapeHandleGrab('rotate', event)}
                             className="cursor-grab"
+                            hidden={selected.kind === 'photo'}
                           >
                             <circle r={grip} fill="transparent" />
                             <circle r={knob} fill="#fce7f3" stroke="#db2777" strokeWidth={3 / view.scale} />
@@ -2810,14 +2952,20 @@ export function GeometryStudio() {
                 </div>
               ) : null}
 
-              <div className="mt-2 flex gap-2">
-                <button type="button" onClick={() => spinSelected(15)} className="geo-chip flex-1">
-                  ↺ 15°
-                </button>
-                <button type="button" onClick={() => spinSelected(-15)} className="geo-chip flex-1">
-                  ↻ 15°
-                </button>
-              </div>
+              {selected && selected.kind !== 'photo' ? (
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={() => spinSelected(15)} className="geo-chip flex-1">
+                    ↺ 15°
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => spinSelected(-15)}
+                    className="geo-chip flex-1"
+                  >
+                    ↻ 15°
+                  </button>
+                </div>
+              ) : null}
 
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 บนกระดาษมีปุ่ม ⤢ ไว้ลากย่อขยาย และปุ่ม ↻ ไว้ลากหมุน

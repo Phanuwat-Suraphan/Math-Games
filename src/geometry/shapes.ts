@@ -100,6 +100,27 @@ export interface StickerShape extends Drawn {
   size: number
 }
 
+/**
+ * รูปจากแบบฝึกที่วางลงกระดาษ
+ *
+ * ครูถ่ายรูปมุมในหนังสือแบบฝึกหัดแล้ววางลงที่นี่ เด็กจะได้วัดของจริงในหนังสือ
+ * ด้วยครึ่งวงกลมบนจอ แทนที่จะวัดเฉพาะมุมที่โปรแกรมสุ่มขึ้นมาเอง
+ *
+ * ไม่มีการหมุน ตั้งใจให้เหลือแค่ลากย้ายกับย่อขยาย เพราะสองอย่างนี้พอสำหรับการวัด
+ * และปุ่มยิ่งน้อย เด็กยิ่งไม่หลงว่ากดอะไรไปแล้วรูปถึงเบี้ยว
+ */
+export interface PhotoShape extends Drawn {
+  kind: 'photo'
+  /** ใจกลางรูป */
+  at: Point
+  imageWidth: number
+  imageHeight: number
+  /** ข้อมูลรูปแบบ data URL ฝังไปกับงานที่บันทึก */
+  src: string
+  /** ความจาง 0 ถึง 1 ปรับให้เส้นที่วาดทับมองเห็นชัดขึ้น */
+  fade: number
+}
+
 export type Shape =
   | SegmentShape
   | CircleShape
@@ -108,6 +129,7 @@ export type Shape =
   | DotShape
   | AngleShape
   | StickerShape
+  | PhotoShape
 
 /** คำอธิบายรูปสำหรับแผงข้อมูลด้านข้าง */
 export interface ShapeReport {
@@ -164,19 +186,33 @@ export function hitTest(shape: Shape, p: Point, tolerance = HIT_TOLERANCE): bool
       return distance(p, shape.vertex) <= tolerance * 2
     case 'sticker':
       return distance(p, shape.at) <= shape.size * 0.6
+    case 'photo':
+      return (
+        Math.abs(p.x - shape.at.x) <= shape.imageWidth / 2 &&
+        Math.abs(p.y - shape.at.y) <= shape.imageHeight / 2
+      )
     default:
       return false
   }
 }
 
-/** หารูปบนสุดที่ถูกจิ้ม (รูปที่วาดทีหลังอยู่บนสุด) */
+/**
+ * หารูปบนสุดที่ถูกจิ้ม (รูปที่วาดทีหลังอยู่บนสุด)
+ *
+ * รูปจากแบบฝึกถูกกันไว้ท้ายแถวเสมอ เพราะมันกินพื้นที่ทั้งผืน
+ * ถ้านับรวมตามลำดับปกติ การจิ้มเส้นที่วาดทับรูปจะไปโดนรูปแทนทุกครั้ง
+ * แล้วเด็กจะลากรูปแบบฝึกเคลื่อนโดยไม่ได้ตั้งใจแทนที่จะได้เลือกเส้นของตัวเอง
+ */
 export function findShapeAt(
   shapes: Shape[],
   p: Point,
   tolerance = HIT_TOLERANCE,
 ): Shape | null {
   for (let i = shapes.length - 1; i >= 0; i -= 1) {
-    if (hitTest(shapes[i], p, tolerance)) return shapes[i]
+    if (shapes[i].kind !== 'photo' && hitTest(shapes[i], p, tolerance)) return shapes[i]
+  }
+  for (let i = shapes.length - 1; i >= 0; i -= 1) {
+    if (shapes[i].kind === 'photo' && hitTest(shapes[i], p, tolerance)) return shapes[i]
   }
   return null
 }
@@ -198,6 +234,7 @@ export function translateShape(shape: Shape, dx: number, dy: number): Shape {
     case 'angle':
       return { ...shape, vertex: move(shape.vertex), a: move(shape.a), b: move(shape.b) }
     case 'sticker':
+    case 'photo':
       return { ...shape, at: move(shape.at) }
     default:
       return shape
@@ -233,7 +270,8 @@ export function shapeAnchors(shape: Shape): Point[] {
     case 'angle':
       return [shape.vertex]
     case 'sticker':
-      /* สติกเกอร์เป็นของตกแต่ง ไม่ควรดูดปลายเส้นให้เบี้ยวไปจากจุดที่ตั้งใจ */
+    case 'photo':
+      /* ของตกแต่งกับรูปแบบฝึกไม่ควรดูดปลายเส้นให้เบี้ยวไปจากจุดที่ตั้งใจ */
       return []
     default:
       return []
@@ -444,6 +482,16 @@ export function describeShape(shape: Shape): ShapeReport {
         title: 'สติกเกอร์',
         lines: ['ลากย้ายไปตรงไหนก็ได้ ใช้ทำเครื่องหมายบนงานของเราเอง'],
       }
+    case 'photo':
+      return {
+        emoji: '🖼️',
+        title: 'รูปจากแบบฝึก',
+        lines: [
+          `กว้าง ${formatCm(shape.imageWidth)} สูง ${formatCm(shape.imageHeight)}`,
+          'ลากย้ายและย่อขยายได้ แล้วเอาครึ่งวงกลมทาบวัดได้เลย',
+          'ปรับความจางได้ ถ้าอยากให้เส้นที่วาดทับเห็นชัดขึ้น',
+        ],
+      }
 
     default:
       return { emoji: '❔', title: 'รูป', lines: [] }
@@ -465,6 +513,7 @@ export function shapeCenter(shape: Shape): Point {
     case 'angle':
       return { ...shape.vertex }
     case 'sticker':
+    case 'photo':
       return { ...shape.at }
     default:
       return { x: 0, y: 0 }
@@ -551,6 +600,16 @@ export function scaleShape(shape: Shape, factor: number, origin: Point): Shape {
         at: pull(shape.at),
         size: Math.min(160, Math.max(16, shape.size * factor)),
       }
+    case 'photo': {
+      /* ย่อขยายพร้อมกันทั้งกว้างและสูง สัดส่วนของรูปในหนังสือจึงไม่เพี้ยน ไม่งั้นมุมที่วัดได้จะผิด */
+      const grow = Math.min(4, Math.max(0.15, factor))
+      return {
+        ...shape,
+        at: pull(shape.at),
+        imageWidth: shape.imageWidth * grow,
+        imageHeight: shape.imageHeight * grow,
+      }
+    }
     default:
       return shape
   }
@@ -575,6 +634,9 @@ export function rotateShape(shape: Shape, deg: number, origin: Point): Shape {
       return { ...shape, vertex: spin(shape.vertex), a: spin(shape.a), b: spin(shape.b) }
     case 'sticker':
       return { ...shape, at: spin(shape.at) }
+    case 'photo':
+      /* รูปจากแบบฝึกไม่หมุน ถ้าหมุนได้ เด็กจะเผลอทำรูปเอียงแล้ววัดมุมผิดไปทั้งข้อ */
+      return shape
     default:
       return shape
   }
@@ -598,6 +660,8 @@ export function shapeReach(shape: Shape): number {
       return Math.max(distance(shape.vertex, shape.a), distance(shape.vertex, shape.b))
     case 'sticker':
       return shape.size * 0.6
+    case 'photo':
+      return Math.max(shape.imageWidth, shape.imageHeight) / 2
     default:
       return 30
   }
@@ -739,6 +803,28 @@ export function editableFields(shape: Shape): ShapeField[] {
         },
       ]
 
+    case 'photo':
+      return [
+        {
+          key: 'width',
+          label: 'ความกว้าง',
+          value: Math.round(toCm(shape.imageWidth) * 10) / 10,
+          min: 2,
+          max: 24,
+          step: 0.5,
+          unit: 'ซม.',
+        },
+        {
+          key: 'fade',
+          label: 'ความจาง',
+          value: Math.round((1 - shape.fade) * 100),
+          min: 20,
+          max: 100,
+          step: 10,
+          unit: '%',
+        },
+      ]
+
     default:
       return []
   }
@@ -799,6 +885,18 @@ export function applyField(shape: Shape, key: string, value: number): Shape {
     return { ...shape, size: Math.min(160, Math.max(16, value * PX_PER_CM)) }
   }
 
+  if (shape.kind === 'photo' && key === 'width') {
+    /* สูงต้องวิ่งตามกว้าง ไม่งั้นรูปในหนังสือจะยืด แล้วมุมที่เด็กวัดได้จะไม่ใช่มุมจริง */
+    const wide = Math.min(24 * PX_PER_CM, Math.max(2 * PX_PER_CM, value * PX_PER_CM))
+    const ratio = shape.imageHeight / shape.imageWidth
+    return { ...shape, imageWidth: wide, imageHeight: wide * ratio }
+  }
+
+  if (shape.kind === 'photo' && key === 'fade') {
+    const seen = Math.min(100, Math.max(20, value))
+    return { ...shape, fade: 1 - seen / 100 }
+  }
+
   return shape
 }
 
@@ -852,6 +950,7 @@ export function shapeVertices(shape: Shape): ShapeVertex[] {
         { key: 'b', at: shape.b },
       ]
     case 'sticker':
+    case 'photo':
       return [{ key: 'at', at: shape.at, center: true }]
     default:
       return []
@@ -922,6 +1021,7 @@ export function moveVertex(shape: Shape, key: string, to: Point): Shape {
       return shape
 
     case 'sticker':
+    case 'photo':
       return key === 'at' ? { ...shape, at: target } : shape
 
     default:
