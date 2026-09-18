@@ -150,6 +150,34 @@ export function sanitizeShape(value: unknown): Shape | null {
         ? { ...base, kind: 'sticker', at, emoji: text(value.emoji, '⭐'), size }
         : null
     }
+    case 'photo': {
+      const at = point(value.at)
+      const imageWidth = num(value.imageWidth)
+      const imageHeight = num(value.imageHeight)
+      const src = text(value.src, '')
+      const fade = num(value.fade) ?? 0
+      /*
+       * รับเฉพาะรูปที่ฝังมาเป็น data URL เท่านั้น
+       * ค่าที่อ่านกลับมาจากเครื่องอาจถูกแก้มือได้ ถ้าปล่อยให้เป็นที่อยู่อะไรก็ได้
+       * หน้าเว็บจะยิงไปโหลดรูปจากปลายทางนั้นให้เองทุกครั้งที่เปิดห้องเรขาคณิต
+       */
+      return at &&
+        imageWidth !== null &&
+        imageWidth > 0 &&
+        imageHeight !== null &&
+        imageHeight > 0 &&
+        src.startsWith('data:image/')
+        ? {
+            ...base,
+            kind: 'photo',
+            at,
+            imageWidth,
+            imageHeight,
+            src,
+            fade: Math.min(0.8, Math.max(0, fade)),
+          }
+        : null
+    }
     default:
       return null
   }

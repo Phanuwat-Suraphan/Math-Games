@@ -36,9 +36,18 @@ export const ShapesLayer = memo(function ShapesLayer({
   offsets,
   onLabelGrab,
 }: ShapesLayerProps) {
+  /*
+   * รูปจากแบบฝึกวาดก่อนเสมอ จึงอยู่ล่างสุดใต้ทุกอย่าง
+   * ถ้าเรียงตามลำดับที่วางลงกระดาษ รูปที่วางทีหลังจะทับเส้นที่เด็กวาดไว้ก่อนจนหายไปทั้งแผ่น
+   */
+  const ordered = [
+    ...shapes.filter((shape) => shape.kind === 'photo'),
+    ...shapes.filter((shape) => shape.kind !== 'photo'),
+  ]
+
   return (
     <g>
-      {shapes.map((shape) => (
+      {ordered.map((shape) => (
         <ShapeView
           key={shape.id}
           shape={shape}
