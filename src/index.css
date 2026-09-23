@@ -2110,6 +2110,29 @@ html[data-animations='off'] *::after {
   color: var(--tc);
 }
 
+/* ลิงก์พิมพ์ใบประกาศเมื่อครบแม่ หรือครบทั้งเล่ม */
+.zr-cert-link {
+  display: block;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: var(--tc, #1e9aae);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  text-align: center;
+  text-decoration: none;
+}
+
+.zr-cert-link:hover {
+  filter: brightness(1.08);
+}
+
+.zr-cert-link-big {
+  --tc: #1e9aae;
+  padding: 10px 14px;
+  font-size: 16px;
+}
+
 /* การ์ดชาวเมืองที่แตะเลือกในสมุดวัคซีน */
 .zr-villager-card {
   position: relative;

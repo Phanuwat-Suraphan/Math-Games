@@ -133,6 +133,16 @@ export function buildFocusSet(book: VaccineBook, rng: Rng): Question[] {
   )
 }
 
+/**
+ * ลิงก์ใบประกาศในชุดพิมพ์ (zombie-rescue.html อยู่ข้างแอปบน GitHub Pages)
+ * ชุดพิมพ์อ่าน ?cert= แล้วแสดงเฉพาะใบประกาศที่เติมชื่อ วันที่ และชาวเมืองของแม่นั้นให้แล้ว
+ * ชื่อตัดที่ 40 ตัวอักษรเหมือนฝั่งชุดพิมพ์ และชุดพิมพ์ escape ก่อนวางลงหน้าเสมอ
+ */
+export function certificateUrl(which: Table | 'all', name: string): string {
+  const params = new URLSearchParams({ cert: String(which), name: name.trim().slice(0, 40) })
+  return `zombie-rescue.html?${params.toString()}`
+}
+
 /** อ่านสมุดจากข้อมูลที่เก็บไว้ ข้อมูลเสียทิ้งทีละช่อง ไม่ทิ้งทั้งเล่ม */
 export function parseBook(raw: unknown): VaccineBook {
   const book = emptyBook()
