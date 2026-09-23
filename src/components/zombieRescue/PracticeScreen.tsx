@@ -6,7 +6,7 @@ import { PRACTICE_LENGTH, buildPracticeSet, checkAnswer } from '../../zombieResc
 import { buildFocusSet, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../../zombieRescue/vaccineBook'
 import type { PracticeTable, QAnswer, Question } from '../../zombieRescue/questions'
-import { AnswerPad, CHEER, COMFORT, Char, QuestionVisual, StickerToast, emphasize, pick } from './ZrParts'
+import { AnswerPad, CHEER, COMFORT, Char, HeartBurst, QuestionVisual, StickerToast, emphasize, pick } from './ZrParts'
 
 /**
  * โหมดฝึกสูตรคูณ: เลือกแม่ แล้วตอบรอบละ 10 ข้อ
@@ -84,8 +84,8 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
     return (
       <div className="panel panel-hero panel-corners p-6">
         <div className="flex justify-center gap-1" aria-hidden="true">
-          <Char k="scientist" className="w-16" />
-          <Char k="zombie" className="w-16" />
+          <Char k="scientist" className="zr-bob w-16" />
+          <Char k="zombie" className="zr-sway w-16" />
         </div>
         <h2 className="title-gold mt-1 text-center text-2xl font-black">ฝึกสูตรคูณ</h2>
         <p className="mt-1 text-center text-sm leading-relaxed text-slate-300">
@@ -247,8 +247,9 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
           <p className="text-balance text-center text-[21px] font-bold leading-snug">{emphasize(q.text)}</p>
           {result ? (
             <>
-              <div className="flex items-center gap-3 rounded-2xl bg-white p-3">
-                <Char k={result.correct ? 'scientist' : 'zombie'} className="w-14 flex-none" />
+              <div className="relative flex items-center gap-3 rounded-2xl bg-white p-3">
+                {result.correct ? <HeartBurst /> : null}
+                <Char k={result.correct ? 'scientist' : 'zombie'} className={`w-14 flex-none ${result.correct ? 'zr-bob' : 'zr-sway'}`} />
                 <div>
                   <p className={`text-xl font-bold ${result.correct ? 'text-green-700' : 'text-red-600'}`}>{result.line}</p>
                   {!result.correct ? (

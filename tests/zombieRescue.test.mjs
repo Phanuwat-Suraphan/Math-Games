@@ -753,6 +753,38 @@ check('สมุดวัคซีนกระดาษในชุดพิม�
   for (const t of Q.TABLES) assert(KIT.tableColor[t], `แม่ ${t} ต้องมีสีประจำ`)
 })
 
+check('ชาวเมือง 50 คน: ชื่อไม่ซ้ำ หน้าตาไม่ซ้ำ ตรงกับช่องในสมุดทีละช่อง', () => {
+  const VIL = load('zombieRescue/villagers')
+  equal(VIL.VILLAGER_COUNT, BOOK.FACT_COUNT, 'จำนวนชาวเมืองเท่าจำนวนช่อง')
+  const all = Array.from({ length: VIL.VILLAGER_COUNT }, (_, i) => VIL.villagerAt(i))
+  equal(new Set(all.map((v) => v.name)).size, 50, 'ชื่อไม่ซ้ำ')
+  equal(new Set(all.map((v) => `${v.style}/${v.accessory}`)).size, 50, 'ทรงผมกับของประจำตัวไม่ซ้ำ')
+  const idx = BOOK.allFacts(BOOK.emptyBook()).map((f) => VIL.villagerIndexOf(f.each, f.groups))
+  equal(JSON.stringify(idx), JSON.stringify(Array.from({ length: 50 }, (_, i) => i)), 'ช่องในสมุดเรียงตรงกับลำดับชาวเมือง')
+  equal(JSON.stringify(VIL.villagerAt(7)), JSON.stringify(VIL.villagerAt(7)), 'หน้าตาเดิมทุกครั้ง')
+  for (const v of all) {
+    for (const svg of [VIL.villagerInner(v), VIL.villagerZombieInner(v)]) {
+      assert(!/NaN|undefined|null/.test(svg), `ภาพของน้อง${v.name} มีค่าเสีย`)
+      assert(svg.length > 200, `ภาพของน้อง${v.name} ว่าง`)
+    }
+    assert(VIL.villagerZombieInner(v).includes('#A9DB8C'), `น้อง${v.name} ตอนเป็นซอมบี้ต้องหน้าเขียว`)
+    assert(!VIL.villagerInner(v).includes('#A9DB8C'), `น้อง${v.name} ที่หายป่วยต้องไม่หน้าเขียว`)
+    assert(VIL.thanksOf(v).length > 0, 'มีคำขอบคุณ')
+  }
+})
+
+check('สมุดวัคซีนกระดาษใช้ชาวเมืองชุดเดียวกับเกม', () => {
+  const VIL = load('zombieRescue/villagers')
+  assert(KIT.villagers, 'ไม่พบชาวเมืองในชุดพิมพ์' + REGEN)
+  equal(KIT.villagers.viewBox, VIL.VILLAGER_VIEWBOX, 'viewBox' + REGEN)
+  for (let i = 0; i < VIL.VILLAGER_COUNT; i += 1) {
+    const v = VIL.villagerAt(i)
+    equal(KIT.villagers.names[i], v.name, `ชื่อคนที่ ${i}` + REGEN)
+    equal(KIT.villagers.zombies[i], VIL.villagerZombieInner(v), `ภาพซอมบี้คนที่ ${i}` + REGEN)
+    equal(KIT.villagers.cured[i], VIL.villagerInner(v), `ภาพหายป่วยคนที่ ${i}` + REGEN)
+  }
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

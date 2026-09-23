@@ -61,6 +61,7 @@ import {
   Die,
   Hearts,
   QuestionVisual,
+  HeartBurst,
   StickerToast,
   ZHead,
   emphasize,
@@ -659,9 +660,9 @@ function SetupPanel({
     <div className="panel panel-hero panel-corners p-6">
       <div className="flex items-end justify-center gap-1" aria-hidden="true">
         {HERO_KEYS.map((hero) => (
-          <Char key={hero} k={hero} className="w-14 sm:w-16" />
+          <Char key={hero} k={hero} className="zr-bob w-14 sm:w-16" />
         ))}
-        <Char k="zombo" className="ml-2 w-16 sm:w-20" />
+        <Char k="zombo" className="zr-sway ml-2 w-16 sm:w-20" />
       </div>
       <h2 className="mt-2 text-center font-display text-3xl font-black tracking-wide">
         <span className="text-[#7ED957]">ZOMBIE</span> <span className="text-[#FFB020]">RESCUE</span>
@@ -1168,8 +1169,13 @@ function QuestionView(props: ModalViewProps & { modal: QuestionModal; pop: strin
 
         {modal.phase === 'result' && outcome ? (
           <>
-            <div className="flex items-center gap-3 rounded-2xl bg-white p-3 text-left">
-              {outcome.correct && modal.ctx !== 'turn' ? <CuredHead className="w-14 flex-none" /> : <Char k={outcome.correct ? me.hero : 'zombie'} className="w-14 flex-none" />}
+            <div className="relative flex items-center gap-3 rounded-2xl bg-white p-3 text-left">
+              {outcome.correct ? <HeartBurst /> : null}
+              {outcome.correct && modal.ctx !== 'turn' ? (
+                <CuredHead className="zr-bob w-14 flex-none" />
+              ) : (
+                <Char k={outcome.correct ? me.hero : 'zombie'} className={`w-14 flex-none ${outcome.correct ? 'zr-bob' : 'zr-sway'}`} />
+              )}
               <div>
                 <p className={`text-xl font-bold ${outcome.correct ? 'text-green-700' : 'text-red-600'}`}>{modal.line}</p>
                 {outcome.correct ? (

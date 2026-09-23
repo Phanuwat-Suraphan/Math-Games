@@ -35,6 +35,7 @@ const Q = load('zombieRescue/questions')
 const ENG = load('zombieRescue/engine')
 const ART = load('zombieRescue/art')
 const BOOK = load('zombieRescue/vaccineBook')
+const VIL = load('zombieRescue/villagers')
 
 function seeded(seed) {
   let a = seed >>> 0
@@ -169,6 +170,13 @@ const data = {
   },
   /* สมุดวัคซีนกระดาษใช้แม่และจำนวนครั้งติดกันชุดเดียวกับสมุดในเกม */
   book: { tables: Q.TABLES, streak: BOOK.STREAK_TO_CURE, count: BOOK.FACT_COUNT },
+  /* ชาวเมือง 50 คนตอนยังเป็นซอมบี้ เรียงตามช่องในสมุด (คนเดียวกับในเกมบนเว็บ) */
+  villagers: {
+    viewBox: VIL.VILLAGER_VIEWBOX,
+    names: Array.from({ length: VIL.VILLAGER_COUNT }, (_, i) => VIL.villagerAt(i).name),
+    zombies: Array.from({ length: VIL.VILLAGER_COUNT }, (_, i) => VIL.villagerZombieInner(VIL.villagerAt(i))),
+    cured: Array.from({ length: VIL.VILLAGER_COUNT }, (_, i) => VIL.villagerInner(VIL.villagerAt(i))),
+  },
   cards,
 }
 

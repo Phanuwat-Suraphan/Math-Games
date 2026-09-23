@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
+import { useGameSettings } from '../../hooks/useGameSettings'
 import { playSfx } from '../../services/audioService'
 import { CHAR_NAMES, charInner, curedHeadInner, zheadInner } from '../../zombieRescue/art'
 import type { CharKey } from '../../zombieRescue/art'
 import { ZONES } from '../../zombieRescue/board'
 import type { AskKind, QAnswer, QVisual, Stage } from '../../zombieRescue/questions'
+import { VILLAGER_VIEWBOX, thanksOf, villagerFor, villagerInner, villagerZombieInner } from '../../zombieRescue/villagers'
+import type { Villager } from '../../zombieRescue/villagers'
 
 /**
  * ชิ้นส่วนหน้าจอของ ZOMBIE RESCUE ใช้ร่วมกันระหว่างเกมกระดานกับโหมดฝึกสูตรคูณ
@@ -316,12 +319,63 @@ export function Hearts({ lives, max = 3 }: { lives: number; max?: number }) {
   )
 }
 
-/** ป้าย "ได้สติกเกอร์ใหม่" ตอนข้อนั้นเพิ่งถูกติดกันครบในสมุดวัคซีน */
-export function StickerToast({ each, groups }: { each: number; groups: number }) {
+/** ชาวเมืองในสมุดวัคซีน ตอนยังเป็นซอมบี้ หรือตอนหายป่วยแล้ว */
+export function VillagerArt({ v, cured, className }: { v: Villager; cured: boolean; className?: string }) {
   return (
-    <p className="zr-sticker-toast flex items-center justify-center gap-2 rounded-2xl bg-[#E6F5EA] px-3 py-2 font-bold text-green-800" role="status">
-      <CuredHead className="w-8" />
-      ได้สติกเกอร์ {groups} × {each} = {each * groups} ในสมุดวัคซีน!
-    </p>
+    <Art
+      viewBox={VILLAGER_VIEWBOX}
+      inner={cured ? villagerInner(v) : villagerZombieInner(v)}
+      label={cured ? `น้อง${v.name}` : `น้อง${v.name} ตอนยังเป็นซอมบี้`}
+      className={className}
+    />
+  )
+}
+
+/**
+ * ป้าย "ได้สติกเกอร์ใหม่": ซอมบี้โยกตัวแล้วกลายเป็นชาวเมืองหน้าเดิม มีประกายรอบตัว
+ * ปิดอนิเมชันในตั้งค่าแล้วเห็นแค่ชาวเมืองที่หายป่วย
+ */
+export function StickerToast({ each, groups }: { each: number; groups: number }) {
+  const { settings } = useGameSettings()
+  const v = villagerFor(each, groups)
+  const moving = settings.animationsEnabled
+  return (
+    <div className="zr-sticker-toast flex items-center gap-3 rounded-2xl bg-[#E6F5EA] px-3 py-2 text-left text-green-800" role="status">
+      <span className="relative block h-14 w-14 flex-none" aria-hidden="true">
+        {moving ? <VillagerArt v={v} cured={false} className="zr-morph-from absolute left-0 top-0 h-full w-full" /> : null}
+        <VillagerArt v={v} cured className={`absolute left-0 top-0 h-full w-full ${moving ? 'zr-morph-to' : ''}`} />
+        {moving ? (
+          <>
+            <span className="zr-sparkle" style={{ left: '-6px', top: '-4px' } as CSSProperties}>✨</span>
+            <span className="zr-sparkle" style={{ right: '-8px', top: '6px', animationDelay: '0.85s' } as CSSProperties}>✨</span>
+            <span className="zr-sparkle" style={{ left: '4px', bottom: '-6px', animationDelay: '1s' } as CSSProperties}>💖</span>
+          </>
+        ) : null}
+      </span>
+      <span className="leading-snug">
+        <b className="block">
+          น้อง{v.name}หายป่วยแล้ว! “{thanksOf(v)}”
+        </b>
+        <span className="text-sm">
+          ได้สติกเกอร์ {groups} × {each} = {each * groups} ในสมุดวัคซีน
+        </span>
+      </span>
+    </div>
+  )
+}
+
+/** หัวใจและประกายลอยขึ้นตอนตอบถูก (วางในกล่องที่มี relative) ปิดอนิเมชันในตั้งค่าแล้วไม่แสดง */
+const BURST = ['💚', '✨', '💖', '⭐', '💉', '✨', '💛']
+export function HeartBurst() {
+  const { settings } = useGameSettings()
+  if (!settings.animationsEnabled) return null
+  return (
+    <span className="zr-burst" aria-hidden="true">
+      {BURST.map((emoji, i) => (
+        <span key={i} style={{ '--x': `${(i - 3) * 20}px`, '--d': `${i * 70}ms` } as CSSProperties}>
+          {emoji}
+        </span>
+      ))}
+    </span>
   )
 }

@@ -2081,6 +2081,136 @@ html[data-animations='off'] *::after {
   background: #f3f6fa;
   font-family: 'Mali', 'Leelawadee UI', Tahoma, sans-serif;
   line-height: 1.1;
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.zr-sticker:hover {
+  transform: translateY(-2px) rotate(-2deg);
+}
+
+.zr-sticker:focus-visible {
+  outline: 3px solid var(--tc);
+  outline-offset: 2px;
+}
+
+.zr-sticker-picked {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tc) 40%, transparent);
+}
+
+.zr-sticker-name {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tc);
+}
+
+/* การ์ดชาวเมืองที่แตะเลือกในสมุดวัคซีน */
+.zr-villager-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 8px 8px;
+  padding: 10px 34px 10px 10px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tc) 12%, #fff);
+  border: 2px solid color-mix(in srgb, var(--tc) 50%, #fff);
+  animation: zr-sticker-in 0.35s ease-out;
+}
+
+.zr-bubble {
+  position: relative;
+  margin-top: 4px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: #fff;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.zr-bubble::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 10px;
+  border: 6px solid transparent;
+  border-left: 0;
+  border-right-color: #fff;
+}
+
+.zr-card-x {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #51607a;
+  font-weight: 700;
+}
+
+.zr-card-x:hover {
+  background: rgba(35, 50, 74, 0.08);
+}
+
+/* ตัวละครขยับเบา ๆ ให้ดูมีชีวิต (ปิดเมื่อผู้ใช้ขอลดการเคลื่อนไหว) */
+.zr-bob {
+  transform-origin: 50% 100%;
+  animation: zr-bob 2.6s ease-in-out infinite;
+}
+
+.zr-bob:nth-child(2n) {
+  animation-delay: -0.9s;
+}
+
+.zr-bob:nth-child(3n) {
+  animation-delay: -1.7s;
+}
+
+.zr-sway {
+  transform-origin: 50% 100%;
+  animation: zr-sway 3.2s ease-in-out infinite;
+}
+
+/* ซอมบี้กลายเป็นชาวเมือง */
+.zr-morph-from {
+  animation: zr-morph-out 1s ease-in forwards;
+}
+
+.zr-morph-to {
+  opacity: 0;
+  animation: zr-morph-in 0.55s 0.75s cubic-bezier(0.3, 1.6, 0.5, 1) forwards;
+}
+
+.zr-sparkle {
+  position: absolute;
+  font-size: 14px;
+  opacity: 0;
+  animation: zr-twinkle 1.1s 0.75s ease-out 2;
+}
+
+/* หัวใจลอยตอนตอบถูก */
+.zr-burst {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.zr-burst span {
+  position: absolute;
+  left: -10px;
+  top: 0;
+  font-size: 20px;
+  opacity: 0;
+  animation: zr-float 1.2s var(--d, 0ms) ease-out forwards;
 }
 
 .zr-sticker-new svg {
@@ -2133,6 +2263,39 @@ html[data-animations='off'] *::after {
   animation: zr-sticker-in 0.4s ease-out;
 }
 
+@keyframes zr-bob {
+  50% { transform: translateY(-3px) rotate(-2deg); }
+}
+
+@keyframes zr-sway {
+  25% { transform: rotate(-4deg); }
+  75% { transform: rotate(4deg); }
+}
+
+@keyframes zr-morph-out {
+  0%, 35% { opacity: 1; transform: none; }
+  50% { transform: rotate(-10deg) scale(1.05); }
+  65% { transform: rotate(10deg) scale(1.05); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+@keyframes zr-morph-in {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes zr-twinkle {
+  0% { opacity: 0; transform: scale(0.3); }
+  35% { opacity: 1; transform: scale(1.2); }
+  100% { opacity: 0; transform: translateY(-8px) scale(0.8); }
+}
+
+@keyframes zr-float {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.4); }
+  20% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x, 0), -90px) scale(1.15); }
+}
+
 @keyframes zr-sticker-in {
   0% { transform: scale(0.6) rotate(-8deg); opacity: 0; }
   70% { transform: scale(1.08) rotate(3deg); opacity: 1; }
@@ -2154,7 +2317,25 @@ html[data-animations='off'] *::after {
   }
 
   .zr-sticker-got,
-  .zr-sticker-toast {
+  .zr-sticker-toast,
+  .zr-villager-card,
+  .zr-bob,
+  .zr-sway,
+  .zr-sparkle,
+  .zr-burst span {
     animation-name: none;
+  }
+
+  .zr-morph-from {
+    display: none;
+  }
+
+  .zr-morph-to {
+    opacity: 1;
+    animation-name: none;
+  }
+
+  .zr-sticker {
+    transition: none;
   }
 }
