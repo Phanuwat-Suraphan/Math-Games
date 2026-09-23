@@ -162,6 +162,18 @@ export function recordTimeAdventure(
   }
 }
 
+/**
+ * บันทึกผลหนึ่งรอบของการฝึกอ่านนาฬิกา
+ *
+ * นับเฉพาะข้อที่ตอบถูก เข้าตัวนับเดียวกับเกมกระดาน
+ * เพราะถ้วย "นักอ่านนาฬิกา" วัดว่าอ่านนาฬิกาถูกกี่ครั้ง ไม่ได้วัดว่าเล่นโหมดไหน
+ * ไม่นับเป็นเกมที่เล่น เพราะหอเกียรติยศแสดงเป็น "เข้าปราสาท / เกมที่เล่น"
+ */
+export function recordTimePractice(player: Player, correct: number): PlayerRecords {
+  const records = recordsOf(player)
+  return { ...records, timeCorrect: clamp(records.timeCorrect + clamp(correct)) }
+}
+
 /** บันทึกชั้นที่ขึ้นไปถึงในหอคอย เก็บเฉพาะค่าที่ดีที่สุด */
 export function recordTowerRun(player: Player, reachedFloor: number): PlayerRecords {
   const records = recordsOf(player)
