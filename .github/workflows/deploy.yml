@@ -51,6 +51,10 @@ jobs:
           cp time-adventure.html dist/time-adventure.html
           cp time-adventure-play.html dist/time-adventure-play.html
 
+      # ชุดพิมพ์บอร์ดเกมการคูณ ป.2 ธีมซอมบี้น่ารัก (ยังไม่มีฉบับเล่นในแอป)
+      - name: แนบชุดพิมพ์ ZOMBIE CURE ไปด้วย
+        run: cp zombie-cure.html dist/zombie-cure.html
+
       # enablement: true คือให้เปิด GitHub Pages ให้เองถ้ายังไม่ได้เปิด
       # เจ้าของ repo จึงไม่ต้องเข้าไปตั้งค่าในหน้า Settings เอง
       # หมายเหตุ: repo นี้เป็นแบบสาธารณะ เว็บที่ได้จึงเปิดดูได้จากทุกที่
