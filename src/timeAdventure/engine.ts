@@ -55,6 +55,16 @@ export interface TaPlayer {
   /** ตอบถูกไปกี่ข้อ ใช้คิดรางวัลและบันทึกสถิติ */
   correct: number
   answered: number
+  /**
+   * การ์ดที่ตอบไปแล้วตามลำดับ ใช้สรุปท้ายเกมว่าควรฝึกอะไรเพิ่ม
+   * เก็บแค่รหัสการ์ดกับถูกผิด ไม่ได้เก็บว่าเด็กตอบอะไร
+   */
+  history: AnswerRecord[]
+}
+
+export interface AnswerRecord {
+  id: string
+  ok: boolean
 }
 
 export interface TaState {
@@ -106,6 +116,7 @@ export function createGame(players: NewPlayer[], easy: boolean, rng: Rng): TaSta
       hand: [],
       correct: 0,
       answered: 0,
+      history: [],
     })),
     turn: 0,
     round: 1,
@@ -247,13 +258,14 @@ export function applyAnswer(
   const player = state.players[index]
   const from = player.pos
   const answered = player.answered + 1
+  const history = [...player.history, { id: card.id, ok: correct }]
 
   if (!correct) {
-    return { state: updatePlayer(state, index, { answered }), correct, coinsGained: 0, from, to: from, won: false }
+    return { state: updatePlayer(state, index, { answered, history }), correct, coinsGained: 0, from, to: from, won: false }
   }
 
   const coinsGained = options.boost ? 2 : 1
-  const base = { coins: player.coins + coinsGained, correct: player.correct + 1, answered }
+  const base = { coins: player.coins + coinsGained, correct: player.correct + 1, answered, history }
 
   if (from === GATE) {
     const won = { ...updatePlayer(state, index, { ...base, pos: CASTLE }), winner: index }
@@ -267,7 +279,122 @@ export function applyAnswer(
 /** ตอบผิดไปแล้วแต่ขอใช้โล่ตอบใหม่: ไม่นับเป็นการตอบเพิ่ม */
 export function undoWrongAnswerCount(state: TaState): TaState {
   const player = state.players[state.turn]
-  return updatePlayer(state, state.turn, { answered: Math.max(0, player.answered - 1) })
+  const last = player.history[player.history.length - 1]
+  return updatePlayer(state, state.turn, {
+    answered: Math.max(0, player.answered - 1),
+    history: last && !last.ok ? player.history.slice(0, -1) : player.history,
+  })
+}
+
+export interface DeckTally {
+  right: number
+  total: number
+}
+
+export interface PlayerReview {
+  byDeck: Record<DeckType, DeckTally>
+  /** การ์ดที่เคยตอบผิด ไม่ซ้ำ เรียงตามที่เจอ */
+  missed: string[]
+}
+
+/**
+ * สรุปของผู้เล่นหนึ่งคน สำหรับหน้าจอท้ายเกม
+ *
+ * การ์ดที่ผิดแล้วภายหลังตอบถูกยังอยู่ในรายการ เพราะหน้าจอท้ายเกม
+ * มีไว้บอกว่าอะไรที่เคยสะดุด ไม่ใช่บอกว่าอะไรยังไม่ผ่าน
+ */
+export function reviewOf(player: TaPlayer): PlayerReview {
+  const byDeck: Record<DeckType, DeckTally> = {
+    time: { right: 0, total: 0 },
+    find: { right: 0, total: 0 },
+    daily: { right: 0, total: 0 },
+    chal: { right: 0, total: 0 },
+  }
+  const missed: string[] = []
+  for (const entry of player.history) {
+    const card = getTimeCard(entry.id)
+    if (!card) continue
+    byDeck[card.deck].total += 1
+    if (entry.ok) byDeck[card.deck].right += 1
+    else if (!missed.includes(card.id)) missed.push(card.id)
+  }
+  return { byDeck, missed }
+}
+
+/* ── เกมที่เล่นค้าง ───────────────────────────────────────── */
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+const isCount = (value: unknown, max: number): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max
+const DECKS: DeckType[] = ['time', 'find', 'daily', 'chal']
+const SPECIAL_KEYS = Object.keys(SPECIAL_INFO) as SpecialKey[]
+
+/**
+ * ตรวจเกมที่อ่านกลับมาจาก localStorage ก่อนใช้
+ *
+ * ข้อมูลในเครื่องแก้ด้วยมือได้ และอาจเป็นของเวอร์ชันเก่าที่รูปร่างต่างไป
+ * ถ้าใช้ตรง ๆ หน้าจอจะพังกลางคาบ ซึ่งแย่กว่าการเริ่มเกมใหม่มาก
+ * อะไรที่ดูไม่ถูกต้องจึงคืน null แล้วให้เด็กเริ่มใหม่ ไม่พยายามซ่อม
+ * การ์ดพิเศษต้องครบ 8 ใบเท่าเดิม ไม่งั้นแก้ข้อมูลเพื่อเสกการ์ดได้
+ */
+export function parseSavedGame(raw: unknown): TaState | null {
+  if (!isRecord(raw) || !Array.isArray(raw.players) || !isRecord(raw.decks) || !Array.isArray(raw.specials)) return null
+  const count = raw.players.length
+  if (count < 1 || count > MAX_PLAYERS) return null
+
+  const players: TaPlayer[] = []
+  for (const item of raw.players) {
+    if (!isRecord(item)) return null
+    const hero = item.hero as HeroKey
+    if (!HERO_KEYS.includes(hero) || typeof item.name !== 'string' || item.name.length > 40) return null
+    if (!isCount(item.pos, CASTLE) || !isCount(item.coins, 9999) || !isCount(item.correct, 9999) || !isCount(item.answered, 9999)) return null
+    if (!Array.isArray(item.hand) || item.hand.length > HAND_LIMIT || !item.hand.every((k) => SPECIAL_KEYS.includes(k as SpecialKey))) return null
+    const history: AnswerRecord[] = []
+    if (Array.isArray(item.history)) {
+      for (const entry of item.history) {
+        if (isRecord(entry) && typeof entry.id === 'string' && getTimeCard(entry.id) && typeof entry.ok === 'boolean') {
+          history.push({ id: entry.id, ok: entry.ok })
+        }
+      }
+    }
+    players.push({
+      name: item.name,
+      hero,
+      pos: item.pos,
+      coins: item.coins,
+      correct: item.correct,
+      answered: item.answered,
+      hand: item.hand as SpecialKey[],
+      history,
+    })
+  }
+
+  const decks = {} as Record<DeckType, string[]>
+  for (const deck of DECKS) {
+    const pile = raw.decks[deck]
+    if (!Array.isArray(pile) || !pile.every((id) => typeof id === 'string' && getTimeCard(id)?.deck === deck)) return null
+    decks[deck] = pile as string[]
+  }
+
+  if (!raw.specials.every((k) => SPECIAL_KEYS.includes(k as SpecialKey))) return null
+  const specials = raw.specials as SpecialKey[]
+  const inHands = players.reduce((sum, player) => sum + player.hand.length, 0)
+  if (specials.length + inHands !== SPECIAL_DECK.length) return null
+
+  const winner = raw.winner === null ? null : isCount(raw.winner, count - 1) ? raw.winner : undefined
+  if (winner === undefined || !isCount(raw.turn, count - 1) || !isCount(raw.round, 9999) || raw.round < 1) return null
+
+  return {
+    players,
+    turn: raw.turn,
+    round: raw.round,
+    easy: raw.easy === true,
+    decks,
+    specials,
+    usedSpecial: raw.usedSpecial === true,
+    winner,
+  }
 }
 
 /**

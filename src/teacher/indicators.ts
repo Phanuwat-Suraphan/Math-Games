@@ -53,6 +53,7 @@ export type IndicatorId =
   | 'basicAddSub'
   | 'percent'
   | 'average'
+  | 'time'
 
 /**
  * ลำดับในรายการนี้คือลำดับคอลัมน์ในตารางของครู และลำดับตัวเลขในรหัส
@@ -134,6 +135,19 @@ export const INDICATORS: readonly Indicator[] = [
     level: 'extend',
     verified: false,
   },
+  /*
+   * ตัวเดียวของชั้น ป.2 ในแอปนี้ มาจากผจญภัยเมืองแห่งเวลา
+   * จัดเป็น review เพราะต่ำกว่า ป.4 จึงไม่ถูกนับเป็นคะแนนตัวชี้วัดของ ป.4
+   * รหัสนี้เกมโยงเอง ครู ป.2 ควรทานกับหลักสูตรของโรงเรียนก่อนกรอกคะแนน
+   */
+  {
+    id: 'time',
+    code: 'ค 2.1 ป.2/1',
+    short: 'เวลา (ป.2)',
+    full: 'บอกเวลาบนหน้าปัดนาฬิกา เขียนเวลาเป็นตัวเลข เปรียบเทียบและเรียงลำดับเวลา และแก้โจทย์ปัญหาเกี่ยวกับเวลา จากการ์ดของผจญภัยเมืองแห่งเวลา',
+    level: 'review',
+    verified: false,
+  },
 ]
 
 export const INDICATOR_ORDER: readonly IndicatorId[] = INDICATORS.map((item) => item.id)
@@ -183,6 +197,9 @@ export const LEDGER_INDICATOR: Record<string, IndicatorId> = {
   build: 'buildProblem',
   unknown: 'unknownAddSub',
 }
+
+/** การ์ดทุกใบของผจญภัยเมืองแห่งเวลา (นับเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของเครื่อง) */
+export const TIME_INDICATOR: IndicatorId = 'time'
 
 /** โจทย์ของโดรนตรวจการณ์ระหว่างเดินในเขาวงกต */
 export const DRONE_INDICATOR: IndicatorId = 'basicAddSub'

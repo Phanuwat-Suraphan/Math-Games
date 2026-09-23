@@ -163,6 +163,20 @@ check('ไม่มีเวลาช่วงตี 1 ถึงตี 5 บน�
   equal(bad.length, 0, `พบ: ${bad.map(([id, t]) => `${id} "${t}"`).join(', ')}`)
 })
 
+check('โจทย์ที่บอกตำแหน่งเข็มมา ต้องวาดเข็มให้เห็น ไม่ใช่หน้าปัดเปล่า', () => {
+  // เคยพลาดมาแล้ว: T04 บอกว่าเข็มชี้ 12 กับ 6 แต่หน้าปัดไม่มีเข็ม เด็กนึกว่านาฬิกาเสีย
+  for (const card of ALL) {
+    if (card.visual?.kind !== 'emptyClock') continue
+    // โจทย์ที่ถามว่า "ชี้เลขอะไร" ใช้หน้าปัดเปล่าได้ ส่วนโจทย์ที่บอกเลขมาแล้วต้องวาดเข็ม
+    assert(!/เข็ม(ยาว|สั้น)(ชี้|อยู่ระหว่าง)\s*\d/.test(card.question), `${card.id} บอกตำแหน่งเข็มแต่หน้าปัดเปล่า`)
+    assert(card.visual.note, `${card.id} หน้าปัดเปล่าต้องมีข้อความบอกว่าตั้งใจให้เปล่า`)
+  }
+  for (const [id, h, m] of [['T04', 6, 0], ['T08', 3, 30], ['T12', 8, 45]]) {
+    const v = CARDS.getTimeCard(id).visual
+    equal(`${v.kind} ${v.h}:${v.m}`, `clock ${h}:${m}`, `${id} ต้องวาดเข็มตามที่โจทย์บอก`)
+  }
+})
+
 check('เวลาครึ่งชั่วโมง เข็มสั้นอยู่กึ่งกลางระหว่างสองเลข', () => {
   equal(ART.handAngles(8, 30).hour, 255, '8:30 เข็มสั้นต้องอยู่ที่ 255 องศา (ระหว่าง 8 กับ 9)')
   equal(ART.handAngles(8, 30).minute, 180, '8:30 เข็มยาวต้องชี้ 6')
@@ -385,6 +399,65 @@ check('รางวัลในแอปคิดจากข้อที่ต�
   equal(ENG.appReward(state), ENG.REWARD_MAX, 'ต้องไม่เกินเพดาน')
 })
 
+check('ประวัติการตอบ: บันทึกทุกใบ และสรุปรายกองกับการ์ดที่เคยผิด', () => {
+  let state = two()
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('T01'), true).state
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('T07'), false).state
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('T07'), true).state
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('F04'), false).state
+  const review = ENG.reviewOf(state.players[0])
+  equal(review.byDeck.time.total, 3, 'ตอบกองอ่านเวลา 3 ครั้ง')
+  equal(review.byDeck.time.right, 2, 'ถูก 2 ครั้ง')
+  equal(review.byDeck.find.right, 0, 'กองหาเวลาถูก 0')
+  equal(review.missed.join(), 'T07,F04', 'การ์ดที่เคยผิด ไม่ซ้ำ เรียงตามที่เจอ')
+})
+
+check('ใช้โล่ตอบใหม่แล้ว ประวัติข้อที่ผิดถูกถอนออก', () => {
+  let state = setPlayer(two(), { hand: ['shield'] })
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('T07'), false).state
+  state = ENG.undoWrongAnswerCount(ENG.spendSpecial(state, 'shield'))
+  equal(state.players[0].history.length, 0, 'ข้อที่ผิดต้องถูกถอน')
+  equal(state.players[0].answered, 0, 'จำนวนที่ตอบต้องถูกถอนด้วย')
+})
+
+check('เกมค้างที่บันทึกไว้ อ่านกลับได้ตรงทุกช่อง', () => {
+  let state = two()
+  state = ENG.drawCard(state, 'time', seeded(8)).state
+  state = ENG.applyAnswer(state, CARDS.getTimeCard('T07'), true).state
+  state = setPlayer({ ...state, specials: state.specials.slice(1) }, { hand: [state.specials[0]] })
+  const back = ENG.parseSavedGame(JSON.parse(JSON.stringify(state)))
+  assert(back, 'ต้องอ่านกลับได้')
+  // เทียบแบบเรียงชื่อช่อง เพราะลำดับช่องใน object ไม่ใช่ข้อมูล
+  const canon = (value) => JSON.stringify(value, (_, v) =>
+    v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b))) : v)
+  equal(canon(back), canon(state), 'ต้องเหมือนเดิมทุกช่อง')
+})
+
+check('เกมค้างที่ข้อมูลถูกแก้หรือเสีย ต้องถูกปฏิเสธ', () => {
+  const good = JSON.parse(JSON.stringify(two()))
+  const bad = (change) => { const copy = JSON.parse(JSON.stringify(good)); change(copy); return ENG.parseSavedGame(copy) }
+  equal(ENG.parseSavedGame(null), null, 'null')
+  equal(ENG.parseSavedGame('ข้อความมั่ว'), null, 'ข้อความ')
+  equal(bad((g) => { g.players[0].hero = 'robot' }), null, 'ฮีโร่ที่ไม่มีจริง')
+  equal(bad((g) => { g.players[0].pos = 99 }), null, 'ตำแหน่งนอกกระดาน')
+  equal(bad((g) => { g.players[0].coins = -5 }), null, 'เหรียญติดลบ')
+  equal(bad((g) => { g.players[0].hand = ['chest', 'chest'] }), null, 'เสกการ์ดพิเศษเพิ่ม')
+  equal(bad((g) => { g.decks.time.push('C01') }), null, 'การ์ดผิดกอง')
+  equal(bad((g) => { g.decks.find = ['ZZZ'] }), null, 'การ์ดที่ไม่มีจริง')
+  equal(bad((g) => { g.turn = 5 }), null, 'ตาของคนที่ไม่มี')
+  equal(bad((g) => { g.players = [] }), null, 'ไม่มีผู้เล่น')
+  const oldSave = bad((g) => { for (const p of g.players) delete p.history })
+  assert(oldSave && oldSave.players[0].history.length === 0, 'ข้อมูลที่ไม่มีประวัติ (รุ่นก่อน) ต้องอ่านได้ ประวัติว่าง')
+})
+
+check('ตัวชี้วัดเวลา ป.2 อยู่ท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
+  const IND = load('teacher/indicators')
+  const last = IND.INDICATORS[IND.INDICATORS.length - 1]
+  equal(last.id, IND.TIME_INDICATOR, 'ต้องต่อท้ายรายการ รหัสเก่าของครูจึงอ่านได้เหมือนเดิม')
+  equal(last.level, 'review', 'ต้องไม่ใช่ตัวชี้วัดหลักของ ป.4')
+  equal(last.verified, false, 'รหัสที่เกมโยงเองต้องบอกครูว่ายังไม่ได้ทาน')
+})
+
 check('จำลองเกมสุ่ม 300 เกม: ไม่มีสถานะไหนหลุดกติกา และทุกเกมจบได้', () => {
   for (let g = 0; g < 300; g += 1) {
     const rng = seeded(1000 + g)
@@ -418,6 +491,7 @@ check('จำลองเกมสุ่ม 300 เกม: ไม่มีสถ
       }
       const inPlay = state.specials.length + state.players.reduce((s, p) => s + p.hand.length, 0)
       equal(inPlay, 8, `การ์ดพิเศษต้องครบ 8 ใบเสมอ (เกม ${g})`)
+      assert(ENG.parseSavedGame(JSON.parse(JSON.stringify(state))), `บันทึกกลางเกมแล้วต้องอ่านกลับได้ (เกม ${g})`)
       if (!out.won) state = ENG.endTurn(state)
     }
     equal(state.players[state.winner].pos, ENG.CASTLE, 'ผู้ชนะต้องอยู่ในปราสาท')

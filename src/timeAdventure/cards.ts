@@ -24,7 +24,12 @@ export type DeckType = 'time' | 'find' | 'daily' | 'chal'
 /** ภาพบนการ์ด หน้าจอเป็นคนตัดสินใจว่าจะวาดอย่างไร */
 export type CardVisual =
   | { kind: 'clock'; h: number; m: number; tag?: string }
-  | { kind: 'emptyClock'; tag?: string }
+  /**
+   * หน้าปัดเปล่า ใช้เฉพาะเมื่อโจทย์ถามว่าเข็มชี้เลขอะไร
+   * ถ้าโจทย์บอกตำแหน่งเข็มมาแล้ว ต้องวาดเข็มให้เห็น ไม่งั้นเด็กนึกว่านาฬิกาเสีย
+   * note คือข้อความใต้หน้าปัด บอกว่าตั้งใจให้เปล่า
+   */
+  | { kind: 'emptyClock'; tag?: string; note?: string }
   | { kind: 'word'; text: string; blank?: boolean; emoji?: string; tag?: string }
   | { kind: 'clocks'; clocks: Array<[number, number]>; word?: string; tag?: string }
   | { kind: 'rows'; rows: ActivityRow[] }
@@ -103,7 +108,7 @@ export const TIME_CARDS: TimeCard[] = [
   },
   {
     id: 'T04', deck: 'time', stars: 1, kind: 'choice',
-    visual: { kind: 'emptyClock', tag: MORNING },
+    visual: { kind: 'clock', h: 6, m: 0, tag: MORNING },
     question: 'เข็มยาวชี้ 12 เข็มสั้นชี้ 6 เป็นเวลาเท่าไร?',
     options: ['06:00 น.', '12:30 น.', '07:00 น.'], answer: 0,
     answerText: '06:00 น. (หกโมงเช้า)', why: 'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 6',
@@ -117,7 +122,7 @@ export const TIME_CARDS: TimeCard[] = [
   },
   {
     id: 'T06', deck: 'time', stars: 1, kind: 'choice',
-    visual: { kind: 'emptyClock', tag: '☀️ เที่ยงวัน' },
+    visual: { kind: 'emptyClock', tag: '☀️ เที่ยงวัน', note: 'หน้าปัดเปล่า ลองนึกภาพเข็มตอนเที่ยงวันดูนะ' },
     question: 'เที่ยงวัน เข็มสั้นและเข็มยาวชี้เลขอะไร?',
     options: ['ชี้ 12 ทั้งสองเข็ม', 'เข็มสั้นชี้ 12 · เข็มยาวชี้ 6', 'เข็มสั้นชี้ 6 · เข็มยาวชี้ 12'], answer: 0,
     answerText: 'ชี้เลข 12 ทั้งสองเข็ม', why: 'เที่ยงวัน = 12:00 น. สองเข็มทับกันที่ 12',
@@ -131,7 +136,7 @@ export const TIME_CARDS: TimeCard[] = [
   },
   {
     id: 'T08', deck: 'time', stars: 2, kind: 'choice',
-    visual: { kind: 'emptyClock', tag: '🌤️ ตอนบ่าย' },
+    visual: { kind: 'clock', h: 3, m: 30, tag: '🌤️ ตอนบ่าย' },
     question: 'เข็มยาวชี้ 6 เข็มสั้นอยู่ระหว่าง 3 กับ 4 เป็นเวลาเท่าไร?',
     options: ['บ่ายสามโมงครึ่ง', 'บ่ายสี่โมงครึ่ง', 'บ่ายสามโมงหกนาที'], answer: 0,
     answerText: 'บ่ายสามโมงครึ่ง (15:30 น.)', why: 'เข็มยาวชี้ 6 = ครึ่ง · เข็มสั้นเลย 3 มาแล้ว · ตอนบ่าย',
@@ -157,7 +162,7 @@ export const TIME_CARDS: TimeCard[] = [
   },
   {
     id: 'T12', deck: 'time', stars: 3, kind: 'choice',
-    visual: { kind: 'emptyClock', tag: MORNING },
+    visual: { kind: 'clock', h: 8, m: 45, tag: MORNING },
     question: 'เข็มยาวชี้ 9 เข็มสั้นอยู่ระหว่าง 8 กับ 9 เป็นเวลาเท่าไร?',
     options: ['08:45 น.', '09:45 น.', '08:09 น.'], answer: 0,
     answerText: '08:45 น.', why: 'นับทีละ 5 ถึงเลข 9 = 45 · เข็มสั้นยังไม่ถึง 9 ➜ 8 โมง',

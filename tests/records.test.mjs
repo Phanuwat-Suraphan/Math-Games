@@ -132,6 +132,13 @@ check('เมืองแห่งเวลานับทุกเกม เก
   equal(bad.timeCorrect, 19, 'จำนวนข้อติดลบต้องไม่ทำให้สถิติลดลง')
 })
 
+check('ฝึกอ่านนาฬิกานับเฉพาะข้อที่ถูก ไม่นับเป็นเกม', () => {
+  let player = fresh()
+  player = { ...player, records: REC.recordTimePractice(player, 8) }
+  equal(player.records.timeCorrect, 8, 'ข้อที่ถูกต้องสะสม')
+  equal(player.records.timePlays, 0, 'การฝึกไม่ใช่เกมกระดาน')
+})
+
 check('หอคอยเก็บเฉพาะชั้นที่สูงที่สุด', () => {
   let player = fresh()
   player = { ...player, records: REC.recordTowerRun(player, 12) }

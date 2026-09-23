@@ -69,7 +69,7 @@ const MENU_ITEMS: MenuItem[] = [
     to: '/time',
     emoji: '⏰',
     label: 'ผจญภัยเมืองแห่งเวลา',
-    description: 'การ์ดเกมอ่านเวลา ป.2 เลือกฮีโร่ เล่นด้วยกันได้ 1–4 คน',
+    description: 'การ์ดเกมอ่านเวลา ป.2 เล่นด้วยกัน 1–4 คน หรือฝึกอ่านนาฬิกาคนเดียว',
     accent: 'from-sky-500/30 to-gold-600/10',
     glow: '#fbbf24',
   },
