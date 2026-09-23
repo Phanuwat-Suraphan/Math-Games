@@ -785,6 +785,19 @@ check('สมุดวัคซีนกระดาษใช้ชาวเม�
   }
 })
 
+check('ลิงก์ใบประกาศ: ชุดพิมพ์อ่านพารามิเตอร์เดียวกับที่เกมส่ง และรับทุกแม่ในสมุด', () => {
+  const url = BOOK.certificateUrl(3, '  มิ้นท์ & <ป.2>  ')
+  assert(url.startsWith('zombie-rescue.html?'), 'ต้องชี้ไปที่ชุดพิมพ์ข้างแอป')
+  const qs = new URLSearchParams(url.split('?')[1])
+  equal(qs.get('cert'), '3', 'แม่')
+  equal(qs.get('name'), 'มิ้นท์ & <ป.2>', 'ชื่อตัดช่องว่างหัวท้ายแล้วส่งครบ')
+  equal(new URLSearchParams(BOOK.certificateUrl('all', 'ก'.repeat(60)).split('?')[1]).get('name').length, 40, 'ชื่อยาวถูกตัดที่ 40')
+  assert(KIT_HTML.includes("QS.get('cert')") && KIT_HTML.includes("QS.get('name')"), 'ชุดพิมพ์ต้องอ่าน cert และ name')
+  assert(/certHtml\(certWhich, who,/.test(KIT_HTML), 'ชุดพิมพ์ต้องวางชื่อผ่าน certHtml ซึ่ง escape ข้อความ')
+  assert(/\(name \? esc\(name\)/.test(KIT_HTML), 'ชื่อบนใบประกาศต้องผ่าน esc()')
+  for (const t of Q.TABLES) assert(KIT.book.tables.includes(t), `ชุดพิมพ์ต้องรู้จักแม่ ${t}`)
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

@@ -51,6 +51,7 @@ import type { QAnswer, Question, Stage } from '../zombieRescue/questions'
 import { clearZombieGame, loadVaccineBook, loadZombieGame, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
 import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../zombieRescue/vaccineBook'
+import { villagerFor } from '../zombieRescue/villagers'
 import {
   AnswerPad,
   BUDDY,
@@ -63,6 +64,7 @@ import {
   QuestionVisual,
   HeartBurst,
   StickerToast,
+  VillagerArt,
   ZHead,
   emphasize,
   pick,
@@ -144,6 +146,8 @@ export function ZombieRescue({ player }: { player: Player }) {
    * ใช้ ref คู่กับ state เพราะตอบสองครั้งติดกัน (ผิดแล้วใช้บัตรช่วยคิด) ต้องต่อจากสมุดล่าสุด
    */
   const [book, setBook] = useState<VaccineBook>(() => loadVaccineBook(player.name))
+  /* สติกเกอร์ที่ได้ระหว่างเกมกระดานนี้ ไว้แห่ขบวนชาวเมืองตอนจบเกม (เกมที่เล่นต่อจากของค้างเริ่มนับใหม่) */
+  const [gameStickers, setGameStickers] = useState<Array<{ each: number; groups: number }>>([])
   const bookRef = useRef(book)
   const noteFact = (q: Question, correct: boolean): boolean => {
     const noted = noteAnswer(bookRef.current, q, correct)
@@ -195,6 +199,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     playSfx('click')
     const players = setup.heroes.slice(0, setup.count).map((hero, i) => ({ hero, name: setup.names[i] ?? '' }))
     setGame(createGame(players, setup.easy, Math.random))
+    setGameStickers([])
     setSaved(null)
     setWalking(null)
     show(null)
@@ -205,6 +210,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     paidRef.current = false
     playSfx('click')
     setGame(saved)
+    setGameStickers([])
     setSaved(null)
     setWalking(null)
     show(null)
@@ -264,6 +270,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     const correct = checkAnswer(modal.q, answer)
     if (game.turn === 0) logIndicator(ZOMBIE_INDICATOR, correct)
     const sticker = noteFact(modal.q, correct)
+    if (sticker) setGameStickers((list) => [...list, { each: modal.q.each, groups: modal.q.groups }])
     if (!correct && !modal.helped && hasItem(game, 'help')) {
       playSfx('wrong')
       setModal({ ...modal, phase: 'offerHelp' })
@@ -440,6 +447,7 @@ export function ZombieRescue({ player }: { player: Player }) {
           ) : mode === 'book' ? (
             <VaccineBookScreen
               book={book}
+              playerName={player.name}
               onPractice={() => {
                 playSfx('click')
                 setPracticeFocus(true)
@@ -625,6 +633,7 @@ export function ZombieRescue({ player }: { player: Player }) {
               show(null)
             }}
             resultCode={game.players[0].answered > 0 ? currentCode() : null}
+            stickers={gameStickers}
             reduceMotion={!settings.animationsEnabled}
           />
         </div>
@@ -848,6 +857,8 @@ interface ModalViewProps {
   onAgain: () => void
   resultCode: string | null
   reduceMotion: boolean
+  /** สติกเกอร์สมุดวัคซีนที่ได้ในเกมนี้ */
+  stickers: Array<{ each: number; groups: number }>
 }
 
 function Sheet({
@@ -1070,6 +1081,26 @@ function ModalView(props: ModalViewProps) {
         ))}
       </ol>
       {helper.energy > 0 ? <p className="text-sm text-slate-600">⭐ = หาพลังวัคซีนให้ทีมได้มากที่สุด</p> : null}
+      {props.stickers.length ? (
+        <div className="rounded-2xl bg-white p-3">
+          <p className="font-bold text-green-700">💉 ชาวเมืองที่หายป่วยในเกมนี้ {props.stickers.length} คน</p>
+          <ul className="mt-2 flex flex-wrap justify-center gap-2">
+            {props.stickers.map((f, i) => {
+              const v = villagerFor(f.each, f.groups)
+              return (
+                <li key={i} className="flex w-16 flex-col items-center text-xs leading-tight">
+                  <VillagerArt v={v} cured className="zr-bob w-12" />
+                  <b className="mt-0.5">{v.name}</b>
+                  <span className="text-slate-500">
+                    {f.groups} × {f.each}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+          <p className="mt-1 text-xs text-slate-500">ดูทุกคนได้ในแท็บ 📒 สมุดวัคซีน</p>
+        </div>
+      ) : null}
       <ReviewPanel game={game} />
       <p className="rounded-2xl bg-white px-3 py-2 font-bold text-amber-700">ได้ 🪙 {modal.reward} เหรียญเข้ากระเป๋า</p>
       {props.resultCode ? (

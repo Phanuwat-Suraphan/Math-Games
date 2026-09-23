@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from '../Button'
 import { TABLES } from '../../zombieRescue/questions'
-import { FACT_COUNT, STREAK_TO_CURE, allFacts, curedCount, weakFacts } from '../../zombieRescue/vaccineBook'
+import { FACT_COUNT, STREAK_TO_CURE, allFacts, certificateUrl, curedCount, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { BookFact, VaccineBook } from '../../zombieRescue/vaccineBook'
 import { thanksOf, villagerFor } from '../../zombieRescue/villagers'
 import { Char, CuredHead, VillagerArt, ZHead } from './ZrParts'
@@ -86,7 +86,7 @@ function VillagerCard({ fact, onClose }: { fact: BookFact; onClose: () => void }
   )
 }
 
-export function VaccineBookScreen({ book, onPractice }: { book: VaccineBook; onPractice: () => void }) {
+export function VaccineBookScreen({ book, playerName, onPractice }: { book: VaccineBook; playerName: string; onPractice: () => void }) {
   const facts = allFacts(book)
   const total = curedCount(book)
   const weak = weakFacts(book)
@@ -124,7 +124,14 @@ export function VaccineBookScreen({ book, onPractice }: { book: VaccineBook; onP
         >
           <div className="h-full rounded-full bg-[#7ED957] transition-all" style={{ width: `${pct}%` }} />
         </div>
-        {done ? <p className="mt-2 text-center font-bold text-[#7ED957]">🎉 ครบทั้งสมุด! เป็นหมอสูตรคูณตัวจริงแล้ว</p> : null}
+        {done ? (
+          <>
+            <p className="mt-2 text-center font-bold text-[#7ED957]">🎉 ครบทั้งสมุด! เป็นหมอสูตรคูณตัวจริงแล้ว</p>
+            <a href={certificateUrl('all', playerName)} target="_blank" rel="noopener" className="zr-cert-link zr-cert-link-big mt-2">
+              🩺 พิมพ์ใบประกาศหมอสูตรคูณตัวจริง
+            </a>
+          </>
+        ) : null}
       </div>
 
       {weak.length ? (
@@ -157,8 +164,13 @@ export function VaccineBookScreen({ book, onPractice }: { book: VaccineBook; onP
           >
             <header className="flex items-center justify-between px-3 pt-2">
               <span className="font-display text-lg">แม่ {table}</span>
-              <span className="text-sm font-bold">{curedCount(book, table)} / 10</span>
+              <span className="text-sm font-bold">{curedCount(book, table) === 10 ? '🏅 ' : ''}{curedCount(book, table)} / 10</span>
             </header>
+            {curedCount(book, table) === 10 ? (
+              <a href={certificateUrl(table, playerName)} target="_blank" rel="noopener" className="zr-cert-link mx-2 mt-1">
+                🏅 ครบแม่ {table} แล้ว! พิมพ์ใบประกาศ
+              </a>
+            ) : null}
             <ol className="grid grid-cols-5 gap-1.5 p-2">
               {facts
                 .filter((f) => f.each === table)
