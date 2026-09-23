@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode, RefObject } from 'react'
 import { Button } from '../components/Button'
+import { ResultCodeCard } from '../components/ResultCodeCard'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { useGame } from '../context/useGame'
 import { useGameSettings } from '../hooks/useGameSettings'
+import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { useMusic } from '../hooks/useMusic'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
 import { recordTimeAdventure } from '../services/recordService'
+import { TIME_INDICATOR } from '../teacher/indicators'
 import type { Player } from '../types/player'
 import {
   BOARD_VIEWBOX,
@@ -20,7 +23,7 @@ import {
   clockArt,
   heroInner,
 } from '../timeAdventure/art'
-import { DECK_INFO, EMPHASIS_WORDS } from '../timeAdventure/cards'
+import { DECK_INFO, EMPHASIS_WORDS, getTimeCard } from '../timeAdventure/cards'
 import type { ActivityRow, CardVisual, DeckType, TimeCard } from '../timeAdventure/cards'
 import {
   CASTLE,
@@ -44,6 +47,7 @@ import {
   keepSpecial,
   landsOnStar,
   ranking,
+  reviewOf,
   shuffle,
   spendSpecial,
   totalCorrect,
@@ -51,6 +55,7 @@ import {
   undoWrongAnswerCount,
 } from '../timeAdventure/engine'
 import type { Answer, AnswerOutcome, HeroKey, SpecialKey, TaState } from '../timeAdventure/engine'
+import { clearTimeGame, loadTimeGame, saveTimeGame } from '../timeAdventure/storage'
 
 /**
  * ผจญภัยเมืองแห่งเวลา: การ์ดเกมอ่านเวลาสำหรับ ป.2
@@ -249,6 +254,13 @@ export function TimeAdventure({ player }: { player: Player }) {
   useMusic('adventure')
   const { patchPlayer } = useGame()
   const { settings } = useGameSettings()
+  /*
+   * ส่งผลให้แผงคุณครูเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของบัญชีในเครื่องนี้
+   * คนอื่นในวงไม่มีบัญชีของตัวเอง ถ้านับรวม ครูจะเห็นผลของสี่คนใต้ชื่อเดียว
+   */
+  const { logIndicator, currentCode } = useIndicatorLog(player.name)
+  /** เกมที่เล่นค้างไว้ อ่านครั้งเดียวตอนเปิดหน้า */
+  const [saved, setSaved] = useState<TaState | null>(() => loadTimeGame(player.name))
 
   const [setup, setSetup] = useState<SetupState>({
     count: 2,
@@ -274,6 +286,11 @@ export function TimeAdventure({ player }: { player: Player }) {
     if (walkTimer.current !== null) window.clearInterval(walkTimer.current)
   }, [])
 
+  /* บันทึกเกมทุกครั้งที่เปลี่ยน เกมที่จบแล้วไม่ต้องเก็บ */
+  useEffect(() => {
+    if (game && game.winner === null && !paidRef.current) saveTimeGame(player.name, game)
+  }, [game, player.name])
+
   const show = useCallback((next: Modal | null) => {
     setModal(next)
     setFreshModal((n) => n + 1)
@@ -285,6 +302,17 @@ export function TimeAdventure({ player }: { player: Player }) {
     playSfx('click')
     const players = setup.heroes.slice(0, setup.count).map((hero, i) => ({ hero, name: setup.names[i] ?? '' }))
     setGame(createGame(players, setup.easy, Math.random))
+    setSaved(null)
+    setWalking(null)
+    show(null)
+  }
+
+  const resume = () => {
+    if (!saved) return
+    paidRef.current = false
+    playSfx('click')
+    setGame(saved)
+    setSaved(null)
     setWalking(null)
     show(null)
   }
@@ -297,6 +325,7 @@ export function TimeAdventure({ player }: { player: Player }) {
         return
       }
       paidRef.current = true
+      clearTimeGame()
       const reward = applyBonusPercent(appReward(state), totalStats(player).coinBonusPercent)
       rewardRef.current = reward
       patchPlayer({
@@ -323,6 +352,7 @@ export function TimeAdventure({ player }: { player: Player }) {
   const submit = (answer: Answer, wrongIndex?: number) => {
     if (!game || !modal || modal.kind !== 'card' || modal.result) return
     const correct = isCorrect(modal.card, answer)
+    if (game.turn === 0) logIndicator(TIME_INDICATOR, correct)
     const outcome = applyAnswer(game, modal.card, correct, { boost: modal.boost, fast: modal.fast })
     setGame(outcome.state)
     playSfx(correct ? 'correct' : 'wrong')
@@ -453,7 +483,7 @@ export function TimeAdventure({ player }: { player: Player }) {
       <>
         <TopBar player={player} title="ผจญภัยเมืองแห่งเวลา" backTo="/menu" backLabel="กลับเมนู" />
         <ScreenLayout width="normal">
-          <SetupPanel setup={setup} onChange={setSetup} onStart={start} />
+          <SetupPanel setup={setup} onChange={setSetup} onStart={start} saved={saved} onResume={resume} />
         </ScreenLayout>
       </>
     )
@@ -609,6 +639,7 @@ export function TimeAdventure({ player }: { player: Player }) {
               setGame(null)
               show(null)
             }}
+            resultCode={game.players[0].answered > 0 ? currentCode() : null}
             reduceMotion={!settings.animationsEnabled}
           />
         </div>
@@ -619,7 +650,19 @@ export function TimeAdventure({ player }: { player: Player }) {
 
 /* ── หน้าตั้งค่า ─────────────────────────────────────────── */
 
-function SetupPanel({ setup, onChange, onStart }: { setup: SetupState; onChange: (next: SetupState) => void; onStart: () => void }) {
+function SetupPanel({
+  setup,
+  onChange,
+  onStart,
+  saved,
+  onResume,
+}: {
+  setup: SetupState
+  onChange: (next: SetupState) => void
+  onStart: () => void
+  saved: TaState | null
+  onResume: () => void
+}) {
   const chooseHero = (slot: number, hero: HeroKey) => {
     const heroes = [...setup.heroes]
     const other = heroes.indexOf(hero)
@@ -636,6 +679,17 @@ function SetupPanel({ setup, onChange, onStart }: { setup: SetupState; onChange:
         ))}
       </div>
       <h2 className="title-gold mt-2 text-center text-2xl font-black">ผจญภัยเมืองแห่งเวลา</h2>
+      {saved ? (
+        <div className="mt-4 rounded-2xl border border-gold-400/40 bg-gold-500/10 p-4">
+          <p className="font-bold text-gold-200">มีเกมที่เล่นค้างไว้</p>
+          <p className="mt-1 text-sm text-slate-300">
+            {saved.players.map((p) => `${p.name} ${p.pos === 0 ? 'START' : `ช่อง ${p.pos}`}`).join(' · ')} · รอบที่ {saved.round}
+          </p>
+          <Button className="mt-3" fullWidth onClick={onResume}>
+            ▶ เล่นต่อเกมเดิม
+          </Button>
+        </div>
+      ) : null}
       <p className="mt-1 text-center text-sm leading-relaxed text-slate-300">
         การ์ดเกมอ่านเวลาสำหรับ ป.2 · ตอบการ์ดให้ถูกแล้วพาฮีโร่เดินไปถึงปราสาทเวลา
         <br />
@@ -726,11 +780,89 @@ function SetupPanel({ setup, onChange, onStart }: { setup: SetupState; onChange:
         <li>· จบตาบนช่อง ⭐ ได้การ์ดพิเศษ ถือได้ 2 ใบ ใช้ได้ตาละ 1 ใบ</li>
         <li>· ถึงประตูปราสาทแล้วตอบการ์ด ⚔️ ถูก = ชนะ! หมดคาบกดนับเหรียญได้เลย</li>
         <li>· เหรียญที่ทั้งวงทำได้ จะเข้ากระเป๋าของผู้เล่นเครื่องนี้ตอนจบเกม</li>
+        <li>· คนที่ 1 คือเจ้าของเครื่อง ผลของคนที่ 1 จะส่งให้แผงคุณครู</li>
       </ul>
 
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
         🚩 เริ่มผจญภัย!
       </Button>
+    </div>
+  )
+}
+
+/* ── สรุปท้ายเกม: ทักษะไหนดีแล้ว การ์ดไหนควรทบทวน ─────────── */
+
+/**
+ * บอกทั้งวงว่าแต่ละคนทำกองไหนได้ดี และการ์ดใบไหนที่เคยสะดุด
+ *
+ * ตั้งใจแสดงเฉลยของการ์ดที่ผิดซ้ำอีกครั้งตอนจบ
+ * เพราะระหว่างเกม เด็กสนใจแค่ว่าจะได้เดินกี่ช่อง ไม่ได้อ่านวิธีคิด
+ * ท้ายเกมคือจังหวะที่ครูเรียกทั้งกลุ่มมาดูด้วยกันได้
+ */
+function ReviewPanel({ game }: { game: TaState }) {
+  const decks: DeckType[] = ['time', 'find', 'daily', 'chal']
+  const reviews = game.players.map((p) => ({ player: p, review: reviewOf(p) }))
+  const missed = [...new Set(reviews.flatMap((r) => r.review.missed))]
+  if (reviews.every((r) => r.player.history.length === 0)) return null
+
+  return (
+    <div className="grid gap-2 text-left">
+      <p className="text-center font-bold">📊 ทำได้แค่ไหนในแต่ละกอง</p>
+      <div className="overflow-x-auto rounded-2xl bg-white p-2">
+        <table className="w-full text-sm">
+          <thead>
+            <tr>
+              <th className="px-1 text-left font-bold">ฮีโร่</th>
+              {decks.map((d) => (
+                <th key={d} className="px-1 text-center" title={DECK_INFO[d].name}>
+                  {DECK_INFO[d].icon}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {reviews.map(({ player, review }, i) => (
+              <tr key={i} className="border-t border-slate-100">
+                <td className="max-w-[7rem] truncate px-1 py-1 font-bold">{player.name}</td>
+                {decks.map((d) => {
+                  const t = review.byDeck[d]
+                  const tone = t.total === 0 ? 'text-slate-300' : t.right === t.total ? 'text-green-700' : t.right * 2 >= t.total ? 'text-amber-700' : 'text-red-600'
+                  return (
+                    <td key={d} className={`px-1 text-center font-display tabular-nums ${tone}`}>
+                      {t.total === 0 ? '–' : `${t.right}/${t.total}`}
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {missed.length ? (
+        <>
+          <p className="text-center font-bold">🔁 การ์ดที่ควรทบทวนด้วยกัน</p>
+          <ul className="grid gap-1.5">
+            {missed.slice(0, 6).map((id) => {
+              const card = getTimeCard(id)
+              if (!card) return null
+              return (
+                <li key={id} className="rounded-2xl bg-white px-3 py-2 text-sm leading-snug">
+                  <span className="font-display" style={{ color: DECK_INFO[card.deck].color }}>
+                    {DECK_INFO[card.deck].icon} {id}
+                  </span>{' '}
+                  {card.question}
+                  <br />
+                  <b>เฉลย {card.answerText}</b>
+                  <span className="text-slate-500"> · {card.why}</span>
+                </li>
+              )
+            })}
+          </ul>
+          {missed.length > 6 ? <p className="text-center text-xs text-slate-500">และอีก {missed.length - 6} ใบ</p> : null}
+        </>
+      ) : (
+        <p className="text-center font-bold text-green-700">ไม่มีการ์ดที่ตอบผิดเลย เก่งมาก! 🎉</p>
+      )}
     </div>
   )
 }
@@ -753,6 +885,7 @@ interface ModalViewProps {
   onClose: () => void
   onAgain: () => void
   reduceMotion: boolean
+  resultCode: string | null
 }
 
 function ModalView(props: ModalViewProps) {
@@ -815,9 +948,18 @@ function ModalView(props: ModalViewProps) {
             })}
           </ol>
           <p className="text-sm text-slate-600">🏅 = มีเหรียญ 5 เหรียญขึ้นไป ได้ตรานักผจญภัยตรงเวลา</p>
+          <ReviewPanel game={game} />
           <p className="rounded-2xl bg-white px-3 py-2 font-bold text-amber-700">
             ทั้งวงตอบถูก {totalCorrect(game)} ข้อ · ได้ 🪙 {modal.reward} เหรียญเข้ากระเป๋า
           </p>
+          {props.resultCode ? (
+            <div className="rounded-2xl bg-night-900 p-1 text-left">
+              <ResultCodeCard
+                code={props.resultCode}
+                hint={`ผลของ ${game.players[0].name} (คนที่ 1) รวมกับโหมดอื่น ส่งรหัสบรรทัดนี้ให้คุณครูท้ายคาบ`}
+              />
+            </div>
+          ) : null}
           <div className="flex flex-wrap justify-center gap-3">
             <Button size="lg" onClick={props.onAgain}>
               🔁 เล่นอีกครั้ง
