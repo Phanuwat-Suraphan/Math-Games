@@ -467,6 +467,26 @@ export const ACHIEVEMENTS: Achievement[] = [
     unit: 'ข้อ',
     valueOf: (player) => recordsOf(player).timeCorrect,
   }),
+  countGoal({
+    id: 'zombie-first-cure',
+    name: 'ผู้พิชิตไวรัส Z',
+    description: 'ช่วยทีมสร้างยา Z-CURE สำเร็จหนึ่งครั้ง',
+    emoji: '💉',
+    category: 'trial',
+    goal: 1,
+    unit: 'ครั้ง',
+    valueOf: (player) => recordsOf(player).zombieCures,
+  }),
+  countGoal({
+    id: 'zombie-correct-100',
+    name: 'หมอนักคูณ',
+    description: 'ตอบโจทย์การคูณใน ZOMBIE RESCUE ถูกรวม 100 ข้อ',
+    emoji: '🧪',
+    category: 'trial',
+    goal: 100,
+    unit: 'ข้อ',
+    valueOf: (player) => recordsOf(player).zombieCorrect,
+  }),
 
   // ── ของสะสม ─────────────────────────────────────────────────
   countGoal({

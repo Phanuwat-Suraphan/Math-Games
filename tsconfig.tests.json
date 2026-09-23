@@ -39,6 +39,7 @@
     "src/render3d/**/*.ts",
     "src/farm/**/*.ts",
     "src/timeAdventure/**/*.ts",
+    "src/zombieRescue/**/*.ts",
     "src/teacher/**/*.ts",
     "src/minigames/**/*.ts",
     "src/questionEngine/**/*.ts",

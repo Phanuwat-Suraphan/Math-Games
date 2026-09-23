@@ -193,6 +193,15 @@ const REQUIRED_CLASSES = [
   'ta-num',
   'ta-num-empty',
   'ta-burst',
+  // ZOMBIE RESCUE
+  'zr-board',
+  'zr-slot',
+  'zr-slot-on',
+  'zr-key',
+  'zr-key-muted',
+  'zr-go',
+  'zr-die-roll',
+  'zr-energy',
 ]
 
 /** คลาสนี้ถูกนิยามไว้ในไฟล์ไหม */

@@ -74,6 +74,14 @@ const MENU_ITEMS: MenuItem[] = [
     glow: '#fbbf24',
   },
   {
+    to: '/zombie',
+    emoji: '🧟',
+    label: 'ZOMBIE RESCUE',
+    description: 'เกมการคูณ ป.2 ช่วยกันหายา รักษาเมือง เล่นด้วยกัน 1–4 คน หรือฝึกสูตรคูณคนเดียว',
+    accent: 'from-leaf-500/30 to-sky-600/10',
+    glow: '#7ed957',
+  },
+  {
     to: '/safezone',
     emoji: '🛡️',
     art: { kind: 'monster', id: 'math-guardian' },

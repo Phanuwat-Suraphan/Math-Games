@@ -1,0 +1,725 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zombie Cure Quest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;600;700;800&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --ground:#DDE8DA; --ground-2:#C9D8C5;
+    --panel:#FFFFFF; --panel-ink:#23324A; --panel-dim:#5D6B82; --panel-line:#D5DED3;
+    --accent:#2E9E4F;
+    --ink:#23324A;
+    --display:"Mitr","Kanit","Leelawadee UI","Tahoma",sans-serif;
+    --cute:"Mali","Sarabun","Leelawadee UI","Tahoma",sans-serif;
+    --body:"Sarabun","Leelawadee UI","Tahoma",sans-serif;
+    --z:1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --ground:#131B17; --ground-2:#0D1410;
+      --panel:#1B2620; --panel-ink:#E7EFE8; --panel-dim:#9CB0A2; --panel-line:#2C3B31;
+      --accent:#6BCB8B;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --ground:#131B17; --ground-2:#0D1410;
+    --panel:#1B2620; --panel-ink:#E7EFE8; --panel-dim:#9CB0A2; --panel-line:#2C3B31;
+    --accent:#6BCB8B;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--panel-ink);
+    font-family:var(--body); font-size:15px; line-height:1.55;
+    padding-inline:16px; padding-block:0 48px;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* ── ส่วนบนจอ ── */
+  .top{position:sticky; top:env(safe-area-inset-top,0px); z-index:5; margin-inline:-16px; padding:10px 16px; background:var(--ground); border-bottom:1px solid var(--ground-2); display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px}
+  .brand{font-family:var(--display); font-weight:600; font-size:18px}
+  .brand small{font-weight:400; color:var(--panel-dim); font-size:13px; margin-left:6px}
+  .nav{display:flex; flex-wrap:wrap; gap:6px}
+  .nav a{font-family:var(--display); font-size:13px; text-decoration:none; color:var(--panel-ink); background:var(--panel); border:1px solid var(--panel-line); border-radius:999px; padding:3px 11px}
+  .nav a:hover,.nav a:focus-visible{border-color:var(--accent); outline:none; color:var(--accent)}
+  .intro{max-width:1123px; margin:18px auto 22px; background:var(--panel); border:1px solid var(--panel-line); border-radius:14px; padding:18px 20px}
+  .intro h1{font-family:var(--display); font-weight:600; font-size:24px; margin:0 0 4px; text-wrap:balance}
+  .intro p{margin:0 0 10px; max-width:70ch}
+  .intro ol{margin:6px 0 0; padding-left:22px; max-width:70ch}
+  .intro li{margin-bottom:4px}
+  .intro h2{font-family:var(--display); font-weight:500; font-size:16px; margin:14px 0 2px}
+  .kit{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:12px 0 14px}
+  .kit div{border:1px solid var(--panel-line); border-radius:10px; padding:8px 10px; font-size:13.5px}
+  .kit b{display:block; font-family:var(--display); font-weight:500; font-size:14px}
+  .kit span{color:var(--panel-dim)}
+  kbd{font-family:var(--display); font-size:12px; border:1px solid var(--panel-line); border-bottom-width:2px; border-radius:5px; padding:0 5px}
+  .sec-label{max-width:1123px; margin:28px auto 10px; font-family:var(--display); font-weight:500; font-size:14px; letter-spacing:.06em; color:var(--panel-dim)}
+
+  /* ── แผ่นกระดาษ ── */
+  .sheet{width:210mm; height:297mm; margin:0 auto 18px; position:relative; overflow:hidden; background:#fff; color:var(--ink); zoom:var(--z); box-shadow:0 1px 2px rgba(20,35,30,.12), 0 8px 24px rgba(20,35,30,.12)}
+  .sheet.land{width:297mm; height:210mm; page:land}
+  .pno{position:absolute; bottom:5mm; right:8mm; font:500 7.5pt var(--display); color:#9AA6B8}
+  .pno-l{position:absolute; bottom:5mm; left:8mm; font:400 7.5pt var(--body); color:#9AA6B8}
+  @page{size:A4 portrait; margin:0}
+  @page land{size:A4 landscape; margin:0}
+  @media print{
+    body{background:#fff; padding:0}
+    .top,.intro,.sec-label{display:none !important}
+    .sheet{margin:0; box-shadow:none; zoom:1; break-after:page}
+    .sheet:last-child{break-after:auto}
+  }
+
+  /* ── การ์ด ── */
+  .grid{position:absolute; left:10.5mm; top:16.5mm; display:grid; grid-template-columns:repeat(3,63mm); grid-template-rows:repeat(3,88mm)}
+  .cut{width:63mm; height:88mm; padding:2mm; outline:.15mm dashed #B7C1CF; outline-offset:-.075mm}
+  .card{
+    --c:#2E9E4F; --bg:#E6F5EA;
+    width:100%; height:100%; border-radius:3.5mm; background-color:var(--bg); border:.9mm solid var(--c);
+    background-image:radial-gradient(rgba(255,255,255,.95) .5mm, transparent .55mm); background-size:6.5mm 6.5mm; background-position:1.5mm 2mm;
+    display:flex; flex-direction:column; overflow:hidden; font-family:var(--body); color:var(--ink);
+  }
+  .c-head{position:relative; margin-bottom:1.3mm; background:var(--c); color:#fff; display:flex; justify-content:space-between; align-items:center; padding:.9mm 2.4mm 1mm; font:500 9pt/1.2 var(--display)}
+  .c-head::after{content:""; position:absolute; left:0; right:0; bottom:-1.3mm; height:1.4mm; background:radial-gradient(circle at 50% 0, var(--c) 1.35mm, transparent 1.45mm) 0 0 / 2.9mm 1.4mm repeat-x}
+  .c-head .stars{font-size:9.5pt; color:#FFE27A; white-space:nowrap}
+  .buddy{display:flex; align-items:center; gap:1.3mm; padding:0 2.2mm; margin-top:.4mm}
+  .bd-ic{width:8.6mm; height:8.6mm; border-radius:50%; background:#fff; border:.35mm solid var(--c); display:flex; align-items:flex-end; justify-content:center; overflow:hidden; flex:none}
+  .bd-ic svg{display:block; width:7.6mm; height:auto}
+  .bd-tx{position:relative; background:#fff; border-radius:2.4mm; padding:.6mm 2.2mm; font:600 7.6pt/1.2 var(--cute)}
+  .bd-tx::before{content:""; position:absolute; left:-1.1mm; top:50%; margin-top:-1mm; border-style:solid; border-width:1mm 1.2mm 1mm 0; border-color:transparent #fff transparent transparent}
+  .art{flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2mm; padding:1.2mm 2.2mm}
+  .q{font:700 10.6pt/1.3 var(--cute); text-align:center; padding:0 2.4mm; text-wrap:balance}
+  .q em{font-style:normal; color:var(--c); text-decoration:underline; text-decoration-thickness:.4mm; text-underline-offset:.6mm}
+  .chipline{display:flex; justify-content:center; gap:1mm; margin-top:1mm; flex-wrap:wrap}
+  .chip{font:500 7.2pt/1.2 var(--display); color:var(--c); background:#fff; border:.3mm solid var(--c); border-radius:99px; padding:.3mm 2mm}
+  .c-foot{display:flex; justify-content:space-between; align-items:flex-end; padding:1mm 1.8mm 1.4mm 2.4mm; gap:1mm}
+  .fl{display:flex; flex-direction:column; gap:.3mm}
+  .cid{font:600 7.5pt var(--display); color:var(--c)}
+  .rw{font:500 6.5pt/1.1 var(--display); color:#5D6B82; white-space:nowrap}
+  .ans{font:400 6.5pt/1.2 var(--body); color:#6B7688; max-width:33mm; text-align:right; border:.25mm dashed #B7C1CF; border-radius:1.2mm; padding:.5mm 1.2mm; background:rgba(255,255,255,.75)}
+  .ans b{font-weight:700; color:#4D596B}
+
+  .expr{font:600 17pt/1.15 var(--display); background:#fff; border-radius:2.5mm; padding:1mm 3.5mm; text-align:center; white-space:nowrap; font-variant-numeric:tabular-nums}
+  .expr.small{font-size:12pt}
+  .deco{display:flex; align-items:center; gap:1.4mm; font-size:13pt; line-height:1; margin-top:2mm}
+  .deco > svg{width:9mm; height:9mm; flex:none}
+  .deco .ar{font-size:9pt; color:var(--c); opacity:.7}
+  .deco .big{width:15mm; height:18mm}
+  .deco small{font:500 7pt var(--cute); color:#6B7A90; max-width:18mm; line-height:1.25}
+  .scene{font-size:15pt; line-height:1.15; text-align:center; letter-spacing:.3mm; max-width:52mm}
+  .grp{display:flex; flex-wrap:wrap; justify-content:center; gap:1.4mm; max-width:55mm}
+  .grp-box{display:grid; gap:.3mm; background:#fff; border:.35mm dashed var(--c); border-radius:2.6mm; padding:.8mm 1mm; font-size:9pt; line-height:1}
+  .grp-box span{display:block; text-align:center}
+  .arr{display:grid; gap:.5mm; background:#fff; border-radius:2.5mm; padding:1.2mm 1.6mm; font-size:9pt; line-height:1}
+  .arr span{display:block; text-align:center}
+  .arr svg, .grp-box svg{width:4.2mm; height:4.2mm; display:block}
+  .pair{display:flex; gap:2.5mm; align-items:flex-end}
+  .pair figure{margin:0; display:flex; flex-direction:column; align-items:center; gap:.6mm}
+  .pair figcaption{font:600 8.5pt var(--display); color:var(--c)}
+  .opts{display:flex; flex-direction:column; gap:.8mm; width:100%}
+  .opt{background:#fff; border-radius:2mm; padding:.4mm 2.2mm; font:500 9.5pt/1.25 var(--display)}
+  .opt b{color:var(--c); margin-right:1.4mm}
+
+  /* การ์ดของและบัตรช่วยคิด */
+  .item-art{position:relative; isolation:isolate; width:24mm; height:24mm; display:flex; align-items:center; justify-content:center; font-size:26pt; line-height:1}
+  .item-art::before{content:""; position:absolute; inset:0; z-index:-1; border-radius:50%; background:repeating-conic-gradient(color-mix(in srgb, var(--c) 30%, #fff) 0 11deg, #fff 11deg 22deg); -webkit-mask:radial-gradient(circle,#000 45%,transparent 71%); mask:radial-gradient(circle,#000 45%,transparent 71%)}
+  .item-name{font:700 12pt/1.1 var(--display); color:var(--c); background:#fff; border-radius:99px; padding:.4mm 3mm; box-shadow:0 0 0 .4mm var(--c); text-align:center}
+  .price{font:600 8.5pt var(--display); color:#fff; background:var(--c); border-radius:99px; padding:.3mm 2.6mm}
+  .help-tip{font:700 10pt/1.35 var(--cute); text-align:center; padding:0 2.6mm}
+  .help-eg{font:500 8.4pt/1.3 var(--display); color:#5D6B82; text-align:center; background:#fff; border-radius:2mm; padding:.6mm 2mm; margin:0 2.4mm}
+  .shop-list{width:100%; display:flex; flex-direction:column; gap:.8mm; padding:0 1mm}
+  .shop-row{display:flex; align-items:center; gap:1.4mm; background:#fff; border-radius:2mm; padding:.6mm 1.6mm; font:600 8.2pt/1.2 var(--cute)}
+  .shop-row .e{font-size:11pt}
+  .shop-row .p{margin-left:auto; font:600 8.2pt var(--display); color:var(--c); white-space:nowrap}
+
+  /* หลังการ์ด */
+  .back{position:relative; width:100%; height:100%; border-radius:3.5mm; background-color:var(--c);
+    background-image:radial-gradient(rgba(255,255,255,.2) .7mm, transparent .8mm), radial-gradient(rgba(255,255,255,.12) .7mm, transparent .8mm);
+    background-size:6mm 6mm, 6mm 6mm; background-position:0 0, 3mm 3mm;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2mm; color:#fff; border:.9mm solid rgba(0,0,0,.12)}
+  .back .ring{width:31mm; height:31mm; border-radius:50%; background:rgba(255,255,255,.95); display:flex; align-items:flex-end; justify-content:center; overflow:hidden; font-size:30pt; box-shadow:0 0 0 1.4mm rgba(255,255,255,.35)}
+  .back .ring.mid{align-items:center}
+  .back .ring svg{width:25mm; height:auto; display:block}
+  .back .logo{font:700 11pt/1 var(--display); letter-spacing:.06em}
+  .back .kind{font:500 9.5pt/1.2 var(--display)}
+  .back .en{font:400 6.8pt var(--display); letter-spacing:.14em; opacity:.85}
+
+  /* ── หน้ากติกา ── */
+  .rules{position:absolute; inset:11mm 12mm 11mm; display:flex; flex-direction:column; gap:2.6mm; font-family:var(--body); font-size:9.2pt; line-height:1.4}
+  .rules header{display:flex; gap:3mm; align-items:center; border-bottom:.5mm solid #23324A; padding-bottom:2.2mm}
+  .rules header .logo{font:700 19pt/1 var(--display); letter-spacing:.01em; flex:0 0 72mm; white-space:nowrap}
+  .rules header .logo small{display:block; font:500 10.5pt var(--display); color:#2E9E4F; margin-top:1mm}
+  .rules header p{margin:0; font-size:8.8pt; color:#3B4A63}
+  .rules header svg{width:17mm; height:auto; flex:none}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:3mm 5mm}
+  .rules h3{font:600 10.5pt var(--display); margin:0 0 1mm; display:flex; align-items:center; gap:1.6mm}
+  .rules h3 .n{font:600 8pt var(--display); background:#23324A; color:#fff; border-radius:99px; width:4.6mm; height:4.6mm; display:inline-flex; align-items:center; justify-content:center}
+  .rules ol,.rules ul{margin:0; padding-left:4.6mm}
+  .rules li{margin-bottom:.5mm}
+  .rules table{width:100%; border-collapse:collapse; font-size:8.5pt}
+  .rules td,.rules th{border-bottom:.2mm solid #D5DEE8; padding:.6mm 1mm; text-align:left; vertical-align:top}
+  .rules th{font:500 8.2pt var(--display); color:#5D6B82}
+  .dot{display:inline-block; width:2.8mm; height:2.8mm; border-radius:50%; vertical-align:-.4mm; margin-right:1mm}
+  .box{border:.3mm solid #D5DEE8; border-radius:2.5mm; padding:2mm 2.8mm}
+  .box.hl{background:#FFF7DB; border-color:#F0CF6A}
+  .box.green{background:#EAF7EC; border-color:#A8DDB3}
+
+  /* ── เหรียญ ── */
+  .sheet-title{position:absolute; left:15mm; right:15mm; top:9mm; font:600 12pt var(--display); display:flex; justify-content:space-between; align-items:baseline}
+  .sheet-title span{font:400 8.5pt var(--body); color:#5D6B82}
+  .coins{position:absolute; left:17.5mm; top:19mm; display:grid; grid-template-columns:repeat(7,25mm); grid-auto-rows:25mm}
+  .coin{display:flex; align-items:center; justify-content:center}
+  .coin div{width:22.5mm; height:22.5mm; border-radius:50%; background:radial-gradient(circle at 35% 30%, #E6FFE9, #8FE3A3 55%, #3FAE5A); border:.6mm solid #237A3A; box-shadow:inset 0 0 0 1.2mm rgba(255,255,255,.45); display:flex; flex-direction:column; align-items:center; justify-content:center; color:#15502A}
+  .coin .e{font-size:11pt; line-height:1}
+  .coin b{font:700 11pt/1 var(--display)}
+  .coin small{font:500 5pt var(--display); letter-spacing:.04em}
+  .pawns{position:absolute; left:15mm; right:15mm; top:204mm; display:flex; justify-content:space-between}
+  .pawn{display:flex; flex-direction:column; align-items:center; gap:1mm}
+  .pawn div{width:36mm; height:36mm; border-radius:50%; border:1.4mm solid var(--pc); background:#fff; display:flex; align-items:flex-end; justify-content:center; overflow:hidden; outline:.15mm dashed #B7C1CF; outline-offset:1.2mm}
+  .pawn div svg{width:28mm; height:auto; display:block}
+  .pawn span{font:500 8.4pt var(--display); text-align:center}
+
+  /* ── เฉลย ── */
+  .key{position:absolute; inset:12mm 13mm 12mm; font-family:var(--body)}
+  .key h2{font:600 13pt var(--display); margin:0 0 1mm}
+  .key p.sub{margin:0 0 2mm; font-size:8.6pt; color:#5D6B82}
+  .key h4{font:600 9.6pt var(--display); margin:2.4mm 0 .8mm}
+  .key table{width:100%; border-collapse:collapse; font-size:8.4pt; line-height:1.3}
+  .key td{border-bottom:.2mm solid #E0E6EE; padding:.7mm 1.2mm; vertical-align:top}
+  .key td:first-child{font:600 8.4pt var(--display); width:10mm}
+  .key td:nth-child(2){font-weight:700; width:50mm}
+  .key td:nth-child(3){color:#3B4A63}
+</style>
+
+<div class="top">
+  <div class="brand">ZOMBIE CURE <small>ภารกิจหมอน้อยนักคูณ · ชุดพิมพ์ ป.2</small></div>
+  <nav class="nav" aria-label="ส่วนของชุดเกม">
+    <a href="#rules">กติกา</a><a href="#board">กระดาน</a><a href="#fronts">หน้าการ์ด</a><a href="#backs">หลังการ์ด</a><a href="#coins">ขวดยา</a><a href="#key">เฉลย</a>
+  </nav>
+</div>
+
+<section class="intro">
+  <h1>ภารกิจหมอน้อยนักคูณ: ตามหายาแก้ซอมบี้ — ชุดเกมพร้อมพิมพ์</h1>
+  <p>บอร์ดเกมการคูณ ป.2 เล่น 2–4 คน ประมาณ 25–40 นาที เด็กต้องคิดเลขจริง เลือกเส้นทางเอง และวางแผนใช้ขวดยา ซอมบี้ในเกมนี้เป็นซอมบี้งัวเงียที่แค่อยากหายป่วย ไม่มีฉากน่ากลัว</p>
+  <div class="kit">
+    <div><b>กติกา</b><span>แผ่น 1</span></div>
+    <div><b>กระดาน A4 แนวนอน</b><span>แผ่น 2 · ขยายเป็น A3 ได้</span></div>
+    <div><b>หน้าการ์ด 72 ใบ</b><span>แผ่น 3–10</span></div>
+    <div><b>หลังการ์ด</b><span>แผ่น 11–18</span></div>
+    <div><b>ขวดยา + ตัวเดิน</b><span>แผ่น 19</span></div>
+    <div><b>เฉลย</b><span>แผ่น 20–21</span></div>
+  </div>
+  <h2>วิธีพิมพ์</h2>
+  <ol>
+    <li>เปิดไฟล์ <b>zombie-cure.html</b> ด้วย Chrome หรือ Edge บนคอมพิวเตอร์ แล้วกด <kbd>Ctrl</kbd> + <kbd>P</kbd></li>
+    <li>กระดาษ <b>A4</b> · ระยะขอบ <b>ไม่มี</b> · สเกล <b>100%</b> · ติ๊ก <b>กราฟิกพื้นหลัง</b> (กระดานจะออกเป็นแนวนอนเอง)</li>
+    <li>การ์ดสองหน้า: พิมพ์แผ่น 3–10 แล้วพิมพ์แผ่น 11–18 ด้านหลังแบบ <b>พลิกด้านยาว</b> ถ้าพิมพ์สองหน้าไม่ได้ ให้พิมพ์แยกแล้วทากาวประกบ</li>
+    <li>เตรียมเพิ่ม: ลูกเต๋า 1 ลูก และนาฬิกาจับเวลาหรือนับ 1–10 สำหรับช่องซอมบี้ไล่</li>
+  </ol>
+</section>
+
+<div class="sec-label" id="rules">แผ่น 1 · กติกา</div>
+<div class="sheet" id="rulesSheet"><div class="pno">1 / 21</div></div>
+
+<div class="sec-label" id="board">แผ่น 2 · กระดานแผนที่ (A4 แนวนอน)</div>
+<div class="sheet land" id="boardSheet"><div class="pno">2 / 21</div></div>
+
+<div class="sec-label" id="fronts">แผ่น 3–10 · หน้าการ์ด</div>
+<div id="frontPages"></div>
+
+<div class="sec-label" id="backs">แผ่น 11–18 · หลังการ์ด (สลับซ้าย–ขวาแล้ว สำหรับพิมพ์สองหน้าแบบพลิกด้านยาว)</div>
+<div id="backPages"></div>
+
+<div class="sec-label" id="coins">แผ่น 19 · ขวดยาและตัวเดิน</div>
+<div class="sheet" id="coinSheet"><div class="pno">19 / 21</div></div>
+
+<div class="sec-label" id="key">แผ่น 20–21 · เฉลยสำหรับผู้คุมเกม</div>
+<div id="keyPages"></div>
+
+<script>
+(function(){
+  const INK = '#23324A', SKIN = '#FFD9B8', HAIR = '#3A2A20', BLUSH = '#FF9DB0';
+  const ZSKIN = '#A9DB8C', ZSKIN_D = '#7FBF67';
+  const O = 'stroke="'+INK+'" stroke-linejoin="round"';
+
+  /* ───────── ตัวละคร (วาดเอง) ───────── */
+  function face(cx, cy){
+    let s = '';
+    s += '<ellipse cx="'+(cx-4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/><ellipse cx="'+(cx+4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/>';
+    s += '<circle cx="'+(cx-3.8)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/><circle cx="'+(cx+5)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/>';
+    s += '<ellipse cx="'+(cx-7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="'+(cx+7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M'+(cx-2.6)+' '+(cy+4.2)+' Q'+cx+' '+(cy+7)+' '+(cx+2.6)+' '+(cy+4.2)+'" fill="none" stroke="'+INK+'" stroke-width="1.1" stroke-linecap="round"/>';
+    return s;
+  }
+  /* หน้าซอมบี้งัวเงีย: ตาปรือ แก้มชมพู ปากเปิดนิด ๆ มีฟันซี่เดียว ไม่มีเลือด ไม่มีตาไขว้ */
+  function zface(cx, cy){
+    let s = '';
+    [-1, 1].forEach(d => {
+      const x = cx + d*4.4;
+      s += '<ellipse cx="'+x+'" cy="'+cy+'" rx="2.1" ry="2.2" fill="#fff" '+O+' stroke-width=".7"/>';
+      s += '<circle cx="'+x+'" cy="'+(cy+.6)+'" r="1.1" fill="'+INK+'"/>';
+      s += '<path d="M'+(x-2.3)+' '+(cy-.2)+' Q'+x+' '+(cy-1.4)+' '+(x+2.3)+' '+(cy-.2)+' L'+(x+2.3)+' '+(cy-2.4)+' L'+(x-2.3)+' '+(cy-2.4)+' Z" fill="'+ZSKIN_D+'"/>';
+      s += '<path d="M'+(x-2.3)+' '+(cy-.2)+' Q'+x+' '+(cy-1.4)+' '+(x+2.3)+' '+(cy-.2)+'" fill="none" stroke="'+INK+'" stroke-width=".8" stroke-linecap="round"/>';
+    });
+    s += '<ellipse cx="'+(cx-7.2)+'" cy="'+(cy+4)+'" rx="2.1" ry="1.2" fill="'+BLUSH+'" opacity=".9"/><ellipse cx="'+(cx+7.2)+'" cy="'+(cy+4)+'" rx="2.1" ry="1.2" fill="'+BLUSH+'" opacity=".9"/>';
+    s += '<ellipse cx="'+cx+'" cy="'+(cy+5)+'" rx="2.3" ry="1.6" fill="#5A3D4A" '+O+' stroke-width=".7"/><rect x="'+(cx-.9)+'" y="'+(cy+3.5)+'" width="1.8" height="1.4" rx=".3" fill="#fff"/>';
+    return s;
+  }
+  function charInner(k){
+    let s = '';
+    if (k === 'doctor'){
+      s += '<rect x="14" y="40" width="5" height="6.5" rx="2" fill="#35507A"/><rect x="21" y="40" width="5" height="6.5" rx="2" fill="#35507A"/>';
+      s += '<path d="M12.6 29.5 L9.6 36.5" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/><path d="M12.6 29.5 L9.6 36.5" stroke="'+INK+'" stroke-width="4.6" stroke-linecap="round" opacity=".15"/><circle cx="9.3" cy="37.2" r="2" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M27.4 29.5 L33.5 23" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/><circle cx="34" cy="22.3" r="2.1" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<rect x="32" y="12.5" width="5" height="7.5" rx="1.6" fill="#7CE08A" '+O+' stroke-width=".8"/><rect x="33.2" y="10.6" width="2.6" height="2.3" rx=".5" fill="#C69C6D" '+O+' stroke-width=".6"/><circle cx="34.5" cy="16.5" r=".8" fill="#fff" opacity=".8"/>';
+      s += '<path d="M11.5 26 L28.5 26 L31 43.5 L9 43.5 Z" fill="#fff" '+O+' stroke-width="1.2"/><path d="M16.5 26 L20 31 L23.5 26 Z" fill="#7FC4F5" '+O+' stroke-width=".7"/><path d="M20 31 V43" stroke="'+INK+'" stroke-width=".6"/>';
+      s += '<path d="M16 26.5 Q13.5 33 17.5 36" fill="none" stroke="#6B7A90" stroke-width="1.1"/><circle cx="17.8" cy="36.4" r="1.6" fill="#B8C4D2" '+O+' stroke-width=".6"/>';
+      s += '<path d="M24.2 33 h3 M25.7 31.5 v3" stroke="#E5484D" stroke-width="1.2" stroke-linecap="round"/>';
+      s += '<circle cx="20" cy="16" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M9.4 15 Q8.8 4.5 20 4.5 Q31.2 4.5 30.6 15 Q27.5 9.5 20 10 Q12.5 9.5 9.4 15 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<path d="M10 9.5 Q20 6.5 30 9.5" fill="none" stroke="#9AA6B8" stroke-width="1"/><circle cx="14.5" cy="8.3" r="2.8" fill="#E3EAF2" '+O+' stroke-width=".8"/><circle cx="14.5" cy="8.3" r="1.1" fill="#fff"/>';
+      s += face(20, 17);
+    } else if (k === 'scientist'){
+      s += '<circle cx="31.5" cy="11" r="4.3" fill="'+HAIR+'" '+O+' stroke-width="1"/><path d="M33 13 Q37 18 33.5 22" fill="none" stroke="'+HAIR+'" stroke-width="3" stroke-linecap="round"/>';
+      s += '<rect x="15" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/><rect x="21.4" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M12.6 29.5 L9.6 36.5" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.3" cy="37.2" r="2" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M27.4 29.5 L33.2 24" stroke="#fff" stroke-width="3.8" stroke-linecap="round"/><circle cx="33.8" cy="23.3" r="2.1" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<g transform="rotate(18 35 16)"><rect x="33.2" y="9.5" width="3.6" height="11" rx="1.8" fill="#fff" '+O+' stroke-width=".8"/><rect x="33.6" y="14.5" width="2.8" height="5.6" rx="1.4" fill="#B57CF2"/></g>';
+      s += '<path d="M11.5 26 L28.5 26 L31.5 42.5 L8.5 42.5 Z" fill="#fff" '+O+' stroke-width="1.2"/><path d="M16.5 26 L20 30.5 L23.5 26 Z" fill="#FF9EC7" '+O+' stroke-width=".7"/><path d="M20 30.5 V42" stroke="'+INK+'" stroke-width=".6"/>';
+      s += '<rect x="23" y="33" width="4" height="3.4" rx=".6" fill="#DDE7F3" '+O+' stroke-width=".6"/>';
+      s += '<circle cx="20" cy="16" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M9.2 16.5 Q8 4.5 20 4.5 Q32 4.5 30.8 16.5 Q28 10.5 20 11 Q12 10.5 9.2 16.5 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<path d="M9.5 9.5 H30.5" stroke="#5B6B82" stroke-width="1.4"/><circle cx="15.5" cy="9.5" r="3" fill="#A8E6FF" '+O+' stroke-width=".9"/><circle cx="24.5" cy="9.5" r="3" fill="#A8E6FF" '+O+' stroke-width=".9"/><circle cx="14.6" cy="8.6" r=".8" fill="#fff"/><circle cx="23.6" cy="8.6" r=".8" fill="#fff"/>';
+      s += face(20, 17.5);
+    } else if (k === 'scout'){
+      s += '<rect x="14" y="39" width="5" height="7.5" rx="2" fill="#B8925A"/><rect x="21" y="39" width="5" height="7.5" rx="2" fill="#B8925A"/>';
+      s += '<path d="M12.6 29.5 L9.6 36.5" stroke="#5DAA5A" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.3" cy="37.2" r="2" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M34.5 20 L40 13 L40 26 Z" fill="#FFE27A" opacity=".85"/>';
+      s += '<path d="M27.4 29.5 L33.2 24" stroke="#5DAA5A" stroke-width="3.8" stroke-linecap="round"/><rect x="31.5" y="18.5" width="4" height="7.5" rx="1.4" fill="#5B6B82" '+O+' stroke-width=".7" transform="rotate(-45 33.5 22)"/><circle cx="33.8" cy="23.6" r="2.1" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<rect x="12" y="26" width="16" height="14" rx="5" fill="#5DAA5A" '+O+' stroke-width="1.2"/><path d="M14.5 26.5 L15.5 39.5 M25.5 26.5 L24.5 39.5" stroke="#F28C28" stroke-width="1.8"/><rect x="17.5" y="31" width="5" height="3.6" rx="1" fill="#F28C28" '+O+' stroke-width=".6"/>';
+      s += '<circle cx="20" cy="16" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M10 14 Q9.5 11 11 9 L29 9 Q30.5 11 30 14 Z" fill="'+HAIR+'"/>';
+      s += '<path d="M9.5 12.5 Q9.5 3.5 20 3.5 Q30.5 3.5 30.5 12.5 Z" fill="#F28C28" '+O+' stroke-width="1"/><path d="M24 12.5 Q31 11.5 36 13.5 Q31 15 24 14.2 Z" fill="#E07415" '+O+' stroke-width=".8"/><circle cx="20" cy="3.8" r="1.2" fill="#E07415"/>';
+      s += face(20, 17.5);
+    } else if (k === 'dog'){
+      s += '<path d="M30 37 Q37 34 35.5 28" fill="none" stroke="#C98B4E" stroke-width="2.6" stroke-linecap="round"/>';
+      s += '<ellipse cx="15" cy="45" rx="3.4" ry="2" fill="#E8B77A" '+O+' stroke-width=".8"/><ellipse cx="25" cy="45" rx="3.4" ry="2" fill="#E8B77A" '+O+' stroke-width=".8"/>';
+      s += '<ellipse cx="20" cy="36" rx="10.5" ry="9" fill="#E8B77A" '+O+' stroke-width="1.2"/>';
+      s += '<path d="M12 31 Q20 27 28 31 L27 40 Q20 43 13 40 Z" fill="#E5484D" '+O+' stroke-width=".9"/><path d="M18.5 35 h3 M20 33.5 v3" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/>';
+      s += '<ellipse cx="8.5" cy="17" rx="3.6" ry="7" fill="#9A6433" '+O+' stroke-width="1" transform="rotate(15 8.5 17)"/><ellipse cx="31.5" cy="17" rx="3.6" ry="7" fill="#9A6433" '+O+' stroke-width="1" transform="rotate(-15 31.5 17)"/>';
+      s += '<circle cx="20" cy="17" r="10.6" fill="#E8B77A" '+O+' stroke-width="1.3"/><path d="M21 7 Q27 8 28 14 Q24 12 21.5 13 Z" fill="#C98B4E"/>';
+      s += '<ellipse cx="20" cy="22.3" rx="5.4" ry="4" fill="#FFF3E4" '+O+' stroke-width=".8"/><ellipse cx="20" cy="20.4" rx="1.8" ry="1.3" fill="'+INK+'"/>';
+      s += '<ellipse cx="15.6" cy="15.6" rx="1.8" ry="2.2" fill="'+INK+'"/><ellipse cx="24.4" cy="15.6" rx="1.8" ry="2.2" fill="'+INK+'"/><circle cx="16.2" cy="14.8" r=".6" fill="#fff"/><circle cx="25" cy="14.8" r=".6" fill="#fff"/>';
+      s += '<path d="M18.3 23.4 Q20 25 21.7 23.4" fill="none" stroke="'+INK+'" stroke-width=".9"/><path d="M19.3 24.2 Q20 27.4 20.7 24.2 Z" fill="#FF7F99"/>';
+      s += '<ellipse cx="11.8" cy="20" rx="1.8" ry="1.1" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="28.2" cy="20" rx="1.8" ry="1.1" fill="'+BLUSH+'" opacity=".85"/>';
+    } else if (k === 'zombie' || k === 'boss'){
+      const boss = k === 'boss';
+      if (boss) s += '<path d="M11 26 L5 45 Q20 41 35 45 L29 26 Z" fill="#8B4FC7" '+O+' stroke-width="1.2"/>';
+      s += '<rect x="14" y="40" width="5" height="6.5" rx="2" fill="#7D8898"/><rect x="21" y="40" width="5" height="6.5" rx="2" fill="#7D8898"/>';
+      s += '<path d="M12.6 29.5 L5 25" stroke="'+(boss ? '#E5484D' : '#8FB7E8')+'" stroke-width="3.8" stroke-linecap="round"/><circle cx="4.3" cy="24.6" r="2.2" fill="'+ZSKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M27.4 29.5 L35 25" stroke="'+(boss ? '#E5484D' : '#8FB7E8')+'" stroke-width="3.8" stroke-linecap="round"/><circle cx="35.7" cy="24.6" r="2.2" fill="'+ZSKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M12 26 L28 26 L28.5 38 L26 40.5 L23.5 38.5 L21 41 L18.5 38.5 L16 40.5 L13.5 38.5 L11.5 39.5 Z" fill="'+(boss ? '#E5484D' : '#8FB7E8')+'" '+O+' stroke-width="1.1"/>';
+      s += '<path d="M15 31 l2 1.5 M24 33 l2 -1.5" stroke="'+INK+'" stroke-width=".7" stroke-linecap="round" opacity=".6"/>';
+      s += '<circle cx="20" cy="16.5" r="10.6" fill="'+ZSKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M15 6.5 Q17 3 19 6 Q21 2.5 22.5 6 Q25 4 25.5 7.5" fill="none" stroke="#3E5F3A" stroke-width="1.6" stroke-linecap="round"/>';
+      s += '<rect x="21.5" y="7.2" width="9" height="3" rx="1.2" fill="#fff" '+O+' stroke-width=".7" transform="rotate(28 26 8.7)"/><path d="M24.4 7.6 v2.4 M27.4 9.1 v2.4" stroke="#F4A3B4" stroke-width=".7" transform="rotate(28 26 8.7)"/>';
+      s += '<path d="M10.8 20.5 l1.6 .8 M11.2 22 l1.6 .8" stroke="#3E5F3A" stroke-width=".7" stroke-linecap="round"/>';
+      s += zface(20, 16.5);
+      if (boss) s += '<path d="M12.5 7.5 L14 1.5 L17.5 5.2 L20 .5 L22.5 5.2 L26 1.5 L27.5 7.5 Z" fill="#FFD233" '+O+' stroke-width=".9"/><circle cx="20" cy="4.4" r=".9" fill="#E5484D"/>';
+    }
+    return s;
+  }
+  const NAMES = {doctor:'หมอภู', scientist:'นักวิทย์มิ้นท์', scout:'ลูกเสือต้น', dog:'บิสกิตหมาดมกลิ่น', zombie:'ซอมบี้งัวเงีย', boss:'ซอมบี้บอส'};
+  const ch = (k, w) => '<svg viewBox="0 0 40 48" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="'+NAMES[k]+'">'+charInner(k)+'</svg>';
+  /* หัวซอมบี้จิ๋วสำหรับนับเป็นกลุ่ม */
+  const ZHEAD = '<svg viewBox="0 0 20 20" role="img" aria-label="ซอมบี้"><circle cx="10" cy="10.5" r="8.4" fill="'+ZSKIN+'" '+O+' stroke-width="1.1"/><path d="M6.5 3.8 Q8 1.8 9.5 3.6 Q11 1.4 12.3 3.8" fill="none" stroke="#3E5F3A" stroke-width="1.2" stroke-linecap="round"/><path d="M4.8 9.6 Q6.6 8.4 8.4 9.6 M11.6 9.6 Q13.4 8.4 15.2 9.6" fill="none" stroke="'+INK+'" stroke-width="1" stroke-linecap="round"/><ellipse cx="10" cy="13.6" rx="1.8" ry="1.3" fill="#5A3D4A"/><ellipse cx="4.6" cy="12.6" rx="1.5" ry=".9" fill="'+BLUSH+'"/><ellipse cx="15.4" cy="12.6" rx="1.5" ry=".9" fill="'+BLUSH+'"/></svg>';
+
+  /* ───────── ประเภทการ์ด ───────── */
+  const TYPES = {
+    facts:   {icon:'✖️', name:'สูตรยา', sub:'โจทย์คูณ', square:'🟢', c:'#2E9E4F', bg:'#E6F5EA', hero:'scientist', say:['ผสมสูตรให้ถูกนะ!','ท่องแม่สูตรคูณช่วยได้','ค่อย ๆ คิดก็ได้','ยาใกล้เสร็จแล้ว!']},
+    quick:   {icon:'⚡', name:'ซอมบี้ไล่!', sub:'คิดเร็ว', square:'🟡', c:'#D98E04', bg:'#FFF4D6', hero:'dog', say:['โฮ่ง! เร็วเข้า!','ซอมบี้มาแล้ว!','ตอบใน 10 วินาทีนะ','วิ่ง! แล้วคิด!']},
+    picture: {icon:'🔍', name:'ส่องกล้อง', sub:'โจทย์ภาพ', square:'🔵', c:'#1E78D9', bg:'#E6F1FC', hero:'scout', say:['นับเป็นกลุ่มนะ','ดูทีละแถว','ส่องให้ดี ๆ','กี่กลุ่ม กลุ่มละเท่าไร?']},
+    story:   {icon:'📖', name:'ช่วยเพื่อน', sub:'โจทย์ปัญหา', square:'🟣', c:'#8B4FC7', bg:'#F2E9FB', hero:'doctor', say:['อ่านให้จบก่อนนะ','หาว่ากี่กลุ่ม','แล้วกลุ่มละเท่าไร?','เพื่อนรอเราอยู่!']},
+    boss:    {icon:'🧟', name:'ซอมบี้บอส', sub:'ท้าทาย', square:'🔴', c:'#E0453A', bg:'#FDE8E6', hero:'boss', say:['คูณ... คูณ...','ตอบได้ไหมเอ่ย~','ข้าคือบอส งือ~','ข้าง่วงจัง~ ฮ้าว~']},
+    final:   {icon:'🧪', name:'ปรุงยาแก้ซอมบี้', sub:'ภารกิจสุดท้าย', square:'🏥', c:'#23324A', bg:'#EEF2F7', hero:'zombie', say:['ช่วยรักษาเราด้วย~','ใกล้หายแล้ว!','ขอบคุณนะหมอน้อย','คูณ... ขอยาหน่อย']},
+    item:    {icon:'🎒', name:'ของจากร้านเสบียง', c:'#0F8F99', bg:'#E3F6F7'},
+    help:    {icon:'💡', name:'บัตรช่วยคิด', c:'#5B5BD6', bg:'#ECECFD'},
+    shop:    {icon:'🛒', name:'ร้านเสบียง', c:'#0F8F99', bg:'#E3F6F7'}
+  };
+  const STARS_COIN = s => '★'.repeat(s) + ' · 🧪' + s;
+
+  /* ───────── ตัวช่วยวาดโจทย์ ───────── */
+  const expr = (t, small) => '<div class="expr'+(small ? ' small' : '')+'">'+t+'</div>';
+  const scene = (e, n) => '<div class="scene">'+Array.from({length:n}, () => e).join('')+'</div>';
+  const item = e => e === 'Z' ? ZHEAD : '<span>'+e+'</span>';
+  function groups(n, each, e){
+    const cols = each <= 3 ? each : each === 4 ? 2 : each <= 6 ? 3 : 4;
+    return '<div class="grp">' + Array.from({length:n}, () => '<div class="grp-box" style="grid-template-columns:repeat('+cols+',auto)">'+Array.from({length:each}, () => item(e)).join('')+'</div>').join('') + '</div>';
+  }
+  const arr = (r, c, e) => '<div class="arr" style="grid-template-columns:repeat('+c+',auto)">'+Array.from({length:r*c}, () => item(e)).join('')+'</div>';
+  const pair = (a, b, e) => '<div class="pair"><figure>'+arr(a[0], a[1], e)+'<figcaption>ก.</figcaption></figure><figure>'+arr(b[0], b[1], e)+'<figcaption>ข.</figcaption></figure></div>';
+  const opts = list => '<div class="opts">'+list.map((o, i) => '<div class="opt"><b>'+'กขค'[i]+'.</b>'+o+'</div>').join('')+'</div>';
+
+  /* ───────── การ์ดโจทย์ 46 ใบ ─────────
+   * ห้ามมีการ์ดที่ถูกผิดเพราะลำดับตัวตั้ง: เฉลยที่เป็นประโยคการคูณยอมรับการสลับที่เสมอ */
+  const Q = [
+    // 🟢 สูตรยา
+    {id:'K01', t:'facts', s:1, art:expr('2 × 3 = ?'), q:'ได้เท่าไร?', a:'6', why:'แม่ 2: สองสามหก · 3 + 3 = 6'},
+    {id:'K02', t:'facts', s:1, art:expr('5 × 4 = ?'), q:'ได้เท่าไร?', a:'20', why:'นับทีละ 5 สี่ครั้ง: 5, 10, 15, 20'},
+    {id:'K03', t:'facts', s:1, art:expr('10 × 3 = ?'), q:'ได้เท่าไร?', a:'30', why:'คูณ 10 เติม 0 ข้างหลัง: 3 ➜ 30'},
+    {id:'K04', t:'facts', s:1, art:expr('4 × 2 = ?'), q:'ได้เท่าไร?', a:'8', why:'2 + 2 + 2 + 2 = 8'},
+    {id:'K05', t:'facts', s:1, art:expr('3 × 5 = ?'), q:'ได้เท่าไร?', a:'15', why:'นับทีละ 5 สามครั้ง: 5, 10, 15'},
+    {id:'K06', t:'facts', s:2, art:expr('2 × □ = 14'), q:'ใน □ คือเลขอะไร?', a:'7', why:'แม่ 2: สองเจ็ดสิบสี่'},
+    {id:'K07', t:'facts', s:2, art:expr('□ × 4 = 12'), q:'ใน □ คือเลขอะไร?', a:'3', why:'นับทีละ 4 ถึง 12 ได้ 3 ครั้ง: 4, 8, 12'},
+    {id:'K08', t:'facts', s:2, art:expr('5 × □ = 35'), q:'ใน □ คือเลขอะไร?', a:'7', why:'นับทีละ 5 ถึง 35 ได้ 7 ครั้ง'},
+    // 🟡 ซอมบี้ไล่!
+    {id:'Z01', t:'quick', s:1, art:expr('2 × 5 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'10', why:'แม่ 2: สองห้าสิบ'},
+    {id:'Z02', t:'quick', s:1, art:expr('3 × 3 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'9', why:'3 + 3 + 3 = 9'},
+    {id:'Z03', t:'quick', s:1, art:expr('10 × 4 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'40', why:'คูณ 10 เติม 0: 4 ➜ 40'},
+    {id:'Z04', t:'quick', s:1, art:expr('4 × 1 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'4', why:'คูณด้วย 1 ได้ตัวเดิมเสมอ'},
+    {id:'Z05', t:'quick', s:1, art:expr('8 × 0 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'0', why:'คูณด้วย 0 ได้ 0 เสมอ'},
+    {id:'Z06', t:'quick', s:1, art:expr('2 × 8 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'16', why:'แม่ 2: สองแปดสิบหก'},
+    {id:'Z07', t:'quick', s:1, art:expr('5 × 5 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'25', why:'แม่ 5: ห้าห้ายี่สิบห้า'},
+    {id:'Z08', t:'quick', s:1, art:expr('3 × 4 = ?'), q:'ตอบให้ทันใน 10 วินาที!', a:'12', why:'4 + 4 + 4 = 12'},
+    // 🔵 ส่องกล้อง
+    {id:'P01', t:'picture', s:1, art:arr(3, 3, 'Z'), q:'ซอมบี้ยืนกี่แถว แถวละกี่ตัว ทั้งหมดกี่ตัว?', a:'3 แถว แถวละ 3 ตัว · 3 × 3 = 9', why:'นับทีละแถว: 3, 6, 9'},
+    {id:'P02', t:'picture', s:1, art:groups(2, 4, '🍎'), q:'เขียนเป็นประโยคการคูณได้อย่างไร?', a:'2 × 4 = 8 (เขียน 4 × 2 = 8 ก็ถูก)', why:'2 กลุ่ม กลุ่มละ 4 ➜ 4 + 4 = 8'},
+    {id:'P03', t:'picture', s:1, art:arr(2, 5, '🧪'), q:'มีขวดยาทั้งหมดกี่ขวด?', a:'10 ขวด', why:'2 แถว แถวละ 5 ➜ 5 + 5 = 10'},
+    {id:'P04', t:'picture', s:1, art:groups(4, 2, '🥫'), q:'มีอาหารกระป๋องทั้งหมดกี่กระป๋อง?', a:'8 กระป๋อง', why:'4 กลุ่ม กลุ่มละ 2 ➜ นับทีละ 2: 2, 4, 6, 8'},
+    {id:'P05', t:'picture', s:2, art:groups(3, 6, '🍬'), q:'มีลูกอมทั้งหมดกี่เม็ด?', a:'18 เม็ด', why:'3 กลุ่ม กลุ่มละ 6 ➜ 6 + 6 + 6 = 18'},
+    {id:'P06', t:'picture', s:2, art:arr(4, 5, '🩹'), q:'เขียนเป็นประโยคการคูณ แล้วหาผลลัพธ์', a:'4 × 5 = 20 (เขียน 5 × 4 = 20 ก็ถูก)', why:'4 แถว แถวละ 5 ➜ นับทีละ 5 สี่ครั้ง'},
+    {id:'P07', t:'picture', s:2, art:pair([2, 6], [6, 2], '🔦'), q:'ไฟฉายสองภาพนี้มีจำนวนเท่ากันไหม?', a:'เท่ากัน (12 ทั้งคู่)', why:'2 × 6 = 12 · 6 × 2 = 12 · สลับที่แล้วผลเท่าเดิม'},
+    {id:'P08', t:'picture', s:2, art:groups(5, 3, '🍌'), q:'มีกล้วยทั้งหมดกี่ผล?', a:'15 ผล', why:'5 กลุ่ม กลุ่มละ 3 ➜ นับทีละ 3: 3, 6, 9, 12, 15'},
+    // 🟣 ช่วยเพื่อน
+    {id:'W01', t:'story', s:2, art:scene('📦', 4), q:'ครูมีดินสอ 4 กล่อง กล่องละ 5 แท่ง ครูมีดินสอ<em>ทั้งหมด</em>กี่แท่ง?', a:'4 × 5 = 20 แท่ง', why:'4 กลุ่ม กลุ่มละ 5 ➜ 5 + 5 + 5 + 5 = 20'},
+    {id:'W02', t:'story', s:2, art:scene('😷', 3), q:'หน้ากาก 3 แพ็ก แพ็กละ 4 ชิ้น มีหน้ากาก<em>ทั้งหมด</em>กี่ชิ้น?', a:'3 × 4 = 12 ชิ้น', why:'นับทีละ 4 สามครั้ง: 4, 8, 12'},
+    {id:'W03', t:'story', s:2, art:scene('🍞', 2), q:'ขนมปังถุงละ 6 แผ่น มี 2 ถุง มีขนมปัง<em>ทั้งหมด</em>กี่แผ่น?', a:'2 × 6 = 12 แผ่น', why:'6 + 6 = 12'},
+    {id:'W04', t:'story', s:2, art:scene('🧒', 5), q:'เพื่อน 5 คน ได้น้ำคนละ 2 ขวด มีน้ำ<em>ทั้งหมด</em>กี่ขวด?', a:'5 × 2 = 10 ขวด', why:'นับทีละ 2 ห้าครั้ง: 2, 4, 6, 8, 10'},
+    {id:'W05', t:'story', s:2, art:scene('🚲', 7), q:'จักรยาน 7 คัน คันละ 2 ล้อ มีล้อ<em>ทั้งหมด</em>กี่ล้อ?', a:'7 × 2 = 14 ล้อ', why:'แม่ 2: สองเจ็ดสิบสี่'},
+    {id:'W06', t:'story', s:2, art:scene('🔦', 4), q:'ไฟฉายอันละ 5 บาท ซื้อ 4 อัน ต้องจ่ายกี่บาท?', a:'4 × 5 = 20 บาท', why:'นับทีละ 5 สี่ครั้ง: 5, 10, 15, 20'},
+    {id:'W07', t:'story', s:2, art:scene('🍬', 3), q:'ลูกอมถุงละ 10 เม็ด มี 3 ถุง มีลูกอม<em>ทั้งหมด</em>กี่เม็ด?', a:'3 × 10 = 30 เม็ด', why:'นับทีละ 10: 10, 20, 30'},
+    {id:'W08', t:'story', s:2, art:scene('⛺', 4), q:'เต็นท์ 1 หลังนอนได้ 4 คน มี 4 หลัง นอนได้<em>ทั้งหมด</em>กี่คน?', a:'4 × 4 = 16 คน', why:'4 + 4 + 4 + 4 = 16'},
+    // 🔴 ซอมบี้บอส
+    {id:'B01', t:'boss', s:3, art:expr('7 × 4 = ?'), q:'ได้เท่าไร?', a:'28', why:'แม่ 4: สี่เจ็ดยี่สิบแปด · นับทีละ 4 เจ็ดครั้ง'},
+    {id:'B02', t:'boss', s:3, art:expr('3 × 4 กับ 2 × 5', true), q:'อันไหนได้ผล<em>มากกว่า</em>?', a:'3 × 4 (ได้ 12 มากกว่า 10)', why:'3 × 4 = 12 · 2 × 5 = 10'},
+    {id:'B03', t:'boss', s:3, art:expr('12 × 3 = ?'), q:'ได้เท่าไร?', a:'36', why:'แยก 12 เป็น 10 กับ 2 ➜ 30 + 6 = 36'},
+    {id:'B04', t:'boss', s:3, art:expr('6 × □ = 30'), q:'ใน □ คือเลขอะไร?', a:'5', why:'แม่ 6: หกห้าสามสิบ · หรือ 5 × 6 = 30'},
+    {id:'B05', t:'boss', s:3, art:scene('🚗', 8), q:'รถ 8 คัน คันละ 4 ล้อ มีล้อ<em>ทั้งหมด</em>กี่ล้อ?', a:'8 × 4 = 32 ล้อ', why:'นับทีละ 4 แปดครั้ง: 4, 8, … 32'},
+    {id:'B06', t:'boss', s:3, art:expr('23 × 3 = ?'), q:'ได้เท่าไร?', a:'69', why:'แยก 23 เป็น 20 กับ 3 ➜ 60 + 9 = 69'},
+    {id:'B07', t:'boss', s:3, art:expr('4 × 6', true) + opts(['6 × 4', '4 + 6', '4 × 5']), q:'ข้อใดได้ผลเท่ากับ 4 × 6?', a:'ก. 6 × 4', why:'สลับที่ตัวคูณ ผลเท่าเดิม = 24'},
+    {id:'B08', t:'boss', s:3, art:scene('🪑', 9), q:'ม้านั่ง 9 ตัว ตัวละ 3 คน นั่งได้<em>ทั้งหมด</em>กี่คน?', a:'9 × 3 = 27 คน', why:'แม่ 3: สามเก้ายี่สิบเจ็ด'},
+    // 🧪 ปรุงยา (ภารกิจสุดท้าย)
+    {id:'F01', t:'final', s:3, art:scene('⚽', 5), q:'นักเรียน 5 คน แต่ละคนมีลูกบอล 4 ลูก มีลูกบอล<em>ทั้งหมด</em>กี่ลูก?', a:'5 × 4 = 20 ลูก', why:'นับทีละ 4 ห้าครั้ง: 4, 8, 12, 16, 20'},
+    {id:'F02', t:'final', s:3, art:scene('🍃', 3), q:'ยาต้องใช้ใบไม้วิเศษ 3 กอง กองละ 10 ใบ ใช้<em>ทั้งหมด</em>กี่ใบ?', a:'3 × 10 = 30 ใบ', why:'นับทีละ 10: 10, 20, 30'},
+    {id:'F03', t:'final', s:3, art:scene('🐝', 4), q:'ผึ้ง 4 ตัว ตัวละ 6 ขา มีขา<em>ทั้งหมด</em>กี่ขา?', a:'4 × 6 = 24 ขา', why:'6 + 6 + 6 + 6 = 24'},
+    {id:'F04', t:'final', s:3, art:scene('🧪', 7), q:'ขวดยาถาดละ 5 ขวด มี 7 ถาด มีขวดยา<em>ทั้งหมด</em>กี่ขวด?', a:'7 × 5 = 35 ขวด', why:'นับทีละ 5 เจ็ดครั้ง'},
+    {id:'F05', t:'final', s:3, art:scene('🐙', 3), q:'ปลาหมึก 3 ตัว ตัวละ 8 หนวด มีหนวด<em>ทั้งหมด</em>กี่เส้น?', a:'3 × 8 = 24 เส้น', why:'8 + 8 + 8 = 24'},
+    {id:'F06', t:'final', s:3, art:scene('🖍️', 4), q:'สีเทียนกล่องละ 11 แท่ง มี 4 กล่อง มี<em>ทั้งหมด</em>กี่แท่ง?', a:'4 × 11 = 44 แท่ง', why:'แยก 11 เป็น 10 กับ 1 ➜ 40 + 4 = 44'}
+  ];
+
+  /* ───────── ของจากร้านเสบียง 15 ใบ ───────── */
+  const ITEMS = [
+    {e:'🛡️', n:'โล่กันซอมบี้', d:'ตอบการ์ดซอมบี้บอสผิด ขวดยาไม่หก', when:'ใช้ตอนตอบ 🔴 ผิด', price:3, count:4},
+    {e:'🛹', n:'สเก็ตบอร์ด', d:'หลังทอยลูกเต๋า เดินเพิ่มอีก 2 ช่อง', when:'ใช้หลังทอยลูกเต๋า', price:3, count:4},
+    {e:'📻', n:'วิทยุเปลี่ยนภารกิจ', d:'ไม่อยากตอบใบนี้? เปลี่ยนการ์ดสีเดิมใหม่ 1 ใบ', when:'ใช้ก่อนตอบ', price:2, count:4},
+    {e:'🎁', n:'กล่องเสบียง', d:'เปิดทันที! รับ 🧪 2 ขวด แล้วคืนกล่องให้ร้าน', when:'ได้จากช่อง ⭐ เท่านั้น', price:0, count:3}
+  ];
+  /* ───────── บัตรช่วยคิด 10 ใบ ───────── */
+  const HELPS = [
+    {e:'⭕', tip:'วาดวงกลมเป็นกลุ่ม แล้ววาดจุดในแต่ละกลุ่ม', eg:'3 × 4 ➜ วาด 3 วง วงละ 4 จุด'},
+    {e:'🔢', tip:'นับทีละ 2 ทีละ 5 หรือทีละ 10', eg:'5 × 4 ➜ 5, 10, 15, 20'},
+    {e:'➕', tip:'เปลี่ยนเป็นการบวกซ้ำ', eg:'3 × 4 = 4 + 4 + 4'},
+    {e:'🪙', tip:'ใช้ขวดยาหรือฝาขวดวางเป็นแถวแล้วนับ', eg:'2 × 6 ➜ วาง 2 แถว แถวละ 6'},
+    {e:'🔄', tip:'สลับที่ตัวคูณ ผลเท่าเดิม', eg:'2 × 7 = 7 × 2'},
+    {e:'🧱', tip:'ใช้สูตรที่จำได้ แล้วบวกเพิ่มอีกหนึ่งกลุ่ม', eg:'5 × 4 = (5 × 3) + 5'},
+    {e:'✂️', tip:'แยกจำนวนสองหลักก่อนคูณ', eg:'12 × 3 = (10 × 3) + (2 × 3)'},
+    {e:'🗣️', tip:'ขอให้เพื่อน 1 คนใบ้ 1 ประโยค (ห้ามบอกคำตอบ)', eg:'เช่น "ลองนับทีละ 5 ดูสิ"'},
+    {e:'🙋', tip:'ยกมือเรียกครูมาใบ้ 1 ครั้ง', eg:'ครูใบ้วิธีคิด ไม่บอกคำตอบ'},
+    {e:'✏️', tip:'อ่านโจทย์ช้า ๆ ขีดเส้นใต้ "กี่กลุ่ม" กับ "กลุ่มละเท่าไร"', eg:'แล้วเขียนเป็น □ × □'}
+  ];
+
+  /* ───────── วาดการ์ด ───────── */
+  const counter = {};
+  function buddy(t){
+    const T = TYPES[t]; counter[t] = (counter[t] || 0) + 1;
+    return '<div class="buddy"><span class="bd-ic">'+ch(T.hero, 7.4)+'</span><span class="bd-tx">'+T.say[(counter[t] - 1) % T.say.length]+'</span></div>';
+  }
+  /* ฉากเล็กใต้โจทย์ที่มีแค่ตัวเลข: ตอบถูก ➜ ซอมบี้หายป่วย */
+  const DECO = {
+    facts: () => '<div class="deco">'+ZHEAD+'<span class="ar">➜</span><span>🧪</span><span class="ar">➜</span><span>😊</span></div>',
+    quick: () => '<div class="deco">'+ZHEAD+'<span class="ar">· · ·</span><span>💨</span>'+ch('dog', 9)+'</div>',
+    boss:  () => '<div class="deco">'+ch('boss', 15).replace('<svg ', '<svg class="big" ')+'<small>ตอบถูก ข้าจะหายป่วย~</small></div>'
+  };
+  function questionCard(c){
+    const T = TYPES[c.t];
+    const plain = c.art.indexOf('<div class="expr') === 0 && c.art.indexOf('opts') < 0;
+    const chips = [];
+    if (c.t === 'quick') chips.push('⏳ นับ 1–10 ให้ทัน');
+    if (c.t === 'boss') chips.push('ตอบผิด ขวดยาหก 🧪−1');
+    if (c.t === 'final') chips.push('ถูก = เข้าห้องแล็บ +🧪3');
+    return '<div class="card" style="--c:'+T.c+';--bg:'+T.bg+'">' +
+      '<div class="c-head"><span>'+T.icon+' '+T.name+'</span><span class="stars">'+STARS_COIN(c.s)+'</span></div>' +
+      buddy(c.t) +
+      '<div class="art">'+c.art+(plain && DECO[c.t] ? DECO[c.t]() : '')+'</div>' +
+      '<div class="q">'+c.q+'</div>' +
+      (chips.length ? '<div class="chipline">'+chips.map(x => '<span class="chip">'+x+'</span>').join('')+'</div>' : '') +
+      '<div class="c-foot"><div class="fl"><span class="cid">'+c.id+'</span><span class="rw">'+T.square+' '+T.sub+'</span></div><span class="ans"><b>เฉลย</b> '+c.a+'</span></div>' +
+    '</div>';
+  }
+  function itemCard(it, i){
+    const T = TYPES.item;
+    return '<div class="card" style="--c:'+T.c+';--bg:'+T.bg+'">' +
+      '<div class="c-head"><span>'+T.icon+' ร้านเสบียง</span><span class="stars">'+(it.price ? 'ราคา 🧪'+it.price : 'ของฟรี ⭐')+'</span></div>' +
+      '<div class="art"><div class="item-art">'+it.e+'</div><div class="item-name">'+it.n+'</div></div>' +
+      '<div class="q">'+it.d+'</div>' +
+      '<div class="chipline"><span class="chip">'+it.when+'</span></div>' +
+      '<div class="c-foot"><div class="fl"><span class="cid">S'+String(i+1).padStart(2,'0')+'</span><span class="rw">ถือได้ไม่เกิน 3 ชิ้น</span></div><span class="ans">ใช้แล้วคืนร้าน</span></div>' +
+    '</div>';
+  }
+  function helpCard(h, i){
+    const T = TYPES.help;
+    return '<div class="card" style="--c:'+T.c+';--bg:'+T.bg+'">' +
+      '<div class="c-head"><span>💡 บัตรช่วยคิด</span><span class="stars">ราคา 🧪2</span></div>' +
+      '<div class="art"><div class="item-art" style="width:20mm;height:20mm;font-size:22pt">'+h.e+'</div></div>' +
+      '<div class="help-tip">'+h.tip+'</div>' +
+      '<div class="help-eg" style="margin-top:1.2mm">'+h.eg+'</div>' +
+      '<div class="chipline"><span class="chip">ใช้หลังตอบผิด แล้วตอบใหม่ 1 ครั้ง</span></div>' +
+      '<div class="c-foot"><div class="fl"><span class="cid">H'+String(i+1).padStart(2,'0')+'</span><span class="rw">ใช้แล้วใส่ใต้กอง</span></div></div>' +
+    '</div>';
+  }
+  function shopCard(){
+    const T = TYPES.shop;
+    return '<div class="card" style="--c:'+T.c+';--bg:'+T.bg+'">' +
+      '<div class="c-head"><span>🛒 ร้านเสบียง</span><span class="stars">ป้ายราคา</span></div>' +
+      '<div class="buddy"><span class="bd-ic">'+ch('scout', 7.4)+'</span><span class="bd-tx">ซื้อได้ตอนต้นตา 1 ชิ้น</span></div>' +
+      '<div class="art"><div class="shop-list">' +
+        [['💡','บัตรช่วยคิด (จั่ว 1 ใบ)',2],['📻','วิทยุเปลี่ยนภารกิจ',2],['🛡️','โล่กันซอมบี้',3],['🛹','สเก็ตบอร์ด',3]].map(r => '<div class="shop-row"><span class="e">'+r[0]+'</span>'+r[1]+'<span class="p">🧪'+r[2]+'</span></div>').join('') +
+        '<div class="shop-row"><span class="e">🎁</span>กล่องเสบียง<span class="p">ช่อง ⭐</span></div>' +
+      '</div></div>' +
+      '<div class="q" style="font-size:8.6pt;margin-bottom:1.6mm">ขวดยาที่จ่ายไปไม่นับตอนจบเกม คิดให้ดีก่อนซื้อ!</div>' +
+    '</div>';
+  }
+
+  // ลำดับบนแผ่น: โจทย์ 46 → ของ 15 → บัตรช่วยคิด 10 → ป้ายราคา 1 = 72 ใบ (8 แผ่น × 9)
+  const slots = [];
+  Q.forEach(c => slots.push({kind:c.t, html:questionCard(c)}));
+  let si = 0;
+  ITEMS.forEach(it => { for (let k = 0; k < it.count; k++) slots.push({kind:'item', html:itemCard(it, si++)}); });
+  HELPS.forEach((h, i) => slots.push({kind:'help', html:helpCard(h, i)}));
+  slots.push({kind:'shop', html:shopCard()});
+
+  const BACK_ART = {
+    facts:'scientist', quick:'dog', picture:'scout', story:'doctor', boss:'boss', final:'zombie'
+  };
+  function backCard(kind){
+    const T = TYPES[kind];
+    const hero = BACK_ART[kind];
+    const ring = hero ? '<div class="ring">'+ch(hero, 25)+'</div>' : '<div class="ring mid">'+T.icon+'</div>';
+    return '<div class="back" style="--c:'+T.c+'">' + ring +
+      '<div class="logo">ZOMBIE CURE</div>' +
+      '<div class="kind">'+(T.square ? T.square+' ' : '')+T.name+'</div>' +
+      '<div class="en">'+(T.sub || 'ภารกิจหมอน้อยนักคูณ')+'</div>' +
+    '</div>';
+  }
+
+  const TOTAL = 21;
+  const pages = Math.ceil(slots.length / 9);
+  let fHtml = '', bHtml = '';
+  for (let p = 0; p < pages; p++){
+    const part = slots.slice(p*9, p*9 + 9);
+    let f = '', b = '';
+    for (let i = 0; i < 9; i++) f += '<div class="cut">'+(part[i] ? part[i].html : '')+'</div>';
+    for (let r = 0; r < 3; r++) for (let c = 2; c >= 0; c--){ const s = part[r*3 + c]; b += '<div class="cut">'+(s ? backCard(s.kind) : '')+'</div>'; }
+    fHtml += '<div class="sheet"><div class="grid">'+f+'</div><div class="pno-l">หน้าการ์ด '+(p+1)+'/'+pages+' · ตัดตามเส้นประ</div><div class="pno">'+(3+p)+' / '+TOTAL+'</div></div>';
+    bHtml += '<div class="sheet"><div class="grid">'+b+'</div><div class="pno-l">หลังการ์ด '+(p+1)+'/'+pages+' · พิมพ์ด้านหลังแผ่น '+(3+p)+'</div><div class="pno">'+(11+p)+' / '+TOTAL+'</div></div>';
+  }
+  document.getElementById('frontPages').innerHTML = fHtml;
+  document.getElementById('backPages').innerHTML = bHtml;
+
+  /* ───────── กระดาน A4 แนวนอน ───────── */
+  const SQ = {
+    facts:{fill:'#3FAE5A', icon:'✖️'}, quick:{fill:'#F2B705', icon:'⚡'}, picture:{fill:'#2F80ED', icon:'🔍'},
+    story:{fill:'#8E5CD9', icon:'📖'}, boss:{fill:'#E5484D', icon:'🧟'}, bonus:{fill:'#FFD233', icon:'⭐'}
+  };
+  // เส้นทาง: [x, y, ชนิดช่อง]
+  const MAIN1 = [[34,178,'picture'],[50,178,'facts'],[66,178,'bonus'],[82,178,'picture'],[98,178,'quick'],[114,178,'facts']];
+  const SAFE_A = [[132,180,'facts'],[149,182,'quick'],[166,182,'bonus'],[182,178,'picture'],[195,166,'facts'],[202,150,'story']];
+  const CUT_A = [[128,160,'boss'],[146,150,'story'],[164,142,'boss']];
+  const MAIN3 = [[190,128,'facts'],[174,115,'quick'],[156,110,'bonus'],[138,110,'picture'],[120,110,'story'],[102,110,'facts']];
+  const SAFE_B = [[84,106,'story'],[68,97,'facts'],[57,83,'bonus'],[56,66,'story'],[66,52,'picture'],[84,43,'quick']];
+  const CUT_B = [[103,94,'boss'],[106,78,'story'],[108,61,'boss']];
+  const MAIN5 = [[112,40,'story'],[130,33,'bonus'],[148,29,'boss']];
+  const START = [16,178], LAB = [178,30];
+  const F = 'font-family="Mitr,Kanit,Tahoma,sans-serif"';
+  const pts = list => list.map(p => p[0]+','+p[1]).join(' ');
+  function road(list, opt){
+    opt = opt || {};
+    let s = '<polyline points="'+pts(list)+'" fill="none" stroke="'+(opt.color || '#D8CDB6')+'" stroke-width="'+(opt.w || 8)+'" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<polyline points="'+pts(list)+'" fill="none" stroke="'+(opt.dash || '#fff')+'" stroke-width="1" stroke-dasharray="2.5 2.5" stroke-linejoin="round"/>';
+    return s;
+  }
+  function squares(list){
+    return list.map(([x, y, t]) => {
+      const q = SQ[t];
+      if (t === 'bonus') return '<path d="'+starPath(x, y, 8.2, 3.9)+'" fill="#FFD233" stroke="#B98400" stroke-width="1"/><text x="'+x+'" y="'+(y+2.1)+'" text-anchor="middle" font-size="5.2">🎁</text>';
+      return '<circle cx="'+x+'" cy="'+y+'" r="6.6" fill="'+q.fill+'" stroke="#fff" stroke-width="1.4"/><circle cx="'+x+'" cy="'+y+'" r="7.3" fill="none" stroke="'+INK+'" stroke-width=".35" opacity=".5"/><text x="'+x+'" y="'+(y+1.9)+'" text-anchor="middle" font-size="5">'+q.icon+'</text>';
+    }).join('');
+  }
+  function starPath(cx, cy, R, r){
+    let d = '';
+    for (let i = 0; i < 10; i++){
+      const a = -Math.PI/2 + i * Math.PI/5, rr = i % 2 ? r : R;
+      d += (i ? 'L' : 'M') + (cx + rr*Math.cos(a)).toFixed(2) + ' ' + (cy + rr*Math.sin(a)).toFixed(2) + ' ';
+    }
+    return d + 'Z';
+  }
+  const land = (x, y, w, h, fill) => '<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="10" fill="'+fill+'"/>';
+  const label = (x, y, text, sub, color, anchor) => '<text x="'+x+'" y="'+y+'" text-anchor="'+(anchor || 'start')+'" '+F+' font-weight="600" font-size="4.6" fill="'+color+'">'+text+'</text>' + (sub ? '<text x="'+x+'" y="'+(y+4.6)+'" text-anchor="'+(anchor || 'start')+'" '+F+' font-size="3.1" fill="#51607A">'+sub+'</text>' : '');
+  const mini = (k, x, y, w) => '<svg x="'+x+'" y="'+y+'" width="'+w+'" height="'+(w*1.2)+'" viewBox="0 0 40 48">'+charInner(k)+'</svg>';
+  const zh = (x, y, w) => '<svg x="'+x+'" y="'+y+'" width="'+w+'" height="'+w+'" viewBox="0 0 20 20">'+ZHEAD.replace(/^<svg[^>]*>|<\/svg>$/g, '')+'</svg>';
+
+  let svg = '<svg viewBox="0 0 287 200" style="position:absolute;left:5mm;top:5mm;width:287mm;height:200mm" role="img" aria-label="กระดานเกม ZOMBIE CURE">';
+  svg += '<rect x="0" y="0" width="287" height="200" rx="8" fill="#F4F8EE"/>';
+  // ดินแดน
+  svg += land(22, 158, 102, 40, '#DDF1D6');                 // ป่า
+  svg += land(124, 162, 92, 36, '#FFF1D6') + land(186, 138, 30, 40, '#FFF1D6'); // ซูเปอร์มาร์เก็ต
+  svg += land(94, 100, 108, 36, '#E3EEFB');                 // โรงเรียน
+  svg += land(44, 34, 56, 82, '#ECE6F6');                    // สุสาน
+  svg += land(100, 18, 112, 32, '#FDE7EF');                  // หอคอยแล็บ
+  // ทางลัด (วาดก่อนเพื่อให้อยู่ใต้ช่อง)
+  svg += road([MAIN1[5], ...CUT_A, MAIN3[0]], {color:'#6F7C8E', dash:'#FFD233', w:7});
+  svg += road([MAIN3[5], ...CUT_B, MAIN5[0]], {color:'#A9B2C3', dash:'#fff', w:7});
+  svg += road([START, ...MAIN1, ...SAFE_A, ...MAIN3, ...SAFE_B, ...MAIN5, LAB]);
+  // ป้ายดินแดน
+  svg += label(28, 191, '🌲 ป่ากลุ่มเท่า', 'ซอมบี้เดินเป็นกลุ่ม ๆ', '#2E7D3E');
+  svg += label(128, 195, '🛒 ซูเปอร์มาร์เก็ตร้าง', '', '#B26B00') + '<text x="176" y="195" '+F+' font-size="3.1" fill="#51607A">ทางปลอดภัย · ง่ายกว่า</text>';
+  svg += label(96, 145, '🕳️ ท่อระบายน้ำลัด!', 'สั้นกว่า แต่มีซอมบี้บอส 🔴', '#E0453A');
+  svg += label(118, 128, '🏫 โรงเรียนแม่สูตรคูณ', 'ท่องแม่ 2 3 4 5 10 ให้คล่อง', '#1E5FB0');
+  svg += label(46, 30, '🪦 สุสานโจทย์ปัญหา', 'ทางปลอดภัย', '#6A3FA0');
+  svg += label(114, 88, '🌫️ หมอกซอมบี้ลัด!', 'สั้นกว่า เสี่ยงกว่า', '#E0453A');
+  svg += label(102, 24, '🧪 หอคอยห้องแล็บ', '', '#B0306A');
+  // ทางแยก
+  svg += '<text x="114" y="191" text-anchor="middle" '+F+' font-weight="600" font-size="3.4" fill="'+INK+'">🔀 เลือกทาง!</text>';
+  svg += '<text x="102" y="122" text-anchor="middle" '+F+' font-weight="600" font-size="3.4" fill="'+INK+'">🔀 เลือกทาง!</text>';
+  // ช่อง
+  svg += squares(MAIN1) + squares(SAFE_A) + squares(CUT_A) + squares(MAIN3) + squares(SAFE_B) + squares(CUT_B) + squares(MAIN5);
+  // START
+  svg += '<circle cx="'+START[0]+'" cy="'+START[1]+'" r="10" fill="'+INK+'"/><text x="'+START[0]+'" y="'+(START[1]-1.5)+'" text-anchor="middle" font-size="6.5">🏠</text><text x="'+START[0]+'" y="'+(START[1]+5.3)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3" fill="#fff">บ้านหลบภัย</text>';
+  // หอคอยแล็บ
+  svg += '<rect x="164" y="6" width="44" height="42" rx="6" fill="#fff" stroke="#B0306A" stroke-width="1"/>';
+  svg += '<text x="186" y="26" text-anchor="middle" font-size="15">🏥</text>';
+  svg += '<text x="186" y="35" text-anchor="middle" '+F+' font-weight="600" font-size="4" fill="#B0306A">ห้องแล็บปรุงยา</text>';
+  svg += '<text x="186" y="41" text-anchor="middle" '+F+' font-size="3" fill="#51607A">ตอบภารกิจสุดท้ายถูก = เข้าได้</text>';
+  svg += mini('scientist', 166, 7, 9) + mini('doctor', 197, 7, 9);
+  // ซอมบี้ประดับ
+  svg += zh(40, 160, 6) + zh(72, 161, 6) + zh(134, 168, 5.5) + zh(206, 184, 6) + mini('zombie', 60, 120, 10) + mini('boss', 151, 157, 9) + zh(90, 60, 6) + zh(170, 96, 6) + mini('zombie', 140, 60, 9);
+  // หัวกระดาน
+  svg += '<text x="6" y="12" '+F+' font-weight="700" font-size="9" fill="'+INK+'">ZOMBIE CURE</text>';
+  svg += '<text x="6" y="19" '+F+' font-weight="500" font-size="4.4" fill="#2E7D3E">ภารกิจหมอน้อยนักคูณ</text>';
+  svg += mini('doctor', 6, 20, 9) + mini('scientist', 16, 20, 9) + mini('scout', 26, 20, 9) + mini('dog', 36, 21, 8.5);
+  // แถบขวา: ช่องและกติกาย่อ
+  svg += '<rect x="220" y="6" width="61" height="188" rx="6" fill="#fff" stroke="#C9D6C3" stroke-width=".6"/>';
+  svg += '<text x="224" y="14" '+F+' font-weight="600" font-size="4.4" fill="'+INK+'">ช่องบนกระดาน</text>';
+  const LEG = [['facts','สูตรยา','โจทย์คูณ','★ 🧪1'],['quick','ซอมบี้ไล่!','คิดเร็ว 10 วิ','★ 🧪1'],['picture','ส่องกล้อง','โจทย์ภาพ','★–★★'],['story','ช่วยเพื่อน','โจทย์ปัญหา','★★ 🧪2'],['boss','ซอมบี้บอส','ผิด = ยาหก','★★★ 🧪3'],['bonus','กล่องเสบียง','รับของฟรี','⭐']];
+  LEG.forEach((l, i) => {
+    const y = 22 + i*10.5, q = SQ[l[0]];
+    svg += l[0] === 'bonus' ? '<path d="'+starPath(228, y, 4.8, 2.3)+'" fill="#FFD233" stroke="#B98400" stroke-width=".6"/>' : '<circle cx="228" cy="'+y+'" r="3.8" fill="'+q.fill+'"/>';
+    svg += '<text x="228" y="'+(y+1.2)+'" text-anchor="middle" font-size="3">'+q.icon+'</text>';
+    svg += '<text x="234" y="'+(y-.4)+'" '+F+' font-weight="600" font-size="3.6" fill="'+INK+'">'+l[1]+'</text>';
+    svg += '<text x="234" y="'+(y+3.6)+'" '+F+' font-size="2.9" fill="#51607A">'+l[2]+' · '+l[3]+'</text>';
+  });
+  svg += '<text x="224" y="92" '+F+' font-weight="600" font-size="4.4" fill="'+INK+'">ตาของฉัน</text>';
+  ['① ซื้อของที่ร้านได้ 1 ชิ้น (ไม่ซื้อก็ได้)', '② จั่วการ์ดสีเดียวกับช่องที่ยืนอยู่', '③ ถูก ➜ รับ 🧪 ตามดาว แล้วทอยเต๋าเดิน', '④ ผิด ➜ ใช้ 💡 ตอบใหม่ หรืออยู่ที่เดิม', '⑤ ถึง 🔀 เลือกทางเอง', '⑥ จบที่ ⭐ ➜ รับของฟรี 1 ชิ้น'].forEach((t, i) => {
+    svg += '<text x="224" y="'+(99 + i*5.6)+'" '+F+' font-size="3.05" fill="#3B4A63">'+t+'</text>';
+  });
+  svg += '<text x="224" y="140" '+F+' font-weight="600" font-size="4.4" fill="'+INK+'">🛒 ร้านเสบียง</text>';
+  [['💡 บัตรช่วยคิด','2'],['📻 วิทยุเปลี่ยนภารกิจ','2'],['🛡️ โล่กันซอมบี้','3'],['🛹 สเก็ตบอร์ด','3']].forEach((r, i) => {
+    const y = 147 + i*5.6;
+    svg += '<text x="224" y="'+y+'" '+F+' font-size="3.2" fill="#3B4A63">'+r[0]+'</text><text x="277" y="'+y+'" text-anchor="end" '+F+' font-weight="600" font-size="3.2" fill="#0F8F99">🧪'+r[1]+'</text>';
+  });
+  svg += '<text x="224" y="175" '+F+' font-weight="600" font-size="4" fill="#B0306A">🏆 ชนะเมื่อ…</text>';
+  svg += '<text x="224" y="181" '+F+' font-size="3" fill="#3B4A63">มีคนเข้าห้องแล็บได้ ➜ จบเกม</text>';
+  svg += '<text x="224" y="186" '+F+' font-size="3" fill="#3B4A63">ใครมี 🧪 มากที่สุด = หมอนักคูณ!</text>';
+  svg += '</svg>';
+  document.getElementById('boardSheet').insertAdjacentHTML('afterbegin', svg);
+
+  /* ───────── กติกา ───────── */
+  document.getElementById('rulesSheet').insertAdjacentHTML('afterbegin', '<div class="rules">' +
+    '<header>'+ch('doctor', 17)+'<div><div class="logo">ZOMBIE CURE<small>ภารกิจหมอน้อยนักคูณ: ตามหายาแก้ซอมบี้</small></div></div>' +
+      '<p>ไวรัสขี้เซาระบาดทั้งเมือง! ใครติดเชื้อกลายเป็น <b>ซอมบี้งัวเงีย</b> เดินช้า ๆ ร้อง "คูณ... คูณ..." ไม่กัดใคร แค่อยากหายป่วย ยาแก้ต้องปรุงที่ <b>ห้องแล็บบนหอคอย</b> ทีมหมอน้อย 4 คนต้องเดินทางผ่าน 5 ดินแดน เก็บ <b>ขวดยา 🧪</b> จากการคิดเลขให้ถูก ใครมีขวดยามากที่สุดตอนจบ ได้เป็น <b>หมอนักคูณ</b></p></header>' +
+    '<div class="cols"><div>' +
+      '<h3><span class="n">1</span>เตรียมเกม (2–4 คน · 25–40 นาที)</h3><ul>' +
+        '<li>ตัวเดินทุกตัวอยู่ที่ 🏠 <b>บ้านหลบภัย</b></li>' +
+        '<li>ทุกคนรับ <b>🧪 2 ขวด</b> และ <b>💡 บัตรช่วยคิด 1 ใบ</b></li>' +
+        '<li>แยกการ์ดโจทย์ 5 สี + การ์ดปรุงยา คว่ำไว้ สับแต่ละกอง</li>' +
+        '<li>วางของทั้ง 15 ชิ้น <b>หงายหน้า</b> เป็นร้านเสบียง</li>' +
+        '<li>คนที่เคยป่วยล่าสุดเริ่มก่อน แล้ววนตามเข็มนาฬิกา</li></ul>' +
+      '<h3 style="margin-top:2mm"><span class="n">3</span>จั่วการ์ดสีตามช่อง</h3><table>' +
+        '<tr><th>ช่อง</th><th>การ์ด</th><th>ถูกได้</th></tr>' +
+        '<tr><td><span class="dot" style="background:#3FAE5A"></span>สูตรยา</td><td>โจทย์คูณ</td><td>🧪 ตามดาว</td></tr>' +
+        '<tr><td><span class="dot" style="background:#F2B705"></span>ซอมบี้ไล่!</td><td>ตอบใน 10 วินาที</td><td>🧪1</td></tr>' +
+        '<tr><td><span class="dot" style="background:#2F80ED"></span>ส่องกล้อง</td><td>โจทย์ภาพ</td><td>🧪1–2</td></tr>' +
+        '<tr><td><span class="dot" style="background:#8E5CD9"></span>ช่วยเพื่อน</td><td>โจทย์ปัญหา</td><td>🧪2</td></tr>' +
+        '<tr><td><span class="dot" style="background:#E5484D"></span>ซอมบี้บอส</td><td>ท้าทาย · ผิดยาหก 1</td><td>🧪3</td></tr>' +
+        '<tr><td>🏠 บ้านหลบภัย</td><td>ใช้การ์ดสูตรยา</td><td></td></tr></table>' +
+    '</div><div>' +
+      '<h3><span class="n">2</span>ในหนึ่งตา</h3><ol>' +
+        '<li><b>ร้านเสบียง</b>: จ่ายขวดยาซื้อของได้ 1 ชิ้น (ไม่ซื้อก็ได้)</li>' +
+        '<li><b>จั่วการ์ด</b>สีเดียวกับช่องที่ยืนอยู่ ให้คนทางซ้ายอ่าน ใช้นิ้วปิดช่องเฉลย</li>' +
+        '<li><b>ตอบถูก</b> ➜ รับ 🧪 ตามจำนวนดาว แล้ว<b>ทอยลูกเต๋า</b>เดิน</li>' +
+        '<li><b>ตอบผิด</b> ➜ ใช้ 💡 บัตรช่วยคิด ทำตามบัตรแล้วตอบใหม่ 1 ครั้ง หรือยอมอยู่ที่เดิม</li>' +
+        '<li>ถึงทางแยก 🔀 <b>เลือกทางเอง</b>: ทางปลอดภัยยาวกว่า ทางลัดสั้นกว่าแต่มีซอมบี้บอส</li>' +
+        '<li>หยุดที่ ⭐ ➜ เลือกของฟรี 1 ชิ้นจากร้าน (หรือกล่องเสบียง รับ 🧪2 ทันที)</li></ol>' +
+      '<h3 style="margin-top:2mm"><span class="n">4</span>ร้านเสบียง</h3><table>' +
+        '<tr><td>💡 บัตรช่วยคิด (จั่ว 1 ใบ)</td><td>🧪2</td></tr><tr><td>📻 วิทยุเปลี่ยนภารกิจ</td><td>🧪2</td></tr>' +
+        '<tr><td>🛡️ โล่กันซอมบี้</td><td>🧪3</td></tr><tr><td>🛹 สเก็ตบอร์ด (+2 ช่อง)</td><td>🧪3</td></tr></table>' +
+      '<p style="margin:1mm 0 0;font-size:8.4pt;color:#5D6B82">ถือของได้ไม่เกิน 3 ชิ้น · ใช้แล้วคืนร้าน · ขวดยาที่จ่ายไปไม่นับตอนจบ</p>' +
+    '</div></div>' +
+    '<div class="box hl"><h3><span class="n">5</span>จบเกมและผู้ชนะ</h3><ul>' +
+      '<li>เดินถึงหรือเลยช่องสุดท้าย ➜ หยุดหน้า 🏥 <b>ห้องแล็บ</b> ตาถัดไปจั่ว <b>การ์ดปรุงยา</b> ถูก = เข้าห้องแล็บ รับ 🧪3 และ<b>เกมจบทันที</b> · ผิด = รอตอบใหม่ตาหน้า</li>' +
+      '<li>ทุกคนนับขวดยา ใครมี <b>🧪 มากที่สุด = หมอนักคูณ</b> (เสมอกัน: คนที่เข้าห้องแล็บ หรืออยู่ใกล้กว่า)</li>' +
+      '<li>คนที่ถึงก่อนอาจไม่ได้ชนะ! จะรีบไปห้องแล็บ หรือเก็บขวดยาให้มากก่อน ต้องวางแผนเอง</li></ul></div>' +
+    '<div class="cols">' +
+      '<div class="box green"><h3>🐢 ปรับให้ง่ายขึ้น</h3><ul><li>เอาการ์ดซอมบี้บอสกับ 2 หลักออก ใช้แต่ทางปลอดภัย</li><li>ซอมบี้ไล่! ให้เวลา 20 วินาที</li><li>เริ่มด้วย 💡 คนละ 2 ใบ</li><li>ใช้ขวดยาวางเป็นกลุ่มช่วยนับได้ทุกข้อ</li></ul></div>' +
+      '<div class="box"><h3>🚀 ปรับให้ท้าทายขึ้น</h3><ul><li>ต้องพูดประโยคการคูณให้ครบทุกข้อ เช่น "4 คูณ 5 เท่ากับ 20"</li><li>ซอมบี้ไล่! ให้ 5 วินาที</li><li>ห้ามใช้บัตรช่วยคิดแบบถามเพื่อน</li><li>แต่งโจทย์ซอมบี้ของตัวเองให้เพื่อนตอบ</li></ul></div>' +
+    '</div>' +
+    '<div class="box"><h3>🎵 ท่องก่อนเล่น (ครูนำ)</h3><div style="font:500 9.4pt/1.45 var(--display);color:#1E5E30">"กี่กลุ่ม? กลุ่มละเท่าไร? คูณกันได้เท่าไร? ถูกแล้ว ซอมบี้หายป่วย!" 🧟➜😊</div></div>' +
+    '<div class="box"><h3>📦 ของในชุดเกม</h3><div class="cols" style="gap:0 5mm"><ul>' +
+      '<li>กระดาน A4 แนวนอน 1 แผ่น (แผ่นที่ 2)</li><li>การ์ดโจทย์ 46 ใบ: 🟢 8 · 🟡 8 · 🔵 8 · 🟣 8 · 🔴 8 · 🏥 6</li><li>การ์ดร้านเสบียง 15 ใบ + ป้ายราคา 1 ใบ</li><li>บัตรช่วยคิด 💡 10 ใบ</li></ul><ul>' +
+      '<li>ขวดยา 🧪 49 ขวด (ใช้ฝาขวดแทนก็ได้)</li><li>ตัวเดิน 4 ตัว · ลูกเต๋า 1 ลูก (เตรียมเอง)</li><li>เฉลยสำหรับผู้คุมเกม 2 แผ่น</li><li>ใครเป็นผู้อ่านการ์ด ให้ใช้นิ้วปิดช่อง <b>เฉลย</b> ไว้</li></ul></div></div>' +
+    '<p style="margin:0;font-size:8pt;color:#5D6B82">หมายเหตุ: หนังสือแต่ละเล่มเรียงตัวตั้งของการคูณไม่เหมือนกัน เช่น 3 กลุ่ม กลุ่มละ 4 เขียนได้ทั้ง 3 × 4 และ 4 × 3 ในเกมนี้ถือว่าถูกทั้งคู่</p>' +
+  '</div>');
+
+  /* ───────── ขวดยาและตัวเดิน ───────── */
+  let coins = '<div class="sheet-title">ขวดยา 🧪 49 ขวด + ตัวเดิน 4 ตัว<span>ตัดตามขอบวงกลม · ติดบนฝาขวดให้หยิบง่าย · ใช้ฝาขวดแทนก็ได้</span></div><div class="coins">';
+  for (let i = 0; i < 49; i++) coins += '<div class="coin"><div><span class="e">🧪</span><b>1</b><small>ขวดยา</small></div></div>';
+  coins += '</div><div class="pawns">';
+  [['doctor','หมอภู','#1E78D9'],['scientist','นักวิทย์มิ้นท์','#E85D9E'],['scout','ลูกเสือต้น','#F28C28'],['dog','บิสกิตหมาดมกลิ่น','#8B5A2B']].forEach(p => {
+    coins += '<div class="pawn" style="--pc:'+p[2]+'"><div>'+ch(p[0], 28)+'</div><span>'+p[1]+'</span></div>';
+  });
+  coins += '</div>';
+  document.getElementById('coinSheet').insertAdjacentHTML('afterbegin', coins);
+
+  /* ───────── เฉลย ───────── */
+  const strip = t => t.replace(/<[^>]+>/g, '');
+  const table = list => '<table>' + list.map(c => '<tr><td>'+c.id+'</td><td>'+strip(c.a)+'</td><td>'+c.why+'</td></tr>').join('') + '</table>';
+  const by = t => Q.filter(c => c.t === t);
+  const k1 = '<div class="key"><h2>เฉลยสำหรับผู้คุมเกม (1/2)</h2><p class="sub">ถ่ายเอกสารกลุ่มละ 1 แผ่น · ประโยคการคูณที่สลับตัวตั้ง (เช่น 4 × 3 แทน 3 × 4) ถือว่าถูก</p>' +
+    '<h4>🟢 สูตรยา (โจทย์คูณ)</h4>' + table(by('facts')) + '<h4>🟡 ซอมบี้ไล่! (คิดเร็ว 10 วินาที)</h4>' + table(by('quick')) + '<h4>🔵 ส่องกล้อง (โจทย์ภาพ)</h4>' + table(by('picture')) + '</div>';
+  const k2 = '<div class="key"><h2>เฉลยสำหรับผู้คุมเกม (2/2)</h2><p class="sub">โจทย์ปัญหาให้เด็กพูดประโยคการคูณก่อนบอกผลลัพธ์ เพื่อฝึกเขียนประโยคสัญลักษณ์ · สลับตัวตั้งก็ถือว่าถูก</p>' +
+    '<h4>🟣 ช่วยเพื่อน (โจทย์ปัญหา)</h4>' + table(by('story')) + '<h4>🔴 ซอมบี้บอส (ท้าทาย)</h4>' + table(by('boss')) + '<h4>🧪 ปรุงยาแก้ซอมบี้ (ภารกิจสุดท้าย)</h4>' + table(by('final')) + '</div>';
+  document.getElementById('keyPages').innerHTML = '<div class="sheet">'+k1+'<div class="pno">20 / 21</div></div><div class="sheet">'+k2+'<div class="pno">21 / 21</div></div>';
+
+  /* ───────── ย่อให้พอดีจอ ───────── */
+  function fit(){
+    const z = Math.min(1, (document.documentElement.clientWidth - 32) / (297 * 96 / 25.4));
+    document.documentElement.style.setProperty('--z', z.toFixed(3));
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('beforeprint', () => document.documentElement.style.setProperty('--z', 1));
+  window.addEventListener('afterprint', fit);
+})();
+</script>

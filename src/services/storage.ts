@@ -481,6 +481,9 @@ function parseRecords(raw: unknown): PlayerRecords {
     timePlays: count(raw.timePlays),
     timeCastles: count(raw.timeCastles),
     timeCorrect: count(raw.timeCorrect),
+    zombiePlays: count(raw.zombiePlays),
+    zombieCures: count(raw.zombieCures),
+    zombieCorrect: count(raw.zombieCorrect),
   }
 }
 

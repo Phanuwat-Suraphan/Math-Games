@@ -204,7 +204,8 @@ function HallOfRecords({ player }: { player: Player }) {
     records.survivorRuns > 0 ||
     records.duelPlays > 0 ||
     records.towerBestFloor > 0 ||
-    records.timePlays > 0
+    records.timePlays > 0 ||
+    records.zombiePlays > 0
   if (!played) return null
 
   const minutes = Math.floor(records.survivorBestSeconds / 60)
@@ -278,6 +279,21 @@ function HallOfRecords({ player }: { player: Player }) {
             <StatBox
               label="อ่านนาฬิกาถูก"
               value={`${records.timeCorrect.toLocaleString('th-TH')} ข้อ`}
+              tone="text-sky-400"
+            />
+          </>
+        ) : null}
+
+        {records.zombiePlays > 0 ? (
+          <>
+            <StatBox
+              label="สร้างยา Z-CURE สำเร็จ"
+              value={`${records.zombieCures} / ${records.zombiePlays} เกม`}
+              tone="text-gold-300"
+            />
+            <StatBox
+              label="ตอบโจทย์คูณถูก"
+              value={`${records.zombieCorrect.toLocaleString('th-TH')} ข้อ`}
               tone="text-sky-400"
             />
           </>

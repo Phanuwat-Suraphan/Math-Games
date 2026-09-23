@@ -54,6 +54,7 @@ export type IndicatorId =
   | 'percent'
   | 'average'
   | 'time'
+  | 'multiplyP2'
 
 /**
  * ลำดับในรายการนี้คือลำดับคอลัมน์ในตารางของครู และลำดับตัวเลขในรหัส
@@ -148,6 +149,18 @@ export const INDICATORS: readonly Indicator[] = [
     level: 'review',
     verified: false,
   },
+  /*
+   * ตัวที่สองของชั้น ป.2 มาจาก ZOMBIE RESCUE จัดเป็น review ด้วยเหตุผลเดียวกับเวลา
+   * รหัสนี้เกมโยงเอง ครู ป.2 ควรทานกับหลักสูตรของโรงเรียนก่อนกรอกคะแนน
+   */
+  {
+    id: 'multiplyP2',
+    code: 'ค 1.1 ป.2/5',
+    short: 'การคูณ (ป.2)',
+    full: 'หาผลคูณและตัวไม่ทราบค่าในประโยคสัญลักษณ์การคูณ เขียนประโยคการคูณจากภาพและโจทย์ปัญหา จากโจทย์ของ ZOMBIE RESCUE',
+    level: 'review',
+    verified: false,
+  },
 ]
 
 export const INDICATOR_ORDER: readonly IndicatorId[] = INDICATORS.map((item) => item.id)
@@ -200,6 +213,9 @@ export const LEDGER_INDICATOR: Record<string, IndicatorId> = {
 
 /** การ์ดทุกใบของผจญภัยเมืองแห่งเวลา (นับเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของเครื่อง) */
 export const TIME_INDICATOR: IndicatorId = 'time'
+
+/** โจทย์การคูณทุกข้อของ ZOMBIE RESCUE (นับเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของเครื่อง) */
+export const ZOMBIE_INDICATOR: IndicatorId = 'multiplyP2'
 
 /** โจทย์ของโดรนตรวจการณ์ระหว่างเดินในเขาวงกต */
 export const DRONE_INDICATOR: IndicatorId = 'basicAddSub'

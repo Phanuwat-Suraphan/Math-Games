@@ -41,6 +41,9 @@ export function createEmptyRecords(): PlayerRecords {
     timePlays: 0,
     timeCastles: 0,
     timeCorrect: 0,
+    zombiePlays: 0,
+    zombieCures: 0,
+    zombieCorrect: 0,
   }
 }
 
@@ -76,6 +79,9 @@ export function recordsOf(player: Player): PlayerRecords {
     timePlays: clamp(raw.timePlays),
     timeCastles: clamp(raw.timeCastles),
     timeCorrect: clamp(raw.timeCorrect),
+    zombiePlays: clamp(raw.zombiePlays),
+    zombieCures: clamp(raw.zombieCures),
+    zombieCorrect: clamp(raw.zombieCorrect),
   }
 }
 
@@ -172,6 +178,31 @@ export function recordTimeAdventure(
 export function recordTimePractice(player: Player, correct: number): PlayerRecords {
   const records = recordsOf(player)
   return { ...records, timeCorrect: clamp(records.timeCorrect + clamp(correct)) }
+}
+
+/**
+ * บันทึกผลหนึ่งเกมของ ZOMBIE RESCUE
+ *
+ * นับทุกเกมที่จบ ไม่ว่าทีมจะสร้าง Z-CURE สำเร็จหรือกดจบตอนหมดคาบ
+ * เหตุผลเดียวกับเมืองแห่งเวลา
+ */
+export function recordZombieRescue(
+  player: Player,
+  result: { cured: boolean; correct: number },
+): PlayerRecords {
+  const records = recordsOf(player)
+  return {
+    ...records,
+    zombiePlays: clamp(records.zombiePlays + 1),
+    zombieCures: clamp(records.zombieCures + (result.cured ? 1 : 0)),
+    zombieCorrect: clamp(records.zombieCorrect + clamp(result.correct)),
+  }
+}
+
+/** บันทึกผลหนึ่งรอบของการฝึกสูตรคูณ นับเฉพาะข้อที่ถูก ไม่นับเป็นเกมที่เล่น */
+export function recordZombiePractice(player: Player, correct: number): PlayerRecords {
+  const records = recordsOf(player)
+  return { ...records, zombieCorrect: clamp(records.zombieCorrect + clamp(correct)) }
 }
 
 /** บันทึกชั้นที่ขึ้นไปถึงในหอคอย เก็บเฉพาะค่าที่ดีที่สุด */
