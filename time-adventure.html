@@ -1,0 +1,840 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Time Adventure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Mitr:wght@400;500;600;700&family=Sarabun:wght@400;600;700;800&display=swap">
+<style>
+  :root{
+    color-scheme: light;
+    --ground:#D9E4EE; --ground-2:#C7D5E3;
+    --panel:#FFFFFF; --panel-ink:#23324A; --panel-dim:#5D6B82; --panel-line:#D5DEE8;
+    --accent:#1E88D9;
+    --ink:#23324A;
+    --display:"Mitr","Kanit","Leelawadee UI","Tahoma",sans-serif;
+    --cute:"Mali","Sarabun","Leelawadee UI","Tahoma",sans-serif;
+    --body:"Sarabun","Leelawadee UI","Tahoma",sans-serif;
+    --z:1;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --ground:#131B27; --ground-2:#0D141E;
+      --panel:#1C2635; --panel-ink:#E7EDF5; --panel-dim:#9CAAC0; --panel-line:#2E3B4F;
+      --accent:#5DB2F2;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --ground:#131B27; --ground-2:#0D141E;
+    --panel:#1C2635; --panel-ink:#E7EDF5; --panel-dim:#9CAAC0; --panel-line:#2E3B4F;
+    --accent:#5DB2F2;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--ground); color:var(--panel-ink);
+    font-family:var(--body); font-size:15px; line-height:1.55;
+    padding-inline:16px; padding-block:0 48px;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+
+  /* ── ส่วนบนจอ (ไม่พิมพ์) ── */
+  .top{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:5;
+    margin-inline:-16px; padding:10px 16px;
+    background:var(--ground); border-bottom:1px solid var(--ground-2);
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 16px;
+  }
+  .brand{font-family:var(--display); font-weight:600; font-size:18px; letter-spacing:.02em}
+  .brand small{font-weight:400; color:var(--panel-dim); font-size:13px; margin-left:6px}
+  .nav{display:flex; flex-wrap:wrap; gap:6px}
+  .nav a{
+    font-family:var(--display); font-size:13px; text-decoration:none; color:var(--panel-ink);
+    background:var(--panel); border:1px solid var(--panel-line); border-radius:999px; padding:3px 11px;
+  }
+  .nav a:hover,.nav a:focus-visible{border-color:var(--accent); outline:none; color:var(--accent)}
+  .intro{
+    max-width:794px; margin:18px auto 22px; background:var(--panel);
+    border:1px solid var(--panel-line); border-radius:14px; padding:18px 20px;
+  }
+  .intro h1{font-family:var(--display); font-weight:600; font-size:24px; margin:0 0 4px; text-wrap:balance}
+  .intro p{margin:0 0 10px; max-width:68ch}
+  .intro ol{margin:6px 0 0; padding-left:22px; max-width:68ch}
+  .intro li{margin-bottom:4px}
+  .intro .kit{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; margin:12px 0 14px}
+  .intro .kit div{border:1px solid var(--panel-line); border-radius:10px; padding:8px 10px; font-size:13.5px}
+  .intro .kit b{display:block; font-family:var(--display); font-weight:500; font-size:14px}
+  .intro .kit span{color:var(--panel-dim); font-variant-numeric:tabular-nums}
+  .intro h2{font-family:var(--display); font-weight:500; font-size:16px; margin:14px 0 2px}
+  kbd{font-family:var(--display); font-size:12px; border:1px solid var(--panel-line); border-bottom-width:2px; border-radius:5px; padding:0 5px}
+  .sec-label{
+    max-width:794px; margin:28px auto 10px; font-family:var(--display); font-weight:500;
+    font-size:14px; letter-spacing:.06em; color:var(--panel-dim);
+  }
+
+  /* ── แผ่นกระดาษ A4 ── */
+  .sheet{
+    width:210mm; height:297mm; margin:0 auto 18px; position:relative; overflow:hidden;
+    background:#fff; color:var(--ink); zoom:var(--z);
+    box-shadow:0 1px 2px rgba(20,35,60,.12), 0 8px 24px rgba(20,35,60,.12);
+  }
+  .pno{position:absolute; bottom:5mm; right:8mm; font:500 7.5pt var(--display); color:#9AA6B8}
+  .pno-l{position:absolute; bottom:5mm; left:8mm; font:400 7.5pt var(--body); color:#9AA6B8}
+
+  @page{size:A4 portrait; margin:0}
+  @media print{
+    body{background:#fff; padding:0}
+    .top,.intro,.sec-label{display:none !important}
+    .sheet{margin:0; box-shadow:none; zoom:1; break-after:page; page-break-after:always}
+    .sheet:last-child{break-after:auto}
+  }
+
+  /* ── การ์ด ── */
+  .grid{
+    position:absolute; left:10.5mm; top:16.5mm;
+    display:grid; grid-template-columns:repeat(3,63mm); grid-template-rows:repeat(3,88mm);
+  }
+  .cut{width:63mm; height:88mm; padding:2mm; outline:.15mm dashed #B7C1CF; outline-offset:-.075mm}
+  .card{
+    --c:#1E88D9; --bg:#E6F3FC;
+    width:100%; height:100%; border-radius:3.5mm; background:var(--bg);
+    border:.9mm solid var(--c); display:flex; flex-direction:column; overflow:hidden;
+    font-family:var(--body); color:var(--ink);
+    background-image:radial-gradient(rgba(255,255,255,.95) .5mm, transparent .55mm);
+    background-size:6.5mm 6.5mm; background-position:1.5mm 2mm;
+  }
+  .t-time{--c:#1E88D9; --bg:#E6F3FC}
+  .t-find{--c:#8B4FC7; --bg:#F2E9FB}
+  .t-daily{--c:#3E9E4F; --bg:#E7F5E9}
+  .t-chal{--c:#E8572E; --bg:#FDEBE4}
+  .t-special{--c:#D99A00; --bg:#FFF5D1}
+  .t-aid{--c:#23324A; --bg:#EEF2F7}
+  .t-blank{--c:#8C97A8; --bg:#FFFFFF}
+
+  .c-head{
+    position:relative; margin-bottom:1.3mm;
+    background:var(--c); color:#fff; display:flex; justify-content:space-between; align-items:center;
+    padding:.9mm 2.4mm 1mm; font:500 9.5pt/1.2 var(--display);
+  }
+  .c-head::after{
+    content:""; position:absolute; left:0; right:0; bottom:-1.3mm; height:1.4mm;
+    background:radial-gradient(circle at 50% 0, var(--c) 1.35mm, transparent 1.45mm) 0 0 / 2.9mm 1.4mm repeat-x;
+  }
+  .c-head .stars{font-size:10.5pt; letter-spacing:.04em; color:#FFE27A}
+  .art{flex:1; min-height:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.3mm; padding:1.4mm 2.2mm}
+  .q{font:700 11pt/1.32 var(--cute); text-align:center; padding:0 2.4mm; text-wrap:balance}
+  .q em{font-style:normal; color:var(--c); text-decoration:underline; text-decoration-thickness:.4mm; text-underline-offset:.6mm}
+  .act{
+    align-self:center; margin-top:1.1mm; font:500 7.6pt/1.2 var(--display); color:var(--c);
+    background:#fff; border:.3mm solid var(--c); border-radius:99px; padding:.4mm 2.2mm;
+  }
+  .buddy{display:flex; align-items:center; gap:1.3mm; padding:0 2.2mm; margin-top:.4mm}
+  .bd-ic{
+    width:8.6mm; height:8.6mm; border-radius:50%; background:#fff; border:.35mm solid var(--c);
+    display:flex; align-items:flex-end; justify-content:center; overflow:hidden; flex:none;
+  }
+  .bd-ic svg{display:block; width:7.6mm; height:auto}
+  .bd-tx{
+    position:relative; background:#fff; border-radius:2.4mm; padding:.6mm 2.2mm;
+    font:600 7.8pt/1.2 var(--cute); color:var(--ink); box-shadow:0 .25mm 0 rgba(35,50,74,.08);
+  }
+  .bd-tx::before{
+    content:""; position:absolute; left:-1.1mm; top:50%; margin-top:-1mm;
+    border-style:solid; border-width:1mm 1.2mm 1mm 0; border-color:transparent #fff transparent transparent;
+  }
+  .fl{display:flex; flex-direction:column; gap:.3mm}
+  .rw{font:500 6.6pt/1.1 var(--display); color:#5D6B82; white-space:nowrap}
+  .sp-burst{position:relative; isolation:isolate; width:26mm; height:26mm; display:flex; align-items:center; justify-content:center}
+  .sp-burst::before{
+    content:""; position:absolute; inset:0; z-index:-1; border-radius:50%;
+    background:repeating-conic-gradient(#FFE27A 0 11deg, #FFF8DC 11deg 22deg);
+    -webkit-mask:radial-gradient(circle, #000 45%, transparent 71%); mask:radial-gradient(circle, #000 45%, transparent 71%);
+  }
+  .sp-burst svg{width:19mm; height:auto}
+  .spark{position:absolute; font-size:8pt; color:#F2B705; line-height:1}
+  .reward{text-align:center; font:400 7pt/1.2 var(--display); color:#5D6B82; margin-top:1mm}
+  .c-foot{display:flex; justify-content:space-between; align-items:flex-end; padding:1mm 1.8mm 1.4mm 2.4mm}
+  .cid{font:600 7.5pt var(--display); color:var(--c)}
+  .ans{
+    font:400 6.6pt/1.2 var(--body); color:#7B8698; max-width:31mm; text-align:right;
+    border:.25mm dashed #B7C1CF; border-radius:1.2mm; padding:.5mm 1.2mm; background:rgba(255,255,255,.7);
+  }
+  .ans b{font-weight:700; color:#5D6B82}
+
+  .clk{display:block; flex:none}
+  .tchip{
+    font:600 12pt/1.2 var(--display); background:#fff; color:var(--ink);
+    border:.45mm solid var(--c); border-radius:2mm; padding:.4mm 2.2mm; white-space:nowrap;
+    font-variant-numeric:tabular-nums;
+  }
+  .vs{display:flex; align-items:center; gap:2mm; font:500 9pt var(--display); color:var(--c)}
+  .stack{display:flex; flex-direction:column; gap:1.1mm; width:100%}
+  .rowa{
+    display:flex; align-items:center; gap:1.6mm; background:#fff; border-radius:2mm;
+    padding:.7mm 1.8mm; font:600 9.6pt/1.2 var(--body);
+  }
+  .rowa .e{font-size:14pt; line-height:1}
+  .rowa .tm{margin-left:auto; white-space:nowrap; font:600 10pt var(--display); color:var(--c); font-variant-numeric:tabular-nums}
+  .choice{background:#fff; border-radius:2mm; padding:.5mm 2.2mm; font:500 10pt/1.25 var(--display)}
+  .choice b{color:var(--c); font-weight:600; margin-right:1.6mm}
+  .trio{display:flex; gap:1.6mm; justify-content:center}
+  .trio figure{margin:0; display:flex; flex-direction:column; align-items:center; gap:.4mm}
+  .trio figcaption{font:600 9pt var(--display); color:var(--c)}
+  .write{display:flex; flex-direction:column; align-items:center; gap:2mm}
+  .write .word{font:600 13pt/1.25 var(--display); text-align:center; background:#fff; border-radius:2mm; padding:1mm 3mm}
+  .write .blank{font:600 20pt var(--display); letter-spacing:.12em; color:#9AA6B8}
+  .big{font-size:26pt; line-height:1}
+  .scene{display:flex; flex-direction:column; align-items:center; gap:1mm; text-align:center}
+  .scene .e{font-size:22pt; line-height:1}
+  .tag{font:500 8pt var(--display); color:var(--c)}
+
+  .sp-emoji{font-size:30pt; line-height:1}
+  .sp-name{font:700 14pt/1.1 var(--display); background:#fff; border-radius:99px; padding:.4mm 3mm; box-shadow:0 0 0 .4mm #F0CF6A; color:#7A5700; letter-spacing:.03em; text-align:center}
+  .t-special .card{background:radial-gradient(circle at 50% 38%, #FFFBEA 0 30%, #FFF5D1 60%)}
+  .aid-row{display:flex; align-items:center; gap:1.6mm; background:#fff; border-radius:2mm; padding:.8mm 1.6mm; width:100%}
+  .aid-row p{margin:0; font:600 8.6pt/1.25 var(--body)}
+  .aid-row p span{display:block; font:400 7.6pt/1.2 var(--body); color:#5D6B82}
+  .lines{width:100%; display:flex; flex-direction:column; gap:3.4mm; padding:0 1mm}
+  .lines i{display:block; border-bottom:.3mm solid #C9D2DE; height:0}
+
+  /* หลังการ์ด */
+  .back{
+    width:100%; height:100%; border-radius:3.5mm; background-color:var(--c);
+    background-image:radial-gradient(rgba(255,255,255,.2) .7mm, transparent .8mm), radial-gradient(rgba(255,255,255,.12) .7mm, transparent .8mm);
+    background-size:6mm 6mm, 6mm 6mm; background-position:0 0, 3mm 3mm;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2mm; color:#fff;
+    border:.9mm solid rgba(0,0,0,.12);
+  }
+  .back .ring svg{width:25mm; height:auto; display:block}
+  .back .star{position:absolute; color:rgba(255,255,255,.85); line-height:1}
+  .back{position:relative}
+  .back .ring{
+    width:31mm; height:31mm; overflow:hidden; border-radius:50%; background:rgba(255,255,255,.95);
+    display:flex; align-items:center; justify-content:center; font-size:30pt;
+    box-shadow:0 0 0 1.4mm rgba(255,255,255,.35);
+  }
+  .back .logo{font:700 12pt/1 var(--display); letter-spacing:.08em}
+  .back .kind{font:500 9.5pt/1.2 var(--display); opacity:.95}
+  .back .en{font:400 7pt var(--display); letter-spacing:.14em; opacity:.8}
+
+  /* ── หน้ากติกา ── */
+  .rules{position:absolute; inset:12mm 13mm 12mm; display:flex; flex-direction:column; gap:3.2mm; font-family:var(--body); font-size:9.6pt; line-height:1.42}
+  .rules header{display:flex; gap:4mm; align-items:center; border-bottom:.5mm solid #23324A; padding-bottom:2.6mm}
+  .rules header .logo{font:700 22pt/1 var(--display); letter-spacing:.02em}
+  .rules header .logo small{display:block; font:500 11pt var(--display); color:#1E88D9; margin-top:1.2mm; letter-spacing:0}
+  .rules header p{margin:0; font-size:9.2pt; color:#3B4A63}
+  .cols{display:grid; grid-template-columns:1fr 1fr; gap:4mm 6mm}
+  .rules h3{font:600 11pt var(--display); margin:0 0 1.2mm; display:flex; align-items:center; gap:1.6mm}
+  .rules h3 .n{font:600 8pt var(--display); background:#23324A; color:#fff; border-radius:99px; width:4.6mm; height:4.6mm; display:inline-flex; align-items:center; justify-content:center}
+  .rules ol,.rules ul{margin:0; padding-left:4.6mm}
+  .rules li{margin-bottom:.6mm}
+  .rules table{width:100%; border-collapse:collapse; font-size:8.8pt}
+  .rules td,.rules th{border-bottom:.2mm solid #D5DEE8; padding:.8mm 1mm; text-align:left; vertical-align:top}
+  .rules th{font:500 8.4pt var(--display); color:#5D6B82}
+  .dot{display:inline-block; width:2.6mm; height:2.6mm; border-radius:50%; vertical-align:-.3mm; margin-right:1mm}
+  .box{border:.3mm solid #D5DEE8; border-radius:2.5mm; padding:2.4mm 3mm}
+  .box.hl{background:#FFF7DB; border-color:#F0CF6A}
+  .chant{font:500 10pt/1.45 var(--display); color:#1E4E86}
+
+  /* ── เหรียญ ── */
+  .coins{position:absolute; left:15mm; top:19mm; display:grid; grid-template-columns:repeat(6,30mm); grid-auto-rows:30mm}
+  .coin{display:flex; align-items:center; justify-content:center}
+  .coin div{
+    width:27mm; height:27mm; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #FFF3B0, #FFD233 55%, #E9A800);
+    border:.6mm solid #B98400; box-shadow:inset 0 0 0 1.4mm rgba(255,255,255,.45);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; color:#6B4B00;
+  }
+  .coin svg{display:block; margin-bottom:-.6mm}
+  .coin b{font:700 12pt/1 var(--display)}
+  .coin small{font:500 5.6pt var(--display); letter-spacing:.06em}
+  .sheet-title{position:absolute; left:15mm; right:15mm; top:9mm; font:600 12pt var(--display); display:flex; justify-content:space-between; align-items:baseline}
+  .sheet-title span{font:400 8.5pt var(--body); color:#5D6B82}
+  .pawns{position:absolute; left:15mm; right:15mm; top:236mm; display:flex; justify-content:space-between}
+  .pawn{display:flex; flex-direction:column; align-items:center; gap:1mm}
+  .pawn div{width:36mm; height:36mm; border-radius:50%; border:1.4mm solid var(--pc); background:#fff; display:flex; align-items:center; justify-content:center; font-size:30pt; outline:.15mm dashed #B7C1CF; outline-offset:1.2mm}
+  .pawn span{font:500 8.4pt var(--display); text-align:center; max-width:40mm}
+
+  /* ── เฉลย ── */
+  .key{position:absolute; inset:13mm 13mm 12mm; font-family:var(--body)}
+  .key h2{font:600 13pt var(--display); margin:0 0 1mm}
+  .key p.sub{margin:0 0 3mm; font-size:8.8pt; color:#5D6B82}
+  .key h4{font:600 10pt var(--display); margin:3mm 0 1mm; display:flex; align-items:center; gap:1.5mm}
+  .key table{width:100%; border-collapse:collapse; font-size:8.8pt; line-height:1.32}
+  .key td{border-bottom:.2mm solid #E0E6EE; padding:.9mm 1.2mm; vertical-align:top}
+  .key td:first-child{font:600 8.6pt var(--display); width:11mm}
+  .key td:nth-child(2){font-weight:700; width:52mm}
+  .key td:nth-child(3){color:#3B4A63}
+</style>
+
+<div class="top">
+  <div class="brand">TIME ADVENTURE <small>ชุดพิมพ์เล่นในห้องเรียน · ป.2</small></div>
+  <nav class="nav" aria-label="ส่วนของชุดเกม">
+    <a href="#rules">กติกา</a><a href="#board">กระดาน</a><a href="#fronts">หน้าการ์ด</a><a href="#backs">หลังการ์ด</a><a href="#coins">เหรียญ</a><a href="#key">เฉลย</a>
+  </nav>
+</div>
+
+<section class="intro">
+  <h1>ผจญภัยเมืองแห่งเวลา — ชุดเกมพร้อมพิมพ์</h1>
+  <p>การ์ดเกมเรื่องเวลาสำหรับ ป.2 เล่นกลุ่มละ 2–4 คน ประมาณ 20 นาที ไม่ใช้ลูกเต๋าและไม่ใช้โทรศัพท์ ทุกอย่างที่ต้องพิมพ์อยู่ในหน้านี้ ครบทั้ง 17 แผ่น A4</p>
+  <div class="kit">
+    <div><b>กติกาย่อ</b><span>แผ่น 1</span></div>
+    <div><b>กระดานแผนที่</b><span>แผ่น 2 · ขยายเป็น A3 ได้</span></div>
+    <div><b>หน้าการ์ด 54 ใบ</b><span>แผ่น 3–8</span></div>
+    <div><b>หลังการ์ด</b><span>แผ่น 9–14</span></div>
+    <div><b>เหรียญ + ตัวเดิน</b><span>แผ่น 15</span></div>
+    <div><b>เฉลยผู้คุมเวลา</b><span>แผ่น 16–17</span></div>
+  </div>
+  <h2>วิธีพิมพ์</h2>
+  <ol>
+    <li>เปิดไฟล์ <b>time-adventure.html</b> ด้วย Chrome หรือ Edge บนคอมพิวเตอร์ แล้วกด <kbd>Ctrl</kbd> + <kbd>P</kbd> (Mac: <kbd>⌘</kbd> + <kbd>P</kbd>)</li>
+    <li>ตั้งค่า: กระดาษ <b>A4</b> · ระยะขอบ <b>ไม่มี</b> · สเกล <b>100%</b> · ติ๊ก <b>กราฟิกพื้นหลัง</b></li>
+    <li>การ์ดสองหน้า: พิมพ์แผ่น 3–8 ก่อน แล้วใส่กระดาษกลับเข้าเครื่องเพื่อพิมพ์แผ่น 9–14 ด้านหลัง แบบ <b>พลิกด้านยาว</b> (หลังการ์ดสลับซ้าย–ขวาไว้แล้ว) ถ้าเครื่องพิมพ์สองหน้าไม่ได้ ให้พิมพ์แยกแล้วทากาวประกบ</li>
+    <li>ใช้กระดาษ 180–210 แกรม หรือเคลือบพลาสติกก่อนตัดตามเส้นประ</li>
+  </ol>
+  <h2>อยากเล่นบนจอ?</h2>
+  <p>เปิดไฟล์ <b>time-adventure-play.html</b> เล่นบนคอมพิวเตอร์หรือแท็บเล็ตได้เลย การ์ดชุดเดียวกัน ผลัดกันเล่น 1–4 คน</p>
+  <h2>ต่อ 1 กลุ่มต้องเตรียมเพิ่ม</h2>
+  <p>นาฬิกากระดาษเข็มหมุนได้ 1 อัน (จานกระดาษ + หมุดผ่า เข็มสั้นสีแดง เข็มยาวสีน้ำเงิน ให้ตรงกับการ์ด) และกระดาษทดหรือไวท์บอร์ดเล็กคนละแผ่น</p>
+</section>
+
+<div class="sec-label" id="rules">แผ่น 1 · กติกาย่อ</div>
+<div class="sheet">
+  <div class="rules">
+    <header>
+      <div class="logo">TIME ADVENTURE<small>ผจญภัยเมืองแห่งเวลา</small></div>
+      <p>เช้าวันหนึ่ง <b>คุณเข็ม</b> นาฬิกาวิเศษของปราสาทเวลาทำเข็มหลุดหาย ทั้งเมืองเลยสับสนเวลา! ฮีโร่ 4 คน <b>อัศวินทิม</b> <b>นางฟ้าใบเตย</b> <b>พ่อมดโมโม่</b> และ <b>มังกรน้อยฟูฟู</b> (มี <b>กระต่ายติ๊กต็อก</b> เป็นผู้ช่วย) ต้องเดินทางจากบ้าน ผ่านโรงเรียน เมืองกิจวัตร และสวนสนุก เก็บ <b>เหรียญเวลา</b> ไปคืนพลังให้คุณเข็ม ใครเข้าปราสาทได้ก่อน ได้เป็น <b>ฮีโร่ผู้พิทักษ์เวลา</b></p>
+    </header>
+
+    <div class="cols">
+      <div>
+        <h3><span class="n">1</span>เตรียมเกม</h3>
+        <ul>
+          <li>แต่ละคนเลือกฮีโร่ 1 ตัว: อัศวิน นางฟ้า พ่อมด หรือมังกร แล้ววางที่ <b>START</b></li>
+          <li>แยกการ์ดคว่ำเป็น 5 กองตามสีหลังการ์ด แล้วสับแต่ละกอง</li>
+          <li>เหรียญทั้งหมดไว้กลางโต๊ะ = ธนาคารเวลา</li>
+          <li>นาฬิกากระดาษ + บัตรช่วยจำ 💡 วางกลางโต๊ะ ใครก็ใช้ได้</li>
+          <li>คนที่ตื่นเช้าที่สุดวันนี้เริ่มก่อน แล้ววนตามเข็มนาฬิกา</li>
+        </ul>
+      </div>
+      <div>
+        <h3><span class="n">2</span>ในหนึ่งตา</h3>
+        <ol>
+          <li>จั่วการ์ด 1 ใบ จากกองของ <b>ด่านที่ตัวเดินอยู่</b></li>
+          <li>ส่งให้ <b>ผู้คุมเวลา</b> (คนทางซ้ายมือ) อ่านออกเสียง — ใช้นิ้วโป้งปิดช่องเฉลยมุมล่าง</li>
+          <li>ตอบ: พูด ชี้ หมุนนาฬิกา หรือเขียน ตามที่การ์ดบอก</li>
+          <li><b>ถูก</b> ➜ รับ 🪙 1 เหรียญ + เดินตามจำนวน <b>★</b> บนการ์ด</li>
+          <li><b>ผิด</b> ➜ อยู่ที่เดิม ผู้คุมเวลาบอกคำตอบและหมุนนาฬิกาให้ดู</li>
+          <li>จบตาบนช่อง ⭐ ➜ จั่วการ์ดพิเศษ 1 ใบ</li>
+        </ol>
+      </div>
+
+      <div>
+        <h3><span class="n">3</span>กองการ์ดของแต่ละด่าน</h3>
+        <table>
+          <tr><th>ด่าน</th><th>จั่วกอง</th></tr>
+          <tr><td>START · 1 บ้านยามเช้า</td><td><span class="dot" style="background:#1E88D9"></span>⏰ อ่านเวลา</td></tr>
+          <tr><td>2 โรงเรียนแสนสนุก</td><td><span class="dot" style="background:#8B4FC7"></span>🔍 หาเวลา</td></tr>
+          <tr><td>3 เมืองกิจวัตร</td><td><span class="dot" style="background:#3E9E4F"></span>🏠 ชีวิตประจำวัน</td></tr>
+          <tr><td>4 สวนสนุกเวลา</td><td><span class="dot" style="background:#E8572E"></span>⚔️ ท้าทาย</td></tr>
+          <tr><td>5 ปราสาทเวลา</td><td>เลือกกองไหนก็ได้</td></tr>
+          <tr><td>🏰 ประตูปราสาท</td><td><span class="dot" style="background:#E8572E"></span>⚔️ ท้าทาย</td></tr>
+        </table>
+      </div>
+      <div>
+        <h3><span class="n">4</span>ช่วยตอบ</h3>
+        <p style="margin:0 0 2mm">ถ้าเจ้าของตาตอบผิด คนอื่น <b>ยกมือ</b> ได้ คนแรกที่ยกได้ตอบ ถูกได้ 🪙 1 เหรียญ (แต่ไม่เดิน) ผิดไม่เสียอะไร</p>
+        <h3><span class="n">5</span>การ์ดพิเศษ ⭐</h3>
+        <ul>
+          <li>ถือได้ไม่เกิน <b>2 ใบ</b> วางหงายไว้หน้าตัวเอง</li>
+          <li>ใช้ได้ <b>ตาละ 1 ใบ</b> ในตาของตัวเอง ใช้แล้วใส่ใต้กอง</li>
+          <li>🎁 TIME CHEST เปิดทันทีที่จั่วได้</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="box hl">
+      <h3><span class="n">6</span>ชนะเมื่อ…</h3>
+      <ul>
+        <li>เดินถึงหรือเลยช่อง 15 ➜ หยุดที่ <b>ประตูปราสาท 🏰</b> ตาถัดไปตอบการ์ด ⚔️ ถูก = <b>เข้าปราสาท ชนะ!</b> ผิด = รอตอบใหม่ตาหน้า</li>
+        <li>ครบ 20 นาทียังไม่มีใครเข้าปราสาท ➜ ใครมี <b>เหรียญมากที่สุด</b> ชนะ (เท่ากัน: คนที่อยู่ใกล้ปราสาทกว่า)</li>
+        <li>ทุกคนที่มี 🪙 5 เหรียญขึ้นไป ได้ตรา <b>นักผจญภัยตรงเวลา</b></li>
+      </ul>
+    </div>
+
+    <div class="cols">
+      <div class="box">
+        <h3>🐢 ปรับให้ง่ายขึ้น</h3>
+        <ul>
+          <li>เอาการ์ด ★★★ ออก (T11 T12 C06–C10)</li>
+          <li>ตอบผิด ได้ลองใหม่ 1 ครั้งหลังผู้คุมเวลาใบ้ "เข็มสั้นชี้เลขอะไร?"</li>
+          <li>ใช้นาฬิกากระดาษช่วยได้ทุกข้อ</li>
+          <li>ใช้การ์ด 🔍 เล่นจับคู่ก่อนเริ่มเกม</li>
+        </ul>
+      </div>
+      <div class="box">
+        <h3>🚀 ปรับให้ท้าทายขึ้น</h3>
+        <ul>
+          <li>ต้องพูดเวลาเต็ม + เขียนเป็นตัวเลขทุกข้อ</li>
+          <li>ตอบภายใน 10 วินาที</li>
+          <li>แต่งโจทย์ลง <b>การ์ดของฉัน ✏️</b> แล้วใส่กองให้เพื่อนตอบ</li>
+          <li>เป็นผู้คุมเวลาประจำ ต้องอธิบายวิธีคิดทุกครั้ง</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="box">
+      <h3>🎵 วอร์มอัปก่อนเล่น (ครูนำ ทั้งห้องพูดพร้อมกัน)</h3>
+      <div class="chant">"เข็มสั้น บอกชั่วโมง ✋ · เข็มยาว บอกนาที 🙌 · เข็มยาวชี้ 12 ตรงชั่วโมง · เข็มยาวชี้ 6 ครึ่งชั่วโมง!"</div>
+    </div>
+  </div>
+  <div class="pno">1 / 17</div>
+</div>
+
+<div class="sec-label" id="board">แผ่น 2 · กระดานแผนที่ (สั่งพิมพ์ขยายเป็น A3 ได้)</div>
+<div class="sheet" id="boardSheet"><div class="pno">2 / 17</div></div>
+
+<div class="sec-label" id="fronts">แผ่น 3–8 · หน้าการ์ด</div>
+<div id="frontPages"></div>
+
+<div class="sec-label" id="backs">แผ่น 9–14 · หลังการ์ด (สลับซ้าย–ขวาแล้ว สำหรับพิมพ์สองหน้าแบบพลิกด้านยาว)</div>
+<div id="backPages"></div>
+
+<div class="sec-label" id="coins">แผ่น 15 · เหรียญเวลาและตัวเดิน</div>
+<div class="sheet" id="coinSheet"><div class="pno">15 / 17</div></div>
+
+<div class="sec-label" id="key">แผ่น 16–17 · เฉลยสำหรับผู้คุมเวลา</div>
+<div id="keyPages"></div>
+
+<script>
+(function(){
+  /* ───────── นาฬิกา ───────── */
+  const INK = '#23324A', HOUR = '#E53935', MIN = '#1E6FD9';
+  function clock(h, m, o){
+    o = o || {};
+    const size = o.size || 30, hands = o.hands !== false, plain = !!o.plain;
+    const vb = plain ? '-50 -50 100 100' : '-55 -60 110 118';
+    const hgt = plain ? size : size * 118 / 110;
+    let s = '<svg class="clk" viewBox="'+vb+'" style="width:'+size+'mm;height:'+hgt.toFixed(2)+'mm" role="img" aria-label="'+(hands ? ('นาฬิกา '+h+':'+String(m).padStart(2,'0')) : 'หน้าปัดนาฬิกาเปล่า')+'">';
+    if (!plain){
+      // กระดิ่งปลุก ขา และปุ่มด้านบน — อยู่นอกหน้าปัด ไม่บังตัวเลข
+      s += '<line x1="-29" y1="41" x2="-37" y2="54" stroke="'+INK+'" stroke-width="5" stroke-linecap="round"/>';
+      s += '<line x1="29" y1="41" x2="37" y2="54" stroke="'+INK+'" stroke-width="5" stroke-linecap="round"/>';
+      s += '<rect x="-5" y="-57" width="10" height="9" rx="2.5" fill="'+INK+'"/>';
+      [-1, 1].forEach(d => {
+        s += '<g transform="rotate('+(d*38)+')"><path d="M-15 -47 Q-15 -62 0 -62 Q15 -62 15 -47 Z" style="fill:var(--c,#1E88D9)" stroke="'+INK+'" stroke-width="3" stroke-linejoin="round"/><circle cx="0" cy="-63.5" r="3" fill="'+INK+'"/></g>';
+      });
+    }
+    s += '<circle r="47" fill="#FFFDF6" style="stroke:'+(plain ? INK : 'var(--c,#23324A)')+'" stroke-width="'+(plain ? 3.6 : 5)+'"/>';
+    if (!plain) s += '<circle r="49.6" fill="none" stroke="'+INK+'" stroke-width="1.4"/>';
+    for (let i = 0; i < 60; i++){
+      const major = i % 5 === 0;
+      s += '<line x1="0" y1="-43.5" x2="0" y2="'+(major ? -38.5 : -41.2)+'" stroke="'+(major ? INK : '#9AA6B8')+'" stroke-width="'+(major ? 2 : 1)+'" transform="rotate('+(i*6)+')"/>';
+    }
+    for (let n = 1; n <= 12; n++){
+      const a = n * Math.PI / 6, r = 30.5;
+      s += '<text x="'+(r*Math.sin(a)).toFixed(2)+'" y="'+(-r*Math.cos(a)).toFixed(2)+'" text-anchor="middle" dominant-baseline="central" font-family="Mitr,Kanit,Tahoma,sans-serif" font-weight="600" font-size="12" fill="'+INK+'">'+n+'</text>';
+    }
+    if (hands){
+      const ha = (h % 12) * 30 + m * 0.5, ma = m * 6;
+      s += '<line x1="0" y1="4" x2="0" y2="-20" stroke="'+HOUR+'" stroke-width="6.4" stroke-linecap="round" transform="rotate('+ha+')"/>';
+      s += '<line x1="0" y1="6" x2="0" y2="-35" stroke="'+MIN+'" stroke-width="3.4" stroke-linecap="round" transform="rotate('+ma+')"/>';
+    }
+    s += '<circle r="3.6" fill="'+INK+'"/></svg>';
+    return s;
+  }
+
+  /* ───────── ตัวละคร (วาดเอง ไม่ต้องใช้รูปภายนอก) ───────── */
+  const SKIN = '#FFD9B8', HAIR = '#3A2A20', BLUSH = '#FF9DB0';
+  // ฮีโร่ 4 ตัว: อัศวินทิม (ฮีโร่ชาย) · นางฟ้าใบเตย (ฮีโร่หญิง) · พ่อมดโมโม่ · มังกรน้อยฟูฟู
+  const NAMES = {knight:'อัศวินทิม', fairy:'นางฟ้าใบเตย', wizard:'พ่อมดโมโม่', dragon:'มังกรน้อยฟูฟู'};
+  const O = 'stroke="'+INK+'" stroke-linejoin="round"';
+  function face(cx, cy, opt){
+    opt = opt || {};
+    let s = '';
+    s += '<ellipse cx="'+(cx-4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/><ellipse cx="'+(cx+4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/>';
+    s += '<circle cx="'+(cx-3.8)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/><circle cx="'+(cx+5)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/>';
+    s += '<ellipse cx="'+(cx-7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="'+(cx+7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M'+(cx-2.6)+' '+(cy+4.2)+' Q'+cx+' '+(cy+7)+' '+(cx+2.6)+' '+(cy+4.2)+'" fill="none" stroke="'+INK+'" stroke-width="1.1" stroke-linecap="round"/>';
+    if (opt.fang) s += '<path d="M'+(cx+.6)+' '+(cy+5.3)+' l.9 1.6 .9-1.4" fill="#fff" stroke="'+INK+'" stroke-width=".5"/>';
+    return s;
+  }
+  function charInner(k){
+    let s = '';
+    if (k === 'knight'){
+      s += '<path d="M12 27 L6 46 Q20 42.5 34 46 L28 27 Z" fill="#E53935" '+O+' stroke-width="1.2"/>';
+      s += '<rect x="14" y="40" width="5" height="6.5" rx="2" fill="#AEB9C7" '+O+' stroke-width=".8"/><rect x="21" y="40" width="5" height="6.5" rx="2" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<path d="M12.6 29.5 L9.5 36" stroke="#AEB9C7" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.2" cy="36.8" r="2.1" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<path d="M35.5 21.5 L38.2 4.5" stroke="#DDE4EC" stroke-width="2.4" stroke-linecap="round"/><path d="M35.5 21.5 L38.2 4.5" stroke="'+INK+'" stroke-width=".6"/><path d="M32.2 21.2 L38.8 22.2" stroke="#E0A100" stroke-width="2" stroke-linecap="round"/>';
+      s += '<path d="M27.4 29.5 L34.2 23.5" stroke="#AEB9C7" stroke-width="3.8" stroke-linecap="round"/><circle cx="34.8" cy="22.6" r="2.2" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<rect x="12" y="26" width="16" height="15.5" rx="5" fill="#1E88D9" '+O+' stroke-width="1.3"/><path d="M12.4 33.5 H27.6" stroke="#E0A100" stroke-width="2.2"/>';
+      s += '<circle cx="20" cy="30.6" r="3.4" fill="#FFD233" '+O+' stroke-width=".9"/><path d="M20 30.6 V28.6 M20 30.6 H21.8" stroke="'+INK+'" stroke-width=".9" stroke-linecap="round"/>';
+      s += '<path d="M19 5.5 Q17 0 24.5 1 Q20.5 2.5 22 5.5 Z" fill="#E53935" '+O+' stroke-width=".8"/>';
+      s += '<circle cx="20" cy="16.5" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M8.6 18.5 Q8 5.2 20 5.2 Q32 5.2 31.4 18.5 L28 18.5 Q28 11.5 20 11.5 Q12 11.5 12 18.5 Z" fill="#C9D3DF" '+O+' stroke-width="1.2"/><path d="M20 5.4 V11.4" stroke="#8A97A8" stroke-width="1"/>';
+      s += face(20, 17.6);
+    } else if (k === 'fairy'){
+      [[-1,'#BDE8FF'],[1,'#BDE8FF']].forEach(w => {
+        s += '<ellipse cx="'+(20 + w[0]*11)+'" cy="27" rx="6.4" ry="9" fill="'+w[1]+'" '+O+' stroke-width=".9" transform="rotate('+(w[0]*28)+' '+(20 + w[0]*11)+' 27)"/>';
+        s += '<ellipse cx="'+(20 + w[0]*10)+'" cy="36" rx="4" ry="5" fill="#FFD3EC" '+O+' stroke-width=".8" transform="rotate('+(w[0]*-20)+' '+(20 + w[0]*10)+' 36)"/>';
+      });
+      s += '<path d="M9 17 Q7.5 29 11 31 L29 31 Q32.5 29 31 17 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<rect x="15" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/><rect x="21.4" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M12.6 29.5 L9.6 36" stroke="'+SKIN+'" stroke-width="3" stroke-linecap="round"/>';
+      s += '<path d="M34.3 22 L37 10.5" stroke="#8B5A2B" stroke-width="1.4" stroke-linecap="round"/><path d="M37.3 5.6 l1.3 2.6 2.8.4 -2 2 .5 2.8 -2.6-1.3 -2.6 1.3 .5-2.8 -2-2 2.8-.4z" fill="#FFD233" '+O+' stroke-width=".6"/>';
+      s += '<path d="M27.4 29.5 L33.8 23.2" stroke="'+SKIN+'" stroke-width="3" stroke-linecap="round"/><circle cx="34.3" cy="22.6" r="1.9" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M14 26.5 L26 26.5 L31 42.5 Q20 45.5 9 42.5 Z" fill="#FF8FC0" '+O+' stroke-width="1.2"/><path d="M11 40 Q20 43 29 40" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="1.4 1.4"/>';
+      s += '<circle cx="20" cy="16" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M9 16.5 Q8 4.5 20 4.5 Q32 4.5 31 16.5 Q27 10 20 10.5 Q14 10 9 16.5 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<circle cx="13.5" cy="7.6" r="1.7" fill="#FF8FC0"/><circle cx="17.5" cy="5.4" r="1.7" fill="#FFD233"/><circle cx="22.5" cy="5.4" r="1.7" fill="#9EE2B0"/><circle cx="26.5" cy="7.6" r="1.7" fill="#FF8FC0"/>';
+      s += face(20, 17);
+    } else if (k === 'wizard'){
+      s += '<path d="M34.5 12.5 V46" stroke="#8B5A2B" stroke-width="1.8" stroke-linecap="round"/><circle cx="34.5" cy="10.5" r="3.4" fill="#7FE3FF" '+O+' stroke-width=".9"/><circle cx="33.4" cy="9.4" r="1" fill="#fff"/>';
+      s += '<path d="M12.5 28 L27.5 28 L31 46.5 L9 46.5 Z" fill="#7C4DDB" '+O+' stroke-width="1.2"/>';
+      s += '<path d="M20 30.5 A4 4 0 1 0 23.6 36 A3.2 3.2 0 1 1 20 30.5 Z" fill="#FFD233" '+O+' stroke-width=".7"/>';
+      s += '<path d="M13 31 L9.6 37" stroke="#7C4DDB" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.3" cy="37.7" r="2" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M27 31 L33 29" stroke="#7C4DDB" stroke-width="3.8" stroke-linecap="round"/><circle cx="34" cy="28.8" r="2.1" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<circle cx="20" cy="19.5" r="9.8" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M10.5 20 Q9.5 15 12.5 13.5 M29.5 20 Q30.5 15 27.5 13.5" stroke="#B9763D" stroke-width="2.4" stroke-linecap="round" fill="none"/>';
+      s += '<path d="M9.5 12.8 L19 1.2 Q23 -.4 25.2 3.2 L30.5 12.8 Z" fill="#6A2FA0" '+O+' stroke-width="1.1"/><ellipse cx="20" cy="13.2" rx="14.2" ry="3" fill="#6A2FA0" '+O+' stroke-width="1.1"/>';
+      s += '<path d="M21 5 l.9 1.8 2 .3 -1.5 1.4 .4 2 -1.8-1 -1.8 1 .4-2 -1.5-1.4 2-.3z" fill="#FFD233"/><circle cx="15" cy="9.4" r=".8" fill="#FFD233"/><circle cx="26" cy="9.2" r=".7" fill="#FFD233"/>';
+      s += face(20, 20.3);
+    } else if (k === 'dragon'){
+      s += '<path d="M28 40 Q37 41 38 33 L35.5 34.8 L36.5 31 Q34 36 27 36 Z" fill="#4CC06A" '+O+' stroke-width="1"/>';
+      s += '<path d="M11 28 L2.5 21.5 L4.5 27 L1.5 29 L6.5 30.5 L7 34 Z" fill="#9BE3AE" '+O+' stroke-width="1"/><path d="M29 28 L37.5 21.5 L35.5 27 L38.5 29 L33.5 30.5 L33 34 Z" fill="#9BE3AE" '+O+' stroke-width="1"/>';
+      s += '<ellipse cx="14.5" cy="45" rx="3.6" ry="2.2" fill="#3DA85A" '+O+' stroke-width=".8"/><ellipse cx="25.5" cy="45" rx="3.6" ry="2.2" fill="#3DA85A" '+O+' stroke-width=".8"/>';
+      s += '<ellipse cx="20" cy="36" rx="10.6" ry="9.4" fill="#4CC06A" '+O+' stroke-width="1.3"/><ellipse cx="20" cy="37.5" rx="6.2" ry="6.6" fill="#FFF1B8" '+O+' stroke-width=".8"/><path d="M15 35.5 H25 M14.6 38.5 H25.4 M15.4 41.5 H24.6" stroke="#E5CF7A" stroke-width=".8"/>';
+      s += '<path d="M12.5 7.5 L11 1.5 L16.5 5.5 Z M27.5 7.5 L29 1.5 L23.5 5.5 Z" fill="#FFD233" '+O+' stroke-width=".8"/>';
+      s += '<circle cx="20" cy="16" r="11.2" fill="#4CC06A" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M17 5.3 L18.5 2.6 L20 5 L21.5 2.6 L23 5.3" fill="#FF8F4D" '+O+' stroke-width=".7"/>';
+      s += '<ellipse cx="20" cy="21.5" rx="7" ry="4.4" fill="#9BE3AE" '+O+' stroke-width=".9"/><circle cx="17.8" cy="20.4" r=".7" fill="'+INK+'"/><circle cx="22.2" cy="20.4" r=".7" fill="'+INK+'"/>';
+      s += '<ellipse cx="15.6" cy="14.6" rx="2.2" ry="2.6" fill="'+INK+'"/><ellipse cx="24.4" cy="14.6" rx="2.2" ry="2.6" fill="'+INK+'"/><circle cx="16.3" cy="13.7" r=".8" fill="#fff"/><circle cx="25.1" cy="13.7" r=".8" fill="#fff"/>';
+      s += '<ellipse cx="11.6" cy="19" rx="2" ry="1.2" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="28.4" cy="19" rx="2" ry="1.2" fill="'+BLUSH+'" opacity=".85"/>';
+      s += '<path d="M17.6 23.4 Q20 25.6 22.4 23.4" fill="none" stroke="'+INK+'" stroke-width="1" stroke-linecap="round"/><path d="M21 24.3 l.8 1.4 .8-1.3" fill="#fff" stroke="'+INK+'" stroke-width=".5"/>';
+    }
+    return s;
+  }
+  const ch = (k, w) => '<svg viewBox="0 0 40 48" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="'+NAMES[k]+'">'+charInner(k)+'</svg>';
+  function bunnyInner(){
+    let s = '';
+    [[13,-12],[27,12]].forEach(e => {
+      s += '<ellipse cx="'+e[0]+'" cy="12" rx="5" ry="11" fill="#fff" stroke="'+INK+'" stroke-width="1.5" transform="rotate('+e[1]+' '+e[0]+' 12)"/>';
+      s += '<ellipse cx="'+e[0]+'" cy="13" rx="2.2" ry="7" fill="#FFB8C6" transform="rotate('+e[1]+' '+e[0]+' 13)"/>';
+    });
+    s += '<ellipse cx="20" cy="30" rx="15" ry="12.5" fill="#fff" stroke="'+INK+'" stroke-width="1.5"/>';
+    s += '<path d="M9 37 Q20 43 31 37" fill="none" stroke="#E0A100" stroke-width="1.4"/><circle cx="20" cy="41" r="2.8" fill="#FFD233" stroke="'+INK+'" stroke-width=".8"/>';
+    s += '<ellipse cx="14.5" cy="29" rx="1.9" ry="2.3" fill="'+INK+'"/><ellipse cx="25.5" cy="29" rx="1.9" ry="2.3" fill="'+INK+'"/><circle cx="15.1" cy="28.2" r=".7" fill="#fff"/><circle cx="26.1" cy="28.2" r=".7" fill="#fff"/>';
+    s += '<ellipse cx="10.6" cy="33.2" rx="2.5" ry="1.4" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="29.4" cy="33.2" rx="2.5" ry="1.4" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M18.8 32 h2.4 l-1.2 1.3z" fill="#FF7F99"/><path d="M17.6 34.4 q1.2 1.3 2.4 0 q1.2 1.3 2.4 0" fill="none" stroke="'+INK+'" stroke-width="1" stroke-linecap="round"/>';
+    return s;
+  }
+  const bunny = w => '<svg viewBox="0 0 40 44" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="กระต่ายติ๊กต็อก">'+bunnyInner()+'</svg>';
+  function khemInner(col){
+    let s = '';
+    s += '<line x1="14" y1="37" x2="10" y2="42" stroke="'+INK+'" stroke-width="2.4" stroke-linecap="round"/><line x1="30" y1="37" x2="34" y2="42" stroke="'+INK+'" stroke-width="2.4" stroke-linecap="round"/>';
+    s += '<circle cx="10" cy="10.5" r="5.6" fill="'+col+'" stroke="'+INK+'" stroke-width="1.3"/><circle cx="34" cy="10.5" r="5.6" fill="'+col+'" stroke="'+INK+'" stroke-width="1.3"/>';
+    s += '<circle cx="22" cy="24" r="15.4" fill="#FFFDF6" stroke="'+col+'" stroke-width="3"/><circle cx="22" cy="24" r="16.9" fill="none" stroke="'+INK+'" stroke-width="1.1"/>';
+    s += '<ellipse cx="17" cy="23" rx="1.8" ry="2.2" fill="'+INK+'"/><ellipse cx="27" cy="23" rx="1.8" ry="2.2" fill="'+INK+'"/><circle cx="17.6" cy="22.3" r=".6" fill="#fff"/><circle cx="27.6" cy="22.3" r=".6" fill="#fff"/>';
+    s += '<ellipse cx="13.6" cy="27.6" rx="2.3" ry="1.3" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="30.4" cy="27.6" rx="2.3" ry="1.3" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M19 28 Q22 31 25 28" fill="none" stroke="'+INK+'" stroke-width="1.1" stroke-linecap="round"/>';
+    return s;
+  }
+  const khem = (w, col) => '<svg viewBox="0 0 44 44" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="คุณเข็ม">'+khemInner(col || '#1E88D9')+'</svg>';
+  const chip = t => '<span class="tchip">'+t+'</span>';
+  const rows = list => '<div class="stack">' + list.map(r => '<div class="rowa"><span class="e">'+r[0]+'</span>'+r[1]+(r[2] ? '<span class="tm">'+r[2]+'</span>' : '')+'</div>').join('') + '</div>';
+  const choices = list => '<div class="stack">' + list.map((c,i) => '<div class="choice"><b>'+'กขค'[i]+'.</b>'+c+'</div>').join('') + '</div>';
+  const trio = list => '<div class="trio">' + list.map((t,i) => '<figure>'+clock(t[0], t[1], {size:17, plain:true})+'<figcaption>'+'กขค'[i]+'.</figcaption></figure>').join('') + '</div>';
+  const duo = list => '<div class="trio">' + list.map((t,i) => '<figure>'+clock(t[0], t[1], {size:22})+'<figcaption>'+'กข'[i]+'.</figcaption></figure>').join('') + '</div>';
+  const write = w => '<div class="write"><div class="word">'+w+'</div><div class="blank">__ : __</div></div>';
+  const empty = (tag) => (tag ? '<div class="tag">'+tag+'</div>' : '') + clock(0, 0, {hands:false, size:tag ? 27 : 30});
+
+  const ACT = {
+    spin:'🔄 หมุนนาฬิกากระดาษให้เพื่อนดู', point:'👆 ชี้บนหน้าปัดให้เพื่อนดู', write:'✏️ เขียนลงกระดาษ',
+    act:'🎭 ทำท่าให้เพื่อนดูด้วย', guess:'🙋 เพื่อนทายถูก ได้ 🪙 ทั้งคู่', order:'👉 ชี้เรียงทีละข้อ', pick:'👆 ชี้ข้อที่ถูก'
+  };
+
+  /* ───────── การ์ดคำถาม ───────── */
+  const CARDS = [
+    // ⏰ อ่านเวลา
+    {id:'T01', t:'time', s:1, art:'<div class="tag">🌅 ตอนเช้า</div>'+clock(7,0,{size:27}), q:'นาฬิกาบอกเวลาเท่าไร?', a:'07:00 น. (เจ็ดโมงเช้า)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 7'},
+    {id:'T02', t:'time', s:1, art:clock(11,0), q:'นาฬิกาบอกเวลาเท่าไร?', a:'11:00 น. (สิบเอ็ดโมง)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 11 (ไม่ใช่ 12)'},
+    {id:'T03', t:'time', s:1, art:empty(), q:'เวลา 10:00 น. เข็มสั้นชี้เลขอะไร? เข็มยาวชี้เลขอะไร?', act:'spin', a:'เข็มสั้นชี้ 10 · เข็มยาวชี้ 12', why:'ตรงชั่วโมง เข็มยาวอยู่ที่ 12 เสมอ'},
+    {id:'T04', t:'time', s:1, art:empty('🌅 ตอนเช้า'), q:'เข็มยาวชี้ 12 เข็มสั้นชี้ 6 เป็นเวลาเท่าไร?', act:'point', a:'06:00 น. (หกโมงเช้า)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 6'},
+    {id:'T05', t:'time', s:1, art:write('แปดนาฬิกา'), q:'เขียนเป็นตัวเลข', act:'write', a:'08:00 น.', why:'8 ชั่วโมง 0 นาที ➜ 08:00'},
+    {id:'T06', t:'time', s:1, art:empty('☀️ เที่ยงวัน'), q:'เที่ยงวัน เข็มสั้นและเข็มยาวชี้เลขอะไร?', act:'point', a:'ชี้เลข 12 ทั้งสองเข็ม', why:'เที่ยงวัน = 12:00 น. สองเข็มทับกันที่ 12'},
+    {id:'T07', t:'time', s:2, art:'<div class="tag">🌅 ตอนเช้า</div>'+clock(8,30,{size:27}), q:'นาฬิกาบอกเวลาเท่าไร?', a:'08:30 น. (แปดโมงครึ่ง)', why:'เข็มยาวชี้ 6 = 30 นาที · เข็มสั้นเลย 8 มาแล้ว'},
+    {id:'T08', t:'time', s:2, art:empty('🌤️ ตอนบ่าย'), q:'เข็มยาวชี้ 6 เข็มสั้นอยู่ระหว่าง 3 กับ 4 เป็นเวลาเท่าไร?', act:'point', a:'บ่ายสามโมงครึ่ง (15:30 น.)', why:'เข็มยาวชี้ 6 = ครึ่ง · เข็มสั้นเลย 3 · ตอนบ่าย'},
+    {id:'T09', t:'time', s:2, art:empty(), q:'เวลา 09:30 น. เข็มยาวชี้เลขอะไร?', act:'spin', a:'เลข 6 (เข็มสั้นอยู่ระหว่าง 9 กับ 10)', why:'ครึ่งชั่วโมง = 30 นาที เข็มยาวไปครึ่งวง'},
+    {id:'T10', t:'time', s:2, art:write('สิบนาฬิกาสามสิบนาที'), q:'เขียนเป็นตัวเลข', act:'write', a:'10:30 น.', why:'ชั่วโมงไว้หน้า : นาทีไว้หลัง :'},
+    {id:'T11', t:'time', s:3, art:'<div class="tag">🌅 ตอนเช้า</div>'+clock(7,15,{size:27}), q:'นาฬิกาบอกเวลาเท่าไร?', a:'07:15 น. (เจ็ดโมงสิบห้านาที)', why:'เข็มยาวชี้ 3 ➜ นับ 5, 10, 15 · เข็มสั้นเลย 7'},
+    {id:'T12', t:'time', s:3, art:empty('🌅 ตอนเช้า'), q:'เข็มยาวชี้ 9 เข็มสั้นอยู่ระหว่าง 8 กับ 9 เป็นเวลาเท่าไร?', act:'point', a:'08:45 น.', why:'นับทีละ 5 ถึงเลข 9 = 45 · เข็มสั้นยังไม่ถึง 9 ➜ 8 โมง'},
+
+    // 🔍 หาเวลา
+    {id:'F01', t:'find', s:1, art:clock(6,0,{size:21}) + choices(['06:00 น.','07:00 น.','12:00 น.']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ก. 06:00 น.', why:'เข็มยาวชี้ 12 · เข็มสั้นชี้ 6'},
+    {id:'F02', t:'find', s:1, art:clock(9,0,{size:21}) + choices(['08:00 น.','09:00 น.','10:00 น.']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ข. 09:00 น.', why:'เข็มยาวชี้ 12 · เข็มสั้นชี้ 9 พอดี'},
+    {id:'F03', t:'find', s:1, art:clock(12,0,{size:21}) + choices(['06:00 น.','12:00 น. เที่ยงวัน','11:00 น.']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ข. 12:00 น. เที่ยงวัน', why:'สองเข็มชี้ 12'},
+    {id:'F04', t:'find', s:2, art:clock(9,30,{size:21}) + choices(['เก้าโมงครึ่ง','สิบโมงครึ่ง','เก้าโมงหกนาที']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ก. เก้าโมงครึ่ง (09:30 น.)', why:'เข็มยาวชี้ 6 = 30 นาที ไม่ใช่ 6 นาที'},
+    {id:'F05', t:'find', s:2, art:clock(7,30,{size:21}) + choices(['08:30 น.','07:30 น.','07:06 น.']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ข. 07:30 น.', why:'เข็มสั้นเลย 7 แต่ยังไม่ถึง 8 ➜ 7 โมงครึ่ง'},
+    {id:'F06', t:'find', s:2, art:clock(11,30,{size:21}) + choices(['11:30 น.','12:30 น.','11:06 น.']), q:'เวลาใดตรงกับนาฬิกานี้?', act:'pick', a:'ก. 11:30 น.', why:'เข็มยาวชี้ 6 = 30 นาที · เข็มสั้นเลย 11'},
+    {id:'F07', t:'find', s:2, art:'<div class="word" style="font:600 12pt var(--display);background:#fff;border-radius:2mm;padding:.8mm 3mm">สิบนาฬิกาสามสิบนาที</div>' + trio([[10,30],[10,0],[6,50]]), q:'ตรงกับนาฬิกาเรือนไหน?', act:'pick', a:'ก.', why:'เข็มยาวชี้ 6 · เข็มสั้นระหว่าง 10 กับ 11'},
+    {id:'F08', t:'find', s:2, art:'<div class="word" style="font:600 12pt var(--display);background:#fff;border-radius:2mm;padding:.8mm 3mm">หกนาฬิกาสามสิบนาที</div>' + trio([[6,0],[7,30],[6,30]]), q:'ตรงกับนาฬิกาเรือนไหน?', act:'pick', a:'ค.', why:'เข็มยาวชี้ 6 · เข็มสั้นระหว่าง 6 กับ 7'},
+
+    // 🏠 ชีวิตประจำวัน
+    {id:'D01', t:'daily', s:1, art:rows([['🛏️','ตื่นนอน','06:00 น.'],['🦷','แปรงฟัน','06:30 น.']]), q:'ทำอะไร <em>ก่อน</em>?', act:'act', a:'ตื่นนอน', why:'06:00 มาก่อน 06:30'},
+    {id:'D02', t:'daily', s:1, art:rows([['🚌','ไปโรงเรียน','07:30 น.'],['🍳','กินข้าวเช้า','07:00 น.']]), q:'ทำอะไร <em>ก่อน</em>?', act:'act', a:'กินข้าวเช้า', why:'ชั่วโมงเท่ากัน · 00 นาทีมาก่อน 30 นาที'},
+    {id:'D03', t:'daily', s:1, art:rows([['🍚','กินข้าวกลางวัน','12:00 น.'],['🎵','เข้าแถวเคารพธงชาติ','08:00 น.']]), q:'ทำอะไร <em>หลัง</em>?', a:'กินข้าวกลางวัน', why:'12:00 มาหลัง 08:00'},
+    {id:'D04', t:'daily', s:1, art:rows([['🏡','กลับบ้าน','16:00 น.'],['😴','เข้านอน','20:00 น.']]), q:'ทำอะไร <em>หลัง</em>?', act:'act', a:'เข้านอน', why:'20:00 (สองทุ่ม) มาหลัง 16:00 (สี่โมงเย็น)'},
+    {id:'D05', t:'daily', s:1, art:'<div class="scene"><span class="e">☀️🍚</span><div class="word" style="font:600 12pt var(--display)">เที่ยงวัน</div></div>', q:'เที่ยงวันเขียนเป็นตัวเลขอย่างไร? ตอนนั้นเราทำอะไรกัน?', act:'write', a:'12:00 น. · กินข้าวกลางวัน (รับคำตอบที่มีเหตุผล)', why:'เที่ยงวัน = 12:00 น. เป็นเวลาพักกินข้าว'},
+    {id:'D06', t:'daily', s:2, art:rows([['😴','เข้านอน','20:00 น.'],['🍛','กินข้าวเย็น','18:00 น.'],['🛁','อาบน้ำ','19:00 น.']]), q:'เรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', act:'order', a:'กินข้าวเย็น ➜ อาบน้ำ ➜ เข้านอน', why:'18 ➜ 19 ➜ 20'},
+    {id:'D07', t:'daily', s:2, art:rows([['📚','เรียนหนังสือ','09:00 น.'],['⏰','ตื่นนอน','06:00 น.'],['🍚','กินข้าวกลางวัน','12:00 น.']]), q:'เรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', act:'order', a:'ตื่นนอน ➜ เรียนหนังสือ ➜ กินข้าวกลางวัน', why:'6 ➜ 9 ➜ 12'},
+    {id:'D08', t:'daily', s:2, art:'<div class="tag">น้องมะลิ 👧</div>' + rows([['⚽','เล่นฟุตบอล','16:30 น.'],['📝','ทำการบ้าน','17:30 น.']]), q:'น้องมะลิทำอะไร <em>ก่อน</em>?', act:'act', a:'เล่นฟุตบอล', why:'นาทีเท่ากัน · 16 มาก่อน 17'},
+    {id:'D09', t:'daily', s:2, art:'<div class="scene">'+chip('20:00 น.')+'<span class="e">🌅 ☀️ 🌙</span></div>', q:'เป็นตอนเช้า ตอนบ่าย หรือตอนกลางคืน?', a:'ตอนกลางคืน (สองทุ่ม)', why:'หลัง 18:00 น. ฟ้ามืดแล้ว'},
+    {id:'D10', t:'daily', s:2, art:'<div class="scene"><span class="e">🎭</span>'+chip('07:00 น.')+'</div>', q:'ทำท่ากิจกรรมตอนนี้ โดยไม่พูด ให้เพื่อนทาย', act:'guess', a:'กิจกรรมตอนเช้า เช่น กินข้าวเช้า ไปโรงเรียน · เพื่อนทายถูกได้ 🪙 ด้วย', why:'07:00 น. เป็นเวลาเช้า ก่อนเข้าเรียน'},
+
+    // ⚔️ ท้าทาย
+    {id:'C01', t:'chal', s:2, art:'<div class="vs">'+chip('08:00 น.')+'กับ'+chip('09:00 น.')+'</div>', q:'เวลาใด <em>มาก่อน</em>?', a:'08:00 น.', why:'8 น้อยกว่า 9 ➜ มาก่อน'},
+    {id:'C02', t:'chal', s:2, art:'<div class="vs">'+chip('10:30 น.')+'กับ'+chip('10:00 น.')+'</div>', q:'เวลาใด <em>มาทีหลัง</em>?', a:'10:30 น.', why:'ชั่วโมงเท่ากัน · 30 นาทีมาหลัง 0 นาที'},
+    {id:'C03', t:'chal', s:2, art:'<div class="vs">'+chip('07:00')+chip('06:00')+chip('08:00')+'</div>', q:'เรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', act:'order', a:'06:00 ➜ 07:00 ➜ 08:00', why:'เรียงเลขชั่วโมง 6, 7, 8'},
+    {id:'C04', t:'chal', s:2, art:rows([['🏫','เข้าเรียน','08:00 น.'],['🛏️','ตื่นนอน','07:00 น.']]), q:'ตื่นนอน <em>ก่อน</em> หรือ <em>หลัง</em> เข้าเรียน?', a:'ก่อน', why:'7 มาก่อน 8'},
+    {id:'C05', t:'chal', s:2, art:'<div class="vs">'+chip('09:30')+chip('09:00')+chip('10:00')+'</div>', q:'เรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', act:'order', a:'09:00 ➜ 09:30 ➜ 10:00', why:'09:30 อยู่กลางระหว่าง 9 โมงกับ 10 โมง'},
+    {id:'C06', t:'chal', s:3, art:'<div class="vs">'+clock(8,0,{size:22})+'<span style="font:600 11pt var(--display)">+ 1 ชั่วโมง</span></div>', q:'ตอนนี้ 08:00 น. อีก 1 ชั่วโมงเป็นเวลาเท่าไร?', act:'spin', a:'09:00 น.', why:'เข็มยาวหมุนครบ 1 รอบ เข็มสั้นขยับไป 1 เลข'},
+    {id:'C07', t:'chal', s:3, art:'<div class="scene"><div class="tag">💡 1 ชั่วโมง = 60 นาที</div><span class="tchip" style="font-size:15pt">ครึ่งชั่วโมง = ? นาที</span></div>', q:'ครึ่งชั่วโมงมีกี่นาที?', a:'30 นาที', why:'ครึ่งของ 60 = 30 · เข็มยาวชี้ 6'},
+    {id:'C08', t:'chal', s:3, art:'<div class="tag">🌅 ตอนเช้าทั้งคู่</div>' + duo([[11,0],[10,30]]), q:'นาฬิกาเรือนไหน <em>มาก่อน</em>?', act:'pick', a:'ข. (10:30 น.)', why:'ก. = 11:00 · ข. = 10:30 · 10 มาก่อน 11'},
+    {id:'C09', t:'chal', s:3, art:rows([['🚌','รถโรงเรียนออก','07:00 น.'],['🧒','หนูถึงป้ายรถ','07:30 น.']]), q:'หนูขึ้นรถทันไหม?', a:'ไม่ทัน เพราะ 07:30 มาหลัง 07:00', why:'ถึงหลังรถออก 30 นาที'},
+    {id:'C10', t:'chal', s:3, art:rows([['🧸','ร้านของเล่นเปิด','09:00 น.'],['🧒','หนูไปถึง','08:30 น.']]), q:'หนูต้องรอไหม?', a:'ต้องรอ เพราะ 08:30 มาก่อน 09:00', why:'ถึงก่อนร้านเปิด (โบนัส: รอ 30 นาที)'}
+  ];
+
+  /* ───────── การ์ดพิเศษ ───────── */
+  const SPECIAL = [
+    {id:'S01', e:'⏰', n:'TIME BOOST', q:'ตอบถูก รับเหรียญเพิ่มอีก 1 เหรียญ!', when:'ประกาศก่อนตอบ'},
+    {id:'S02', e:'🍀', n:'LUCKY HOUR', q:'ไม่อยากตอบใบนี้? เปลี่ยนจั่วใบใหม่ได้ 1 ครั้ง', when:'ใช้หลังจั่วการ์ด ก่อนตอบ'},
+    {id:'S03', e:'🔄', n:'TIME TRAVEL', q:'วาร์ปไปข้างหน้า 1 ช่องทันที!', when:'ใช้ตอนเริ่มตา'},
+    {id:'S04', e:'🛡️', n:'TIME SHIELD', q:'ตอบผิด? ได้ตอบใหม่อีก 1 ครั้ง', when:'ใช้หลังตอบผิด'},
+    {id:'S05', e:'🛡️', n:'TIME SHIELD', q:'ตอบผิด? ได้ตอบใหม่อีก 1 ครั้ง', when:'ใช้หลังตอบผิด'},
+    {id:'S06', e:'🚀', n:'FAST TIME', q:'ตอบถูก เดินเพิ่มอีก 2 ช่อง!', when:'ประกาศก่อนตอบ'},
+    {id:'S07', e:'🎁', n:'TIME CHEST', q:'เปิดหีบ! รับ 2 เหรียญจากธนาคาร', when:'เปิดทันทีที่จั่วได้'},
+    {id:'S08', e:'@bunny', n:'กระต่ายช่วยคิด', q:'ชวนเพื่อน 1 คนช่วยคิด ถูกแล้วได้เหรียญทั้งคู่!', when:'ประกาศก่อนตอบ'}
+  ];
+
+  const TYPES = {
+    time:{icon:'⏰', name:'อ่านเวลา', en:'TIME CARD', c:'#1E88D9'},
+    find:{icon:'🔍', name:'หาเวลา', en:'FIND THE TIME', c:'#8B4FC7'},
+    daily:{icon:'🏠', name:'ชีวิตประจำวัน', en:'DAILY LIFE', c:'#3E9E4F'},
+    chal:{icon:'⚔️', name:'ท้าทาย', en:'TIME CHALLENGE', c:'#E8572E'},
+    special:{icon:'⭐', name:'การ์ดพิเศษ', en:'SPECIAL', c:'#D99A00'},
+    aid:{icon:'💡', name:'บัตรช่วยจำ', en:'HELP CARD', c:'#23324A'},
+    blank:{icon:'✏️', name:'การ์ดของฉัน', en:'MY CARD', c:'#8C97A8'}
+  };
+
+  const BUDDY = {
+    time:{who:() => ch('wizard', 7.2), say:['ดูเข็มสั้นก่อนน้า~','เข็มสั้นบอกชั่วโมงนะ','เวทมนตร์คือค่อย ๆ ดู','หนูทำได้แน่นอน!']},
+    find:{who:() => ch('fairy', 7.2), say:['นางฟ้าช่วยส่องนะ ✨','ดูเข็มยาวด้วยน้า','มีข้อเดียวที่ถูกนะ','โบกไม้กายสิทธิ์ ชี้เลย!']},
+    daily:{who:() => ch('knight', 7.2), say:['วันนี้หนูทำอะไรบ้าง?','นึกถึงวันของหนูสิ','อัศวินก็ตื่นเช้านะ!','ลองทำท่าด้วยก็ได้!']},
+    chal:{who:() => ch('dragon', 7.4), say:['มังกรน้อยท้าดวล!','ใกล้ถึงปราสาทแล้ว','คิดทีละขั้นนะ','เก่งมากที่มาถึงตรงนี้!']}
+  };
+  const counter = {};
+  function buddy(t){
+    const b = BUDDY[t]; if (!b) return '';
+    const i = counter[t] = (counter[t] || 0) + 1;
+    return '<div class="buddy"><span class="bd-ic">'+b.who(i)+'</span><span class="bd-tx">'+b.say[(i - 1) % b.say.length]+'</span></div>';
+  }
+  function stars(n){ return '★'.repeat(n); }
+  function questionCard(c){
+    const T = TYPES[c.t];
+    return '<div class="card t-'+c.t+'">' +
+      '<div class="c-head"><span>'+T.icon+' '+T.name+'</span><span class="stars" aria-label="'+c.s+' ดาว">'+stars(c.s)+'</span></div>' +
+      buddy(c.t) +
+      '<div class="art">'+c.art+'</div>' +
+      '<div class="q">'+c.q+'</div>' +
+      (c.act ? '<div class="act">'+ACT[c.act]+'</div>' : '') +
+      '<div class="c-foot"><div class="fl"><span class="cid">'+c.id+'</span><span class="rw">ถูก 🪙+1 · เดิน '+c.s+'</span></div><span class="ans"><b>เฉลย</b> '+c.a+'</span></div>' +
+    '</div>';
+  }
+  function specialCard(s){
+    return '<div class="card t-special">' +
+      '<div class="c-head"><span>⭐ การ์ดพิเศษ</span><span class="stars">✦</span></div>' +
+      '<div class="art"><div class="sp-burst"><span class="spark" style="top:1mm;left:2mm">✦</span><span class="spark" style="bottom:3mm;right:1mm">✦</span>'+(s.e === '@bunny' ? bunny(17) : '<span class="sp-emoji">'+s.e+'</span>')+'</div><div class="sp-name">'+s.n+'</div></div>' +
+      '<div class="q">'+s.q+'</div>' +
+      '<div class="act">'+s.when+'</div>' +
+      '<div class="c-foot" style="margin-top:1.5mm"><span class="cid">'+s.id+'</span><span class="ans">ถือได้ไม่เกิน 2 ใบ · ใช้ตาละ 1 ใบ</span></div>' +
+    '</div>';
+  }
+  function aidCard(){
+    return '<div class="card t-aid">' +
+      '<div class="c-head"><span>💡 บัตรช่วยจำ</span><span class="stars">✦</span></div>' +
+      '<div class="art" style="gap:1.6mm">' +
+        '<div class="aid-row">'+clock(7,0,{size:17, plain:true})+'<p>เข็มยาวชี้ 12<span>= ตรงชั่วโมง ➜ 07:00</span></p></div>' +
+        '<div class="aid-row">'+clock(7,30,{size:17, plain:true})+'<p>เข็มยาวชี้ 6<span>= ครึ่งชั่วโมง ➜ 07:30</span></p></div>' +
+      '</div>' +
+      '<div class="q" style="font-size:9.6pt;margin-bottom:2.4mm"><span style="color:#E53935">● เข็มสั้น</span> บอกชั่วโมง<br><span style="color:#1E6FD9">● เข็มยาว</span> บอกนาที</div>' +
+    '</div>';
+  }
+  function blankCard(){
+    return '<div class="card t-blank">' +
+      '<div class="c-head"><span>✏️ การ์ดของฉัน</span><span class="stars">☆☆☆</span></div>' +
+      '<div class="buddy"><span class="bd-ic">'+ch('fairy', 7.2)+'</span><span class="bd-tx">แต่งโจทย์ให้เพื่อนเลย!</span></div>' +
+      '<div class="art">'+clock(0,0,{hands:false, size:23})+'<div class="lines"><i></i><i></i></div></div>' +
+      '<div class="reward" style="margin:0 0 1mm">วาดเข็ม · เขียนโจทย์ · ระบายดาว = ระดับ</div>' +
+      '<div class="c-foot"><span class="cid">ผู้แต่ง ______</span><span class="ans"><b>เฉลย</b> ____________</span></div>' +
+    '</div>';
+  }
+
+  // ลำดับบนแผ่น: คำถาม 40 → พิเศษ 8 → ช่วยจำ 2 → การ์ดของฉัน 4 = 54 ใบ (6 แผ่น × 9)
+  const slots = [];
+  CARDS.forEach(c => slots.push({kind:c.t, html:questionCard(c)}));
+  SPECIAL.forEach(s => slots.push({kind:'special', html:specialCard(s)}));
+  for (let i = 0; i < 2; i++) slots.push({kind:'aid', html:aidCard()});
+  for (let i = 0; i < 4; i++) slots.push({kind:'blank', html:blankCard()});
+
+  const BACK_ART = {
+    time:() => ch('wizard', 22),
+    find:() => ch('fairy', 22),
+    daily:() => ch('knight', 22),
+    chal:() => ch('dragon', 23),
+    special:() => bunny(24),
+    aid:() => khem(24, '#23324A')
+  };
+  function backCard(kind){
+    const T = TYPES[kind];
+    return '<div class="back" style="--c:'+T.c+'">' +
+      '<span class="star" style="top:5mm;left:6mm;font-size:9pt">✦</span><span class="star" style="top:12mm;right:6mm;font-size:6pt">✦</span><span class="star" style="bottom:9mm;left:8mm;font-size:6pt">✦</span><span class="star" style="bottom:5mm;right:9mm;font-size:9pt">✦</span>' +
+      '<div class="ring">'+(BACK_ART[kind] ? BACK_ART[kind]() : T.icon)+'</div>' +
+      '<div class="logo">TIME ADVENTURE</div>' +
+      '<div class="kind">'+T.icon+' '+T.name+'</div>' +
+      '<div class="en">'+T.en+'</div>' +
+    '</div>';
+  }
+
+  const fronts = document.getElementById('frontPages');
+  const backs = document.getElementById('backPages');
+  const pages = Math.ceil(slots.length / 9);
+  const TOTAL = 17;
+  let fHtml = '', bHtml = '';
+  for (let p = 0; p < pages; p++){
+    const part = slots.slice(p*9, p*9 + 9);
+    let f = '', b = '';
+    for (let i = 0; i < 9; i++){
+      const s = part[i];
+      f += '<div class="cut">'+(s ? s.html : '')+'</div>';
+    }
+    // หลังการ์ด: สลับคอลัมน์ซ้าย–ขวาในแต่ละแถว เพื่อพิมพ์สองหน้าแบบพลิกด้านยาว
+    for (let r = 0; r < 3; r++){
+      for (let c = 2; c >= 0; c--){
+        const s = part[r*3 + c];
+        b += '<div class="cut">'+(s ? backCard(s.kind) : '')+'</div>';
+      }
+    }
+    fHtml += '<div class="sheet"><div class="grid">'+f+'</div><div class="pno-l">หน้าการ์ด '+(p+1)+'/'+pages+' · ตัดตามเส้นประ</div><div class="pno">'+(3+p)+' / '+TOTAL+'</div></div>';
+    bHtml += '<div class="sheet"><div class="grid">'+b+'</div><div class="pno-l">หลังการ์ด '+(p+1)+'/'+pages+' · พิมพ์ด้านหลังแผ่น '+(3+p)+'</div><div class="pno">'+(9+p)+' / '+TOTAL+'</div></div>';
+  }
+  fronts.innerHTML = fHtml;
+  backs.innerHTML = bHtml;
+
+  /* ───────── กระดาน ───────── */
+  const Z = [
+    {n:1, name:'บ้านยามเช้า', deck:'⏰ อ่านเวลา', c:'#1E88D9', bg:'#E6F3FC', y:230, dir:1, icons:['🐓','⭐','🦷'], deco:'🏠', skill:'อ่านเวลาเต็มชั่วโมง'},
+    {n:2, name:'โรงเรียนแสนสนุก', deck:'🔍 หาเวลา', c:'#8B4FC7', bg:'#F2E9FB', y:188, dir:-1, icons:['🔔','⭐','📚'], deco:'🏫', skill:'ครึ่งชั่วโมง · จับคู่หน้าปัด'},
+    {n:3, name:'เมืองกิจวัตร', deck:'🏠 ชีวิตประจำวัน', c:'#3E9E4F', bg:'#E7F5E9', y:146, dir:1, icons:['🍜','⭐','⚽'], deco:'🏙️', skill:'เรียงกิจกรรมตามเวลา'},
+    {n:4, name:'สวนสนุกเวลา', deck:'⚔️ ท้าทาย', c:'#E8572E', bg:'#FDEBE4', y:104, dir:-1, icons:['🎠','⭐','🎡'], deco:'🎢', skill:'เปรียบเทียบ ก่อน / หลัง'},
+    {n:5, name:'ปราสาทเวลา', deck:'เลือกกองเอง', c:'#D99A00', bg:'#FFF5D1', y:62, dir:1, icons:['🌉','⭐','🏰'], deco:'✨', skill:'รวมทุกทักษะ'}
+  ];
+  const XS = [58, 103, 148];
+  const F = 'font-family="Mitr,Kanit,Tahoma,sans-serif"';
+  let svg = '<svg viewBox="0 0 190 277" style="position:absolute;left:10mm;top:10mm;width:190mm;height:277mm" role="img" aria-label="กระดานเกม TIME ADVENTURE">';
+  // หัวกระดาน
+  svg += '<text x="4" y="13" '+F+' font-weight="700" font-size="11.5" fill="#23324A">TIME ADVENTURE</text>';
+  svg += '<text x="4" y="21" '+F+' font-weight="500" font-size="6" fill="#1E88D9">ผจญภัยเมืองแห่งเวลา</text>';
+  svg += '<text x="4" y="31" '+F+' font-size="4.1" fill="#3B4A63">ตาของฉัน: จั่วการ์ดสีของด่าน ➜ ผู้คุมเวลาอ่าน ➜ ตอบ</text>';
+  svg += '<text x="4" y="37" '+F+' font-size="4.1" fill="#3B4A63">ถูก ➜ 🪙 +1 และเดินตามจำนวน ★ · จบตาที่ ⭐ ➜ จั่วการ์ดพิเศษ</text>';
+  svg += '<text x="4" y="47" '+F+' font-size="4.1" fill="#3B4A63">ถึงช่อง 15 แล้วตอบ ⚔️ ถูก ➜ เข้าปราสาท ชนะ!</text>';
+  ['knight','fairy','wizard'].forEach((k, i) => { svg += '<svg x="'+(80 + i*12.5)+'" y="41" width="12" height="15" viewBox="0 0 40 48">'+charInner(k)+'</svg>'; });
+  // แถบด่าน (ทึบ เพื่อให้ถนนเห็นเฉพาะช่วงที่ต้องเห็น)
+  Z.forEach(z => { svg += '<rect x="2" y="'+z.y+'" width="186" height="38" rx="6" fill="'+z.bg+'" stroke="'+z.c+'" stroke-width=".8"/>'; });
+  // ถนน
+  const pts = [[16, Z[0].y+24]];
+  Z.forEach(z => { const xs = z.dir === 1 ? XS : XS.slice().reverse(); xs.forEach(x => pts.push([x, z.y+24])); });
+  pts.push([148, 40]);
+  const road = pts.map(p => p.join(',')).join(' ');
+  svg += '<polyline points="'+road+'" fill="none" stroke="#C9D6E6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>';
+  svg += '<polyline points="'+road+'" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" stroke-linejoin="round"/>';
+  // ปราสาท
+  svg += '<rect x="118" y="3" width="68" height="48" rx="7" fill="#FFF5D1" stroke="#D99A00" stroke-width="1.2"/>';
+  svg += '<text x="152" y="27" text-anchor="middle" font-size="22">🏰</text>';
+  svg += '<svg x="121" y="8" width="15" height="17" viewBox="0 0 40 44">'+bunnyInner()+'</svg>';
+  svg += '<svg x="168" y="9" width="15" height="15" viewBox="0 0 44 44">'+khemInner('#D99A00')+'</svg>';
+  svg += '<text x="152" y="38" text-anchor="middle" '+F+' font-weight="600" font-size="5.2" fill="#7A5700">ห้องคุณเข็ม 👑</text>';
+  svg += '<text x="152" y="45" text-anchor="middle" '+F+' font-size="3.6" fill="#7A5700">ผู้พิทักษ์เวลา</text>';
+
+  let sq = 0;
+  Z.forEach(z => {
+    const lx = z.dir === 1 ? 6 : 184, anchor = z.dir === 1 ? 'start' : 'end';
+    svg += '<text x="'+lx+'" y="'+(z.y+6.5)+'" text-anchor="'+anchor+'" '+F+' font-weight="600" font-size="4.6" fill="'+z.c+'">ด่าน '+z.n+' · '+z.name+'</text>';
+    svg += '<text x="'+lx+'" y="'+(z.y+11.2)+'" text-anchor="'+anchor+'" '+F+' font-size="3.3" fill="#3B4A63">จั่ว: '+z.deck+' · '+z.skill+'</text>';
+    const cy = z.y + 24;
+    if (z.n === 5){
+      svg += '<text x="174" y="'+(cy-2)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.6" fill="#7A5700">ประตู</text>';
+      svg += '<text x="174" y="'+(cy+2.6)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.6" fill="#7A5700">ปราสาท</text>';
+      svg += '<text x="174" y="'+(cy+7.6)+'" text-anchor="middle" '+F+' font-size="3.2" fill="#7A5700">ตอบ ⚔️ ถูก = ชนะ</text>';
+    } else {
+      if (z.n === 4) svg += '<svg x="4" y="'+(cy-11)+'" width="19" height="23" viewBox="0 0 40 48">'+charInner('dragon')+'</svg>';
+      else svg += '<text x="'+(z.dir === 1 ? 177 : 13)+'" y="'+(cy+4)+'" text-anchor="middle" font-size="11">'+z.deco+'</text>';
+    }
+    const xs = z.dir === 1 ? XS : XS.slice().reverse();
+    xs.forEach((x, i) => {
+      sq++;
+      const star = i === 1, gate = sq === 15;
+      svg += '<circle cx="'+x+'" cy="'+cy+'" r="11.5" fill="'+(star ? '#FFE27A' : '#fff')+'" stroke="'+(gate ? '#B98400' : z.c)+'" stroke-width="'+(gate ? 2.2 : 1.6)+'"/>';
+      svg += '<text x="'+x+'" y="'+(cy-5.2)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.6" fill="#23324A">'+sq+'</text>';
+      svg += '<text x="'+x+'" y="'+(cy+4.2)+'" text-anchor="middle" font-size="8.5">'+z.icons[i]+'</text>';
+    });
+  });
+  // START
+  const sy = Z[0].y + 24;
+  svg += '<circle cx="16" cy="'+sy+'" r="9" fill="#23324A"/>';
+  svg += '<text x="16" y="'+(sy-1)+'" text-anchor="middle" font-size="6">🚩</text>';
+  svg += '<text x="16" y="'+(sy+5.6)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.4" fill="#fff">START</text>';
+  // คำอธิบายสีท้ายกระดาน
+  const leg = [['#1E88D9','⏰ อ่านเวลา'],['#8B4FC7','🔍 หาเวลา'],['#3E9E4F','🏠 ชีวิตประจำวัน'],['#E8572E','⚔️ ท้าทาย'],['#D99A00','⭐ พิเศษ']];
+  leg.forEach((l, i) => {
+    const x = 6 + i * 37;
+    svg += '<circle cx="'+(x+2)+'" cy="273" r="2" fill="'+l[0]+'"/><text x="'+(x+5.5)+'" y="274.3" '+F+' font-size="3.6" fill="#23324A">'+l[1]+'</text>';
+  });
+  svg += '</svg>';
+  document.getElementById('boardSheet').insertAdjacentHTML('afterbegin', svg);
+
+  /* ───────── เหรียญและตัวเดิน ───────── */
+  let coins = '<div class="sheet-title">เหรียญเวลา 42 เหรียญ + ตัวเดินฮีโร่ 4 ตัว<span>ตัดตามขอบวงกลม · ติดบนฝาขวดให้หยิบง่าย</span></div><div class="coins">';
+  for (let i = 0; i < 42; i++) coins += '<div class="coin"><div>'+khem(9.5, '#E8572E')+'<b>1</b><small>TIME COIN</small></div></div>';
+  coins += '</div><div class="pawns">';
+  [[ch('knight', 25),'อัศวินทิม','#1E88D9'],[ch('fairy', 25),'นางฟ้าใบเตย','#E85D9E'],[ch('wizard', 25),'พ่อมดโมโม่','#7C4DDB'],[ch('dragon', 26),'มังกรน้อยฟูฟู','#3E9E4F']].forEach(p => {
+    coins += '<div class="pawn" style="--pc:'+p[2]+'"><div>'+p[0]+'</div><span>'+p[1]+'</span></div>';
+  });
+  coins += '</div>';
+  document.getElementById('coinSheet').insertAdjacentHTML('afterbegin', coins);
+
+  /* ───────── เฉลย ───────── */
+  function keyTable(list){
+    return '<table>' + list.map(c => '<tr><td>'+c.id+'</td><td>'+c.a+'</td><td>'+c.why+'</td></tr>').join('') + '</table>';
+  }
+  const by = t => CARDS.filter(c => c.t === t);
+  const k1 = '<div class="key"><h2>เฉลยสำหรับผู้คุมเวลา (1/2)</h2><p class="sub">ถ่ายเอกสารกลุ่มละ 1 แผ่น · คำในวงเล็บคือคำเรียกแบบภาษาพูด ถือว่าถูกเช่นกัน · เขียน 8:30 หรือ 08:30 ก็ถูก</p>' +
+    '<h4>⏰ อ่านเวลา</h4>' + keyTable(by('time')) + '<h4>🔍 หาเวลา</h4>' + keyTable(by('find')) + '</div>';
+  const k2 = '<div class="key"><h2>เฉลยสำหรับผู้คุมเวลา (2/2)</h2><p class="sub">การ์ดที่คำตอบเปิดกว้าง (D05, D10) รับทุกคำตอบที่มีเหตุผลและเป็นช่วงเวลาที่ถูกต้อง</p>' +
+    '<h4>🏠 ชีวิตประจำวัน</h4>' + keyTable(by('daily')) + '<h4>⚔️ ท้าทาย</h4>' + keyTable(by('chal')) +
+    '<h4>⭐ การ์ดพิเศษ</h4><table>' + SPECIAL.filter((s,i) => i !== 4).map(s => '<tr><td>'+(s.e === '@bunny' ? '🐰' : s.e)+'</td><td>'+s.n+(s.id === 'S04' ? ' ×2' : '')+'</td><td>'+s.q+' — '+s.when+'</td></tr>').join('') + '</table></div>';
+  document.getElementById('keyPages').innerHTML =
+    '<div class="sheet">'+k1+'<div class="pno">16 / 17</div></div><div class="sheet">'+k2+'<div class="pno">17 / 17</div></div>';
+
+  /* ───────── ย่อแผ่นให้พอดีจอเล็ก ───────── */
+  function fit(){
+    const sheetPx = 210 * 96 / 25.4;
+    const z = Math.min(1, (document.documentElement.clientWidth - 32) / sheetPx);
+    document.documentElement.style.setProperty('--z', z.toFixed(3));
+  }
+  fit();
+  window.addEventListener('resize', fit);
+  window.addEventListener('beforeprint', () => document.documentElement.style.setProperty('--z', 1));
+  window.addEventListener('afterprint', fit);
+})();
+</script>

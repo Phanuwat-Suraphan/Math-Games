@@ -38,6 +38,9 @@ export function createEmptyRecords(): PlayerRecords {
     duelPlays: 0,
     duelWins: 0,
     towerBestFloor: 0,
+    timePlays: 0,
+    timeCastles: 0,
+    timeCorrect: 0,
   }
 }
 
@@ -70,6 +73,9 @@ export function recordsOf(player: Player): PlayerRecords {
     duelPlays: clamp(raw.duelPlays),
     duelWins: clamp(raw.duelWins),
     towerBestFloor: clamp(raw.towerBestFloor),
+    timePlays: clamp(raw.timePlays),
+    timeCastles: clamp(raw.timeCastles),
+    timeCorrect: clamp(raw.timeCorrect),
   }
 }
 
@@ -134,6 +140,25 @@ export function recordDuel(player: Player, won: boolean): PlayerRecords {
     ...records,
     duelPlays: clamp(records.duelPlays + 1),
     duelWins: clamp(records.duelWins + (won ? 1 : 0)),
+  }
+}
+
+/**
+ * บันทึกผลหนึ่งเกมของผจญภัยเมืองแห่งเวลา
+ *
+ * นับทุกเกมที่จบ ไม่ว่าจะมีคนเข้าปราสาทหรือกดนับเหรียญตอนหมดคาบ
+ * เพราะในห้องเรียน เกมส่วนใหญ่จบด้วยเสียงออด ไม่ใช่ด้วยผู้ชนะ
+ */
+export function recordTimeAdventure(
+  player: Player,
+  result: { reachedCastle: boolean; correct: number },
+): PlayerRecords {
+  const records = recordsOf(player)
+  return {
+    ...records,
+    timePlays: clamp(records.timePlays + 1),
+    timeCastles: clamp(records.timeCastles + (result.reachedCastle ? 1 : 0)),
+    timeCorrect: clamp(records.timeCorrect + clamp(result.correct)),
   }
 }
 

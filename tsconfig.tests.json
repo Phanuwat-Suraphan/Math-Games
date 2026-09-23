@@ -38,6 +38,7 @@
     "src/safezone/**/*.ts",
     "src/render3d/**/*.ts",
     "src/farm/**/*.ts",
+    "src/timeAdventure/**/*.ts",
     "src/teacher/**/*.ts",
     "src/minigames/**/*.ts",
     "src/questionEngine/**/*.ts",

@@ -90,6 +90,9 @@ jobs:
       - name: ทดสอบสมุดสถิติและถ้วยรางวัล
         run: node tests/records.test.mjs /tmp/logic
 
+      - name: ทดสอบผจญภัยเมืองแห่งเวลา (การ์ดเวลา ป.2)
+        run: node tests/timeAdventure.test.mjs /tmp/logic
+
       - name: ทดสอบเครื่องแต่งเพลง
         run: node tests/music.test.mjs /tmp/logic
 

@@ -201,7 +201,10 @@ export function Character({ player }: { player: Player }) {
 function HallOfRecords({ player }: { player: Player }) {
   const records = recordsOf(player)
   const played =
-    records.survivorRuns > 0 || records.duelPlays > 0 || records.towerBestFloor > 0
+    records.survivorRuns > 0 ||
+    records.duelPlays > 0 ||
+    records.towerBestFloor > 0 ||
+    records.timePlays > 0
   if (!played) return null
 
   const minutes = Math.floor(records.survivorBestSeconds / 60)
@@ -211,7 +214,9 @@ function HallOfRecords({ player }: { player: Player }) {
     <section aria-label="หอเกียรติยศ" className="panel panel-corners mt-5 p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-lg font-bold text-white">🏛️ หอเกียรติยศ</h3>
-        <p className="text-sm text-slate-400">สถิติจากสนามรบ ศึกผ่าสมการ และหอคอย</p>
+        <p className="text-sm text-slate-400">
+          สถิติจากสนามรบ ศึกผ่าสมการ หอคอย และเมืองแห่งเวลา
+        </p>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -261,6 +266,21 @@ function HallOfRecords({ player }: { player: Player }) {
             value={`ชั้น ${records.towerBestFloor}`}
             tone="text-gold-300"
           />
+        ) : null}
+
+        {records.timePlays > 0 ? (
+          <>
+            <StatBox
+              label="เข้าปราสาทเวลา"
+              value={`${records.timeCastles} / ${records.timePlays} เกม`}
+              tone="text-gold-300"
+            />
+            <StatBox
+              label="อ่านนาฬิกาถูก"
+              value={`${records.timeCorrect.toLocaleString('th-TH')} ข้อ`}
+              tone="text-sky-400"
+            />
+          </>
         ) : null}
       </dl>
     </section>

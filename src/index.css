@@ -1733,3 +1733,242 @@ html[data-animations='off'] *::after {
     opacity: 0;
   }
 }
+
+/* ────────────────────────────────────────────────────────────
+ * ผจญภัยเมืองแห่งเวลา (/time)
+ *
+ * การ์ดเป็นของสว่างวางบนฉากมืดของเกม ตั้งใจให้ต่างจากแผงอื่น
+ * เพราะเป็นการ์ดชุดเดียวกับที่ครูพิมพ์เล่นบนโต๊ะ เด็กต้องจำได้ว่าเป็นใบเดียวกัน
+ * สีของแต่ละกองมาจาก --c กับ --bg ที่หน้าจอใส่ให้ ไม่ได้เขียนตายไว้ที่นี่
+ * ──────────────────────────────────────────────────────────── */
+
+.ta-cute {
+  font-family: 'Mali', 'Kanit', 'Noto Sans Thai', system-ui, sans-serif;
+}
+
+.ta-board {
+  border-radius: 22px;
+  background: #fff;
+  padding: 8px;
+  box-shadow: 0 18px 40px -20px rgba(0, 0, 0, 0.8);
+}
+
+.ta-pawn {
+  transition: transform 0.32s cubic-bezier(0.3, 1.4, 0.6, 1);
+}
+
+.ta-pawn-now > g {
+  animation: ta-bob 1s ease-in-out infinite;
+}
+
+.ta-hero-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  border-radius: 16px;
+  border: 3px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 6px 4px 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #e2e8f0;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.ta-hero-tile-on {
+  border-color: var(--hc);
+  background: color-mix(in srgb, var(--hc) 22%, transparent);
+  color: #fff;
+}
+
+.ta-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px 24px;
+  background: rgba(8, 12, 30, 0.72);
+}
+
+.ta-card {
+  width: min(460px, 100%);
+  margin: auto 0;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 5px solid var(--c);
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.95) 2px, transparent 2.4px);
+  background-size: 24px 24px;
+  color: #23324a;
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.9);
+}
+
+.ta-card-pop {
+  animation: ta-pop 0.28s cubic-bezier(0.3, 1.5, 0.6, 1);
+}
+
+.ta-card-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 9px 16px 10px;
+  background: var(--c);
+  color: #fff;
+  font-family: 'Mitr', 'Kanit', sans-serif;
+  font-size: 1.05rem;
+}
+
+/* ขอบหยักเหมือนเมฆใต้หัวการ์ด แบบเดียวกับการ์ดที่พิมพ์ */
+.ta-card-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -9px;
+  height: 10px;
+  background: radial-gradient(circle at 50% 0, var(--c) 9px, transparent 9.6px) 0 0 / 20px 10px repeat-x;
+}
+
+.ta-bubble {
+  position: relative;
+  border-radius: 14px;
+  background: #fff;
+  padding: 6px 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.ta-bubble::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 50%;
+  margin-top: -6px;
+  border-style: solid;
+  border-width: 6px 8px 6px 0;
+  border-color: transparent #fff transparent transparent;
+}
+
+.ta-emph {
+  color: var(--c);
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-thickness: 3px;
+  text-underline-offset: 4px;
+}
+
+.ta-opt {
+  display: flex;
+  width: 100%;
+  min-height: 56px;
+  align-items: center;
+  gap: 10px;
+  border-radius: 18px;
+  border: 3px solid var(--c);
+  background: #fff;
+  padding: 8px 14px;
+  text-align: left;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #23324a;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--c) 35%, #fff);
+}
+
+.ta-opt:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 35%, #fff);
+}
+
+.ta-opt-right {
+  border-color: #2e9e5b;
+  background: #e3f7ea;
+}
+
+.ta-opt-wrong {
+  border-color: #e0533d;
+  background: #fde7e3;
+}
+
+.ta-opt-gone {
+  opacity: 0.25;
+  pointer-events: none;
+  text-decoration: line-through;
+}
+
+/* ป้ายลำดับ 1 2 3 ของการ์ดเรียงลำดับ ช่องว่างเป็นเส้นประให้รู้ว่ายังไม่ได้แตะ */
+.ta-num {
+  display: inline-flex;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  border-radius: 999px;
+  background: var(--c);
+  color: #fff;
+  font-family: 'Mitr', 'Kanit', sans-serif;
+  font-size: 1.1rem;
+}
+
+.ta-num-empty {
+  border: 2.5px dashed color-mix(in srgb, var(--c) 45%, #fff);
+  background: #fff;
+}
+
+.ta-burst {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: 150px;
+  height: 150px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-size: 72px;
+  line-height: 1;
+}
+
+.ta-burst::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 999px;
+  background: repeating-conic-gradient(#ffe27a 0 11deg, #fff8dc 11deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 45%, transparent 71%);
+  mask: radial-gradient(circle, #000 45%, transparent 71%);
+  animation: ta-spin 14s linear infinite;
+}
+
+@keyframes ta-pop {
+  from { transform: scale(0.85) rotate(-2deg); opacity: 0; }
+}
+
+@keyframes ta-bob {
+  50% { transform: translateY(-1.6px); }
+}
+
+@keyframes ta-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ta-card-pop,
+  .ta-pawn-now > g,
+  .ta-burst::before {
+    animation-name: none;
+  }
+
+  .ta-pawn {
+    transition: none;
+  }
+}
