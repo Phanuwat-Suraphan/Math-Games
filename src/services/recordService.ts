@@ -44,6 +44,7 @@ export function createEmptyRecords(): PlayerRecords {
     zombiePlays: 0,
     zombieCures: 0,
     zombieCorrect: 0,
+    zombieStickers: 0,
   }
 }
 
@@ -82,6 +83,7 @@ export function recordsOf(player: Player): PlayerRecords {
     zombiePlays: clamp(raw.zombiePlays),
     zombieCures: clamp(raw.zombieCures),
     zombieCorrect: clamp(raw.zombieCorrect),
+    zombieStickers: Math.min(ZOMBIE_STICKER_MAX, clamp(raw.zombieStickers)),
   }
 }
 
@@ -197,6 +199,16 @@ export function recordZombieRescue(
     zombieCures: clamp(records.zombieCures + (result.cured ? 1 : 0)),
     zombieCorrect: clamp(records.zombieCorrect + clamp(result.correct)),
   }
+}
+
+/** จำนวนช่องในสมุดวัคซีน (แม่ 2 3 4 5 10 คูณ 1–10) ต้องตรงกับ FACT_COUNT ใน zombieRescue/vaccineBook */
+export const ZOMBIE_STICKER_MAX = 50
+
+/** บันทึกจำนวนสติกเกอร์ในสมุดวัคซีน เก็บค่าที่มากที่สุด คืนค่าเดิมถ้าไม่เพิ่ม */
+export function recordZombieStickers(player: Player, count: number): PlayerRecords {
+  const records = recordsOf(player)
+  const next = Math.min(ZOMBIE_STICKER_MAX, clamp(count))
+  return next > records.zombieStickers ? { ...records, zombieStickers: next } : records
 }
 
 /** บันทึกผลหนึ่งรอบของการฝึกสูตรคูณ นับเฉพาะข้อที่ถูก ไม่นับเป็นเกมที่เล่น */

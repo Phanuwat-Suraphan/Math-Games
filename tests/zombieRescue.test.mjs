@@ -650,6 +650,20 @@ check('ชุดฝึกข้อที่ยังพลาดยังได�
   equal(BOOK.buildFocusSet(book, seeded(9)).length, Q.PRACTICE_LENGTH, 'ยังฝึกได้')
 })
 
+check('จำนวนสติกเกอร์ในบันทึกผู้เล่น: เพดานตรงกับสมุด และเก็บค่าที่มากที่สุด', () => {
+  const REC = load('services/recordService')
+  equal(REC.ZOMBIE_STICKER_MAX, BOOK.FACT_COUNT, 'เพดานต้องเท่าจำนวนช่องในสมุด')
+  const player = { records: REC.createEmptyRecords() }
+  equal(player.records.zombieStickers, 0, 'เริ่มที่ 0')
+  player.records = REC.recordZombieStickers(player, 12)
+  equal(player.records.zombieStickers, 12, 'เพิ่มได้')
+  player.records = REC.recordZombieStickers(player, 5)
+  equal(player.records.zombieStickers, 12, 'ไม่ลดลง')
+  player.records = REC.recordZombieStickers(player, 999)
+  equal(player.records.zombieStickers, 50, 'ไม่เกินเพดาน')
+  equal(REC.recordsOf({ records: { zombieStickers: 80 } }).zombieStickers, 50, 'ค่าที่ถูกแก้ต้องถูกตัด')
+})
+
 check('อ่านสมุดที่เก็บไว้: ข้อมูลเสียทิ้งทีละช่อง ไม่ทิ้งทั้งเล่ม', () => {
   const parsed = BOOK.parseBook({
     facts: {
@@ -729,6 +743,14 @@ check('ชุดพิมพ์ตรงกับเกมบนเว็บ: �
   equal(KIT.targets.easy.join(), [1, 2, 3, 4].map((n) => ENG.targetFor(n, true)).join(), 'เป้าหลอดพลังระดับง่าย' + REGEN)
   equal(KIT.rules.maxLives, ENG.MAX_LIVES, 'พลังชีวิต' + REGEN)
   equal(KIT.rules.bag, ENG.BAG_LIMIT, 'กระเป๋า' + REGEN)
+})
+
+check('สมุดวัคซีนกระดาษในชุดพิมพ์ใช้แม่และจำนวนครั้งเดียวกับสมุดในเกม', () => {
+  assert(KIT && KIT.book, 'ไม่พบข้อมูลสมุดวัคซีนในชุดพิมพ์' + REGEN)
+  equal(JSON.stringify(KIT.book.tables), JSON.stringify(Q.TABLES), 'แม่สูตรคูณ' + REGEN)
+  equal(KIT.book.streak, BOOK.STREAK_TO_CURE, 'ถูกติดกันกี่ครั้งถึงได้สติกเกอร์' + REGEN)
+  equal(KIT.book.count, BOOK.FACT_COUNT, 'จำนวนช่อง' + REGEN)
+  for (const t of Q.TABLES) assert(KIT.tableColor[t], `แม่ ${t} ต้องมีสีประจำ`)
 })
 
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */

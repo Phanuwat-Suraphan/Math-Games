@@ -487,6 +487,26 @@ export const ACHIEVEMENTS: Achievement[] = [
     unit: 'ข้อ',
     valueOf: (player) => recordsOf(player).zombieCorrect,
   }),
+  countGoal({
+    id: 'zombie-stickers-25',
+    name: 'นักสะสมวัคซีน',
+    description: 'สะสมสติกเกอร์ในสมุดวัคซีนครึ่งเล่ม 25 ช่อง',
+    emoji: '📒',
+    category: 'trial',
+    goal: 25,
+    unit: 'ช่อง',
+    valueOf: (player) => recordsOf(player).zombieStickers,
+  }),
+  countGoal({
+    id: 'zombie-stickers-50',
+    name: 'หมอสูตรคูณตัวจริง',
+    description: 'สะสมสติกเกอร์สมุดวัคซีนครบ 50 ช่อง (แม่ 2 3 4 5 10)',
+    emoji: '🩺',
+    category: 'trial',
+    goal: 50,
+    unit: 'ช่อง',
+    valueOf: (player) => recordsOf(player).zombieStickers,
+  }),
 
   // ── ของสะสม ─────────────────────────────────────────────────
   countGoal({

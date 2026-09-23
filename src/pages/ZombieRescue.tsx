@@ -10,7 +10,7 @@ import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { useMusic } from '../hooks/useMusic'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
-import { recordZombiePractice, recordZombieRescue } from '../services/recordService'
+import { recordZombiePractice, recordZombieRescue, recordZombieStickers, recordsOf } from '../services/recordService'
 import { ZOMBIE_INDICATOR } from '../teacher/indicators'
 import type { Player } from '../types/player'
 import { BOARD_VIEWBOX, CURE_POSITION, SQUARE_POSITIONS, boardArt, charInner } from '../zombieRescue/art'
@@ -151,6 +151,12 @@ export function ZombieRescue({ player }: { player: Player }) {
     saveVaccineBook(player.name, noted.book)
     return noted.newSticker
   }
+
+  /* จำนวนสติกเกอร์เข้าบันทึกผู้เล่น ให้ถ้วยรางวัลกับหอเกียรติยศเห็น (สมุดที่ได้มาก่อนมีถ้วยก็นับด้วย) */
+  const stickers = curedCount(book)
+  useEffect(() => {
+    if (stickers > recordsOf(player).zombieStickers) patchPlayer({ records: recordZombieStickers(player, stickers) })
+  }, [stickers, player, patchPlayer])
 
   const finishPractice = (correct: number, total: number) => {
     const reward = applyBonusPercent(practiceReward(correct, total), totalStats(player).coinBonusPercent)
