@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from '../Button'
 import { TABLES } from '../../zombieRescue/questions'
 import { FACT_COUNT, STREAK_TO_CURE, allFacts, curedCount, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { BookFact, VaccineBook } from '../../zombieRescue/vaccineBook'
-import { Char, CuredHead, ZHead } from './ZrParts'
+import { thanksOf, villagerFor } from '../../zombieRescue/villagers'
+import { Char, CuredHead, VillagerArt, ZHead } from './ZrParts'
 
 /**
  * สมุดวัคซีน: ดูว่ารักษาซอมบี้สูตรคูณไปแล้วกี่ตัว และข้อไหนยังพลาด
@@ -13,8 +15,9 @@ import { Char, CuredHead, ZHead } from './ZrParts'
 /** สีประจำแม่ ตรงกับสีเสื้อซอมบี้ในชุดพิมพ์ */
 export const TABLE_COLOR: Record<number, string> = { 2: '#2E9E4F', 3: '#D9730D', 4: '#1E78D9', 5: '#8B4FC7', 10: '#E0453A' }
 
-function Sticker({ fact }: { fact: BookFact }) {
+function Sticker({ fact, picked, onPick }: { fact: BookFact; picked: boolean; onPick: () => void }) {
   const { each, groups, entry, status } = fact
+  const v = villagerFor(each, groups)
   const label =
     status === 'weak'
       ? 'ยังพลาด ลองฝึกอีกนิด'
@@ -24,22 +27,62 @@ function Sticker({ fact }: { fact: BookFact }) {
           ? `ถูกติดกัน ${entry.s} จาก ${STREAK_TO_CURE} ครั้ง`
           : 'ยังไม่เคยเจอ'
   return (
-    <li
-      className={`zr-sticker zr-sticker-${status} ${entry.got ? 'zr-sticker-got' : ''}`}
-      aria-label={`${groups} × ${each} ${label}`}
-      title={label}
-    >
-      {entry.got ? <CuredHead className="w-8" /> : <ZHead className="w-8" />}
-      <span className="zr-sticker-fact">
-        {groups}×{each}
-      </span>
-      {entry.got ? <span className="zr-sticker-ans">={each * groups}</span> : null}
-      {status === 'weak' ? (
-        <span className="zr-sticker-flag" aria-hidden="true">
-          !
+    <li>
+      <button
+        type="button"
+        onClick={onPick}
+        aria-pressed={picked}
+        aria-label={`${groups} × ${each} น้อง${v.name} ${label}`}
+        className={`zr-sticker zr-sticker-${status} ${entry.got ? 'zr-sticker-got' : ''} ${picked ? 'zr-sticker-picked' : ''}`}
+      >
+        <VillagerArt v={v} cured={entry.got} className="w-10" />
+        <span className="zr-sticker-fact">
+          {groups}×{each}
         </span>
-      ) : null}
+        {entry.got ? <span className="zr-sticker-name">{v.name}</span> : null}
+        {status === 'weak' ? (
+          <span className="zr-sticker-flag" aria-hidden="true">
+            !
+          </span>
+        ) : null}
+      </button>
     </li>
+  )
+}
+
+/** การ์ดของชาวเมืองที่แตะเลือก: หายป่วยแล้วพูดขอบคุณ ยังไม่หายก็ขอให้ช่วย */
+function VillagerCard({ fact, onClose }: { fact: BookFact; onClose: () => void }) {
+  const { each, groups, entry, status } = fact
+  const v = villagerFor(each, groups)
+  const line = entry.got
+    ? status === 'weak'
+      ? `ข้อ ${groups} × ${each} ครั้งล่าสุดพลาดไปนิด มาฝึกกันอีกรอบนะ!`
+      : `“${thanksOf(v)}”`
+    : status === 'weak'
+      ? `ช่วยน้อง${v.name}ด้วย! ข้อ ${groups} × ${each} ครั้งล่าสุดยังพลาดอยู่`
+      : `ช่วยน้อง${v.name}ด้วย! ตอบ ${groups} × ${each} ให้ถูก ${STREAK_TO_CURE} ครั้งติดกัน`
+  return (
+    <div className="zr-villager-card" role="status">
+      <VillagerArt v={v} cured={entry.got} className={`w-20 flex-none ${entry.got ? 'zr-bob' : 'zr-sway'}`} />
+      <div className="min-w-0 flex-1">
+        <p className="font-display text-lg">น้อง{v.name}</p>
+        <p className="zr-bubble">{line}</p>
+        <p className="mt-1 text-sm">
+          {entry.got ? (
+            <b>
+              {groups} × {each} = {each * groups} 💉
+            </b>
+          ) : (
+            <>
+              ถูกติดกันแล้ว {entry.s} / {STREAK_TO_CURE} ครั้ง
+            </>
+          )}
+        </p>
+      </div>
+      <button type="button" onClick={onClose} className="zr-card-x" aria-label="ปิด">
+        ✕
+      </button>
+    </div>
   )
 }
 
@@ -49,18 +92,19 @@ export function VaccineBookScreen({ book, onPractice }: { book: VaccineBook; onP
   const weak = weakFacts(book)
   const pct = Math.round((total / FACT_COUNT) * 100)
   const done = total === FACT_COUNT
+  const [picked, setPicked] = useState<string | null>(null)
 
   return (
     <div className="panel panel-hero panel-corners p-5 sm:p-6">
       <div className="flex items-end justify-center gap-1" aria-hidden="true">
-        <Char k="doctor" className="w-14" />
-        <Char k={done ? 'zombo' : 'zombie'} className="w-16" />
+        <Char k="doctor" className="zr-bob w-14" />
+        <Char k={done ? 'zombo' : 'zombie'} className="zr-bob w-16" />
       </div>
       <h2 className="title-gold mt-1 text-center text-2xl font-black">📒 สมุดวัคซีน</h2>
       <p className="mt-1 text-center text-sm leading-relaxed text-slate-300">
-        ตอบข้อไหนถูก {STREAK_TO_CURE} ครั้งติดกัน ซอมบี้ในช่องนั้นหายป่วย ได้สติกเกอร์ติดสมุด
+        ชาวเมือง {FACT_COUNT} คนติดไวรัสซอมบี้ หนึ่งคนต่อหนึ่งข้อสูตรคูณ
         <br />
-        นับทั้งตอนผจญภัยในเมืองและตอนฝึกสูตรคูณ
+        ตอบข้อไหนถูก {STREAK_TO_CURE} ครั้งติดกัน คนในช่องนั้นหายป่วย · แตะช่องเพื่อทักทาย
       </p>
 
       <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
@@ -118,20 +162,26 @@ export function VaccineBookScreen({ book, onPractice }: { book: VaccineBook; onP
             <ol className="grid grid-cols-5 gap-1.5 p-2">
               {facts
                 .filter((f) => f.each === table)
-                .map((f) => (
-                  <Sticker key={f.groups} fact={f} />
-                ))}
+                .map((f) => {
+                  const key = `${f.each}x${f.groups}`
+                  return <Sticker key={f.groups} fact={f} picked={picked === key} onPick={() => setPicked(picked === key ? null : key)} />
+                })}
             </ol>
+            {facts
+              .filter((f) => f.each === table && picked === `${f.each}x${f.groups}`)
+              .map((f) => (
+                <VillagerCard key={picked} fact={f} onClose={() => setPicked(null)} />
+              ))}
           </section>
         ))}
       </div>
 
       <ul className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-slate-300">
         <li>
-          <CuredHead className="inline w-4 align-[-3px]" /> ได้สติกเกอร์
+          <CuredHead className="inline w-4 align-[-3px]" /> หายป่วยแล้ว
         </li>
         <li>
-          <ZHead className="inline w-4 align-[-3px]" /> ยังไม่ได้
+          <ZHead className="inline w-4 align-[-3px]" /> ยังเป็นซอมบี้
         </li>
         <li>
           <span className="font-bold text-ember-300">!</span> ตอบผิดครั้งล่าสุด
