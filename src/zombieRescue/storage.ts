@@ -8,6 +8,8 @@
 
 import { parseSavedGame } from './engine'
 import type { ZrState } from './engine'
+import { emptyBook, parseBook } from './vaccineBook'
+import type { VaccineBook } from './vaccineBook'
 
 const KEY = 'math-adventure:zombie:v1'
 
@@ -56,5 +58,39 @@ export function clearZombieGame(): void {
     storage.removeItem(KEY)
   } catch {
     // ลบไม่ได้ก็ไม่เป็นไร เกมใหม่จะบันทึกทับตอนเริ่มเล่นอยู่แล้ว
+  }
+}
+
+/* ── สมุดวัคซีน ───────────────────────────────────────────── */
+
+/**
+ * สมุดวัคซีนเก็บแยกคีย์ และแยกตามชื่อผู้เล่น
+ * เครื่องเดียวอาจมีหลายบัญชีผลัดกันใช้ สติกเกอร์ของใครต้องอยู่กับคนนั้น
+ */
+const BOOK_KEY = 'math-adventure:zombie-book:v1'
+
+function readBooks(storage: Storage): Record<string, unknown> {
+  try {
+    const raw: unknown = JSON.parse(storage.getItem(BOOK_KEY) ?? '{}')
+    return typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function loadVaccineBook(owner: string): VaccineBook {
+  const storage = getStorage()
+  if (!storage) return emptyBook()
+  return parseBook(readBooks(storage)[owner])
+}
+
+export function saveVaccineBook(owner: string, book: VaccineBook): boolean {
+  const storage = getStorage()
+  if (!storage) return false
+  try {
+    storage.setItem(BOOK_KEY, JSON.stringify({ ...readBooks(storage), [owner]: book }))
+    return true
+  } catch {
+    return false
   }
 }

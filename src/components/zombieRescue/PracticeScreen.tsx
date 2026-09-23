@@ -3,8 +3,10 @@ import type { CSSProperties } from 'react'
 import { Button } from '../Button'
 import { playSfx } from '../../services/audioService'
 import { PRACTICE_LENGTH, buildPracticeSet, checkAnswer } from '../../zombieRescue/questions'
+import { buildFocusSet, weakFacts } from '../../zombieRescue/vaccineBook'
+import type { VaccineBook } from '../../zombieRescue/vaccineBook'
 import type { PracticeTable, QAnswer, Question } from '../../zombieRescue/questions'
-import { AnswerPad, CHEER, COMFORT, Char, QuestionVisual, emphasize, pick } from './ZrParts'
+import { AnswerPad, CHEER, COMFORT, Char, QuestionVisual, StickerToast, emphasize, pick } from './ZrParts'
 
 /**
  * โหมดฝึกสูตรคูณ: เลือกแม่ แล้วตอบรอบละ 10 ข้อ
@@ -16,6 +18,9 @@ import { AnswerPad, CHEER, COMFORT, Char, QuestionVisual, emphasize, pick } from
 
 const RETRY_LIMIT = 3
 const COLORS = { '--c': '#2E9E4F', '--bg': '#E6F5EA' } as CSSProperties
+/** 'focus' คือชุดข้อที่ยังพลาดจากสมุดวัคซีน */
+type Choice = PracticeTable | 'focus'
+
 const CHOICES: Array<{ key: PracticeTable; label: string; note: string }> = [
   { key: 2, label: '×2', note: 'แม่ 2' },
   { key: 3, label: '×3', note: 'แม่ 3' },
@@ -27,15 +32,21 @@ const CHOICES: Array<{ key: PracticeTable; label: string; note: string }> = [
 
 interface Props {
   playerName: string
-  /** บันทึกผลหนึ่งข้อให้แผงคุณครู เรียกเฉพาะรอบแรก ไม่เรียกในรอบแก้ตัว */
-  onAnswer: (correct: boolean) => void
+  book: VaccineBook
+  /** เปิดมาที่ชุดข้อที่ยังพลาดเลย (กดมาจากสมุดวัคซีน) */
+  startFocus?: boolean
+  /**
+   * บันทึกผลหนึ่งข้อให้แผงคุณครูและสมุดวัคซีน เรียกเฉพาะรอบแรก ไม่เรียกในรอบแก้ตัว
+   * เพราะรอบแก้ตัวเด็กเพิ่งเห็นเฉลย คืน true เมื่อข้อนี้เพิ่งได้สติกเกอร์
+   */
+  onAnswer: (q: Question, correct: boolean) => boolean
   /** จบรอบ: หน้าหลักจ่ายเหรียญแล้วคืนจำนวนที่ได้ */
   onFinish: (firstTryCorrect: number, total: number) => number
   onPlayingChange: (playing: boolean) => void
 }
 
 interface Round {
-  table: PracticeTable
+  table: Choice
   questions: Question[]
   index: number
   results: boolean[]
@@ -46,18 +57,20 @@ interface Round {
 
 type Phase = { kind: 'choose' } | { kind: 'play'; round: Round } | { kind: 'done'; round: Round; reward: number }
 
-const tableName = (table: PracticeTable) => (table === 'mix' ? 'รวมทุกแม่' : `แม่ ${table}`)
+const tableName = (table: Choice) => (table === 'focus' ? 'ข้อที่ยังพลาด' : table === 'mix' ? 'รวมทุกแม่' : `แม่ ${table}`)
 
-export function PracticeScreen({ playerName, onAnswer, onFinish, onPlayingChange }: Props) {
+export function PracticeScreen({ playerName, book, startFocus = false, onAnswer, onFinish, onPlayingChange }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: 'choose' })
-  const [table, setTable] = useState<PracticeTable>(2)
-  const [result, setResult] = useState<{ correct: boolean; line: string } | null>(null)
+  const [table, setTable] = useState<Choice>(startFocus ? 'focus' : 2)
+  const [result, setResult] = useState<{ correct: boolean; line: string; sticker: boolean } | null>(null)
+  const weakCount = weakFacts(book).length
 
-  const begin = (chosen: PracticeTable) => {
+  const begin = (chosen: Choice) => {
     playSfx('click')
     setTable(chosen)
     setResult(null)
-    setPhase({ kind: 'play', round: { table: chosen, questions: buildPracticeSet(chosen, Math.random), index: 0, results: [], retry: [], retrying: false, retryIndex: 0 } })
+    const questions = chosen === 'focus' ? buildFocusSet(book, Math.random) : buildPracticeSet(chosen, Math.random)
+    setPhase({ kind: 'play', round: { table: chosen, questions, index: 0, results: [], retry: [], retrying: false, retryIndex: 0 } })
     onPlayingChange(true)
   }
 
@@ -96,6 +109,19 @@ export function PracticeScreen({ playerName, onAnswer, onFinish, onPlayingChange
               </button>
             ))}
           </div>
+          <button
+            type="button"
+            aria-pressed={table === 'focus'}
+            onClick={() => setTable('focus')}
+            className={`mt-2 w-full rounded-xl border p-3 text-center transition ${
+              table === 'focus' ? 'border-gold-300 bg-gold-500/15' : 'border-white/15 bg-white/5 hover:border-white/30'
+            }`}
+          >
+            <span className="block font-display text-lg text-white">📒 ข้อที่ยังพลาด</span>
+            <span className="block text-xs text-slate-300">
+              {weakCount ? `หยิบ ${weakCount} ข้อที่ตอบผิดล่าสุดจากสมุดวัคซีนมาฝึกก่อน` : 'ข้อที่ยังไม่ได้สติกเกอร์ในสมุดวัคซีน'}
+            </span>
+          </button>
         </fieldset>
         <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
           <li>· ถูกข้อละ 🪙 1 เหรียญ ถูกหมดทั้งรอบได้โบนัส</li>
@@ -161,9 +187,9 @@ export function PracticeScreen({ playerName, onAnswer, onFinish, onPlayingChange
     if (result) return
     const correct = checkAnswer(q, value)
     playSfx(correct ? 'correct' : 'wrong')
-    setResult({ correct, line: pick(correct ? CHEER : COMFORT) })
+    const sticker = round.retrying ? false : onAnswer(q, correct)
+    setResult({ correct, line: pick(correct ? CHEER : COMFORT), sticker })
     if (round.retrying) return
-    onAnswer(correct)
     const retry = !correct && round.retry.length < RETRY_LIMIT ? [...round.retry, q] : round.retry
     setPhase({ kind: 'play', round: { ...round, results: [...round.results, correct], retry } })
   }
@@ -233,6 +259,7 @@ export function PracticeScreen({ playerName, onAnswer, onFinish, onPlayingChange
                   <p className="text-sm text-slate-600">💡 {q.why}</p>
                 </div>
               </div>
+              {result.sticker ? <StickerToast each={q.each} groups={q.groups} /> : null}
               <Button size="lg" fullWidth onClick={next}>
                 ข้อต่อไป ➜
               </Button>

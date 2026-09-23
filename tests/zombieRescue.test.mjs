@@ -15,8 +15,10 @@
  *   node tests/zombieRescue.test.mjs /tmp/logic
  */
 
+import fs from 'fs'
 import path from 'path'
 import { createRequire } from 'module'
+import { fileURLToPath } from 'url'
 
 const OUT = process.argv[2]
 if (!OUT) {
@@ -379,7 +381,9 @@ check('กล่องเสบียง ➕: ได้ของเสมอ · 
     if (reward.kind === 'item') equal(state.players[0].items.join(), reward.item, 'ได้ของเข้ากระเป๋า')
     else equal(state.players[0].supplies, 2 + reward.amount, 'ได้เสบียง')
   }
-  assert(count.medkit > count.shield && count.medkit > count.radio, 'ยาต้องออกบ่อยที่สุด')
+  assert(['help', 'shield', 'skate', 'supplies'].every((k) => count.medkit > count[k]), 'ยาต้องออกบ่อยที่สุด')
+  equal(count.radio, undefined, 'วิทยุไม่อยู่ในกล่องเสบียง (ซื้อที่ตลาดเท่านั้น) เหมือนชุดพิมพ์')
+  equal(ENG.SUPPLY_TABLE.reduce((s, [, w]) => s + w, 0), 6, 'กล่องเสบียงคือการทอยลูกเต๋า 1 ลูก (6 หน้า) เหมือนชุดพิมพ์')
   const full = setPlayer(newGame(1), { items: ['help', 'help', 'help', 'help'] })
   for (let i = 0; i < 50; i += 1) {
     const { state, reward } = ENG.openSupply(full, rng)
@@ -555,6 +559,176 @@ check('ความยาวเกมพอดีคาบ: เด็กตอ�
     assert(median >= 10 && median <= 22, `${n} คน: ค่ากลางจำนวนรอบ ${median}`)
     assert(doorMedian >= 1 && doorMedian <= 6, `${n} คน: ถึงประตูแล้วอีก ${doorMedian} รอบถึงสร้างยาได้`)
   }
+})
+
+/* ── สมุดวัคซีน ───────────────────────────────────────── */
+
+const BOOK = load('zombieRescue/vaccineBook')
+
+check('สมุดวัคซีนมี 50 ช่อง: แม่ 2 3 4 5 10 คูณ 1–10', () => {
+  const facts = BOOK.allFacts(BOOK.emptyBook())
+  equal(facts.length, 50, 'จำนวนช่อง')
+  equal(BOOK.FACT_COUNT, 50, 'FACT_COUNT')
+  equal(new Set(facts.map((f) => `${f.each}x${f.groups}`)).size, 50, 'ช่องไม่ซ้ำ')
+  assert(facts.every((f) => f.status === 'new'), 'สมุดใหม่ทุกช่องยังไม่เคยเจอ')
+})
+
+check('ถูก 2 ครั้งติดกันได้สติกเกอร์ ผิดคั่นกลางต้องเริ่มนับใหม่', () => {
+  const q = { each: 3, groups: 7 }
+  let r = BOOK.noteAnswer(BOOK.emptyBook(), q, true)
+  equal(r.newSticker, false, 'ถูกครั้งแรกยังไม่ได้')
+  equal(BOOK.statusOf(BOOK.entryOf(r.book, 3, 7)), 'trying', 'ถูกครั้งเดียวคือกำลังลอง')
+  r = BOOK.noteAnswer(r.book, q, false)
+  equal(BOOK.statusOf(BOOK.entryOf(r.book, 3, 7)), 'weak', 'ผิดล่าสุดคือยังพลาด')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, false, 'ถูกหลังผิดเพิ่งนับ 1')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, true, 'ถูกติดกันครบ 2 ได้สติกเกอร์')
+  equal(BOOK.curedCount(r.book), 1, 'นับสติกเกอร์')
+  equal(BOOK.curedCount(r.book, 3), 1, 'นับสติกเกอร์ของแม่ 3')
+  equal(BOOK.curedCount(r.book, 2), 0, 'แม่อื่นไม่นับ')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, false, 'ได้แล้วไม่ประกาศซ้ำ')
+})
+
+check('สติกเกอร์ไม่หายเมื่อตอบผิดทีหลัง แต่ข้อนั้นกลับไปอยู่ในข้อที่ยังพลาด', () => {
+  const q = { each: 5, groups: 9 }
+  let book = BOOK.noteAnswer(BOOK.emptyBook(), q, true).book
+  book = BOOK.noteAnswer(book, q, true).book
+  book = BOOK.noteAnswer(book, q, false).book
+  const entry = BOOK.entryOf(book, 5, 9)
+  equal(entry.got, true, 'สติกเกอร์ยังอยู่')
+  equal(BOOK.statusOf(entry), 'weak', 'ขึ้นเป็นข้อที่ยังพลาด')
+  equal(BOOK.weakFacts(book).length, 1, 'อยู่ในรายการข้อที่ยังพลาด')
+  book = BOOK.noteAnswer(book, q, true).book
+  equal(BOOK.statusOf(BOOK.entryOf(book, 5, 9)), 'cured', 'ถูกอีกครั้งพ้นรายการ')
+})
+
+check('สมุดไม่จดข้อนอกสูตรคูณ ป.2 และไม่แก้สมุดเดิม', () => {
+  const book = BOOK.emptyBook()
+  equal(BOOK.noteAnswer(book, { each: 3, groups: 11 }, true).book, book, 'เกิน 10 กลุ่ม')
+  equal(BOOK.noteAnswer(book, { each: 6, groups: 2 }, true).book, book, 'แม่ 6 ไม่อยู่ในสมุด')
+  BOOK.noteAnswer(book, { each: 2, groups: 2 }, true)
+  equal(Object.keys(book.facts).length, 0, 'สมุดเดิมต้องไม่ถูกแก้')
+})
+
+check('ทุกโจทย์ที่เกมสร้างจดลงสมุดได้ (แม่กับจำนวนกลุ่มอยู่ในสมุดเสมอ)', () => {
+  const rng = seeded(4242)
+  for (const stage of [1, 2, 3, 4, 5, 'boss']) {
+    for (let i = 0; i < 2000; i += 1) {
+      const q = Q.makeQuestion(stage, rng, { easy: i % 2 === 0 })
+      assert(BOOK.isBookFact(q.each, q.groups), `โจทย์ ${stage} ${q.groups}×${q.each} ไม่อยู่ในสมุด`)
+    }
+  }
+})
+
+check('ชุดฝึกข้อที่ยังพลาด: 10 ข้อ ไม่ซ้ำ ข้อที่พลาดมาก่อน เฉลยถูก', () => {
+  let book = BOOK.emptyBook()
+  const weak = [[3, 7], [4, 8], [10, 6]]
+  for (const [each, groups] of weak) book = BOOK.noteAnswer(book, { each, groups }, false).book
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const set = BOOK.buildFocusSet(book, seeded(seed))
+    equal(set.length, Q.PRACTICE_LENGTH, 'จำนวนข้อ')
+    const keys = set.map((q) => `${q.each}x${q.groups}`)
+    equal(new Set(keys).size, keys.length, 'ไม่มีข้อซ้ำ')
+    for (const [each, groups] of weak) assert(keys.includes(`${each}x${groups}`), `ต้องมีข้อที่พลาด ${groups}×${each}`)
+    for (const q of set) {
+      equal(q.product, q.groups * q.each, 'ผลคูณ')
+      assert(Q.checkAnswer(q, { kind: 'number', value: Q.expectedNumber(q) }) || q.ask === 'sentence', 'เฉลยต้องตรวจผ่าน')
+      if (q.ask === 'missing') assert(q.groups >= 2, 'ข้อหา □ ต้องมีอย่างน้อย 2 กลุ่ม')
+    }
+  }
+})
+
+check('ชุดฝึกข้อที่ยังพลาดยังได้ 10 ข้อเมื่อได้สติกเกอร์ครบทั้งสมุด', () => {
+  let book = BOOK.emptyBook()
+  for (const f of BOOK.allFacts(book)) {
+    book = BOOK.noteAnswer(book, f, true).book
+    book = BOOK.noteAnswer(book, f, true).book
+  }
+  equal(BOOK.curedCount(book), 50, 'ครบสมุด')
+  equal(BOOK.buildFocusSet(book, seeded(9)).length, Q.PRACTICE_LENGTH, 'ยังฝึกได้')
+})
+
+check('อ่านสมุดที่เก็บไว้: ข้อมูลเสียทิ้งทีละช่อง ไม่ทิ้งทั้งเล่ม', () => {
+  const parsed = BOOK.parseBook({
+    facts: {
+      '2x3': { r: 2, w: 1, s: 2, got: true },
+      '3x4': 'เสีย',
+      '6x2': { r: 5, w: 0, s: 5, got: true },
+      '4x4': { r: -3, w: 1.7, s: 'x', got: 'yes' },
+    },
+  })
+  equal(JSON.stringify(parsed.facts['2x3']), JSON.stringify({ r: 2, w: 1, s: 2, got: true }), 'ช่องดีอยู่ครบ')
+  equal(parsed.facts['3x4'], undefined, 'ช่องเสียถูกทิ้ง')
+  equal(parsed.facts['6x2'], undefined, 'ช่องนอกสมุดถูกทิ้ง')
+  equal(JSON.stringify(parsed.facts['4x4']), JSON.stringify({ r: 0, w: 1, s: 0, got: false }), 'ค่าเพี้ยนถูกตัด')
+  equal(Object.keys(BOOK.parseBook(null).facts).length, 0, 'null ได้สมุดเปล่า')
+  equal(Object.keys(BOOK.parseBook({ facts: 7 }).facts).length, 0, 'facts ผิดชนิดได้สมุดเปล่า')
+})
+
+/* ── ชุดพิมพ์ zombie-rescue.html ───────────────────────── */
+
+/**
+ * ชุดพิมพ์กับเกมบนเว็บต้องเป็นเกมเดียวกัน
+ * ข้อมูลในชุดพิมพ์สร้างจาก scripts/zombie-kit-data.mjs ถ้าแก้เกมบนเว็บแล้วลืมสร้างใหม่ ตรงนี้จะฟ้อง
+ * วิธีแก้: npx tsc -p tsconfig.tests.json --outDir /tmp/logic && node scripts/zombie-kit-data.mjs /tmp/logic
+ */
+const KIT_HTML = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'zombie-rescue.html'), 'utf8')
+const KIT = (() => {
+  const m = KIT_HTML.match(/<script id="kit-data" type="application\/json">([\s\S]*?)<\/script>/)
+  return m && m[1].trim() ? JSON.parse(m[1]) : null
+})()
+const REGEN = ' (สร้างข้อมูลชุดพิมพ์ใหม่ด้วย scripts/zombie-kit-data.mjs)'
+
+check('ชุดพิมพ์: การ์ดโจทย์ 70 ใบ เขตละ 12 และ ดร.ซอมโบ 10 · รหัสไม่ซ้ำ', () => {
+  assert(KIT, 'ไม่พบข้อมูลในชุดพิมพ์' + REGEN)
+  equal(KIT.cards.length, 70, 'จำนวนการ์ดโจทย์')
+  for (const [stage, count] of [[1, 12], [2, 12], [3, 12], [4, 12], [5, 12], ['boss', 10]]) {
+    equal(KIT.cards.filter((c) => c.stage === stage).length, count, `กองของเขต ${stage}`)
+  }
+  const ids = KIT.cards.map((c) => c.id)
+  equal(new Set(ids).size, ids.length, 'รหัสการ์ดซ้ำ')
+})
+
+check('ชุดพิมพ์: เฉลยทุกใบถูก ใช้แม่ของเขต และโจทย์กับคำใบ้ไม่เผยคำตอบ', () => {
+  for (const c of KIT.cards) {
+    const q = { ...c, hidden: c.hidden ?? undefined }
+    equal(c.product, c.groups * c.each, `${c.id} ผลคูณ`)
+    assert(c.groups >= 2 && c.groups <= 10, `${c.id} จำนวนกลุ่ม ${c.groups}`)
+    if (typeof c.stage === 'number' && Q.ZONE_TABLE[c.stage]) equal(c.each, Q.ZONE_TABLE[c.stage], `${c.id} แม่ของเขต`)
+    equal(c.answer, Q.expectedNumber(q), `${c.id} คำตอบ`)
+    if (c.ask === 'sentence') {
+      assert(Q.checkAnswer(q, { kind: 'sentence', x: c.each, y: c.groups, z: c.product }), `${c.id} สลับที่ต้องถูก`)
+      assert(c.short.includes(`= ${c.product}`), `${c.id} เฉลยบนการ์ด`)
+    } else {
+      assert(Q.checkAnswer(q, { kind: 'number', value: c.answer }), `${c.id} ตอบถูกต้องถูก`)
+      assert(hasNumber(c.short, c.answer), `${c.id} เฉลยบนการ์ด`)
+    }
+    const given = c.ask === 'missing' ? [c.product, c.hidden === 'each' ? c.groups : c.each] : [c.groups, c.each]
+    const answer = c.ask === 'sentence' ? c.product : c.answer
+    if (!given.includes(answer)) {
+      const shown = c.text + ' ' + (c.visual.text || '') + ' ' + (c.visual.tag || '')
+      assert(!hasNumber(shown, answer), `${c.id} โจทย์เผยคำตอบ`)
+      assert(!hasNumber(c.hint, answer), `${c.id} คำใบ้เผยคำตอบ`)
+    }
+    const v = c.visual
+    if (v.kind === 'groups') assert(v.groups * v.each <= 30, `${c.id} ภาพเยอะเกิน`)
+    if (v.kind === 'array') assert(v.rows * v.cols <= 30, `${c.id} ภาพเยอะเกิน`)
+  }
+})
+
+check('ชุดพิมพ์ตรงกับเกมบนเว็บ: กระดาน ตัวละคร เขต ราคา การ์ดพิเศษ และเป้าหลอดพลัง', () => {
+  equal(KIT.board.svg, ART.boardArt(), 'กระดาน' + REGEN)
+  equal(KIT.chars.zombo, ART.charInner('zombo'), 'ตัวละคร' + REGEN)
+  equal(JSON.stringify(KIT.zones), JSON.stringify(BOARD.ZONES), 'เขต' + REGEN)
+  equal(JSON.stringify(KIT.items), JSON.stringify(ENG.ITEM_INFO), 'อุปกรณ์และราคา' + REGEN)
+  equal(JSON.stringify(KIT.events.map((e) => e.key)), JSON.stringify(ENG.EVENT_DECK), 'การ์ดพิเศษ' + REGEN)
+  equal(JSON.stringify(KIT.supplyTable), JSON.stringify(ENG.SUPPLY_TABLE), 'กล่องเสบียง' + REGEN)
+  equal(KIT.targets.normal.join(), [1, 2, 3, 4].map((n) => ENG.targetFor(n, false)).join(), 'เป้าหลอดพลัง' + REGEN)
+  equal(KIT.targets.easy.join(), [1, 2, 3, 4].map((n) => ENG.targetFor(n, true)).join(), 'เป้าหลอดพลังระดับง่าย' + REGEN)
+  equal(KIT.rules.maxLives, ENG.MAX_LIVES, 'พลังชีวิต' + REGEN)
+  equal(KIT.rules.bag, ENG.BAG_LIMIT, 'กระเป๋า' + REGEN)
 })
 
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */

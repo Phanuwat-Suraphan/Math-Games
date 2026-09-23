@@ -315,3 +315,13 @@ export function Hearts({ lives, max = 3 }: { lives: number; max?: number }) {
     </span>
   )
 }
+
+/** ป้าย "ได้สติกเกอร์ใหม่" ตอนข้อนั้นเพิ่งถูกติดกันครบในสมุดวัคซีน */
+export function StickerToast({ each, groups }: { each: number; groups: number }) {
+  return (
+    <p className="zr-sticker-toast flex items-center justify-center gap-2 rounded-2xl bg-[#E6F5EA] px-3 py-2 font-bold text-green-800" role="status">
+      <CuredHead className="w-8" />
+      ได้สติกเกอร์ {groups} × {each} = {each * groups} ในสมุดวัคซีน!
+    </p>
+  )
+}
