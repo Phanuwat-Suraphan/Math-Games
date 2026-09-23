@@ -48,7 +48,9 @@ import {
 import type { AnswerContext, AnswerOutcome, EventDraw, HeroKey, ItemKey, SupplyReward, ZrState } from '../zombieRescue/engine'
 import { TABLES, checkAnswer, practiceReward } from '../zombieRescue/questions'
 import type { QAnswer, Question, Stage } from '../zombieRescue/questions'
-import { clearZombieGame, loadZombieGame, saveZombieGame } from '../zombieRescue/storage'
+import { clearZombieGame, loadVaccineBook, loadZombieGame, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
+import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
+import type { VaccineBook } from '../zombieRescue/vaccineBook'
 import {
   AnswerPad,
   BUDDY,
@@ -59,12 +61,14 @@ import {
   Die,
   Hearts,
   QuestionVisual,
+  StickerToast,
   ZHead,
   emphasize,
   pick,
   stageColors,
 } from '../components/zombieRescue/ZrParts'
 import { PracticeScreen } from '../components/zombieRescue/PracticeScreen'
+import { VaccineBookScreen } from '../components/zombieRescue/VaccineBookScreen'
 
 /**
  * ZOMBIE RESCUE: ภารกิจรอดชีวิต พิชิตไวรัสซอมบี้ (เกมการคูณ ป.2)
@@ -92,6 +96,8 @@ interface QuestionModal {
   phase: 'ask' | 'offerHelp' | 'result'
   outcome: AnswerOutcome | null
   line: string
+  /** ข้อนี้เพิ่งได้สติกเกอร์ในสมุดวัคซีน */
+  sticker: boolean
 }
 
 type Modal =
@@ -127,8 +133,24 @@ export function ZombieRescue({ player }: { player: Player }) {
   /* ส่งผลให้แผงคุณครูเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของบัญชีในเครื่องนี้ (เหตุผลเดียวกับเมืองแห่งเวลา) */
   const { logIndicator, currentCode } = useIndicatorLog(player.name)
   const [saved, setSaved] = useState<ZrState | null>(() => loadZombieGame(player.name))
-  const [mode, setMode] = useState<'board' | 'practice'>('board')
+  const [mode, setMode] = useState<'board' | 'practice' | 'book'>('board')
   const [practicing, setPracticing] = useState(false)
+  const [practiceFocus, setPracticeFocus] = useState(false)
+
+  /*
+   * สมุดวัคซีนจดทุกข้อที่ตอบบนเครื่องนี้ ทั้งของคนที่ 1 และเพื่อนในวง
+   * เหตุผลเดียวกับตัวนับ zombieCorrect: เกมผลัดกันเล่นบนเครื่องเดียว สมุดจึงเป็นของทั้งวง
+   * ใช้ ref คู่กับ state เพราะตอบสองครั้งติดกัน (ผิดแล้วใช้บัตรช่วยคิด) ต้องต่อจากสมุดล่าสุด
+   */
+  const [book, setBook] = useState<VaccineBook>(() => loadVaccineBook(player.name))
+  const bookRef = useRef(book)
+  const noteFact = (q: Question, correct: boolean): boolean => {
+    const noted = noteAnswer(bookRef.current, q, correct)
+    bookRef.current = noted.book
+    setBook(noted.book)
+    saveVaccineBook(player.name, noted.book)
+    return noted.newSticker
+  }
 
   const finishPractice = (correct: number, total: number) => {
     const reward = applyBonusPercent(practiceReward(correct, total), totalStats(player).coinBonusPercent)
@@ -207,7 +229,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     const drawn = nextQuestion(state, stage, Math.random)
     setGame(drawn.state)
     const buddy = ctx === 'zombie' ? BUDDY.zombie : BUDDY[stage]
-    show({ kind: 'question', ctx, stage, q: drawn.question, buddy: pick(buddy.say), helped: false, attempt: 0, phase: 'ask', outcome: null, line: '' })
+    show({ kind: 'question', ctx, stage, q: drawn.question, buddy: pick(buddy.say), helped: false, attempt: 0, phase: 'ask', outcome: null, line: '', sticker: false })
   }
 
   const explore = () => {
@@ -234,12 +256,13 @@ export function ZombieRescue({ player }: { player: Player }) {
     if (!game || !modal || modal.kind !== 'question' || modal.phase !== 'ask') return
     const correct = checkAnswer(modal.q, answer)
     if (game.turn === 0) logIndicator(ZOMBIE_INDICATOR, correct)
+    const sticker = noteFact(modal.q, correct)
     if (!correct && !modal.helped && hasItem(game, 'help')) {
       playSfx('wrong')
       setModal({ ...modal, phase: 'offerHelp' })
       return
     }
-    finalize(modal, game, correct)
+    finalize({ ...modal, sticker }, game, correct)
   }
 
   const applyHelp = () => {
@@ -378,11 +401,12 @@ export function ZombieRescue({ player }: { player: Player }) {
         <TopBar player={player} title="ZOMBIE RESCUE" backTo="/menu" backLabel="กลับเมนู" />
         <ScreenLayout width="normal">
           {!practicing ? (
-            <div className="mb-4 grid grid-cols-2 gap-2" role="tablist" aria-label="เลือกโหมด">
+            <div className="mb-4 grid grid-cols-3 gap-2" role="tablist" aria-label="เลือกโหมด">
               {(
                 [
                   ['board', '🗺️ ผจญภัยในเมือง', 'เล่นด้วยกัน 1–4 คน'],
                   ['practice', '🎯 ฝึกสูตรคูณ', 'คนเดียว รอบละ 10 ข้อ'],
+                  ['book', '📒 สมุดวัคซีน', `สติกเกอร์ ${curedCount(book)}/50${weakFacts(book).length ? ` · พลาด ${weakFacts(book).length}` : ''}`],
                 ] as const
               ).map(([key, label, note]) => (
                 <button
@@ -390,7 +414,10 @@ export function ZombieRescue({ player }: { player: Player }) {
                   type="button"
                   role="tab"
                   aria-selected={mode === key}
-                  onClick={() => setMode(key)}
+                  onClick={() => {
+                    setMode(key)
+                    setPracticeFocus(false)
+                  }}
                   className={`rounded-2xl border-2 px-3 py-2.5 text-left transition ${
                     mode === key ? 'border-gold-300 bg-gold-500/15' : 'border-white/10 bg-white/5 hover:border-white/25'
                   }`}
@@ -403,10 +430,25 @@ export function ZombieRescue({ player }: { player: Player }) {
           ) : null}
           {mode === 'board' ? (
             <SetupPanel setup={setup} onChange={setSetup} onStart={start} saved={saved} onResume={resume} />
+          ) : mode === 'book' ? (
+            <VaccineBookScreen
+              book={book}
+              onPractice={() => {
+                playSfx('click')
+                setPracticeFocus(true)
+                setMode('practice')
+              }}
+            />
           ) : (
             <PracticeScreen
+              key={practiceFocus ? 'focus' : 'pick'}
               playerName={player.name}
-              onAnswer={(correct) => logIndicator(ZOMBIE_INDICATOR, correct)}
+              book={book}
+              startFocus={practiceFocus}
+              onAnswer={(q, correct) => {
+                logIndicator(ZOMBIE_INDICATOR, correct)
+                return noteFact(q, correct)
+              }}
               onFinish={finishPractice}
               onPlayingChange={setPracticing}
             />
@@ -725,6 +767,12 @@ function SetupPanel({
       <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
         🧟 เริ่มภารกิจ!
       </Button>
+      <p className="mt-4 text-center text-sm text-slate-300">
+        อยากเล่นบนโต๊ะในห้องเรียน?{' '}
+        <a href="zombie-rescue.html" target="_blank" rel="noopener" className="font-bold text-gold-200 underline underline-offset-2">
+          🖨️ เปิดชุดพิมพ์บอร์ดเกม
+        </a>
+      </p>
     </div>
   )
 }
@@ -1142,6 +1190,7 @@ function QuestionView(props: ModalViewProps & { modal: QuestionModal; pop: strin
                 <p className="text-sm text-slate-600">💡 {q.why}</p>
               </div>
             </div>
+            {modal.sticker ? <StickerToast each={q.each} groups={q.groups} /> : null}
             <Button size="lg" fullWidth onClick={props.onAfterAnswer}>
               {outcome.cured ? '💉 ดูผลภารกิจ' : modal.ctx === 'turn' && outcome.correct ? '🎲 ทอยลูกเต๋า' : 'ไปต่อ ➜'}
             </Button>

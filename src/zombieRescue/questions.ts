@@ -440,8 +440,6 @@ export const PRACTICE_PERFECT_BONUS = 5
  * ข้อหา □ ต้องมีอย่างน้อย 2 กลุ่ม ไม่งั้นคำตอบคือ 1 เสมอ
  */
 export function buildPracticeSet(table: PracticeTable, rng: Rng): Question[] {
-  const expr = exprTemplate('practice-expr')
-  const missing = missingTemplate('practice-missing')
   const shuffled = <T>(list: T[]): T[] => {
     const out = list.slice()
     for (let i = out.length - 1; i > 0; i -= 1) {
@@ -455,13 +453,26 @@ export function buildPracticeSet(table: PracticeTable, rng: Rng): Question[] {
     table === 'mix'
       ? shuffled(TABLES.flatMap((t) => counts.map((g): [Table, number] => [t, g]))).slice(0, PRACTICE_LENGTH)
       : shuffled(counts).map((g): [Table, number] => [table, g])
-  const missingSlots = [4, 9]
+  return practiceFromPairs(pairs, rng)
+}
+
+/**
+ * สร้างชุดฝึกจากคู่ [แม่, จำนวนกลุ่ม] ที่เลือกไว้แล้ว (ใช้ทั้งชุดฝึกปกติและชุดฝึกข้อที่ยังพลาด)
+ * ข้อที่ 5 และ 10 เป็นข้อหา □ ถ้ามีคู่ที่มีอย่างน้อย 2 กลุ่มให้สลับมาไว้ช่องนั้น
+ */
+export function practiceFromPairs(input: Array<[Table, number]>, rng: Rng): Question[] {
+  const expr = exprTemplate('practice-expr')
+  const missing = missingTemplate('practice-missing')
+  const pairs = input.slice()
+  const missingSlots = [4, 9].filter((slot) => slot < pairs.length)
   for (const slot of missingSlots) {
     if (pairs[slot][1] >= 2) continue
     const swap = pairs.findIndex((pair, i) => pair[1] >= 2 && !missingSlots.includes(i))
-    ;[pairs[slot], pairs[swap]] = [pairs[swap], pairs[slot]]
+    if (swap >= 0) [pairs[slot], pairs[swap]] = [pairs[swap], pairs[slot]]
   }
-  return pairs.map(([each, groups], i) => buildFrom(missingSlots.includes(i) ? missing : expr, 'practice', groups, each, rng))
+  return pairs.map(([each, groups], i) =>
+    buildFrom(missingSlots.includes(i) && groups >= 2 ? missing : expr, 'practice', groups, each, rng),
+  )
 }
 
 export function practiceReward(firstTryCorrect: number, total: number): number {

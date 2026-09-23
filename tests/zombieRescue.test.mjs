@@ -561,6 +561,112 @@ check('ความยาวเกมพอดีคาบ: เด็กตอ�
   }
 })
 
+/* ── สมุดวัคซีน ───────────────────────────────────────── */
+
+const BOOK = load('zombieRescue/vaccineBook')
+
+check('สมุดวัคซีนมี 50 ช่อง: แม่ 2 3 4 5 10 คูณ 1–10', () => {
+  const facts = BOOK.allFacts(BOOK.emptyBook())
+  equal(facts.length, 50, 'จำนวนช่อง')
+  equal(BOOK.FACT_COUNT, 50, 'FACT_COUNT')
+  equal(new Set(facts.map((f) => `${f.each}x${f.groups}`)).size, 50, 'ช่องไม่ซ้ำ')
+  assert(facts.every((f) => f.status === 'new'), 'สมุดใหม่ทุกช่องยังไม่เคยเจอ')
+})
+
+check('ถูก 2 ครั้งติดกันได้สติกเกอร์ ผิดคั่นกลางต้องเริ่มนับใหม่', () => {
+  const q = { each: 3, groups: 7 }
+  let r = BOOK.noteAnswer(BOOK.emptyBook(), q, true)
+  equal(r.newSticker, false, 'ถูกครั้งแรกยังไม่ได้')
+  equal(BOOK.statusOf(BOOK.entryOf(r.book, 3, 7)), 'trying', 'ถูกครั้งเดียวคือกำลังลอง')
+  r = BOOK.noteAnswer(r.book, q, false)
+  equal(BOOK.statusOf(BOOK.entryOf(r.book, 3, 7)), 'weak', 'ผิดล่าสุดคือยังพลาด')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, false, 'ถูกหลังผิดเพิ่งนับ 1')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, true, 'ถูกติดกันครบ 2 ได้สติกเกอร์')
+  equal(BOOK.curedCount(r.book), 1, 'นับสติกเกอร์')
+  equal(BOOK.curedCount(r.book, 3), 1, 'นับสติกเกอร์ของแม่ 3')
+  equal(BOOK.curedCount(r.book, 2), 0, 'แม่อื่นไม่นับ')
+  r = BOOK.noteAnswer(r.book, q, true)
+  equal(r.newSticker, false, 'ได้แล้วไม่ประกาศซ้ำ')
+})
+
+check('สติกเกอร์ไม่หายเมื่อตอบผิดทีหลัง แต่ข้อนั้นกลับไปอยู่ในข้อที่ยังพลาด', () => {
+  const q = { each: 5, groups: 9 }
+  let book = BOOK.noteAnswer(BOOK.emptyBook(), q, true).book
+  book = BOOK.noteAnswer(book, q, true).book
+  book = BOOK.noteAnswer(book, q, false).book
+  const entry = BOOK.entryOf(book, 5, 9)
+  equal(entry.got, true, 'สติกเกอร์ยังอยู่')
+  equal(BOOK.statusOf(entry), 'weak', 'ขึ้นเป็นข้อที่ยังพลาด')
+  equal(BOOK.weakFacts(book).length, 1, 'อยู่ในรายการข้อที่ยังพลาด')
+  book = BOOK.noteAnswer(book, q, true).book
+  equal(BOOK.statusOf(BOOK.entryOf(book, 5, 9)), 'cured', 'ถูกอีกครั้งพ้นรายการ')
+})
+
+check('สมุดไม่จดข้อนอกสูตรคูณ ป.2 และไม่แก้สมุดเดิม', () => {
+  const book = BOOK.emptyBook()
+  equal(BOOK.noteAnswer(book, { each: 3, groups: 11 }, true).book, book, 'เกิน 10 กลุ่ม')
+  equal(BOOK.noteAnswer(book, { each: 6, groups: 2 }, true).book, book, 'แม่ 6 ไม่อยู่ในสมุด')
+  BOOK.noteAnswer(book, { each: 2, groups: 2 }, true)
+  equal(Object.keys(book.facts).length, 0, 'สมุดเดิมต้องไม่ถูกแก้')
+})
+
+check('ทุกโจทย์ที่เกมสร้างจดลงสมุดได้ (แม่กับจำนวนกลุ่มอยู่ในสมุดเสมอ)', () => {
+  const rng = seeded(4242)
+  for (const stage of [1, 2, 3, 4, 5, 'boss']) {
+    for (let i = 0; i < 2000; i += 1) {
+      const q = Q.makeQuestion(stage, rng, { easy: i % 2 === 0 })
+      assert(BOOK.isBookFact(q.each, q.groups), `โจทย์ ${stage} ${q.groups}×${q.each} ไม่อยู่ในสมุด`)
+    }
+  }
+})
+
+check('ชุดฝึกข้อที่ยังพลาด: 10 ข้อ ไม่ซ้ำ ข้อที่พลาดมาก่อน เฉลยถูก', () => {
+  let book = BOOK.emptyBook()
+  const weak = [[3, 7], [4, 8], [10, 6]]
+  for (const [each, groups] of weak) book = BOOK.noteAnswer(book, { each, groups }, false).book
+  for (let seed = 1; seed <= 200; seed += 1) {
+    const set = BOOK.buildFocusSet(book, seeded(seed))
+    equal(set.length, Q.PRACTICE_LENGTH, 'จำนวนข้อ')
+    const keys = set.map((q) => `${q.each}x${q.groups}`)
+    equal(new Set(keys).size, keys.length, 'ไม่มีข้อซ้ำ')
+    for (const [each, groups] of weak) assert(keys.includes(`${each}x${groups}`), `ต้องมีข้อที่พลาด ${groups}×${each}`)
+    for (const q of set) {
+      equal(q.product, q.groups * q.each, 'ผลคูณ')
+      assert(Q.checkAnswer(q, { kind: 'number', value: Q.expectedNumber(q) }) || q.ask === 'sentence', 'เฉลยต้องตรวจผ่าน')
+      if (q.ask === 'missing') assert(q.groups >= 2, 'ข้อหา □ ต้องมีอย่างน้อย 2 กลุ่ม')
+    }
+  }
+})
+
+check('ชุดฝึกข้อที่ยังพลาดยังได้ 10 ข้อเมื่อได้สติกเกอร์ครบทั้งสมุด', () => {
+  let book = BOOK.emptyBook()
+  for (const f of BOOK.allFacts(book)) {
+    book = BOOK.noteAnswer(book, f, true).book
+    book = BOOK.noteAnswer(book, f, true).book
+  }
+  equal(BOOK.curedCount(book), 50, 'ครบสมุด')
+  equal(BOOK.buildFocusSet(book, seeded(9)).length, Q.PRACTICE_LENGTH, 'ยังฝึกได้')
+})
+
+check('อ่านสมุดที่เก็บไว้: ข้อมูลเสียทิ้งทีละช่อง ไม่ทิ้งทั้งเล่ม', () => {
+  const parsed = BOOK.parseBook({
+    facts: {
+      '2x3': { r: 2, w: 1, s: 2, got: true },
+      '3x4': 'เสีย',
+      '6x2': { r: 5, w: 0, s: 5, got: true },
+      '4x4': { r: -3, w: 1.7, s: 'x', got: 'yes' },
+    },
+  })
+  equal(JSON.stringify(parsed.facts['2x3']), JSON.stringify({ r: 2, w: 1, s: 2, got: true }), 'ช่องดีอยู่ครบ')
+  equal(parsed.facts['3x4'], undefined, 'ช่องเสียถูกทิ้ง')
+  equal(parsed.facts['6x2'], undefined, 'ช่องนอกสมุดถูกทิ้ง')
+  equal(JSON.stringify(parsed.facts['4x4']), JSON.stringify({ r: 0, w: 1, s: 0, got: false }), 'ค่าเพี้ยนถูกตัด')
+  equal(Object.keys(BOOK.parseBook(null).facts).length, 0, 'null ได้สมุดเปล่า')
+  equal(Object.keys(BOOK.parseBook({ facts: 7 }).facts).length, 0, 'facts ผิดชนิดได้สมุดเปล่า')
+})
+
 /* ── ชุดพิมพ์ zombie-rescue.html ───────────────────────── */
 
 /**

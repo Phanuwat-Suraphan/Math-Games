@@ -2057,6 +2057,88 @@ html[data-animations='off'] *::after {
   transition: width 0.5s ease;
 }
 
+.zr-book-page {
+  border-radius: 18px;
+  background: #fffdf6;
+  color: #23324a;
+  border: 3px solid var(--tc);
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--tc) 55%, #000);
+}
+
+.zr-book-page header {
+  color: var(--tc);
+}
+
+.zr-sticker {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 2px 4px;
+  border-radius: 12px;
+  border: 2px dashed #cfd8e3;
+  background: #f3f6fa;
+  font-family: 'Mali', 'Leelawadee UI', Tahoma, sans-serif;
+  line-height: 1.1;
+}
+
+.zr-sticker-new svg {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.zr-sticker-trying {
+  border-color: color-mix(in srgb, var(--tc) 45%, #fff);
+}
+
+.zr-sticker-got {
+  border: 2px solid var(--tc);
+  background: color-mix(in srgb, var(--tc) 14%, #fff);
+  animation: zr-sticker-in 0.4s ease-out;
+}
+
+.zr-sticker-weak {
+  border: 2px solid #e0533d;
+  background: #fff0ec;
+}
+
+.zr-sticker-fact {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.zr-sticker-ans {
+  font-size: 11px;
+  color: var(--tc);
+  font-weight: 700;
+}
+
+.zr-sticker-flag {
+  position: absolute;
+  top: -7px;
+  right: -5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e0533d;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+}
+
+.zr-sticker-toast {
+  animation: zr-sticker-in 0.4s ease-out;
+}
+
+@keyframes zr-sticker-in {
+  0% { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+  70% { transform: scale(1.08) rotate(3deg); opacity: 1; }
+  100% { transform: none; }
+}
+
 @keyframes zr-roll {
   25% { transform: rotate(12deg) scale(0.94); }
   75% { transform: rotate(-12deg) scale(1.04); }
@@ -2069,5 +2151,10 @@ html[data-animations='off'] *::after {
 
   .zr-energy {
     transition: none;
+  }
+
+  .zr-sticker-got,
+  .zr-sticker-toast {
+    animation-name: none;
   }
 }
