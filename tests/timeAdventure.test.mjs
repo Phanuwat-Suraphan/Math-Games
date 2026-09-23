@@ -450,10 +450,12 @@ check('เกมค้างที่ข้อมูลถูกแก้หร�
   assert(oldSave && oldSave.players[0].history.length === 0, 'ข้อมูลที่ไม่มีประวัติ (รุ่นก่อน) ต้องอ่านได้ ประวัติว่าง')
 })
 
-check('ตัวชี้วัดเวลา ป.2 อยู่ท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
+check('ตัวชี้วัดเวลา ป.2 ต่อท้ายตัวชี้วัดเดิมและไม่นับเป็นตัวชี้วัด ป.4', () => {
   const IND = load('teacher/indicators')
-  const last = IND.INDICATORS[IND.INDICATORS.length - 1]
-  equal(last.id, IND.TIME_INDICATOR, 'ต้องต่อท้ายรายการ รหัสเก่าของครูจึงอ่านได้เหมือนเดิม')
+  // เวลาถูกต่อท้ายหลังค่าเฉลี่ย ของใหม่ที่มาทีหลังต่อท้ายต่อจากเวลาได้ แต่เวลาต้องอยู่ที่เดิมเสมอ
+  const at = IND.INDICATOR_ORDER.indexOf(IND.TIME_INDICATOR)
+  equal(at, IND.INDICATOR_ORDER.indexOf('average') + 1, 'ต้องอยู่ต่อจากค่าเฉลี่ยเสมอ รหัสเก่าของครูจึงอ่านได้เหมือนเดิม')
+  const last = IND.INDICATORS[at]
   equal(last.level, 'review', 'ต้องไม่ใช่ตัวชี้วัดหลักของ ป.4')
   equal(last.verified, false, 'รหัสที่เกมโยงเองต้องบอกครูว่ายังไม่ได้ทาน')
 })

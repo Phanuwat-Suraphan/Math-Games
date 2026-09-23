@@ -57,4 +57,14 @@ export interface PlayerRecords {
    * และเครื่องนั้นมีบัญชีผู้เล่นบัญชีเดียว
    */
   timeCorrect: number
+
+  /** เล่น ZOMBIE RESCUE จบไปกี่เกม */
+  zombiePlays: number
+  /** เกมที่ทีมสร้าง Z-CURE สำเร็จ */
+  zombieCures: number
+  /**
+   * ตอบโจทย์การคูณถูกรวมกี่ข้อ ทั้งเกมกระดานและโหมดฝึกสูตรคูณ
+   * นับของทุกคนในวง ด้วยเหตุผลเดียวกับ timeCorrect
+   */
+  zombieCorrect: number
 }

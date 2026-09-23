@@ -29,6 +29,7 @@ import { Teacher } from './pages/Teacher'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
 import { TimeAdventure } from './pages/TimeAdventure'
+import { ZombieRescue } from './pages/ZombieRescue'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -115,6 +116,12 @@ function GameRoutes() {
           path="/time"
           element={
             <RequirePlayer render={(player) => <TimeAdventure player={player} />} />
+          }
+        />
+        <Route
+          path="/zombie"
+          element={
+            <RequirePlayer render={(player) => <ZombieRescue player={player} />} />
           }
         />
         <Route

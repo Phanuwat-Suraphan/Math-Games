@@ -96,6 +96,9 @@ jobs:
       - name: ทดสอบโหมดฝึกอ่านนาฬิกา (โจทย์สุ่มหลายหมื่นข้อ)
         run: node tests/timePractice.test.mjs /tmp/logic
 
+      - name: ทดสอบ ZOMBIE RESCUE (เกมการคูณ ป.2 โจทย์สุ่มหลายหมื่นข้อและจำลองหลายร้อยเกม)
+        run: node tests/zombieRescue.test.mjs /tmp/logic
+
       - name: ทดสอบเครื่องแต่งเพลง
         run: node tests/music.test.mjs /tmp/logic
 

@@ -289,6 +289,9 @@ function maxedPlayer() {
       timePlays: 30,
       timeCastles: 10,
       timeCorrect: 400,
+      zombiePlays: 20,
+      zombieCures: 8,
+      zombieCorrect: 500,
     },
   }
 }

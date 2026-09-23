@@ -1972,3 +1972,102 @@ html[data-animations='off'] *::after {
     transition: none;
   }
 }
+
+/* ────────────────────────────────────────────────────────────
+ * ZOMBIE RESCUE (เกมการคูณ ป.2)
+ *
+ * การ์ดโจทย์ใช้ ta-* ร่วมกับเมืองแห่งเวลา ที่นี่มีแค่ของที่เกมคูณมีเพิ่ม:
+ * แป้นตอบสีสว่างในการ์ด ช่องเติมคำตอบ □ × □ = □ ลูกเต๋า และหลอดพลังวัคซีน
+ * ──────────────────────────────────────────────────────────── */
+
+.zr-board {
+  background: #8fcb74;
+  padding: 6px;
+}
+
+.zr-slot {
+  display: inline-flex;
+  min-width: 64px;
+  height: 58px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  border: 3px dashed color-mix(in srgb, var(--c) 45%, #fff);
+  background: #fff;
+  padding: 0 8px;
+  font-family: 'Mitr', 'Kanit', sans-serif;
+  font-size: 2rem;
+  font-variant-numeric: tabular-nums;
+  color: #23324a;
+}
+
+.zr-slot-on {
+  border-style: solid;
+  border-color: var(--c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent);
+}
+
+.zr-key {
+  min-height: 52px;
+  border-radius: 14px;
+  border: 2.5px solid color-mix(in srgb, var(--c) 55%, #fff);
+  background: #fff;
+  font-family: 'Mitr', 'Kanit', sans-serif;
+  font-size: 1.6rem;
+  color: #23324a;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--c) 30%, #fff);
+}
+
+.zr-key:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 30%, #fff);
+}
+
+.zr-key:disabled,
+.zr-go:disabled {
+  opacity: 0.45;
+}
+
+.zr-key-muted {
+  background: color-mix(in srgb, var(--c) 10%, #fff);
+  font-size: 1.3rem;
+}
+
+.zr-go {
+  min-height: 56px;
+  border-radius: 16px;
+  background: var(--c);
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 800;
+  box-shadow: 0 4px 0 color-mix(in srgb, var(--c) 60%, #000);
+}
+
+.zr-go:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--c) 60%, #000);
+}
+
+.zr-die-roll {
+  animation: zr-roll 0.25s linear infinite;
+}
+
+.zr-energy {
+  background: linear-gradient(90deg, #35c6d9, #7ed957);
+  transition: width 0.5s ease;
+}
+
+@keyframes zr-roll {
+  25% { transform: rotate(12deg) scale(0.94); }
+  75% { transform: rotate(-12deg) scale(1.04); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zr-die-roll {
+    animation-name: none;
+  }
+
+  .zr-energy {
+    transition: none;
+  }
+}
