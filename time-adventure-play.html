@@ -1,0 +1,917 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Time Adventure Online</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Mitr:wght@400;500;600&display=swap">
+<style>
+  /* โลกเดียวสว่างสดใส (ตั้งใจไม่ทำโหมดมืด เพราะเป็นเกมเด็กที่มีสีประจำการ์ด) */
+  :root{
+    color-scheme: light;
+    --sky:#E4F3FF; --sky-2:#CFE8FB; --paper:#FFFFFF; --ink:#23324A; --ink-2:#51607A; --line:#D3E0EE;
+    --time:#1E88D9; --find:#8B4FC7; --daily:#3E9E4F; --chal:#E8572E; --gold:#D99A00; --gold-l:#FFE27A;
+    --good:#2E9E5B; --bad:#E0533D;
+    --cute:"Mali","Leelawadee UI","Tahoma",sans-serif;
+    --display:"Mitr","Kanit","Leelawadee UI","Tahoma",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100%; color:var(--ink); font-family:var(--cute); font-size:16px; line-height:1.5;
+    background-color:var(--sky);
+    background-image:radial-gradient(rgba(255,255,255,.85) 2px, transparent 2.5px);
+    background-size:28px 28px;
+    padding-inline:16px; padding-block:0 40px;
+  }
+  button{font-family:inherit; color:inherit; cursor:pointer}
+  button:focus-visible,input:focus-visible{outline:3px solid #FFB300; outline-offset:2px}
+  .app{max-width:1180px; margin:0 auto}
+
+  /* ── หัวเกม ── */
+  .top{display:flex; align-items:center; gap:10px; padding-block:12px; flex-wrap:wrap}
+  .logo{font:600 22px/1 var(--display); letter-spacing:.02em; margin-right:auto; display:flex; align-items:center; gap:8px}
+  .logo small{font:500 14px var(--cute); color:var(--ink-2)}
+  .icon-btn{
+    border:2px solid var(--line); background:var(--paper); border-radius:14px; padding:6px 12px;
+    font:600 14px var(--cute); display:inline-flex; align-items:center; gap:6px; box-shadow:0 3px 0 var(--line);
+  }
+  .icon-btn:active{transform:translateY(2px); box-shadow:0 1px 0 var(--line)}
+
+  /* ── ปุ่มหลัก ── */
+  .btn{
+    --b:#1E88D9; border:0; border-radius:18px; padding:12px 20px; min-height:52px;
+    font:700 18px/1.2 var(--cute); color:#fff; background:var(--b);
+    box-shadow:0 5px 0 color-mix(in srgb, var(--b) 70%, #000); transition:transform .08s, box-shadow .08s;
+  }
+  .btn:active{transform:translateY(3px); box-shadow:0 2px 0 color-mix(in srgb, var(--b) 70%, #000)}
+  .btn[disabled]{opacity:.45; cursor:not-allowed}
+  .btn.ghost{background:#fff; color:var(--ink); box-shadow:0 5px 0 var(--line); border:2px solid var(--line)}
+  .btn.big{font-size:21px; padding:14px 26px; min-height:60px}
+
+  /* ── หน้าเริ่ม ── */
+  .setup{max-width:760px; margin:10px auto 0; background:var(--paper); border-radius:28px; padding:24px 22px 26px; box-shadow:0 10px 30px rgba(35,50,74,.12)}
+  .hero-row{display:flex; justify-content:center; gap:4px; margin:-6px 0 4px; flex-wrap:wrap}
+  .hero-row svg{width:74px; height:auto}
+  .setup h1{font:600 clamp(26px,5vw,36px)/1.1 var(--display); text-align:center; margin:4px 0 2px; text-wrap:balance}
+  .setup .tag{text-align:center; color:var(--ink-2); margin:0 0 18px}
+  .setup h2{font:700 17px var(--cute); margin:18px 0 8px}
+  .seg{display:flex; gap:8px; flex-wrap:wrap}
+  .seg button{
+    border:3px solid var(--line); background:#fff; border-radius:16px; padding:8px 16px; font:700 17px var(--cute); min-width:64px;
+  }
+  .seg button[aria-pressed="true"]{border-color:var(--time); background:#E6F3FC; color:#0F5B98}
+  .slots{display:grid; gap:10px}
+  .slot{display:grid; grid-template-columns:auto 1fr; gap:6px 12px; align-items:center; border:2px solid var(--line); border-radius:18px; padding:10px 12px}
+  .slot .who{font:700 15px var(--cute); color:var(--ink-2)}
+  .slot input{
+    font:600 16px var(--cute); border:2px solid var(--line); border-radius:12px; padding:6px 10px; width:100%; min-width:0; color:var(--ink);
+  }
+  .hero-pick{grid-column:1 / -1; display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+  .hero-pick button{
+    border:3px solid var(--line); background:#fff; border-radius:16px; padding:4px 2px 6px; display:flex; flex-direction:column; align-items:center; gap:0;
+    font:600 12.5px/1.2 var(--cute);
+  }
+  .hero-pick button svg{width:46px; height:auto}
+  .hero-pick button[aria-pressed="true"]{border-color:var(--hc); background:color-mix(in srgb, var(--hc) 12%, #fff)}
+  .start-row{display:flex; gap:10px; justify-content:center; margin-top:22px; flex-wrap:wrap}
+
+  /* ── หน้าเกม ── */
+  .layout{display:grid; grid-template-columns:minmax(0,1fr) 370px; gap:18px; align-items:start}
+  @media (max-width:880px){ .layout{grid-template-columns:1fr} }
+  .board-wrap{background:var(--paper); border-radius:24px; padding:8px; box-shadow:0 8px 24px rgba(35,50,74,.10)}
+  .board-wrap > svg{display:block; width:100%; height:auto; max-height:calc(100vh - 110px); margin:0 auto}
+  .pawn{transition:transform .32s cubic-bezier(.3,1.4,.6,1)}
+  .pawn.now .bob{animation:bob 1s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateY(-1.6px)}}
+  .panel{display:flex; flex-direction:column; gap:12px}
+  .turn{background:var(--paper); border-radius:24px; padding:16px; box-shadow:0 8px 24px rgba(35,50,74,.10); display:flex; flex-direction:column; gap:12px}
+  .turn-head{display:flex; align-items:center; gap:12px}
+  .turn-head svg{width:62px; height:auto; flex:none}
+  .turn-head b{display:block; font:700 20px/1.2 var(--cute)}
+  .turn-head span{color:var(--ink-2); font-size:14.5px}
+  .deck-btns{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .players{display:grid; gap:8px}
+  .pl{display:grid; grid-template-columns:44px 1fr auto; gap:10px; align-items:center; background:var(--paper); border-radius:18px; padding:8px 12px; border:3px solid transparent}
+  .pl.now{border-color:var(--hc); box-shadow:0 0 0 4px color-mix(in srgb, var(--hc) 18%, transparent)}
+  .pl svg{width:44px; height:auto}
+  .pl .nm{font:700 16px/1.2 var(--cute)}
+  .pl .sub{font-size:13px; color:var(--ink-2)}
+  .pl .coins{font:600 18px var(--display); display:flex; align-items:center; gap:4px; font-variant-numeric:tabular-nums}
+  .hand{display:flex; gap:4px; flex-wrap:wrap; margin-top:3px}
+  .chip{font:600 12px/1 var(--cute); background:#FFF5D1; border:1.5px solid #F0CF6A; border-radius:99px; padding:3px 8px}
+  .note{font-size:13.5px; color:var(--ink-2); text-align:center; margin:0}
+
+  /* ── การ์ดบนจอ ── */
+  .overlay{position:fixed; inset:0; z-index:20; background:rgba(22,38,64,.5); display:flex; align-items:flex-start; justify-content:center; overflow-y:auto; padding:max(16px, env(safe-area-inset-top,0px)) 16px 24px}
+  .gcard{
+    --c:#1E88D9; --bg:#E6F3FC;
+    width:min(460px,100%); margin:auto 0; border-radius:26px; background:var(--bg); border:5px solid var(--c); overflow:hidden;
+    background-image:radial-gradient(rgba(255,255,255,.95) 2px, transparent 2.4px); background-size:24px 24px;
+    box-shadow:0 18px 50px rgba(0,0,0,.25);
+  }
+  .gcard.pop{animation:pop .28s cubic-bezier(.3,1.5,.6,1)}
+  @keyframes pop{from{transform:scale(.85) rotate(-2deg); opacity:0}}
+  .t-time{--c:#1E88D9; --bg:#E6F3FC} .t-find{--c:#8B4FC7; --bg:#F2E9FB} .t-daily{--c:#3E9E4F; --bg:#E7F5E9}
+  .t-chal{--c:#E8572E; --bg:#FDEBE4} .t-special{--c:#D99A00; --bg:#FFF5D1} .t-plain{--c:#23324A; --bg:#F4F7FB}
+  .g-head{position:relative; background:var(--c); color:#fff; display:flex; justify-content:space-between; align-items:center; padding:9px 16px 10px; font:500 17px var(--display); margin-bottom:10px}
+  .g-head::after{content:""; position:absolute; left:0; right:0; bottom:-9px; height:10px; background:radial-gradient(circle at 50% 0, var(--c) 9px, transparent 9.6px) 0 0 / 20px 10px repeat-x}
+  .g-head .stars{color:#FFE27A; letter-spacing:.05em}
+  .g-body{padding:6px 18px 18px; display:flex; flex-direction:column; gap:12px}
+  .buddy{display:flex; align-items:center; gap:8px}
+  .bd-ic{width:46px; height:46px; border-radius:50%; background:#fff; border:2.5px solid var(--c); display:flex; align-items:flex-end; justify-content:center; overflow:hidden; flex:none}
+  .bd-ic svg{width:40px; height:auto; display:block}
+  .bd-tx{position:relative; background:#fff; border-radius:14px; padding:6px 12px; font:700 15px/1.25 var(--cute)}
+  .bd-tx::before{content:""; position:absolute; left:-7px; top:50%; margin-top:-6px; border-style:solid; border-width:6px 8px 6px 0; border-color:transparent #fff transparent transparent}
+  .art{display:flex; flex-direction:column; align-items:center; gap:8px}
+  .art .clk{width:min(190px,56vw) !important; height:auto !important}
+  .tag{font:600 14px var(--display); color:var(--c)}
+  .word{font:600 20px/1.3 var(--display); background:#fff; border-radius:14px; padding:6px 16px; text-align:center}
+  .blank{font:600 30px var(--display); letter-spacing:.12em; color:#9AA6B8}
+  .trio{display:flex; gap:8px; justify-content:center}
+  .trio figure{margin:0; display:flex; flex-direction:column; align-items:center}
+  .trio .clk{width:min(104px,26vw) !important; height:auto !important}
+  .trio figcaption{font:600 17px var(--display); color:var(--c)}
+  .q{font:700 21px/1.35 var(--cute); text-align:center; text-wrap:balance; margin:0}
+  .q em{font-style:normal; color:var(--c); text-decoration:underline; text-decoration-thickness:3px; text-underline-offset:4px}
+  .opts{display:grid; gap:10px}
+  .opt{
+    border:3px solid var(--c); background:#fff; border-radius:18px; min-height:56px; padding:8px 14px;
+    font:700 19px/1.25 var(--cute); text-align:left; display:flex; align-items:center; gap:10px;
+    box-shadow:0 4px 0 color-mix(in srgb, var(--c) 35%, #fff);
+  }
+  .opt:active{transform:translateY(2px); box-shadow:0 2px 0 color-mix(in srgb, var(--c) 35%, #fff)}
+  .opt .k{font:600 15px var(--display); background:var(--c); color:#fff; border-radius:10px; min-width:30px; height:30px; display:inline-flex; align-items:center; justify-content:center; flex:none}
+  .opt .e{font-size:24px; line-height:1}
+  .opt .tm{margin-left:auto; font:600 17px var(--display); color:var(--c); font-variant-numeric:tabular-nums; white-space:nowrap}
+  .opt.gone{opacity:.25; pointer-events:none; text-decoration:line-through}
+  .opt.right{background:#E3F7EA; border-color:var(--good)}
+  .opt.wrong{background:#FDE7E3; border-color:var(--bad)}
+  .opt .n{margin-left:auto; width:34px; height:34px; border-radius:50%; background:var(--c); color:#fff; font:600 18px var(--display); display:inline-flex; align-items:center; justify-content:center}
+  .opt .n:empty{background:#fff; border:2.5px dashed color-mix(in srgb, var(--c) 45%, #fff)}
+  .setter{display:flex; flex-direction:column; align-items:center; gap:10px}
+  .setter .clk{width:min(230px,66vw) !important; height:auto !important; touch-action:none; cursor:grab}
+  .set-ctl{display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%}
+  .set-ctl div{display:flex; flex-direction:column; align-items:center; gap:4px; background:#fff; border-radius:16px; padding:8px}
+  .set-ctl span{font:700 14px var(--cute)}
+  .set-ctl span i{font-style:normal; display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px}
+  .set-ctl .pair{display:flex; gap:8px; flex-direction:row}
+  .set-ctl button{width:56px; height:46px; border-radius:14px; border:3px solid var(--line); background:#fff; font:700 20px var(--display)}
+  .row-btns{display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
+  .powers{display:flex; gap:8px; flex-wrap:wrap; justify-content:center}
+  .power{border:2px solid #F0CF6A; background:#FFF5D1; border-radius:99px; padding:6px 12px; font:700 14px var(--cute)}
+  .power[aria-pressed="true"]{background:#FFD233; border-color:#B98400}
+  .fb{border-radius:18px; padding:12px 14px; display:flex; gap:12px; align-items:center; background:#fff}
+  .fb svg{width:64px; height:auto; flex:none}
+  .fb b{display:block; font:700 20px/1.2 var(--cute)}
+  .fb.good b{color:var(--good)} .fb.bad b{color:var(--bad)}
+  .fb p{margin:2px 0 0; font-size:15.5px; line-height:1.4}
+  .g-foot{font:500 12px var(--display); color:color-mix(in srgb, var(--c) 70%, #000); text-align:right; padding:0 16px 10px}
+  .sp-burst{position:relative; isolation:isolate; width:150px; height:150px; margin:0 auto; display:flex; align-items:center; justify-content:center; font-size:72px; line-height:1}
+  .sp-burst::before{content:""; position:absolute; inset:0; z-index:-1; border-radius:50%; background:repeating-conic-gradient(#FFE27A 0 11deg,#FFF8DC 11deg 22deg); -webkit-mask:radial-gradient(circle,#000 45%,transparent 71%); mask:radial-gradient(circle,#000 45%,transparent 71%); animation:spin 14s linear infinite}
+  .sp-burst svg{width:104px; height:auto}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .sp-name{font:600 24px/1.1 var(--display); color:#7A5700; text-align:center; background:#fff; border-radius:99px; padding:6px 18px; align-self:center; box-shadow:0 0 0 3px #F0CF6A}
+  .win{text-align:center}
+  .win .crown{font-size:44px; line-height:1}
+  .win svg.hero{width:140px; height:auto}
+  .rank{display:grid; gap:8px; text-align:left}
+  .rank div{display:grid; grid-template-columns:30px 40px 1fr auto; gap:10px; align-items:center; background:#fff; border-radius:16px; padding:6px 12px; font:700 16px var(--cute)}
+  .rank svg{width:40px; height:auto}
+  .rules-list{margin:0; padding-left:22px; font-size:16px; line-height:1.55}
+  .rules-list li{margin-bottom:6px}
+  .confetti{position:fixed; top:-12px; width:10px; height:14px; border-radius:3px; z-index:40; pointer-events:none; animation:fall 1.4s ease-in forwards}
+  @keyframes fall{to{transform:translateY(105vh) rotate(540deg); opacity:.9}}
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important; transition:none !important}
+  }
+  .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+</style>
+
+<div class="app" id="app"></div>
+<div class="sr" aria-live="polite" id="live"></div>
+
+<script>
+(function(){
+  const INK = '#23324A', HOUR = '#E53935', MIN = '#1E6FD9';
+  function clock(h, m, o){
+    o = o || {};
+    const size = o.size || 30, hands = o.hands !== false, plain = !!o.plain;
+    const vb = plain ? '-50 -50 100 100' : '-55 -60 110 118';
+    const hgt = plain ? size : size * 118 / 110;
+    let s = '<svg class="clk" viewBox="'+vb+'" style="width:'+size+'mm;height:'+hgt.toFixed(2)+'mm" role="img" aria-label="'+(hands ? ('นาฬิกา '+h+':'+String(m).padStart(2,'0')) : 'หน้าปัดนาฬิกาเปล่า')+'">';
+    if (!plain){
+      // กระดิ่งปลุก ขา และปุ่มด้านบน — อยู่นอกหน้าปัด ไม่บังตัวเลข
+      s += '<line x1="-29" y1="41" x2="-37" y2="54" stroke="'+INK+'" stroke-width="5" stroke-linecap="round"/>';
+      s += '<line x1="29" y1="41" x2="37" y2="54" stroke="'+INK+'" stroke-width="5" stroke-linecap="round"/>';
+      s += '<rect x="-5" y="-57" width="10" height="9" rx="2.5" fill="'+INK+'"/>';
+      [-1, 1].forEach(d => {
+        s += '<g transform="rotate('+(d*38)+')"><path d="M-15 -47 Q-15 -62 0 -62 Q15 -62 15 -47 Z" style="fill:var(--c,#1E88D9)" stroke="'+INK+'" stroke-width="3" stroke-linejoin="round"/><circle cx="0" cy="-63.5" r="3" fill="'+INK+'"/></g>';
+      });
+    }
+    s += '<circle r="47" fill="#FFFDF6" style="stroke:'+(plain ? INK : 'var(--c,#23324A)')+'" stroke-width="'+(plain ? 3.6 : 5)+'"/>';
+    if (!plain) s += '<circle r="49.6" fill="none" stroke="'+INK+'" stroke-width="1.4"/>';
+    for (let i = 0; i < 60; i++){
+      const major = i % 5 === 0;
+      s += '<line x1="0" y1="-43.5" x2="0" y2="'+(major ? -38.5 : -41.2)+'" stroke="'+(major ? INK : '#9AA6B8')+'" stroke-width="'+(major ? 2 : 1)+'" transform="rotate('+(i*6)+')"/>';
+    }
+    for (let n = 1; n <= 12; n++){
+      const a = n * Math.PI / 6, r = 30.5;
+      s += '<text x="'+(r*Math.sin(a)).toFixed(2)+'" y="'+(-r*Math.cos(a)).toFixed(2)+'" text-anchor="middle" dominant-baseline="central" font-family="Mitr,Kanit,Tahoma,sans-serif" font-weight="600" font-size="12" fill="'+INK+'">'+n+'</text>';
+    }
+    if (hands){
+      const ha = (h % 12) * 30 + m * 0.5, ma = m * 6;
+      s += '<line x1="0" y1="4" x2="0" y2="-20" stroke="'+HOUR+'" stroke-width="6.4" stroke-linecap="round" transform="rotate('+ha+')"/>';
+      s += '<line x1="0" y1="6" x2="0" y2="-35" stroke="'+MIN+'" stroke-width="3.4" stroke-linecap="round" transform="rotate('+ma+')"/>';
+    }
+    s += '<circle r="3.6" fill="'+INK+'"/></svg>';
+    return s;
+  }
+
+  /* ───────── ตัวละคร (วาดเอง ไม่ต้องใช้รูปภายนอก) ───────── */
+  const SKIN = '#FFD9B8', HAIR = '#3A2A20', BLUSH = '#FF9DB0';
+  // ฮีโร่ 4 ตัว: อัศวินทิม (ฮีโร่ชาย) · นางฟ้าใบเตย (ฮีโร่หญิง) · พ่อมดโมโม่ · มังกรน้อยฟูฟู
+  const NAMES = {knight:'อัศวินทิม', fairy:'นางฟ้าใบเตย', wizard:'พ่อมดโมโม่', dragon:'มังกรน้อยฟูฟู'};
+  const O = 'stroke="'+INK+'" stroke-linejoin="round"';
+  function face(cx, cy, opt){
+    opt = opt || {};
+    let s = '';
+    s += '<ellipse cx="'+(cx-4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/><ellipse cx="'+(cx+4.4)+'" cy="'+cy+'" rx="1.9" ry="2.3" fill="'+INK+'"/>';
+    s += '<circle cx="'+(cx-3.8)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/><circle cx="'+(cx+5)+'" cy="'+(cy-.8)+'" r=".7" fill="#fff"/>';
+    s += '<ellipse cx="'+(cx-7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="'+(cx+7.2)+'" cy="'+(cy+4)+'" rx="2.2" ry="1.25" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M'+(cx-2.6)+' '+(cy+4.2)+' Q'+cx+' '+(cy+7)+' '+(cx+2.6)+' '+(cy+4.2)+'" fill="none" stroke="'+INK+'" stroke-width="1.1" stroke-linecap="round"/>';
+    if (opt.fang) s += '<path d="M'+(cx+.6)+' '+(cy+5.3)+' l.9 1.6 .9-1.4" fill="#fff" stroke="'+INK+'" stroke-width=".5"/>';
+    return s;
+  }
+  function charInner(k){
+    let s = '';
+    if (k === 'knight'){
+      s += '<path d="M12 27 L6 46 Q20 42.5 34 46 L28 27 Z" fill="#E53935" '+O+' stroke-width="1.2"/>';
+      s += '<rect x="14" y="40" width="5" height="6.5" rx="2" fill="#AEB9C7" '+O+' stroke-width=".8"/><rect x="21" y="40" width="5" height="6.5" rx="2" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<path d="M12.6 29.5 L9.5 36" stroke="#AEB9C7" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.2" cy="36.8" r="2.1" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<path d="M35.5 21.5 L38.2 4.5" stroke="#DDE4EC" stroke-width="2.4" stroke-linecap="round"/><path d="M35.5 21.5 L38.2 4.5" stroke="'+INK+'" stroke-width=".6"/><path d="M32.2 21.2 L38.8 22.2" stroke="#E0A100" stroke-width="2" stroke-linecap="round"/>';
+      s += '<path d="M27.4 29.5 L34.2 23.5" stroke="#AEB9C7" stroke-width="3.8" stroke-linecap="round"/><circle cx="34.8" cy="22.6" r="2.2" fill="#AEB9C7" '+O+' stroke-width=".8"/>';
+      s += '<rect x="12" y="26" width="16" height="15.5" rx="5" fill="#1E88D9" '+O+' stroke-width="1.3"/><path d="M12.4 33.5 H27.6" stroke="#E0A100" stroke-width="2.2"/>';
+      s += '<circle cx="20" cy="30.6" r="3.4" fill="#FFD233" '+O+' stroke-width=".9"/><path d="M20 30.6 V28.6 M20 30.6 H21.8" stroke="'+INK+'" stroke-width=".9" stroke-linecap="round"/>';
+      s += '<path d="M19 5.5 Q17 0 24.5 1 Q20.5 2.5 22 5.5 Z" fill="#E53935" '+O+' stroke-width=".8"/>';
+      s += '<circle cx="20" cy="16.5" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M8.6 18.5 Q8 5.2 20 5.2 Q32 5.2 31.4 18.5 L28 18.5 Q28 11.5 20 11.5 Q12 11.5 12 18.5 Z" fill="#C9D3DF" '+O+' stroke-width="1.2"/><path d="M20 5.4 V11.4" stroke="#8A97A8" stroke-width="1"/>';
+      s += face(20, 17.6);
+    } else if (k === 'fairy'){
+      [[-1,'#BDE8FF'],[1,'#BDE8FF']].forEach(w => {
+        s += '<ellipse cx="'+(20 + w[0]*11)+'" cy="27" rx="6.4" ry="9" fill="'+w[1]+'" '+O+' stroke-width=".9" transform="rotate('+(w[0]*28)+' '+(20 + w[0]*11)+' 27)"/>';
+        s += '<ellipse cx="'+(20 + w[0]*10)+'" cy="36" rx="4" ry="5" fill="#FFD3EC" '+O+' stroke-width=".8" transform="rotate('+(w[0]*-20)+' '+(20 + w[0]*10)+' 36)"/>';
+      });
+      s += '<path d="M9 17 Q7.5 29 11 31 L29 31 Q32.5 29 31 17 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<rect x="15" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/><rect x="21.4" y="40" width="3.6" height="6.2" rx="1.6" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M12.6 29.5 L9.6 36" stroke="'+SKIN+'" stroke-width="3" stroke-linecap="round"/>';
+      s += '<path d="M34.3 22 L37 10.5" stroke="#8B5A2B" stroke-width="1.4" stroke-linecap="round"/><path d="M37.3 5.6 l1.3 2.6 2.8.4 -2 2 .5 2.8 -2.6-1.3 -2.6 1.3 .5-2.8 -2-2 2.8-.4z" fill="#FFD233" '+O+' stroke-width=".6"/>';
+      s += '<path d="M27.4 29.5 L33.8 23.2" stroke="'+SKIN+'" stroke-width="3" stroke-linecap="round"/><circle cx="34.3" cy="22.6" r="1.9" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M14 26.5 L26 26.5 L31 42.5 Q20 45.5 9 42.5 Z" fill="#FF8FC0" '+O+' stroke-width="1.2"/><path d="M11 40 Q20 43 29 40" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="1.4 1.4"/>';
+      s += '<circle cx="20" cy="16" r="10.6" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M9 16.5 Q8 4.5 20 4.5 Q32 4.5 31 16.5 Q27 10 20 10.5 Q14 10 9 16.5 Z" fill="'+HAIR+'" '+O+' stroke-width="1"/>';
+      s += '<circle cx="13.5" cy="7.6" r="1.7" fill="#FF8FC0"/><circle cx="17.5" cy="5.4" r="1.7" fill="#FFD233"/><circle cx="22.5" cy="5.4" r="1.7" fill="#9EE2B0"/><circle cx="26.5" cy="7.6" r="1.7" fill="#FF8FC0"/>';
+      s += face(20, 17);
+    } else if (k === 'wizard'){
+      s += '<path d="M34.5 12.5 V46" stroke="#8B5A2B" stroke-width="1.8" stroke-linecap="round"/><circle cx="34.5" cy="10.5" r="3.4" fill="#7FE3FF" '+O+' stroke-width=".9"/><circle cx="33.4" cy="9.4" r="1" fill="#fff"/>';
+      s += '<path d="M12.5 28 L27.5 28 L31 46.5 L9 46.5 Z" fill="#7C4DDB" '+O+' stroke-width="1.2"/>';
+      s += '<path d="M20 30.5 A4 4 0 1 0 23.6 36 A3.2 3.2 0 1 1 20 30.5 Z" fill="#FFD233" '+O+' stroke-width=".7"/>';
+      s += '<path d="M13 31 L9.6 37" stroke="#7C4DDB" stroke-width="3.8" stroke-linecap="round"/><circle cx="9.3" cy="37.7" r="2" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<path d="M27 31 L33 29" stroke="#7C4DDB" stroke-width="3.8" stroke-linecap="round"/><circle cx="34" cy="28.8" r="2.1" fill="'+SKIN+'" '+O+' stroke-width=".7"/>';
+      s += '<circle cx="20" cy="19.5" r="9.8" fill="'+SKIN+'" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M10.5 20 Q9.5 15 12.5 13.5 M29.5 20 Q30.5 15 27.5 13.5" stroke="#B9763D" stroke-width="2.4" stroke-linecap="round" fill="none"/>';
+      s += '<path d="M9.5 12.8 L19 1.2 Q23 -.4 25.2 3.2 L30.5 12.8 Z" fill="#6A2FA0" '+O+' stroke-width="1.1"/><ellipse cx="20" cy="13.2" rx="14.2" ry="3" fill="#6A2FA0" '+O+' stroke-width="1.1"/>';
+      s += '<path d="M21 5 l.9 1.8 2 .3 -1.5 1.4 .4 2 -1.8-1 -1.8 1 .4-2 -1.5-1.4 2-.3z" fill="#FFD233"/><circle cx="15" cy="9.4" r=".8" fill="#FFD233"/><circle cx="26" cy="9.2" r=".7" fill="#FFD233"/>';
+      s += face(20, 20.3);
+    } else if (k === 'dragon'){
+      s += '<path d="M28 40 Q37 41 38 33 L35.5 34.8 L36.5 31 Q34 36 27 36 Z" fill="#4CC06A" '+O+' stroke-width="1"/>';
+      s += '<path d="M11 28 L2.5 21.5 L4.5 27 L1.5 29 L6.5 30.5 L7 34 Z" fill="#9BE3AE" '+O+' stroke-width="1"/><path d="M29 28 L37.5 21.5 L35.5 27 L38.5 29 L33.5 30.5 L33 34 Z" fill="#9BE3AE" '+O+' stroke-width="1"/>';
+      s += '<ellipse cx="14.5" cy="45" rx="3.6" ry="2.2" fill="#3DA85A" '+O+' stroke-width=".8"/><ellipse cx="25.5" cy="45" rx="3.6" ry="2.2" fill="#3DA85A" '+O+' stroke-width=".8"/>';
+      s += '<ellipse cx="20" cy="36" rx="10.6" ry="9.4" fill="#4CC06A" '+O+' stroke-width="1.3"/><ellipse cx="20" cy="37.5" rx="6.2" ry="6.6" fill="#FFF1B8" '+O+' stroke-width=".8"/><path d="M15 35.5 H25 M14.6 38.5 H25.4 M15.4 41.5 H24.6" stroke="#E5CF7A" stroke-width=".8"/>';
+      s += '<path d="M12.5 7.5 L11 1.5 L16.5 5.5 Z M27.5 7.5 L29 1.5 L23.5 5.5 Z" fill="#FFD233" '+O+' stroke-width=".8"/>';
+      s += '<circle cx="20" cy="16" r="11.2" fill="#4CC06A" '+O+' stroke-width="1.3"/>';
+      s += '<path d="M17 5.3 L18.5 2.6 L20 5 L21.5 2.6 L23 5.3" fill="#FF8F4D" '+O+' stroke-width=".7"/>';
+      s += '<ellipse cx="20" cy="21.5" rx="7" ry="4.4" fill="#9BE3AE" '+O+' stroke-width=".9"/><circle cx="17.8" cy="20.4" r=".7" fill="'+INK+'"/><circle cx="22.2" cy="20.4" r=".7" fill="'+INK+'"/>';
+      s += '<ellipse cx="15.6" cy="14.6" rx="2.2" ry="2.6" fill="'+INK+'"/><ellipse cx="24.4" cy="14.6" rx="2.2" ry="2.6" fill="'+INK+'"/><circle cx="16.3" cy="13.7" r=".8" fill="#fff"/><circle cx="25.1" cy="13.7" r=".8" fill="#fff"/>';
+      s += '<ellipse cx="11.6" cy="19" rx="2" ry="1.2" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="28.4" cy="19" rx="2" ry="1.2" fill="'+BLUSH+'" opacity=".85"/>';
+      s += '<path d="M17.6 23.4 Q20 25.6 22.4 23.4" fill="none" stroke="'+INK+'" stroke-width="1" stroke-linecap="round"/><path d="M21 24.3 l.8 1.4 .8-1.3" fill="#fff" stroke="'+INK+'" stroke-width=".5"/>';
+    }
+    return s;
+  }
+  const ch = (k, w) => '<svg viewBox="0 0 40 48" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="'+NAMES[k]+'">'+charInner(k)+'</svg>';
+  function bunnyInner(){
+    let s = '';
+    [[13,-12],[27,12]].forEach(e => {
+      s += '<ellipse cx="'+e[0]+'" cy="12" rx="5" ry="11" fill="#fff" stroke="'+INK+'" stroke-width="1.5" transform="rotate('+e[1]+' '+e[0]+' 12)"/>';
+      s += '<ellipse cx="'+e[0]+'" cy="13" rx="2.2" ry="7" fill="#FFB8C6" transform="rotate('+e[1]+' '+e[0]+' 13)"/>';
+    });
+    s += '<ellipse cx="20" cy="30" rx="15" ry="12.5" fill="#fff" stroke="'+INK+'" stroke-width="1.5"/>';
+    s += '<path d="M9 37 Q20 43 31 37" fill="none" stroke="#E0A100" stroke-width="1.4"/><circle cx="20" cy="41" r="2.8" fill="#FFD233" stroke="'+INK+'" stroke-width=".8"/>';
+    s += '<ellipse cx="14.5" cy="29" rx="1.9" ry="2.3" fill="'+INK+'"/><ellipse cx="25.5" cy="29" rx="1.9" ry="2.3" fill="'+INK+'"/><circle cx="15.1" cy="28.2" r=".7" fill="#fff"/><circle cx="26.1" cy="28.2" r=".7" fill="#fff"/>';
+    s += '<ellipse cx="10.6" cy="33.2" rx="2.5" ry="1.4" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="29.4" cy="33.2" rx="2.5" ry="1.4" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M18.8 32 h2.4 l-1.2 1.3z" fill="#FF7F99"/><path d="M17.6 34.4 q1.2 1.3 2.4 0 q1.2 1.3 2.4 0" fill="none" stroke="'+INK+'" stroke-width="1" stroke-linecap="round"/>';
+    return s;
+  }
+  const bunny = w => '<svg viewBox="0 0 40 44" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="กระต่ายติ๊กต็อก">'+bunnyInner()+'</svg>';
+  function khemInner(col){
+    let s = '';
+    s += '<line x1="14" y1="37" x2="10" y2="42" stroke="'+INK+'" stroke-width="2.4" stroke-linecap="round"/><line x1="30" y1="37" x2="34" y2="42" stroke="'+INK+'" stroke-width="2.4" stroke-linecap="round"/>';
+    s += '<circle cx="10" cy="10.5" r="5.6" fill="'+col+'" stroke="'+INK+'" stroke-width="1.3"/><circle cx="34" cy="10.5" r="5.6" fill="'+col+'" stroke="'+INK+'" stroke-width="1.3"/>';
+    s += '<circle cx="22" cy="24" r="15.4" fill="#FFFDF6" stroke="'+col+'" stroke-width="3"/><circle cx="22" cy="24" r="16.9" fill="none" stroke="'+INK+'" stroke-width="1.1"/>';
+    s += '<ellipse cx="17" cy="23" rx="1.8" ry="2.2" fill="'+INK+'"/><ellipse cx="27" cy="23" rx="1.8" ry="2.2" fill="'+INK+'"/><circle cx="17.6" cy="22.3" r=".6" fill="#fff"/><circle cx="27.6" cy="22.3" r=".6" fill="#fff"/>';
+    s += '<ellipse cx="13.6" cy="27.6" rx="2.3" ry="1.3" fill="'+BLUSH+'" opacity=".85"/><ellipse cx="30.4" cy="27.6" rx="2.3" ry="1.3" fill="'+BLUSH+'" opacity=".85"/>';
+    s += '<path d="M19 28 Q22 31 25 28" fill="none" stroke="'+INK+'" stroke-width="1.1" stroke-linecap="round"/>';
+    return s;
+  }
+  const khem = (w, col) => '<svg viewBox="0 0 44 44" style="width:'+(w || 8)+'mm;height:auto" role="img" aria-label="คุณเข็ม">'+khemInner(col || '#1E88D9')+'</svg>';
+
+  /* ───────── ข้อมูลเกม ───────── */
+  const HEROES = {
+    knight:{name:'อัศวินทิม', c:'#1E88D9'},
+    fairy:{name:'นางฟ้าใบเตย', c:'#E85D9E'},
+    wizard:{name:'พ่อมดโมโม่', c:'#7C4DDB'},
+    dragon:{name:'มังกรน้อยฟูฟู', c:'#3E9E4F'}
+  };
+  const HERO_KEYS = ['knight','fairy','wizard','dragon'];
+  const TYPES = {
+    time:{icon:'⏰', name:'อ่านเวลา', c:'#1E88D9'},
+    find:{icon:'🔍', name:'หาเวลา', c:'#8B4FC7'},
+    daily:{icon:'🏠', name:'ชีวิตประจำวัน', c:'#3E9E4F'},
+    chal:{icon:'⚔️', name:'ท้าทาย', c:'#E8572E'}
+  };
+  const BUDDY = {
+    time:{k:'wizard', say:['ดูเข็มสั้นก่อนน้า~','เข็มสั้นบอกชั่วโมงนะ','เวทมนตร์คือค่อย ๆ ดู','หนูทำได้แน่นอน!']},
+    find:{k:'fairy', say:['นางฟ้าช่วยส่องนะ ✨','ดูเข็มยาวด้วยน้า','มีข้อเดียวที่ถูกนะ','โบกไม้กายสิทธิ์ ชี้เลย!']},
+    daily:{k:'knight', say:['วันนี้หนูทำอะไรบ้าง?','นึกถึงวันของหนูสิ','อัศวินก็ตื่นเช้านะ!','เลขชั่วโมงน้อย มาก่อนนะ']},
+    chal:{k:'dragon', say:['มังกรน้อยท้าดวล!','ใกล้ถึงปราสาทแล้ว','คิดทีละขั้นนะ','เก่งมากที่มาถึงตรงนี้!']}
+  };
+  const CHEER = ['เก่งมาก!','สุดยอดเลย!','ตรงเวลาเป๊ะ!','เวทมนตร์ได้ผล!','ฮีโร่ตัวจริง!'];
+  const COMFORT = ['ไม่เป็นไรนะ','เกือบแล้ว!','ลองใหม่ตาหน้านะ','ค่อย ๆ ดูอีกทีนะ'];
+
+  const tagM = '<div class="tag">🌅 ตอนเช้า</div>';
+  const rowsO = list => list.map(r => ({e:r[0], label:r[1], tm:r[2]}));
+  // kind: choice (ตัวเลือก) · order (แตะเรียง) · set (หมุนเข็ม)
+  const CARDS = [
+    {id:'T01', t:'time', s:1, art:() => tagM + clock(7,0), q:'นาฬิกาบอกเวลาเท่าไร?', opts:['07:00 น.','12:00 น.','08:00 น.'], ans:0, a:'07:00 น. (เจ็ดโมงเช้า)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 7'},
+    {id:'T02', t:'time', s:1, art:() => clock(11,0), q:'นาฬิกาบอกเวลาเท่าไร?', opts:['11:00 น.','12:00 น.','10:00 น.'], ans:0, a:'11:00 น. (สิบเอ็ดโมง)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 11 (ไม่ใช่ 12)'},
+    {id:'T03', t:'time', s:1, kind:'set', start:[12,0], target:[10,0], q:'หมุนเข็มให้เป็น <em>10:00 น.</em>', a:'เข็มสั้นชี้ 10 · เข็มยาวชี้ 12', why:'ตรงชั่วโมง เข็มยาวอยู่ที่ 12 เสมอ'},
+    {id:'T04', t:'time', s:1, art:() => tagM + clock(0,0,{hands:false}), q:'เข็มยาวชี้ 12 เข็มสั้นชี้ 6 เป็นเวลาเท่าไร?', opts:['06:00 น.','12:30 น.','07:00 น.'], ans:0, a:'06:00 น. (หกโมงเช้า)', why:'เข็มยาวชี้ 12 = ตรงชั่วโมง · เข็มสั้นชี้ 6'},
+    {id:'T05', t:'time', s:1, art:() => '<div class="word">แปดนาฬิกา</div><div class="blank">__ : __</div>', q:'เขียนเป็นตัวเลขอย่างไร?', opts:['08:00','00:08','18:00'], ans:0, a:'08:00 น.', why:'8 ชั่วโมง 0 นาที ➜ 08:00'},
+    {id:'T06', t:'time', s:1, art:() => '<div class="tag">☀️ เที่ยงวัน</div>' + clock(0,0,{hands:false}), q:'เที่ยงวัน เข็มสั้นและเข็มยาวชี้เลขอะไร?', opts:['ชี้ 12 ทั้งสองเข็ม','เข็มสั้นชี้ 12 · เข็มยาวชี้ 6','เข็มสั้นชี้ 6 · เข็มยาวชี้ 12'], ans:0, a:'ชี้เลข 12 ทั้งสองเข็ม', why:'เที่ยงวัน = 12:00 น. สองเข็มทับกันที่ 12'},
+    {id:'T07', t:'time', s:2, art:() => tagM + clock(8,30), q:'นาฬิกาบอกเวลาเท่าไร?', opts:['08:30 น.','09:30 น.','08:06 น.'], ans:0, a:'08:30 น. (แปดโมงครึ่ง)', why:'เข็มยาวชี้ 6 = 30 นาที · เข็มสั้นเลย 8 มาแล้ว'},
+    {id:'T08', t:'time', s:2, art:() => '<div class="tag">🌤️ ตอนบ่าย</div>' + clock(0,0,{hands:false}), q:'เข็มยาวชี้ 6 เข็มสั้นอยู่ระหว่าง 3 กับ 4 เป็นเวลาเท่าไร?', opts:['บ่ายสามโมงครึ่ง','บ่ายสี่โมงครึ่ง','บ่ายสามโมงหกนาที'], ans:0, a:'บ่ายสามโมงครึ่ง (15:30 น.)', why:'เข็มยาวชี้ 6 = ครึ่ง · เข็มสั้นเลย 3 มาแล้ว · ตอนบ่าย'},
+    {id:'T09', t:'time', s:2, kind:'set', start:[12,0], target:[9,30], q:'หมุนเข็มให้เป็น <em>09:30 น.</em>', a:'เข็มยาวชี้ 6 · เข็มสั้นอยู่ระหว่าง 9 กับ 10', why:'ครึ่งชั่วโมง = 30 นาที เข็มยาวไปครึ่งวง'},
+    {id:'T10', t:'time', s:2, art:() => '<div class="word">สิบนาฬิกาสามสิบนาที</div><div class="blank">__ : __</div>', q:'เขียนเป็นตัวเลขอย่างไร?', opts:['10:30','30:10','10:03'], ans:0, a:'10:30 น.', why:'ชั่วโมงไว้หน้า : นาทีไว้หลัง :'},
+    {id:'T11', t:'time', s:3, art:() => tagM + clock(7,15), q:'นาฬิกาบอกเวลาเท่าไร?', opts:['07:15 น.','07:03 น.','08:15 น.'], ans:0, a:'07:15 น. (เจ็ดโมงสิบห้านาที)', why:'เข็มยาวชี้ 3 ➜ นับ 5, 10, 15 · เข็มสั้นเลย 7'},
+    {id:'T12', t:'time', s:3, art:() => tagM + clock(0,0,{hands:false}), q:'เข็มยาวชี้ 9 เข็มสั้นอยู่ระหว่าง 8 กับ 9 เป็นเวลาเท่าไร?', opts:['08:45 น.','09:45 น.','08:09 น.'], ans:0, a:'08:45 น.', why:'นับทีละ 5 ถึงเลข 9 = 45 · เข็มสั้นยังไม่ถึง 9 ➜ 8 โมง'},
+
+    {id:'F01', t:'find', s:1, art:() => clock(6,0), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['06:00 น.','07:00 น.','12:00 น.'], ans:0, a:'06:00 น.', why:'เข็มยาวชี้ 12 · เข็มสั้นชี้ 6'},
+    {id:'F02', t:'find', s:1, art:() => clock(9,0), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['08:00 น.','09:00 น.','10:00 น.'], ans:1, a:'09:00 น.', why:'เข็มยาวชี้ 12 · เข็มสั้นชี้ 9 พอดี'},
+    {id:'F03', t:'find', s:1, art:() => clock(12,0), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['06:00 น.','12:00 น. เที่ยงวัน','11:00 น.'], ans:1, a:'12:00 น. เที่ยงวัน', why:'สองเข็มชี้ 12'},
+    {id:'F04', t:'find', s:2, art:() => clock(9,30), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['เก้าโมงครึ่ง','สิบโมงครึ่ง','เก้าโมงหกนาที'], ans:0, a:'เก้าโมงครึ่ง (09:30 น.)', why:'เข็มยาวชี้ 6 = 30 นาที ไม่ใช่ 6 นาที'},
+    {id:'F05', t:'find', s:2, art:() => clock(7,30), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['08:30 น.','07:30 น.','07:06 น.'], ans:1, a:'07:30 น.', why:'เข็มสั้นเลย 7 แต่ยังไม่ถึง 8 ➜ 7 โมงครึ่ง'},
+    {id:'F06', t:'find', s:2, art:() => clock(11,30), q:'เวลาใดตรงกับนาฬิกานี้?', opts:['11:30 น.','12:30 น.','11:06 น.'], ans:0, a:'11:30 น.', why:'เข็มยาวชี้ 6 = 30 นาที · เข็มสั้นเลย 11'},
+    {id:'F07', t:'find', s:2, fixed:true, art:() => '<div class="word">สิบนาฬิกาสามสิบนาที</div>' + trio([[10,30],[10,0],[6,50]]), q:'ตรงกับนาฬิกาเรือนไหน?', opts:['ก.','ข.','ค.'], ans:0, a:'ก.', why:'เข็มยาวชี้ 6 · เข็มสั้นระหว่าง 10 กับ 11'},
+    {id:'F08', t:'find', s:2, fixed:true, art:() => '<div class="word">หกนาฬิกาสามสิบนาที</div>' + trio([[6,0],[7,30],[6,30]]), q:'ตรงกับนาฬิกาเรือนไหน?', opts:['ก.','ข.','ค.'], ans:2, a:'ค.', why:'เข็มยาวชี้ 6 · เข็มสั้นระหว่าง 6 กับ 7'},
+
+    {id:'D01', t:'daily', s:1, q:'ทำอะไร <em>ก่อน</em>?', opts:rowsO([['🛏️','ตื่นนอน','06:00 น.'],['🦷','แปรงฟัน','06:30 น.']]), ans:0, a:'ตื่นนอน', why:'06:00 มาก่อน 06:30'},
+    {id:'D02', t:'daily', s:1, q:'ทำอะไร <em>ก่อน</em>?', opts:rowsO([['🚌','ไปโรงเรียน','07:30 น.'],['🍳','กินข้าวเช้า','07:00 น.']]), ans:1, a:'กินข้าวเช้า', why:'ชั่วโมงเท่ากัน · 00 นาทีมาก่อน 30 นาที'},
+    {id:'D03', t:'daily', s:1, q:'ทำอะไร <em>หลัง</em>?', opts:rowsO([['🍚','กินข้าวกลางวัน','12:00 น.'],['🎵','เข้าแถวเคารพธงชาติ','08:00 น.']]), ans:0, a:'กินข้าวกลางวัน', why:'12:00 มาหลัง 08:00'},
+    {id:'D04', t:'daily', s:1, q:'ทำอะไร <em>หลัง</em>?', opts:rowsO([['🏡','กลับบ้าน','16:00 น.'],['😴','เข้านอน','20:00 น.']]), ans:1, a:'เข้านอน', why:'20:00 (สองทุ่ม) มาหลัง 16:00 (สี่โมงเย็น)'},
+    {id:'D05', t:'daily', s:1, art:() => '<div style="font-size:44px;line-height:1">☀️🍚</div><div class="word">เที่ยงวัน</div>', q:'เที่ยงวันเขียนเป็นตัวเลขอย่างไร?', opts:['12:00 น.','10:00 น.','00:12 น.'], ans:0, a:'12:00 น.', why:'เที่ยงวัน = 12:00 น. เป็นเวลาพักกินข้าวกลางวัน'},
+    {id:'D06', t:'daily', s:2, kind:'order', q:'แตะเรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', items:rowsO([['😴','เข้านอน','20:00 น.'],['🍛','กินข้าวเย็น','18:00 น.'],['🛁','อาบน้ำ','19:00 น.']]), order:[1,2,0], a:'กินข้าวเย็น ➜ อาบน้ำ ➜ เข้านอน', why:'18 ➜ 19 ➜ 20'},
+    {id:'D07', t:'daily', s:2, kind:'order', q:'แตะเรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', items:rowsO([['📚','เรียนหนังสือ','09:00 น.'],['⏰','ตื่นนอน','06:00 น.'],['🍚','กินข้าวกลางวัน','12:00 น.']]), order:[1,0,2], a:'ตื่นนอน ➜ เรียนหนังสือ ➜ กินข้าวกลางวัน', why:'6 ➜ 9 ➜ 12'},
+    {id:'D08', t:'daily', s:2, art:() => '<div class="tag">👧 น้องมะลิ</div>', q:'น้องมะลิทำอะไร <em>ก่อน</em>?', opts:rowsO([['⚽','เล่นฟุตบอล','16:30 น.'],['📝','ทำการบ้าน','17:30 น.']]), ans:0, a:'เล่นฟุตบอล', why:'นาทีเท่ากัน · 16 มาก่อน 17'},
+    {id:'D09', t:'daily', s:2, fixed:true, art:() => '<div class="word">20:00 น.</div>', q:'เป็นตอนเช้า ตอนบ่าย หรือตอนกลางคืน?', opts:['🌅 ตอนเช้า','☀️ ตอนบ่าย','🌙 ตอนกลางคืน'], ans:2, a:'ตอนกลางคืน (สองทุ่ม)', why:'หลัง 18:00 น. ฟ้ามืดแล้ว'},
+    {id:'D10', t:'daily', s:2, art:() => '<div class="word">07:00 น.</div>', q:'ตอนนี้เด็ก ๆ มักทำอะไร?', opts:['🍳 กินข้าวเช้า','😴 เข้านอน','🍛 กินข้าวเย็น'], ans:0, a:'กินข้าวเช้า', why:'07:00 น. เป็นเวลาเช้า ก่อนเข้าเรียน'},
+
+    {id:'C01', t:'chal', s:2, q:'เวลาใด <em>มาก่อน</em>?', opts:['08:00 น.','09:00 น.'], ans:0, a:'08:00 น.', why:'8 น้อยกว่า 9 ➜ มาก่อน'},
+    {id:'C02', t:'chal', s:2, q:'เวลาใด <em>มาทีหลัง</em>?', opts:['10:30 น.','10:00 น.'], ans:0, a:'10:30 น.', why:'ชั่วโมงเท่ากัน · 30 นาทีมาหลัง 0 นาที'},
+    {id:'C03', t:'chal', s:2, kind:'order', q:'แตะเรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', items:rowsO([['🕖','','07:00 น.'],['🕕','','06:00 น.'],['🕗','','08:00 น.']]), order:[1,0,2], a:'06:00 ➜ 07:00 ➜ 08:00', why:'เรียงเลขชั่วโมง 6, 7, 8'},
+    {id:'C04', t:'chal', s:2, fixed:true, art:() => rowsHtml([['🏫','เข้าเรียน','08:00 น.'],['🛏️','ตื่นนอน','07:00 น.']]), q:'ตื่นนอน <em>ก่อน</em> หรือ <em>หลัง</em> เข้าเรียน?', opts:['ก่อน','หลัง'], ans:0, a:'ก่อน', why:'7 มาก่อน 8'},
+    {id:'C05', t:'chal', s:2, kind:'order', q:'แตะเรียงจาก <em>ก่อน</em> ➜ <em>หลัง</em>', items:rowsO([['🕤','','09:30 น.'],['🕘','','09:00 น.'],['🕙','','10:00 น.']]), order:[1,0,2], a:'09:00 ➜ 09:30 ➜ 10:00', why:'09:30 อยู่กลางระหว่าง 9 โมงกับ 10 โมง'},
+    {id:'C06', t:'chal', s:3, kind:'set', start:[8,0], target:[9,0], q:'ตอนนี้ 08:00 น. หมุนเข็มไปอีก <em>1 ชั่วโมง</em>', a:'09:00 น.', why:'เข็มยาวหมุนครบ 1 รอบ เข็มสั้นขยับไป 1 เลข'},
+    {id:'C07', t:'chal', s:3, art:() => '<div class="tag">💡 1 ชั่วโมง = 60 นาที</div>', q:'ครึ่งชั่วโมงมีกี่นาที?', opts:['30 นาที','60 นาที','6 นาที'], ans:0, a:'30 นาที', why:'ครึ่งของ 60 = 30 · เข็มยาวชี้ 6'},
+    {id:'C08', t:'chal', s:3, fixed:true, art:() => '<div class="tag">🌅 ตอนเช้าทั้งคู่</div>' + trio([[11,0],[10,30]]), q:'นาฬิกาเรือนไหน <em>มาก่อน</em>?', opts:['ก.','ข.'], ans:1, a:'ข. (10:30 น.)', why:'ก. = 11:00 · ข. = 10:30 · 10 มาก่อน 11'},
+    {id:'C09', t:'chal', s:3, fixed:true, art:() => rowsHtml([['🚌','รถโรงเรียนออก','07:00 น.'],['🧒','หนูถึงป้ายรถ','07:30 น.']]), q:'หนูขึ้นรถทันไหม?', opts:['ทัน','ไม่ทัน'], ans:1, a:'ไม่ทัน', why:'07:30 มาหลัง 07:00 · ถึงหลังรถออก'},
+    {id:'C10', t:'chal', s:3, fixed:true, art:() => rowsHtml([['🧸','ร้านของเล่นเปิด','09:00 น.'],['🧒','หนูไปถึง','08:30 น.']]), q:'หนูต้องรอไหม?', opts:['ต้องรอ','ไม่ต้องรอ'], ans:0, a:'ต้องรอ', why:'08:30 มาก่อน 09:00 · ถึงก่อนร้านเปิด 30 นาที'}
+  ];
+  const BY_ID = Object.fromEntries(CARDS.map(c => [c.id, c]));
+
+  const SPECIALS = {
+    boost:{e:'⏰', n:'TIME BOOST', d:'ตอบถูก รับเหรียญเพิ่มอีก 1 เหรียญ', when:'กดก่อนตอบ'},
+    lucky:{e:'🍀', n:'LUCKY HOUR', d:'ไม่อยากตอบใบนี้? เปลี่ยนการ์ดใหม่ได้', when:'กดก่อนตอบ'},
+    travel:{e:'🔄', n:'TIME TRAVEL', d:'วาร์ปไปข้างหน้า 1 ช่องทันที', when:'กดตอนเริ่มตา'},
+    shield:{e:'🛡️', n:'TIME SHIELD', d:'ตอบผิด? ได้ตอบใหม่อีก 1 ครั้ง', when:'ใช้หลังตอบผิด'},
+    fast:{e:'🚀', n:'FAST TIME', d:'ตอบถูก เดินเพิ่มอีก 2 ช่อง', when:'กดก่อนตอบ'},
+    chest:{e:'🎁', n:'TIME CHEST', d:'เปิดหีบ! รับ 2 เหรียญทันที', when:'เปิดทันที'},
+    bunny:{e:'🐰', n:'กระต่ายช่วยคิด', d:'กระต่ายช่วยตัดคำตอบผิดออก 1 ข้อ', when:'กดก่อนตอบ'}
+  };
+  const SPECIAL_DECK = ['boost','lucky','travel','shield','shield','fast','chest','bunny'];
+  const STAR_SQ = [2,5,8,11,14];
+  const GATE = 15, CASTLE = 16;
+
+  /* ───────── ตัวช่วยวาด ───────── */
+  const trio = list => '<div class="trio">' + list.map((t,i) => '<figure>'+clock(t[0], t[1], {plain:true})+'<figcaption>'+'กขค'[i]+'.</figcaption></figure>').join('') + '</div>';
+  function rowsHtml(list){
+    return '<div class="opts" style="width:100%">' + list.map(r => '<div class="opt" style="pointer-events:none;box-shadow:none;border-width:2px"><span class="e">'+r[0]+'</span>'+r[1]+'<span class="tm">'+r[2]+'</span></div>').join('') + '</div>';
+  }
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const pick = a => a[Math.floor(Math.random() * a.length)];
+  const esc = s => String(s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
+
+  /* ───────── เสียง ───────── */
+  let actx = null;
+  function tone(notes){
+    if (!S.sound) return;
+    try{
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      let t = actx.currentTime;
+      notes.forEach(([f, d]) => {
+        const o = actx.createOscillator(), g = actx.createGain();
+        o.type = 'triangle'; o.frequency.value = f;
+        g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(.18, t + .02); g.gain.exponentialRampToValueAtTime(.0001, t + d);
+        o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + d + .02); t += d * .8;
+      });
+    }catch(e){}
+  }
+  const SND = {
+    good:() => tone([[659,.12],[784,.12],[1047,.22]]),
+    bad:() => tone([[392,.16],[330,.24]]),
+    step:() => tone([[880,.06]]),
+    card:() => tone([[523,.08],[659,.1]]),
+    win:() => tone([[523,.14],[659,.14],[784,.14],[1047,.3],[784,.12],[1047,.4]])
+  };
+
+  /* ───────── สถานะ ───────── */
+  const SAVE_KEY = 'time-adventure-play-v1';
+  let S = {screen:'setup', sound:true};
+  let setup = {n:2, heroes:['knight','fairy','wizard','dragon'], names:['','','',''], easy:false};
+  let M = null;      // การ์ดที่เปิดอยู่ (ไม่บันทึก)
+  let busy = false;  // ระหว่างตัวเดินกำลังเดิน
+  let lastM = null;  // ใช้เล่นแอนิเมชันเปิดการ์ดเฉพาะตอนเปิดใบใหม่
+
+  function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+  function loadSaved(){ try{ const v = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); return v && v.screen === 'game' ? v : null; }catch(e){ return null; } }
+  function clearSaved(){ try{ localStorage.removeItem(SAVE_KEY); }catch(e){} }
+  function say(t){ const el = document.getElementById('live'); if (el) el.textContent = t; }
+
+  function freshDeck(t){ return shuffle(CARDS.filter(c => c.t === t && !(S.easy && c.s === 3)).map(c => c.id)); }
+  function newGame(){
+    const players = [];
+    for (let i = 0; i < setup.n; i++){
+      const k = setup.heroes[i];
+      players.push({hero:k, name:(setup.names[i] || '').trim() || HEROES[k].name, pos:0, coins:0, hand:[]});
+    }
+    S = {screen:'game', sound:S.sound, easy:setup.easy, players, turn:0, round:1, used:false, winner:null,
+      decks:{time:freshDeck('time'), find:[], daily:[], chal:[]}, sdeck:shuffle(SPECIAL_DECK)};
+    ['find','daily','chal'].forEach(t => S.decks[t] = freshDeck(t));
+    M = null; save(); render();
+  }
+  const cur = () => S.players[S.turn];
+  const zoneOf = pos => pos <= 3 ? 1 : pos <= 6 ? 2 : pos <= 9 ? 3 : pos <= 12 ? 4 : 5;
+  const ZONE_DECK = {1:'time', 2:'find', 3:'daily', 4:'chal'};
+  function draw(t){
+    if (!S.decks[t].length) S.decks[t] = freshDeck(t);
+    return S.decks[t].shift();
+  }
+
+  /* ───────── กระดาน ───────── */
+  const Z = [
+    {n:1, name:'บ้านยามเช้า', deck:'⏰ อ่านเวลา', c:'#1E88D9', bg:'#E6F3FC', y:212, dir:1, icons:['🐓','⭐','🦷'], deco:'🏠'},
+    {n:2, name:'โรงเรียนแสนสนุก', deck:'🔍 หาเวลา', c:'#8B4FC7', bg:'#F2E9FB', y:172, dir:-1, icons:['🔔','⭐','📚'], deco:'🏫'},
+    {n:3, name:'เมืองกิจวัตร', deck:'🏠 ชีวิตประจำวัน', c:'#3E9E4F', bg:'#E7F5E9', y:132, dir:1, icons:['🍜','⭐','⚽'], deco:'🏙️'},
+    {n:4, name:'สวนสนุกเวลา', deck:'⚔️ ท้าทาย', c:'#E8572E', bg:'#FDEBE4', y:92, dir:-1, icons:['🎠','⭐','🎡'], deco:'@dragon'},
+    {n:5, name:'ปราสาทเวลา', deck:'เลือกกองเอง', c:'#D99A00', bg:'#FFF5D1', y:52, dir:1, icons:['🌉','⭐','🏰'], deco:'@gate'}
+  ];
+  const XS = [58, 103, 148];
+  const POS = [[16, 234]];
+  Z.forEach(z => (z.dir === 1 ? XS : XS.slice().reverse()).forEach(x => POS.push([x, z.y + 22])));
+  POS.push([152, 26]);
+  const F = 'font-family="Mitr,Kanit,Tahoma,sans-serif"';
+  const OFF = [[-4.5,-4.5],[4.5,-4.5],[-4.5,4.5],[4.5,4.5]];
+
+  function boardSvg(){
+    let s = '<svg viewBox="0 0 190 250" role="img" aria-label="กระดานเมืองแห่งเวลา">';
+    s += '<text x="4" y="14" '+F+' font-weight="600" font-size="8.5" fill="#23324A">เมืองแห่งเวลา</text>';
+    s += '<text x="4" y="22.5" '+F+' font-size="4" fill="#51607A">ตอบถูก ➜ 🪙 +1 และเดินตาม ★</text>';
+    s += '<text x="4" y="29" '+F+' font-size="4" fill="#51607A">จบตาที่ ⭐ ➜ ได้การ์ดพิเศษ</text>';
+    s += '<text x="4" y="35.5" '+F+' font-size="4" fill="#51607A">ถึงประตูปราสาท ตอบ ⚔️ ถูก = ชนะ!</text>';
+    Z.forEach(z => { s += '<rect x="2" y="'+z.y+'" width="186" height="36" rx="6" fill="'+z.bg+'" stroke="'+z.c+'" stroke-width=".8"/>'; });
+    const road = POS.slice(0, 16).map(p => p.join(',')).join(' ') + ' 148,40';
+    s += '<polyline points="'+road+'" fill="none" stroke="#C9D6E6" stroke-width="9" stroke-linejoin="round" stroke-linecap="round"/>';
+    s += '<polyline points="'+road+'" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 3" stroke-linejoin="round"/>';
+    s += '<rect x="118" y="3" width="68" height="44" rx="7" fill="#FFF5D1" stroke="#D99A00" stroke-width="1.2"/>';
+    s += '<text x="152" y="25" text-anchor="middle" font-size="19">🏰</text>';
+    s += '<text x="152" y="36" text-anchor="middle" '+F+' font-weight="600" font-size="4.8" fill="#7A5700">ห้องคุณเข็ม 👑</text>';
+    s += '<svg x="120" y="7" width="13" height="15" viewBox="0 0 40 44">'+bunnyInner()+'</svg>';
+    s += '<svg x="171" y="8" width="13" height="13" viewBox="0 0 44 44">'+khemInner('#D99A00')+'</svg>';
+    let sq = 0;
+    Z.forEach(z => {
+      const lx = z.dir === 1 ? 6 : 184, anchor = z.dir === 1 ? 'start' : 'end', cy = z.y + 22;
+      s += '<text x="'+lx+'" y="'+(z.y+6.5)+'" text-anchor="'+anchor+'" '+F+' font-weight="600" font-size="4.4" fill="'+z.c+'">ด่าน '+z.n+' · '+z.name+'</text>';
+      s += '<text x="'+lx+'" y="'+(z.y+11.2)+'" text-anchor="'+anchor+'" '+F+' font-size="3.3" fill="#3B4A63">จั่ว: '+z.deck+'</text>';
+      if (z.deco === '@dragon') s += '<svg x="4" y="'+(cy-10)+'" width="17" height="21" viewBox="0 0 40 48">'+charInner('dragon')+'</svg>';
+      else if (z.deco === '@gate'){
+        s += '<text x="174" y="'+(cy-1.5)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.6" fill="#7A5700">ประตู</text>';
+        s += '<text x="174" y="'+(cy+3)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.6" fill="#7A5700">ปราสาท</text>';
+      } else s += '<text x="'+(z.dir === 1 ? 177 : 13)+'" y="'+(cy+4)+'" text-anchor="middle" font-size="10">'+z.deco+'</text>';
+      (z.dir === 1 ? XS : XS.slice().reverse()).forEach((x, i) => {
+        sq++;
+        const star = i === 1, gate = sq === GATE;
+        s += '<circle cx="'+x+'" cy="'+cy+'" r="11" fill="'+(star ? '#FFE27A' : '#fff')+'" stroke="'+(gate ? '#B98400' : z.c)+'" stroke-width="'+(gate ? 2.2 : 1.6)+'"/>';
+        s += '<text x="'+x+'" y="'+(cy-4.8)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.4" fill="#23324A">'+sq+'</text>';
+        s += '<text x="'+x+'" y="'+(cy+4)+'" text-anchor="middle" font-size="8">'+z.icons[i]+'</text>';
+      });
+    });
+    const sy = POS[0][1];
+    s += '<circle cx="16" cy="'+sy+'" r="9" fill="#23324A"/><text x="16" y="'+(sy-1)+'" text-anchor="middle" font-size="5.5">🚩</text><text x="16" y="'+(sy+5.2)+'" text-anchor="middle" '+F+' font-weight="600" font-size="3.2" fill="#fff">START</text>';
+    // ตัวเดิน: คนที่กำลังเล่นวาดทีหลังสุดให้อยู่บน
+    const order = S.players.map((p, i) => i).sort((a, b) => (a === S.turn) - (b === S.turn));
+    order.forEach(i => {
+      const p = S.players[i], [x, y] = POS[p.pos], o = OFF[i];
+      const h = HEROES[p.hero];
+      s += '<g class="pawn'+(i === S.turn ? ' now' : '')+'" id="pawn'+i+'" style="transform:translate('+(x+o[0])+'px,'+(y+o[1])+'px)"><g class="bob">';
+      s += '<ellipse cx="0" cy="7.2" rx="5" ry="1.6" fill="rgba(35,50,74,.25)"/>';
+      s += '<circle cx="0" cy="0" r="6.4" fill="#fff" stroke="'+h.c+'" stroke-width="'+(i === S.turn ? 1.8 : 1.1)+'"/>';
+      s += '<svg x="-5.4" y="-6.4" width="10.8" height="13" viewBox="0 0 40 48">'+charInner(p.hero)+'</svg>';
+      s += '</g></g>';
+    });
+    return s + '</svg>';
+  }
+  function placePawn(i){
+    const el = document.getElementById('pawn'+i); if (!el) return;
+    const p = S.players[i], [x, y] = POS[p.pos], o = OFF[i];
+    el.style.transform = 'translate('+(x+o[0])+'px,'+(y+o[1])+'px)';
+  }
+
+  /* ───────── หน้าจอ ───────── */
+  const app = document.getElementById('app');
+  function topBar(){
+    return '<div class="top"><div class="logo">⏰ TIME ADVENTURE <small>ผจญภัยเมืองแห่งเวลา</small></div>' +
+      '<button class="icon-btn" data-act="sound" aria-pressed="'+S.sound+'">'+(S.sound ? '🔊 เสียงเปิด' : '🔈 เสียงปิด')+'</button>' +
+      '<button class="icon-btn" data-act="rules">📖 วิธีเล่น</button>' +
+      (S.screen === 'game' ? '<button class="icon-btn" data-act="end">🏁 จบเกม</button>' : '') + '</div>';
+  }
+  function render(){
+    if (S.screen === 'setup') app.innerHTML = topBar() + setupHtml();
+    else app.innerHTML = topBar() + gameHtml();
+    renderModal();
+  }
+  function setupHtml(){
+    const saved = loadSaved();
+    let h = '<section class="setup"><div class="hero-row">' + HERO_KEYS.map(k => ch(k, 20)).join('') + '</div>';
+    h += '<h1>ผจญภัยเมืองแห่งเวลา</h1><p class="tag">เกมอ่านเวลาสำหรับ ป.2 · เล่นได้ 1–4 คน ผลัดกันเล่นบนเครื่องเดียวกัน</p>';
+    h += '<h2>มีผู้เล่นกี่คน?</h2><div class="seg" role="group" aria-label="จำนวนผู้เล่น">' + [1,2,3,4].map(n => '<button data-act="n" data-v="'+n+'" aria-pressed="'+(setup.n === n)+'">'+n+' คน</button>').join('') + '</div>';
+    h += '<h2>เลือกฮีโร่ของแต่ละคน</h2><div class="slots">';
+    for (let i = 0; i < setup.n; i++){
+      h += '<div class="slot"><span class="who">คนที่ '+(i+1)+'</span><input id="name'+i+'" data-i="'+i+'" maxlength="16" placeholder="ชื่อ (ไม่ใส่ก็ได้)" value="'+esc(setup.names[i])+'" aria-label="ชื่อผู้เล่นคนที่ '+(i+1)+'">';
+      h += '<div class="hero-pick" role="group" aria-label="ฮีโร่ของคนที่ '+(i+1)+'">' + HERO_KEYS.map(k => '<button data-act="hero" data-i="'+i+'" data-v="'+k+'" style="--hc:'+HEROES[k].c+'" aria-pressed="'+(setup.heroes[i] === k)+'">'+ch(k, 12)+HEROES[k].name+'</button>').join('') + '</div></div>';
+    }
+    h += '</div><h2>ระดับ</h2><div class="seg" role="group" aria-label="ระดับ">' +
+      '<button data-act="easy" data-v="0" aria-pressed="'+(!setup.easy)+'">⭐ ปกติ</button>' +
+      '<button data-act="easy" data-v="1" aria-pressed="'+setup.easy+'">🌱 ง่าย (ไม่มีการ์ด ★★★)</button></div>';
+    h += '<div class="start-row">' + (saved ? '<button class="btn ghost big" data-act="resume">▶ เล่นต่อเกมเดิม</button>' : '') + '<button class="btn big" data-act="start" style="--b:#2E9E5B">🚩 เริ่มผจญภัย!</button></div></section>';
+    return h;
+  }
+  function gameHtml(){
+    const p = cur(), hero = HEROES[p.hero];
+    let turn = '<div class="turn" style="--hc:'+hero.c+'"><div class="turn-head">'+ch(p.hero, 16)+'<div><b>ตาของ '+esc(p.name)+'</b><span>รอบที่ '+S.round+' · อยู่ช่อง '+(p.pos === 0 ? 'START' : p.pos)+'</span></div></div>';
+    if (S.winner != null){
+      turn += '<button class="btn big" data-act="showwin" style="--b:#D99A00">👑 ดูผู้ชนะ</button>';
+    } else if (p.pos === GATE){
+      turn += '<p class="note">ถึงประตูปราสาทแล้ว! ตอบคำถามจากคุณเข็มให้ถูก เพื่อเข้าปราสาท</p>';
+      turn += '<button class="btn big" data-act="draw" data-v="chal" style="--b:#E8572E">🏰 คำถามจากคุณเข็ม ⚔️</button>';
+    } else {
+      const z = zoneOf(p.pos);
+      if (z === 5){
+        turn += '<p class="note">ด่านปราสาท: เลือกกองการ์ดเองได้เลย</p><div class="deck-btns">' +
+          Object.keys(TYPES).map(t => '<button class="btn" data-act="draw" data-v="'+t+'" style="--b:'+TYPES[t].c+'">'+TYPES[t].icon+' '+TYPES[t].name+'</button>').join('') + '</div>';
+      } else {
+        const t = ZONE_DECK[z];
+        turn += '<button class="btn big" data-act="draw" data-v="'+t+'" style="--b:'+TYPES[t].c+'">จั่วการ์ด '+TYPES[t].icon+' '+TYPES[t].name+'</button>';
+      }
+      if (p.hand.includes('travel') && !S.used) turn += '<button class="btn ghost" data-act="travel">🔄 ใช้ TIME TRAVEL เดินหน้า 1 ช่อง</button>';
+    }
+    turn += '</div>';
+    let pl = '<div class="players">' + S.players.map((q, i) => '<div class="pl'+(i === S.turn ? ' now' : '')+'" style="--hc:'+HEROES[q.hero].c+'">'+ch(q.hero, 11)+
+      '<div><div class="nm">'+esc(q.name)+'</div><div class="sub">'+(q.pos === CASTLE ? '👑 อยู่ในปราสาท' : q.pos === 0 ? 'START' : 'ช่อง '+q.pos)+'</div>' +
+      (q.hand.length ? '<div class="hand">'+q.hand.map(k => '<span class="chip">'+SPECIALS[k].e+' '+SPECIALS[k].n+'</span>').join('')+'</div>' : '') +
+      '</div><div class="coins" aria-label="'+q.coins+' เหรียญ">🪙 '+q.coins+'</div></div>').join('') + '</div>';
+    return '<div class="layout"><div class="board-wrap">'+boardSvg()+'</div><div class="panel">'+turn+pl+'</div></div>';
+  }
+
+  /* ───────── การ์ด ───────── */
+  function openCard(id, extra){
+    const c = BY_ID[id];
+    const idx = c.opts ? c.opts.map((o, i) => i) : [];
+    M = Object.assign({type:'card', id, order:c.fixed ? idx : shuffle(idx), picked:[], gone:[], wrong:[], done:false, ok:null,
+      boost:false, fast:false, set:c.start ? c.start.slice() : null, retry:false}, extra || {});
+    SND.card(); renderModal();
+  }
+  function buddyHtml(t){
+    const b = BUDDY[t];
+    return '<div class="buddy"><span class="bd-ic">'+ch(b.k, 11)+'</span><span class="bd-tx">'+pick(b.say)+'</span></div>';
+  }
+  function optLabel(c, i){
+    const o = c.opts ? c.opts[i] : c.items[i];
+    if (typeof o === 'string') return o;
+    return '<span class="e">'+o.e+'</span>'+(o.label || '')+'<span class="tm">'+o.tm+'</span>';
+  }
+  function cardHtml(){
+    const c = BY_ID[M.id], T = TYPES[c.t], p = cur();
+    let h = '<div class="gcard t-'+c.t+'" role="dialog" aria-modal="true" aria-label="การ์ด '+T.name+'">';
+    h += '<div class="g-head"><span>'+T.icon+' '+T.name+(M.gate ? ' · ประตูปราสาท' : '')+'</span><span class="stars" aria-label="'+c.s+' ดาว">'+'★'.repeat(c.s)+'</span></div><div class="g-body">';
+    if (!M.done) h += (M.buddyHtml = M.buddyHtml || buddyHtml(c.t));
+    if (c.art) h += '<div class="art">'+c.art()+'</div>';
+    h += '<p class="q">'+c.q+'</p>';
+    const kind = c.kind || 'choice';
+    if (kind === 'choice'){
+      h += '<div class="opts">' + M.order.map((i, n) => {
+        let cls = 'opt';
+        if (M.gone.includes(i)) cls += ' gone';
+        if (M.done && i === c.ans) cls += ' right';
+        if (M.wrong.includes(i)) cls += ' wrong';
+        const key = typeof c.opts[i] === 'string' && !c.fixed ? '<span class="k">'+'กขค'[n]+'</span>' : '';
+        return '<button class="'+cls+'" data-act="pick" data-v="'+i+'"'+(M.done || M.wrong.includes(i) ? ' disabled' : '')+'>'+key+optLabel(c, i)+'</button>';
+      }).join('') + '</div>';
+    } else if (kind === 'order'){
+      h += '<div class="opts">' + c.items.map((it, i) => {
+        const n = M.picked.indexOf(i);
+        let cls = 'opt';
+        if (M.done) cls += (c.order.indexOf(i) === n ? ' right' : ' wrong');
+        return '<button class="'+cls+'" data-act="ord" data-v="'+i+'"'+(M.done ? ' disabled' : '')+'>'+optLabel(c, i)+'<span class="n">'+(n >= 0 ? n + 1 : '')+'</span></button>';
+      }).join('') + '</div>';
+      if (!M.done) h += '<div class="row-btns"><button class="btn ghost" data-act="ordreset">↺ เริ่มเรียงใหม่</button><button class="btn" data-act="ordcheck" style="--b:var(--c)"'+(M.picked.length < c.items.length ? ' disabled' : '')+'>✔ ตรวจคำตอบ</button></div>';
+    } else if (kind === 'set'){
+      const [hh, mm] = M.done && !M.ok ? c.target : M.set;
+      h += '<div class="setter"><div id="setClock">'+clock(hh, mm, {plain:false})+'</div>';
+      if (!M.done){
+        h += '<div class="set-ctl"><div><span><i style="background:'+HOUR+'"></i>เข็มสั้น (ชั่วโมง)</span><div class="pair"><button data-act="h" data-v="-1" aria-label="ถอยเข็มสั้น">⟲</button><button data-act="h" data-v="1" aria-label="หมุนเข็มสั้นไปข้างหน้า">⟳</button></div></div>' +
+          '<div><span><i style="background:'+MIN+'"></i>เข็มยาว (นาที)</span><div class="pair"><button data-act="m" data-v="-5" aria-label="ถอยเข็มยาว 5 นาที">⟲</button><button data-act="m" data-v="5" aria-label="หมุนเข็มยาวไปข้างหน้า 5 นาที">⟳</button></div></div></div>';
+        h += '<p class="note">ลากเข็มยาวบนหน้าปัดได้ด้วย</p><button class="btn" data-act="setcheck" style="--b:var(--c)">✔ ตรวจคำตอบ</button>';
+      } else if (!M.ok) h += '<p class="note">นี่คือเข็มที่ถูกต้อง</p>';
+      h += '</div>';
+    }
+    // การ์ดพิเศษที่ใช้ได้ก่อนตอบ
+    if (!M.done && !M.answeredOnce){
+      const usable = ['boost','fast','lucky','bunny'].filter(k => p.hand.includes(k) && (k !== 'bunny' || (kind === 'choice' && c.opts.length > 2 && !M.gone.length)));
+      const active = M.boost ? 'boost' : M.fast ? 'fast' : null;
+      if (usable.length && (!S.used || active)){
+        h += '<div class="powers" aria-label="การ์ดพิเศษ">' + usable.map(k => '<button class="power" data-act="power" data-v="'+k+'" aria-pressed="'+(active === k)+'"'+(S.used && active !== k ? ' disabled' : '')+'>'+SPECIALS[k].e+' '+SPECIALS[k].n+'</button>').join('') + '</div>';
+      }
+    }
+    if (M.done){
+      const hk = p.hero;
+      if (M.ok){
+        const extra = [];
+        if (M.boost) extra.push('⏰ BOOST +1 เหรียญ');
+        if (M.fast) extra.push('🚀 เดินเพิ่ม 2 ช่อง');
+        h += '<div class="fb good">'+ch(hk, 17)+'<div><b>'+(M.cheer = M.cheer || pick(CHEER))+'</b><p>'+(M.gate ? 'เปิดประตูปราสาทได้แล้ว!' : 'ได้ 🪙 '+(M.boost ? 2 : 1)+' เหรียญ · เดิน '+(c.s + (M.fast ? 2 : 0))+' ช่อง')+(extra.length && !M.gate ? '<br>'+extra.join(' · ') : '')+'</p><p style="color:#51607A">💡 '+c.why+'</p></div></div>';
+      } else {
+        h += '<div class="fb bad">'+ch(hk, 17)+'<div><b>'+(M.comfort = M.comfort || pick(COMFORT))+'</b><p>คำตอบคือ <b style="display:inline;font-size:inherit;color:inherit">'+c.a+'</b></p><p style="color:#51607A">💡 '+c.why+'</p></div></div>';
+      }
+      if (M.shieldOffer) h += '<div class="row-btns"><button class="btn" data-act="shield" style="--b:#D99A00">🛡️ ใช้ TIME SHIELD ตอบใหม่</button><button class="btn ghost" data-act="next">ไม่ใช้ ไปต่อ</button></div>';
+      else h += '<div class="row-btns"><button class="btn big" data-act="next" style="--b:var(--c)">'+(M.ok ? (M.gate ? '👑 เข้าปราสาท!' : '👣 เดินเลย!') : 'ไปต่อ ➜')+'</button></div>';
+    }
+    h += '</div><div class="g-foot">'+c.id+'</div></div>';
+    return h;
+  }
+  function specialHtml(){
+    const sp = SPECIALS[M.key], p = cur();
+    let h = '<div class="gcard t-special" role="dialog" aria-modal="true" aria-label="การ์ดพิเศษ"><div class="g-head"><span>⭐ การ์ดพิเศษ</span><span class="stars">✦</span></div><div class="g-body">';
+    h += '<div class="sp-burst">'+(M.key === 'bunny' ? bunny(28) : sp.e)+'</div><div class="sp-name">'+sp.n+'</div><p class="q">'+sp.d+'</p>';
+    if (M.key === 'chest') h += '<p class="note">'+esc(p.name)+' ได้ 🪙 2 เหรียญแล้ว!</p><div class="row-btns"><button class="btn big" data-act="spdone" style="--b:#D99A00">เย่! ไปต่อ</button></div>';
+    else if (p.hand.length >= 2){
+      h += '<p class="note">ถือการ์ดพิเศษได้แค่ 2 ใบ เลือกทิ้ง 1 ใบ</p><div class="opts">' +
+        p.hand.concat([M.key]).map((k, i) => '<button class="opt" data-act="drop" data-v="'+i+'" style="--c:#D99A00">'+SPECIALS[k].e+' ทิ้ง '+SPECIALS[k].n+(i === 2 ? ' (ใบใหม่)' : '')+'</button>').join('') + '</div>';
+    } else h += '<p class="note">ใช้ได้เมื่อ: '+sp.when+'</p><div class="row-btns"><button class="btn big" data-act="spkeep" style="--b:#D99A00">เก็บไว้ในมือ ✨</button></div>';
+    return h + '</div></div>';
+  }
+  function winHtml(){
+    const ranked = ranking(), w = S.players[S.winner != null ? S.winner : ranked[0]];
+    let h = '<div class="gcard t-special" role="dialog" aria-modal="true" aria-label="ผลการแข่งขัน"><div class="g-head"><span>👑 ฮีโร่ผู้พิทักษ์เวลา</span><span class="stars">✦✦✦</span></div><div class="g-body win">';
+    h += '<div class="crown">👑</div>'+ch(w.hero, 36).replace('<svg ', '<svg class="hero" ')+'<p class="q">'+esc(w.name)+'<br>'+(S.winner != null ? 'เข้าปราสาทเวลาได้สำเร็จ!' : 'มีเหรียญมากที่สุด!')+'</p>';
+    h += '<div class="rank">' + ranked.map((i, n) => { const q = S.players[i]; return '<div><span>'+(n + 1)+'.</span>'+ch(q.hero, 10)+'<span>'+esc(q.name)+(q.coins >= 5 ? ' 🏅' : '')+'</span><span>🪙 '+q.coins+'</span></div>'; }).join('') + '</div>';
+    h += '<p class="note">🏅 = มีเหรียญ 5 เหรียญขึ้นไป ได้ตรานักผจญภัยตรงเวลา</p>';
+    h += '<div class="row-btns"><button class="btn ghost" data-act="close">ดูกระดาน</button><button class="btn big" data-act="again" style="--b:#2E9E5B">🔁 เล่นอีกครั้ง</button></div></div></div>';
+    return h;
+  }
+  function ranking(){
+    return S.players.map((p, i) => i).sort((a, b) => {
+      const A = S.players[a], B = S.players[b];
+      return (B.pos === CASTLE) - (A.pos === CASTLE) || B.coins - A.coins || B.pos - A.pos;
+    });
+  }
+  function rulesHtml(){
+    return '<div class="gcard t-plain" role="dialog" aria-modal="true" aria-label="วิธีเล่น"><div class="g-head"><span>📖 วิธีเล่น</span><span class="stars">✦</span></div><div class="g-body"><ol class="rules-list">' +
+      '<li>ผลัดกันเล่นทีละคน กด <b>จั่วการ์ด</b> สีของด่านที่ตัวเองอยู่</li>' +
+      '<li>ตอบถูก ได้ 🪙 1 เหรียญ และเดินตามจำนวน ★ บนการ์ด</li>' +
+      '<li>ตอบผิด อยู่ที่เดิม และได้ดูเฉลยพร้อมวิธีคิด</li>' +
+      '<li>จบตาบนช่อง ⭐ ได้การ์ดพิเศษ ถือได้ 2 ใบ ใช้ได้ตาละ 1 ใบ</li>' +
+      '<li>ด่าน 5 เลือกกองการ์ดเองได้</li>' +
+      '<li>ถึงช่อง 15 ประตูปราสาท ตอบการ์ด ⚔️ ถูก = <b>เข้าปราสาท ชนะ!</b></li>' +
+      '<li>กด 🏁 จบเกม เมื่อหมดเวลา ใครมีเหรียญมากที่สุดชนะ</li></ol>' +
+      '<p class="note">ครูบอกนักเรียนให้ช่วยกันคิดได้ แต่ให้เจ้าของตาเป็นคนกดตอบ</p>' +
+      '<div class="row-btns"><button class="btn" data-act="close">เข้าใจแล้ว!</button></div></div></div>';
+  }
+  function endAskHtml(){
+    return '<div class="gcard t-plain" role="dialog" aria-modal="true" aria-label="จบเกม"><div class="g-head"><span>🏁 จบเกม</span><span class="stars">✦</span></div><div class="g-body">' +
+      '<p class="q">หยุดเล่นแล้วนับเหรียญเลยไหม?</p><div class="row-btns"><button class="btn ghost" data-act="close">เล่นต่อ</button><button class="btn" data-act="endnow" style="--b:#D99A00">นับเหรียญ 🪙</button></div></div></div>';
+  }
+  function renderModal(){
+    let ov = document.getElementById('ov');
+    if (!M){ if (ov) ov.remove(); return; }
+    if (!ov){ ov = document.createElement('div'); ov.id = 'ov'; ov.className = 'overlay'; document.body.appendChild(ov); }
+    const html = M.type === 'card' ? cardHtml() : M.type === 'special' ? specialHtml() : M.type === 'win' ? winHtml() : M.type === 'rules' ? rulesHtml() : endAskHtml();
+    ov.innerHTML = html;
+    if (M !== lastM){ const g = ov.querySelector('.gcard'); if (g) g.classList.add('pop'); lastM = M; }
+    const f = ov.querySelector('button:not([disabled])'); if (f && M.focusFirst !== false) f.focus({preventScroll:true});
+    bindSetter();
+  }
+
+  /* ───────── หมุนเข็มด้วยการลาก ───────── */
+  function bindSetter(){
+    const box = document.getElementById('setClock'); if (!box || !M || M.done) return;
+    const svg = box.querySelector('svg');
+    let drag = false;
+    const setFrom = ev => {
+      const r = svg.getBoundingClientRect();
+      // หน้าปัดอยู่ที่ (0,0) ใน viewBox -55 -60 110 118
+      const cx = r.left + r.width * 55 / 110, cy = r.top + r.height * 60 / 118;
+      let a = Math.atan2(ev.clientX - cx, -(ev.clientY - cy)) * 180 / Math.PI; if (a < 0) a += 360;
+      const m = (Math.round(a / 30) * 5) % 60;
+      if (m !== M.set[1]){ M.set[1] = m; redrawSetter(); SND.step(); }
+    };
+    svg.addEventListener('pointerdown', ev => { drag = true; try{ svg.setPointerCapture(ev.pointerId); }catch(e){} setFrom(ev); });
+    svg.addEventListener('pointermove', ev => { if (drag) setFrom(ev); });
+    svg.addEventListener('pointerup', () => drag = false);
+    svg.addEventListener('pointercancel', () => drag = false);
+  }
+  function redrawSetter(){
+    const box = document.getElementById('setClock'); if (!box) return;
+    box.innerHTML = clock(M.set[0], M.set[1]);
+    bindSetter();
+  }
+
+  /* ───────── ผลการตอบ ───────── */
+  function resolve(ok){
+    const c = BY_ID[M.id], p = cur();
+    M.done = true; M.ok = ok; M.answeredOnce = true;
+    if (ok){
+      SND.good(); confetti();
+      p.coins += M.boost ? 2 : 1;
+      say('ถูกต้อง! '+c.a);
+    } else {
+      SND.bad();
+      M.shieldOffer = p.hand.includes('shield') && !S.used && !M.retry;
+      say('ยังไม่ถูก คำตอบคือ '+c.a);
+    }
+    save(); render();
+  }
+  function useSpecial(k){
+    const p = cur(), i = p.hand.indexOf(k);
+    if (i >= 0){ p.hand.splice(i, 1); S.sdeck.push(k); }
+    S.used = true;
+  }
+  async function next(){
+    const c = BY_ID[M.id], p = cur(), i = S.turn, ok = M.ok, gate = M.gate;
+    const steps = ok ? c.s + (M.fast ? 2 : 0) : 0;
+    M = null; render();
+    if (ok && gate){
+      p.pos = CASTLE; S.winner = i; save(); render(); SND.win(); confetti(60);
+      M = {type:'win'}; renderModal(); return;
+    }
+    const start = p.pos;
+    if (steps) await walk(i, Math.min(GATE, p.pos + steps));
+    if (p.pos !== start && STAR_SQ.includes(p.pos) && S.sdeck.length){
+      M = {type:'special', key:S.sdeck.shift()};
+      if (M.key === 'chest'){ p.coins += 2; S.sdeck.push('chest'); }
+      SND.good(); save(); render(); return;
+    }
+    endTurn();
+  }
+  function walk(i, to){
+    return new Promise(res => {
+      busy = true;
+      const p = S.players[i];
+      const stepOnce = () => {
+        if (p.pos >= to){ busy = false; save(); res(); return; }
+        p.pos++; placePawn(i); SND.step();
+        setTimeout(stepOnce, window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 60 : 360);
+      };
+      stepOnce();
+    });
+  }
+  function endTurn(){
+    S.turn = (S.turn + 1) % S.players.length;
+    if (S.turn === 0) S.round++;
+    S.used = false; M = null; save(); render();
+    say('ตาของ '+cur().name);
+  }
+  function confetti(n){
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cols = ['#1E88D9','#8B4FC7','#3E9E4F','#E8572E','#FFD233','#FF8FC0'];
+    for (let k = 0; k < (n || 26); k++){
+      const d = document.createElement('div'); d.className = 'confetti';
+      d.style.left = Math.random() * 100 + 'vw'; d.style.background = pick(cols);
+      d.style.animationDelay = Math.random() * .3 + 's'; d.style.animationDuration = 1 + Math.random() * .8 + 's';
+      document.body.appendChild(d); setTimeout(() => d.remove(), 2400);
+    }
+  }
+
+  /* ───────── ปุ่มทั้งหมด ───────── */
+  document.addEventListener('input', e => {
+    const t = e.target;
+    if (t.id && t.id.startsWith('name')) setup.names[+t.dataset.i] = t.value;
+  });
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]'); if (!b || b.disabled || busy) return;
+    const act = b.dataset.act, v = b.dataset.v;
+    const p = S.players ? cur() : null;
+    switch (act){
+      case 'sound': S.sound = !S.sound; if (S.screen === 'game') save(); render(); if (S.sound) SND.card(); break;
+      case 'rules': M = {type:'rules'}; renderModal(); break;
+      case 'close': M = null; renderModal(); break;
+      case 'end': M = {type:'endask'}; renderModal(); break;
+      case 'endnow': M = {type:'win'}; SND.win(); renderModal(); break;
+      case 'showwin': M = {type:'win'}; renderModal(); break;
+      case 'again': M = null; clearSaved(); S = {screen:'setup', sound:S.sound}; render(); break;
+      case 'n': setup.n = +v; render(); break;
+      case 'easy': setup.easy = v === '1'; render(); break;
+      case 'hero': {
+        const i = +b.dataset.i, j = setup.heroes.indexOf(v);
+        if (j !== i){ setup.heroes[j] = setup.heroes[i]; setup.heroes[i] = v; }
+        render(); break;
+      }
+      case 'start': newGame(); say('เริ่มเกม ตาของ '+cur().name); break;
+      case 'resume': { const s = loadSaved(); if (s){ S = s; M = null; render(); } break; }
+      case 'draw': openCard(draw(v), {gate:p.pos === GATE}); break;
+      case 'travel':
+        useSpecial('travel'); save(); render();
+        await walk(S.turn, Math.min(GATE, p.pos + 1)); render(); break;
+      case 'pick': {
+        const c = BY_ID[M.id], i = +v;
+        if (i === c.ans) resolve(true);
+        else { M.wrong.push(i); resolve(false); }
+        break;
+      }
+      case 'ord': {
+        const i = +v, n = M.picked.indexOf(i);
+        if (n >= 0) M.picked.splice(n); else M.picked.push(i);
+        SND.step(); renderModal(); break;
+      }
+      case 'ordreset': M.picked = []; renderModal(); break;
+      case 'ordcheck': { const c = BY_ID[M.id]; resolve(M.picked.every((x, n) => x === c.order[n])); break; }
+      case 'h': M.set[0] = ((M.set[0] + +v + 11) % 12) + 1; redrawSetter(); SND.step(); break;
+      case 'm': {
+        let m = M.set[1] + +v, h = M.set[0];
+        if (m >= 60){ m -= 60; h = h % 12 + 1; }
+        if (m < 0){ m += 60; h = ((h + 10) % 12) + 1; }
+        M.set = [h, m]; redrawSetter(); SND.step(); break;
+      }
+      case 'setcheck': { const c = BY_ID[M.id]; resolve(M.set[0] % 12 === c.target[0] % 12 && M.set[1] === c.target[1]); break; }
+      case 'power': {
+        if (v === 'lucky'){
+          useSpecial('lucky'); save();
+          const c = BY_ID[M.id]; openCard(draw(c.t), {gate:M.gate}); render(); break;
+        }
+        if (v === 'bunny'){
+          useSpecial('bunny'); save();
+          const c = BY_ID[M.id];
+          M.gone.push(pick(M.order.filter(i => i !== c.ans)));
+          render(); break;
+        }
+        // boost / fast: กดอีกครั้งเพื่อยกเลิก ก่อนตอบ
+        if (M[v]){ M[v] = false; p.hand.push(v); S.sdeck.splice(S.sdeck.lastIndexOf(v), 1); S.used = false; }
+        else { M[v] = true; useSpecial(v); }
+        save(); render(); break;
+      }
+      case 'shield': {
+        useSpecial('shield');
+        const c = BY_ID[M.id];
+        Object.assign(M, {done:false, ok:null, shieldOffer:false, retry:true, picked:[], set:c.start ? c.start.slice() : null, cheer:null, comfort:null});
+        save(); render(); break;
+      }
+      case 'next': next(); break;
+      case 'spkeep': p.hand.push(M.key); endTurn(); break;
+      case 'spdone': endTurn(); break;
+      case 'drop': {
+        const all = p.hand.concat([M.key]), i = +v;
+        S.sdeck.push(all[i]); all.splice(i, 1); p.hand = all; endTurn(); break;
+      }
+    }
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && M && (M.type === 'rules' || M.type === 'endask')){ M = null; renderModal(); }
+  });
+
+  /* ───────── เริ่ม (เก็บสถานะไว้เมื่อหน้าเว็บอัปเดต) ───────── */
+  try{ if (window.claude && window.claude.hot && typeof window.claude.hot.snapshot === 'function') window.claude.hot.snapshot(() => ({S, setup})); }catch(e){}
+  function start(d){
+    if (d && d.S) S = d.S;
+    if (d && d.setup) setup = d.setup;
+    render();
+  }
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start);
+  else start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+})();
+</script>
