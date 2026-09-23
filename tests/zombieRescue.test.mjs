@@ -15,8 +15,10 @@
  *   node tests/zombieRescue.test.mjs /tmp/logic
  */
 
+import fs from 'fs'
 import path from 'path'
 import { createRequire } from 'module'
+import { fileURLToPath } from 'url'
 
 const OUT = process.argv[2]
 if (!OUT) {
@@ -379,7 +381,9 @@ check('กล่องเสบียง ➕: ได้ของเสมอ · 
     if (reward.kind === 'item') equal(state.players[0].items.join(), reward.item, 'ได้ของเข้ากระเป๋า')
     else equal(state.players[0].supplies, 2 + reward.amount, 'ได้เสบียง')
   }
-  assert(count.medkit > count.shield && count.medkit > count.radio, 'ยาต้องออกบ่อยที่สุด')
+  assert(['help', 'shield', 'skate', 'supplies'].every((k) => count.medkit > count[k]), 'ยาต้องออกบ่อยที่สุด')
+  equal(count.radio, undefined, 'วิทยุไม่อยู่ในกล่องเสบียง (ซื้อที่ตลาดเท่านั้น) เหมือนชุดพิมพ์')
+  equal(ENG.SUPPLY_TABLE.reduce((s, [, w]) => s + w, 0), 6, 'กล่องเสบียงคือการทอยลูกเต๋า 1 ลูก (6 หน้า) เหมือนชุดพิมพ์')
   const full = setPlayer(newGame(1), { items: ['help', 'help', 'help', 'help'] })
   for (let i = 0; i < 50; i += 1) {
     const { state, reward } = ENG.openSupply(full, rng)
@@ -555,6 +559,70 @@ check('ความยาวเกมพอดีคาบ: เด็กตอ�
     assert(median >= 10 && median <= 22, `${n} คน: ค่ากลางจำนวนรอบ ${median}`)
     assert(doorMedian >= 1 && doorMedian <= 6, `${n} คน: ถึงประตูแล้วอีก ${doorMedian} รอบถึงสร้างยาได้`)
   }
+})
+
+/* ── ชุดพิมพ์ zombie-rescue.html ───────────────────────── */
+
+/**
+ * ชุดพิมพ์กับเกมบนเว็บต้องเป็นเกมเดียวกัน
+ * ข้อมูลในชุดพิมพ์สร้างจาก scripts/zombie-kit-data.mjs ถ้าแก้เกมบนเว็บแล้วลืมสร้างใหม่ ตรงนี้จะฟ้อง
+ * วิธีแก้: npx tsc -p tsconfig.tests.json --outDir /tmp/logic && node scripts/zombie-kit-data.mjs /tmp/logic
+ */
+const KIT_HTML = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'zombie-rescue.html'), 'utf8')
+const KIT = (() => {
+  const m = KIT_HTML.match(/<script id="kit-data" type="application\/json">([\s\S]*?)<\/script>/)
+  return m && m[1].trim() ? JSON.parse(m[1]) : null
+})()
+const REGEN = ' (สร้างข้อมูลชุดพิมพ์ใหม่ด้วย scripts/zombie-kit-data.mjs)'
+
+check('ชุดพิมพ์: การ์ดโจทย์ 70 ใบ เขตละ 12 และ ดร.ซอมโบ 10 · รหัสไม่ซ้ำ', () => {
+  assert(KIT, 'ไม่พบข้อมูลในชุดพิมพ์' + REGEN)
+  equal(KIT.cards.length, 70, 'จำนวนการ์ดโจทย์')
+  for (const [stage, count] of [[1, 12], [2, 12], [3, 12], [4, 12], [5, 12], ['boss', 10]]) {
+    equal(KIT.cards.filter((c) => c.stage === stage).length, count, `กองของเขต ${stage}`)
+  }
+  const ids = KIT.cards.map((c) => c.id)
+  equal(new Set(ids).size, ids.length, 'รหัสการ์ดซ้ำ')
+})
+
+check('ชุดพิมพ์: เฉลยทุกใบถูก ใช้แม่ของเขต และโจทย์กับคำใบ้ไม่เผยคำตอบ', () => {
+  for (const c of KIT.cards) {
+    const q = { ...c, hidden: c.hidden ?? undefined }
+    equal(c.product, c.groups * c.each, `${c.id} ผลคูณ`)
+    assert(c.groups >= 2 && c.groups <= 10, `${c.id} จำนวนกลุ่ม ${c.groups}`)
+    if (typeof c.stage === 'number' && Q.ZONE_TABLE[c.stage]) equal(c.each, Q.ZONE_TABLE[c.stage], `${c.id} แม่ของเขต`)
+    equal(c.answer, Q.expectedNumber(q), `${c.id} คำตอบ`)
+    if (c.ask === 'sentence') {
+      assert(Q.checkAnswer(q, { kind: 'sentence', x: c.each, y: c.groups, z: c.product }), `${c.id} สลับที่ต้องถูก`)
+      assert(c.short.includes(`= ${c.product}`), `${c.id} เฉลยบนการ์ด`)
+    } else {
+      assert(Q.checkAnswer(q, { kind: 'number', value: c.answer }), `${c.id} ตอบถูกต้องถูก`)
+      assert(hasNumber(c.short, c.answer), `${c.id} เฉลยบนการ์ด`)
+    }
+    const given = c.ask === 'missing' ? [c.product, c.hidden === 'each' ? c.groups : c.each] : [c.groups, c.each]
+    const answer = c.ask === 'sentence' ? c.product : c.answer
+    if (!given.includes(answer)) {
+      const shown = c.text + ' ' + (c.visual.text || '') + ' ' + (c.visual.tag || '')
+      assert(!hasNumber(shown, answer), `${c.id} โจทย์เผยคำตอบ`)
+      assert(!hasNumber(c.hint, answer), `${c.id} คำใบ้เผยคำตอบ`)
+    }
+    const v = c.visual
+    if (v.kind === 'groups') assert(v.groups * v.each <= 30, `${c.id} ภาพเยอะเกิน`)
+    if (v.kind === 'array') assert(v.rows * v.cols <= 30, `${c.id} ภาพเยอะเกิน`)
+  }
+})
+
+check('ชุดพิมพ์ตรงกับเกมบนเว็บ: กระดาน ตัวละคร เขต ราคา การ์ดพิเศษ และเป้าหลอดพลัง', () => {
+  equal(KIT.board.svg, ART.boardArt(), 'กระดาน' + REGEN)
+  equal(KIT.chars.zombo, ART.charInner('zombo'), 'ตัวละคร' + REGEN)
+  equal(JSON.stringify(KIT.zones), JSON.stringify(BOARD.ZONES), 'เขต' + REGEN)
+  equal(JSON.stringify(KIT.items), JSON.stringify(ENG.ITEM_INFO), 'อุปกรณ์และราคา' + REGEN)
+  equal(JSON.stringify(KIT.events.map((e) => e.key)), JSON.stringify(ENG.EVENT_DECK), 'การ์ดพิเศษ' + REGEN)
+  equal(JSON.stringify(KIT.supplyTable), JSON.stringify(ENG.SUPPLY_TABLE), 'กล่องเสบียง' + REGEN)
+  equal(KIT.targets.normal.join(), [1, 2, 3, 4].map((n) => ENG.targetFor(n, false)).join(), 'เป้าหลอดพลัง' + REGEN)
+  equal(KIT.targets.easy.join(), [1, 2, 3, 4].map((n) => ENG.targetFor(n, true)).join(), 'เป้าหลอดพลังระดับง่าย' + REGEN)
+  equal(KIT.rules.maxLives, ENG.MAX_LIVES, 'พลังชีวิต' + REGEN)
+  equal(KIT.rules.bag, ENG.BAG_LIMIT, 'กระเป๋า' + REGEN)
 })
 
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */

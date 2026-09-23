@@ -37,7 +37,7 @@ export const HERO_INFO: Record<HeroKey, { name: string; role: string; color: str
 
 export const ITEM_KEYS: ItemKey[] = ['medkit', 'help', 'radio', 'shield', 'skate']
 export const ITEM_INFO: Record<ItemKey, { emoji: string; name: string; effect: string; when: string; price: number }> = {
-  medkit: { emoji: '💉', name: 'ยา', effect: 'ฟื้น ❤️ 1 ดวง', when: 'กดใช้ตอนเริ่มตา', price: 2 },
+  medkit: { emoji: '💉', name: 'ยา', effect: 'ฟื้น ❤️ 1 ดวง', when: 'ใช้ตอนเริ่มตา', price: 2 },
   help: { emoji: '💡', name: 'บัตรช่วยคิด', effect: 'ดูคำใบ้แล้วตอบใหม่ได้ 1 ครั้ง', when: 'ใช้หลังตอบผิด', price: 2 },
   radio: { emoji: '📻', name: 'วิทยุ', effect: 'ขอเปลี่ยนเป็นโจทย์ข้อใหม่', when: 'ใช้ก่อนตอบ', price: 2 },
   shield: { emoji: '🛡️', name: 'โล่', effect: 'กันไม่ให้เสีย ❤️ 1 ครั้ง', when: 'ใช้เองตอนจะเสีย ❤️', price: 3 },
@@ -339,14 +339,18 @@ export function rest(state: ZrState): ZrState {
 
 export type SupplyReward = { kind: 'item'; item: ItemKey; kept: boolean } | { kind: 'supplies'; amount: number }
 
-/** ยาออกบ่อยที่สุด เพราะช่องนี้คือ "ได้ไอเทม/ยา" และเป็นทางฟื้นหลักของเด็กที่ตอบผิดบ่อย */
-const SUPPLY_TABLE: Array<[ItemKey | 'supplies', number]> = [
-  ['medkit', 30],
-  ['help', 20],
-  ['shield', 15],
-  ['skate', 15],
-  ['radio', 5],
-  ['supplies', 15],
+/**
+ * กล่องเสบียงเท่ากับการทอยลูกเต๋า 1 ลูก แบบเดียวกับชุดพิมพ์ zombie-rescue.html
+ * 1–2 ยา · 3 บัตรช่วยคิด · 4 โล่ · 5 สเก็ตบอร์ด · 6 เสบียง 2
+ * ยาออกบ่อยที่สุด เพราะช่องนี้คือ "ได้ไอเทม/ยา" และเป็นทางฟื้นหลักของเด็กที่ตอบผิดบ่อย
+ * วิทยุไม่อยู่ในกล่อง ซื้อได้ที่ตลาดเท่านั้น
+ */
+export const SUPPLY_TABLE: Array<[ItemKey | 'supplies', number]> = [
+  ['medkit', 2],
+  ['help', 1],
+  ['shield', 1],
+  ['skate', 1],
+  ['supplies', 1],
 ]
 
 export function openSupply(state: ZrState, rng: Rng): { state: ZrState; reward: SupplyReward } {
