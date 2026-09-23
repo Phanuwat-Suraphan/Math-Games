@@ -97,6 +97,7 @@ export function Visual({ visual }: { visual: CardVisual }) {
         <>
           <Tag text={visual.tag} />
           <Clock h={0} m={0} hands={false} className="w-[min(180px,52vw)]" />
+          {visual.note ? <p className="text-center text-sm text-slate-500">{visual.note}</p> : null}
         </>
       )
     case 'word':
