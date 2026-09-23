@@ -284,7 +284,7 @@ function HallOfRecords({ player }: { player: Player }) {
           </>
         ) : null}
 
-        {records.zombiePlays > 0 ? (
+        {records.zombiePlays > 0 || records.zombieStickers > 0 ? (
           <>
             <StatBox
               label="สร้างยา Z-CURE สำเร็จ"
@@ -296,6 +296,7 @@ function HallOfRecords({ player }: { player: Player }) {
               value={`${records.zombieCorrect.toLocaleString('th-TH')} ข้อ`}
               tone="text-sky-400"
             />
+            <StatBox label="สติกเกอร์สมุดวัคซีน" value={`${records.zombieStickers} / 50 ช่อง`} tone="text-leaf-400" />
           </>
         ) : null}
       </dl>

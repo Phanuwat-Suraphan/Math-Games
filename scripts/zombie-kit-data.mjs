@@ -34,6 +34,7 @@ const BOARD = load('zombieRescue/board')
 const Q = load('zombieRescue/questions')
 const ENG = load('zombieRescue/engine')
 const ART = load('zombieRescue/art')
+const BOOK = load('zombieRescue/vaccineBook')
 
 function seeded(seed) {
   let a = seed >>> 0
@@ -166,6 +167,8 @@ const data = {
     supplyCoins: ENG.SUPPLY_COINS,
     squares: BOARD.LAST_SQUARE,
   },
+  /* สมุดวัคซีนกระดาษใช้แม่และจำนวนครั้งติดกันชุดเดียวกับสมุดในเกม */
+  book: { tables: Q.TABLES, streak: BOOK.STREAK_TO_CURE, count: BOOK.FACT_COUNT },
   cards,
 }
 

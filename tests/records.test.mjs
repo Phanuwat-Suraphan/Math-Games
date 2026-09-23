@@ -292,6 +292,7 @@ function maxedPlayer() {
       zombiePlays: 20,
       zombieCures: 8,
       zombieCorrect: 500,
+      zombieStickers: 50,
     },
   }
 }
