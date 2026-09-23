@@ -478,6 +478,9 @@ function parseRecords(raw: unknown): PlayerRecords {
     duelPlays: count(raw.duelPlays),
     duelWins: count(raw.duelWins),
     towerBestFloor: count(raw.towerBestFloor),
+    timePlays: count(raw.timePlays),
+    timeCastles: count(raw.timeCastles),
+    timeCorrect: count(raw.timeCorrect),
   }
 }
 

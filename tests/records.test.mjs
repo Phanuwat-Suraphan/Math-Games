@@ -121,6 +121,17 @@ check('บันทึกศึกผ่าสมการนับทั้ง�
   equal(player.records.duelWins, 1, 'ต้องนับชนะหนึ่งครั้ง')
 })
 
+check('เมืองแห่งเวลานับทุกเกม เกมที่เข้าปราสาท และข้อที่ตอบถูกสะสม', () => {
+  let player = fresh()
+  player = { ...player, records: REC.recordTimeAdventure(player, { reachedCastle: false, correct: 7 }) }
+  player = { ...player, records: REC.recordTimeAdventure(player, { reachedCastle: true, correct: 12 }) }
+  equal(player.records.timePlays, 2, 'ต้องนับสองเกม แม้เกมแรกไม่มีใครเข้าปราสาท')
+  equal(player.records.timeCastles, 1, 'ต้องนับเข้าปราสาทหนึ่งครั้ง')
+  equal(player.records.timeCorrect, 19, 'ข้อที่ตอบถูกต้องบวกสะสม')
+  const bad = REC.recordTimeAdventure(player, { reachedCastle: false, correct: -50 })
+  equal(bad.timeCorrect, 19, 'จำนวนข้อติดลบต้องไม่ทำให้สถิติลดลง')
+})
+
 check('หอคอยเก็บเฉพาะชั้นที่สูงที่สุด', () => {
   let player = fresh()
   player = { ...player, records: REC.recordTowerRun(player, 12) }
@@ -192,6 +203,20 @@ check('สมุดสถิติเดินทางผ่านการบ�
   equal(loaded.records.survivorEvolutions.length, 2, 'ร่างสมบูรณ์ต้องถูกบันทึกไว้ครบ')
 })
 
+check('สถิติเมืองแห่งเวลาเดินทางผ่านการบันทึกและอ่านกลับได้ครบ', () => {
+  const storage = globalThis.window.localStorage
+  storage.clear()
+
+  let player = fresh()
+  player = { ...player, records: REC.recordTimeAdventure(player, { reachedCastle: true, correct: 9 }) }
+  STORAGE.savePlayer(player)
+
+  const loaded = STORAGE.loadPlayer().data
+  equal(loaded.records.timePlays, 1, 'จำนวนเกมต้องถูกบันทึกไว้')
+  equal(loaded.records.timeCastles, 1, 'การเข้าปราสาทต้องถูกบันทึกไว้')
+  equal(loaded.records.timeCorrect, 9, 'ข้อที่ตอบถูกต้องถูกบันทึกไว้')
+})
+
 /* ── ถ้วยรางวัล ─────────────────────────────────────────── */
 
 /** ผู้เล่นที่ทำทุกอย่างในเกมจนสุดแล้ว ใช้ตรวจว่าทุกถ้วยแตะถึงได้จริง */
@@ -254,6 +279,9 @@ function maxedPlayer() {
       duelPlays: 100,
       duelWins: 60,
       towerBestFloor: 40,
+      timePlays: 30,
+      timeCastles: 10,
+      timeCorrect: 400,
     },
   }
 }

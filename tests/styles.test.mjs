@@ -174,6 +174,25 @@ const REQUIRED_CLASSES = [
   'farm-ledger-row',
   'farm-ledger-done',
   'farm-ledger-num',
+  // ผจญภัยเมืองแห่งเวลา
+  'ta-cute',
+  'ta-board',
+  'ta-pawn',
+  'ta-hero-tile',
+  'ta-hero-tile-on',
+  'ta-overlay',
+  'ta-card',
+  'ta-card-pop',
+  'ta-card-head',
+  'ta-bubble',
+  'ta-emph',
+  'ta-opt',
+  'ta-opt-right',
+  'ta-opt-wrong',
+  'ta-opt-gone',
+  'ta-num',
+  'ta-num-empty',
+  'ta-burst',
 ]
 
 /** คลาสนี้ถูกนิยามไว้ในไฟล์ไหม */

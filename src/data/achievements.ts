@@ -447,6 +447,26 @@ export const ACHIEVEMENTS: Achievement[] = [
     unit: 'ชั้น',
     valueOf: (player) => recordsOf(player).towerBestFloor,
   }),
+  countGoal({
+    id: 'time-first-castle',
+    name: 'ผู้พิทักษ์เวลา',
+    description: 'พาฮีโร่เข้าปราสาทเวลาได้หนึ่งครั้ง',
+    emoji: '🏰',
+    category: 'trial',
+    goal: 1,
+    unit: 'ครั้ง',
+    valueOf: (player) => recordsOf(player).timeCastles,
+  }),
+  countGoal({
+    id: 'time-correct-50',
+    name: 'นักอ่านนาฬิกา',
+    description: 'ตอบการ์ดเวลาถูกรวม 50 ข้อ',
+    emoji: '⏰',
+    category: 'trial',
+    goal: 50,
+    unit: 'ข้อ',
+    valueOf: (player) => recordsOf(player).timeCorrect,
+  }),
 
   // ── ของสะสม ─────────────────────────────────────────────────
   countGoal({

@@ -28,6 +28,7 @@ import { SafeZone } from './pages/SafeZone'
 import { Teacher } from './pages/Teacher'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
+import { TimeAdventure } from './pages/TimeAdventure'
 import { StageResult } from './pages/StageResult'
 import { World } from './pages/World'
 import { WorldMap } from './pages/WorldMap'
@@ -108,6 +109,12 @@ function GameRoutes() {
           path="/duel"
           element={
             <RequirePlayer render={(player) => <DivisorDuel player={player} />} />
+          }
+        />
+        <Route
+          path="/time"
+          element={
+            <RequirePlayer render={(player) => <TimeAdventure player={player} />} />
           }
         />
         <Route
