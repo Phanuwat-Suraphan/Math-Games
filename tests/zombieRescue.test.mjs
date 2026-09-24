@@ -868,6 +868,41 @@ check('⚡ ซอมบี้บุก!: ดาว เหรียญ และ�
   equal(RUSH.withRushResult({}, 3, 0).record, false, 'ได้ 0 ไม่นับเป็นสถิติ')
 })
 
+check('📺 ทั้งห้องเรียน: ชุดโจทย์ไม่ซ้ำ ไม่เกินจำนวนข้อของแม่ ภาพเฉลยไม่เกิน 30 ชิ้น', () => {
+  const CLS = load('zombieRescue/classroom')
+  const RUSH = load('zombieRescue/rush')
+  for (const table of RUSH.RUSH_TABLES) {
+    for (const count of [...CLS.CLASS_COUNTS, 99]) {
+      const set = CLS.buildClassSet(table, count, seeded(count * 13 + String(table).length))
+      const size = table === 'mix' ? 50 : 10
+      equal(set.length, Math.min(size, count), `จำนวนข้อ ${table}/${count}`)
+      equal(new Set(set.map((f) => `${f.each}x${f.groups}`)).size, set.length, `ไม่ซ้ำ ${table}/${count}`)
+      for (const f of set) {
+        const v = CLS.classVisual(f)
+        if (v.kind === 'groups') {
+          assert(v.groups * v.each <= Q.MAX_DRAWN, 'ภาพกลุ่มต้องไม่เกิน 30 ชิ้น')
+          equal(v.groups * v.each, f.groups * f.each, 'ภาพกลุ่มต้องเท่าผลคูณ')
+        } else {
+          equal(v.kind, 'add', 'เกิน 30 ชิ้นใช้การบวกซ้ำ')
+          equal(v.addend * v.times, f.groups * f.each, 'การบวกซ้ำต้องเท่าผลคูณ')
+        }
+      }
+    }
+  }
+})
+
+check('📺 ทั้งห้องเรียน: ดาวของห้อง และข้อที่ต้องซ่อมไม่ซ้ำ', () => {
+  const CLS = load('zombieRescue/classroom')
+  const r = (each, groups, correct) => ({ fact: { each, groups }, correct })
+  equal(CLS.classStars([]), 0, 'ยังไม่ตอบไม่มีดาว')
+  equal(CLS.classStars([r(2, 1, true), r(2, 2, true)]), 3, 'ถูกหมด 3 ดาว')
+  equal(CLS.classStars([...Array(8)].map(() => r(2, 1, true)).concat([r(2, 3, false), r(2, 4, false)])), 2, '80% ได้ 2 ดาว')
+  equal(CLS.classStars([...Array(6)].map(() => r(2, 1, true)).concat([...Array(4)].map(() => r(2, 3, false)))), 1, '60% ได้ 1 ดาว')
+  equal(CLS.classStars([r(2, 1, false), r(2, 2, true)]), 0, 'ต่ำกว่า 60% ไม่มีดาว')
+  const missed = CLS.classMissed([r(3, 7, false), r(3, 7, false), r(4, 2, true), r(5, 9, false)])
+  equal(JSON.stringify(missed), JSON.stringify([{ each: 3, groups: 7 }, { each: 5, groups: 9 }]), 'ข้อที่พลาดไม่ซ้ำ ตามลำดับ')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
