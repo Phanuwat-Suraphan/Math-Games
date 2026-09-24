@@ -475,6 +475,61 @@ export function practiceFromPairs(input: Array<[Table, number]>, rng: Rng): Ques
   )
 }
 
+/* ── ➗ แบ่งวัคซีน: การหารแบบแบ่งออกเป็นกลุ่มละเท่า ๆ กัน ─────────── */
+
+/**
+ * การหารใน ป.2 เรียนเป็น "ความสัมพันธ์ย้อนกลับของการคูณ" จึงใช้คู่เดียวกับสูตรคูณ
+ * ตัวหารคือแม่ (each) และคำตอบคือจำนวนกลุ่ม (groups) คำตอบจึงไม่ใช่เลขแม่ซ้ำ ๆ
+ * ใช้โครงเดียวกับข้อหา □ (ask missing, hidden groups) การตรวจคำตอบจึงใช้ checkAnswer เดิม
+ * คำใบ้พากลับไปที่สูตรคูณเสมอ: □ × แม่ = ตัวตั้ง
+ */
+const DIV_STORIES: Array<{ text: (p: number, e: number) => string; unit: string }> = [
+  { text: (p, e) => `มีวัคซีน ${p} ขวด ใส่กล่องละ ${e} ขวด ได้กี่กล่อง?`, unit: 'กล่อง' },
+  { text: (p, e) => `ชาวเมือง ${p} คน นั่งรถพยาบาลคันละ ${e} คน ต้องใช้รถกี่คัน?`, unit: 'คัน' },
+  { text: (p, e) => `มีเสบียง ${p} กระป๋อง แบ่งใส่ถุงละ ${e} กระป๋อง ได้กี่ถุง?`, unit: 'ถุง' },
+  { text: (p, e) => `หลอดทดลอง ${p} หลอด วางชั้นละ ${e} หลอด ได้กี่ชั้น?`, unit: 'ชั้น' },
+]
+
+export function divisionQuestion(groups: number, each: Table, story: number | null): Question {
+  const product = groups * each
+  const s = story === null ? null : DIV_STORIES[((story % DIV_STORIES.length) + DIV_STORIES.length) % DIV_STORIES.length]
+  return {
+    key: s ? 'div-story' : 'div-expr',
+    stage: 'practice',
+    groups,
+    each,
+    product,
+    ask: 'missing',
+    hidden: 'groups',
+    unit: s ? s.unit : '',
+    text: s ? s.text(product, each) : 'ใน □ คือเลขอะไร?',
+    // ใช้ □ แทน ? ให้ตรงกับแป้นตอบของข้อหา □ ที่ขึ้นว่า "□ ="
+    visual: { kind: 'expr', text: `${product} ÷ ${each} = □` },
+    answerText: `${groups}${s ? ' ' + s.unit : ''} (เพราะ ${groups} × ${each} = ${product})`,
+    why: `${groups} × ${each} = ${product} จึง ${product} ÷ ${each} = ${groups}`,
+    hint: `นึกถึงสูตรคูณ: □ × ${each} = ${product}`,
+  }
+}
+
+/** ชุดฝึกแบ่งวัคซีน 10 ข้อ: สลับข้อหารตรง ๆ กับโจทย์ปัญหา แม่เดียวใช้ครบ 1–10 กลุ่ม */
+export function buildDivisionSet(table: PracticeTable, rng: Rng): Question[] {
+  const counts = Array.from({ length: 10 }, (_, i) => i + 1)
+  const shuffled = <T>(list: T[]): T[] => {
+    const out = list.slice()
+    for (let i = out.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(rng() * (i + 1))
+      ;[out[i], out[j]] = [out[j], out[i]]
+    }
+    return out
+  }
+  const pairs: Array<[Table, number]> =
+    table === 'mix'
+      ? shuffled(TABLES.flatMap((t) => counts.map((g): [Table, number] => [t, g]))).slice(0, PRACTICE_LENGTH)
+      : shuffled(counts).map((g): [Table, number] => [table, g])
+  const first = Math.floor(rng() * DIV_STORIES.length)
+  return pairs.map(([each, groups], i) => divisionQuestion(groups, each, i % 2 === 1 ? first + (i - 1) / 2 : null))
+}
+
 export function practiceReward(firstTryCorrect: number, total: number): number {
   const correct = Math.max(0, Math.min(total, firstTryCorrect))
   return correct + (total > 0 && correct === total ? PRACTICE_PERFECT_BONUS : 0)

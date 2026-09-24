@@ -453,7 +453,7 @@ export function ZombieRescue({ player }: { player: Player }) {
               {(
                 [
                   ['board', '🗺️ ผจญภัยในเมือง', 'เล่นด้วยกัน 1–4 คน'],
-                  ['practice', '🎯 ฝึกสูตรคูณ', 'คนเดียว รอบละ 10 ข้อ'],
+                  ['practice', '🎯 ฝึกสูตรคูณ', 'คูณและหาร รอบละ 10 ข้อ'],
                   ['rush', '⚡ ซอมบี้บุก!', 'ท้าเวลา 60 วินาที'],
                   ['class', '📺 ทั้งห้องเรียน', 'ครูเปิดขึ้นจอใหญ่'],
                   ['book', '📒 สมุดวัคซีน', `สติกเกอร์ ${curedCount(book)}/50${weakFacts(book).length ? ` · พลาด ${weakFacts(book).length}` : ''}`],
@@ -510,6 +510,8 @@ export function ZombieRescue({ player }: { player: Player }) {
               book={book}
               startFocus={practiceFocus}
               onAnswer={(q, correct) => {
+                // ข้อหาร (แบ่งวัคซีน) ไม่ใช่ตัวชี้วัดการคูณ และไม่ใช่ข้อในสมุดวัคซีน
+                if (q.key.startsWith('div-')) return false
                 logIndicator(ZOMBIE_INDICATOR, correct)
                 return noteFact(q, correct)
               }}

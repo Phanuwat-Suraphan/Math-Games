@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from '../Button'
 import { playSfx } from '../../services/audioService'
-import { PRACTICE_LENGTH, buildPracticeSet, checkAnswer } from '../../zombieRescue/questions'
+import { PRACTICE_LENGTH, buildDivisionSet, buildPracticeSet, checkAnswer } from '../../zombieRescue/questions'
 import { buildFocusSet, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../../zombieRescue/vaccineBook'
 import type { PracticeTable, QAnswer, Question } from '../../zombieRescue/questions'
@@ -46,7 +46,12 @@ interface Props {
   onPlayingChange: (playing: boolean) => void
 }
 
+/** ✖ สูตรคูณ หรือ ➗ แบ่งวัคซีน (การหาร) */
+type Op = 'mul' | 'div'
+const isDivision = (q: Question) => q.key.startsWith('div-')
+
 interface Round {
+  op: Op
   table: Choice
   questions: Question[]
   index: number
@@ -63,15 +68,17 @@ const tableName = (table: Choice) => (table === 'focus' ? 'ข้อที่ย
 export function PracticeScreen({ playerName, book, startFocus = false, onAnswer, onFinish, onPlayingChange }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: 'choose' })
   const [table, setTable] = useState<Choice>(startFocus ? 'focus' : 2)
+  const [op, setOp] = useState<Op>('mul')
   const [result, setResult] = useState<{ correct: boolean; line: string; sticker: boolean } | null>(null)
   const weakCount = weakFacts(book).length
 
-  const begin = (chosen: Choice) => {
+  const begin = (chosen: Choice, withOp: Op = op) => {
     playSfx('click')
     setTable(chosen)
     setResult(null)
-    const questions = chosen === 'focus' ? buildFocusSet(book, Math.random) : buildPracticeSet(chosen, Math.random)
-    setPhase({ kind: 'play', round: { table: chosen, questions, index: 0, results: [], retry: [], retrying: false, retryIndex: 0 } })
+    const questions =
+      chosen === 'focus' ? buildFocusSet(book, Math.random) : withOp === 'div' ? buildDivisionSet(chosen, Math.random) : buildPracticeSet(chosen, Math.random)
+    setPhase({ kind: 'play', round: { op: chosen === 'focus' ? 'mul' : withOp, table: chosen, questions, index: 0, results: [], retry: [], retrying: false, retryIndex: 0 } })
     onPlayingChange(true)
   }
 
@@ -92,8 +99,32 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
         <p className="mt-1 text-center text-sm leading-relaxed text-slate-300">
           รอบละ {PRACTICE_LENGTH} ข้อ เลือกแม่ที่อยากฝึก ข้อที่ผิดจะกลับมาให้ลองใหม่ท้ายรอบ
         </p>
-        <fieldset className="mt-5">
-          <legend className="mb-2 text-sm font-bold text-white">เลือกแม่สูตรคูณ</legend>
+        <div className="mt-5 grid grid-cols-2 gap-2" role="group" aria-label="แบบฝึก">
+          {(
+            [
+              ['mul', '✖ สูตรคูณ', 'หาผลคูณ และเติม □'],
+              ['div', '➗ แบ่งวัคซีน', 'การหาร คิดจากสูตรคูณ'],
+            ] as const
+          ).map(([key, label, note]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={op === key}
+              onClick={() => {
+                setOp(key)
+                if (key === 'div' && table === 'focus') setTable(2)
+              }}
+              className={`rounded-xl border-2 p-2.5 text-center transition ${
+                op === key ? 'border-gold-300 bg-gold-500/15' : 'border-white/15 bg-white/5 hover:border-white/30'
+              }`}
+            >
+              <span className="block font-bold text-white">{label}</span>
+              <span className="block text-xs text-slate-300">{note}</span>
+            </button>
+          ))}
+        </div>
+        <fieldset className="mt-4">
+          <legend className="mb-2 text-sm font-bold text-white">{op === 'div' ? 'แบ่งทีละเท่าไร (ตัวหาร)' : 'เลือกแม่สูตรคูณ'}</legend>
           <div className="grid grid-cols-3 gap-2">
             {CHOICES.map((choice) => (
               <button
@@ -110,6 +141,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
               </button>
             ))}
           </div>
+          {op === 'mul' ? (
           <button
             type="button"
             aria-pressed={table === 'focus'}
@@ -123,15 +155,20 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
               {weakCount ? `หยิบ ${weakCount} ข้อที่ตอบผิดล่าสุดจากสมุดวัคซีนมาฝึกก่อน` : 'ข้อที่ยังไม่ได้สติกเกอร์ในสมุดวัคซีน'}
             </span>
           </button>
+          ) : null}
         </fieldset>
         <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
           <li>· ถูกข้อละ 🪙 1 เหรียญ ถูกหมดทั้งรอบได้โบนัส</li>
-          <li>· ผลของ {playerName} ส่งให้แผงคุณครูในตัวชี้วัด "การคูณ (ป.2)"</li>
+          {op === 'div' ? (
+            <li>· การหารคือการคูณย้อนกลับ: 12 ÷ 3 = □ คิดจาก □ × 3 = 12 (ข้อหารไม่นับลงสมุดวัคซีนและตัวชี้วัดการคูณ)</li>
+          ) : (
+            <li>· ผลของ {playerName} ส่งให้แผงคุณครูในตัวชี้วัด "การคูณ (ป.2)"</li>
+          )}
         </ul>
         <Button size="lg" fullWidth className="mt-6" onClick={() => begin(table)}>
           🎯 เริ่มฝึก
         </Button>
-        {table !== 'focus' ? (
+        {table !== 'focus' && op === 'mul' ? (
           <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table)}>
             📝 พิมพ์ใบงาน{tableName(table)} ฝึกบนกระดาษ
           </Button>
@@ -149,7 +186,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
     return (
       <div className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
-          <span>🎯 จบรอบฝึก · {tableName(round.table)}</span>
+          <span>🎯 จบรอบฝึก · {round.op === 'div' ? '➗ หาร ' : ''}{tableName(round.table)}</span>
           <span className="text-[#FFE27A]">{'★'.repeat(stars)}{'☆'.repeat(3 - stars)}</span>
         </div>
         <div className="grid gap-3 px-5 pb-5 pt-1 text-center">
@@ -164,7 +201,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
               {missed.map((q, i) => (
                 <p key={i} className="rounded-2xl bg-white px-3 py-2 text-sm leading-snug">
                   <b>
-                    {q.groups} × {q.each} = {q.product}
+                    {isDivision(q) ? `${q.product} ÷ ${q.each} = ${q.groups}` : `${q.groups} × ${q.each} = ${q.product}`}
                   </b>
                   <span className="text-slate-500"> · {q.why}</span>
                 </p>
@@ -177,7 +214,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
             <Button variant="secondary" onClick={stop}>
               เปลี่ยนแม่
             </Button>
-            <Button onClick={() => begin(round.table)}>🔁 ฝึกอีกรอบ</Button>
+            <Button onClick={() => begin(round.table, round.op)}>🔁 ฝึกอีกรอบ</Button>
           </div>
         </div>
       </div>
@@ -223,7 +260,10 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-bold text-white">
           {round.retrying ? `🔁 รอบแก้ตัว ข้อ ${round.retryIndex + 1} / ${round.retry.length}` : `ข้อ ${round.index + 1} / ${round.questions.length}`}
-          <span className="ml-2 font-normal text-slate-400">{tableName(round.table)}</span>
+          <span className="ml-2 font-normal text-slate-400">
+            {round.op === 'div' ? '➗ หาร ' : ''}
+            {tableName(round.table)}
+          </span>
         </p>
         <Button variant="ghost" onClick={stop}>
           หยุดฝึก
@@ -243,8 +283,8 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
 
       <div key={cardKey} className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
-          <span>🎯 ฝึกสูตรคูณ</span>
-          <span className="text-sm">{round.retrying ? 'ลองอีกครั้ง!' : tableName(round.table)}</span>
+          <span>{round.op === 'div' ? '➗ แบ่งวัคซีน' : '🎯 ฝึกสูตรคูณ'}</span>
+          <span className="text-sm">{round.retrying ? 'ลองอีกครั้ง!' : `${round.op === 'div' ? '➗ ' : ''}${tableName(round.table)}`}</span>
         </div>
         <div className="flex flex-col gap-3 px-[18px] pb-[18px] pt-1.5">
           <div className="flex flex-col items-center gap-2">

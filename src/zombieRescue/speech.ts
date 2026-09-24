@@ -19,6 +19,7 @@ export function mathSpeech(text: string): string {
   return text
     .replace(/□/g, ' ช่องว่าง ')
     .replace(/×/g, ' คูณ ')
+    .replace(/÷/g, ' หาร ')
     .replace(/\+/g, ' บวก ')
     .replace(/=\s*\?/g, ' เท่ากับเท่าไร ')
     .replace(/=/g, ' เท่ากับ ')
@@ -30,6 +31,9 @@ export function mathSpeech(text: string): string {
 /** ประโยคอ่านโจทย์หนึ่งข้อของเกมกระดานหรือโหมดฝึก */
 export function questionSpeech(q: Question): string {
   const v = q.visual
+  // ข้อหาร: ข้อตรง ๆ อ่านนิพจน์ ข้อโจทย์ปัญหาอ่านเรื่อง (โจทย์ปัญหามีตัวเลขครบในเรื่องแล้ว)
+  if (q.key === 'div-story') return mathSpeech(q.text)
+  if (q.key === 'div-expr') return `${q.product} หาร ${q.each} เท่ากับเท่าไร`
   if (v.kind === 'expr') {
     return mathSpeech(v.text) + (q.ask === 'missing' ? ' ช่องว่างคือเลขอะไร' : '')
   }
