@@ -86,7 +86,18 @@ function VillagerCard({ fact, onClose }: { fact: BookFact; onClose: () => void }
   )
 }
 
-export function VaccineBookScreen({ book, playerName, onPractice }: { book: VaccineBook; playerName: string; onPractice: () => void }) {
+export function VaccineBookScreen({
+  book,
+  playerName,
+  onPractice,
+  onReport,
+}: {
+  book: VaccineBook
+  playerName: string
+  onPractice: () => void
+  /** พิมพ์รายงานความก้าวหน้า (หน้าหลักรวบรวมข้อมูลผู้เล่นให้) */
+  onReport: () => void
+}) {
   const facts = allFacts(book)
   const total = curedCount(book)
   const weak = weakFacts(book)
@@ -133,6 +144,10 @@ export function VaccineBookScreen({ book, playerName, onPractice }: { book: Vacc
           </>
         ) : null}
       </div>
+
+      <Button variant="secondary" fullWidth className="mt-3" onClick={onReport}>
+        📄 พิมพ์รายงานความก้าวหน้า (ให้ผู้ปกครอง / ครู)
+      </Button>
 
       {weak.length ? (
         <div className="mt-4 rounded-2xl border border-ember-500/40 bg-ember-500/10 p-3">
