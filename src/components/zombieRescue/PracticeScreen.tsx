@@ -6,7 +6,8 @@ import { PRACTICE_LENGTH, buildPracticeSet, checkAnswer } from '../../zombieResc
 import { buildFocusSet, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../../zombieRescue/vaccineBook'
 import type { PracticeTable, QAnswer, Question } from '../../zombieRescue/questions'
-import { AnswerPad, CHEER, COMFORT, Char, HeartBurst, QuestionVisual, StickerToast, emphasize, openWorksheet, pick } from './ZrParts'
+import { AnswerPad, CHEER, COMFORT, Char, HeartBurst, QuestionVisual, SpeakButton, StickerToast, emphasize, openWorksheet, pick } from './ZrParts'
+import { questionSpeech } from '../../zombieRescue/speech'
 
 /**
  * โหมดฝึกสูตรคูณ: เลือกแม่ แล้วตอบรอบละ 10 ข้อ
@@ -250,6 +251,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
             <QuestionVisual visual={q.visual} />
           </div>
           <p className="text-balance text-center text-[21px] font-bold leading-snug">{emphasize(q.text)}</p>
+          <SpeakButton text={questionSpeech(q)} className="mx-auto" />
           {result ? (
             <>
               <div className="relative flex items-center gap-3 rounded-2xl bg-white p-3">

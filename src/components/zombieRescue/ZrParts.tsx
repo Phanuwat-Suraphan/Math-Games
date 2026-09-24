@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode } from 'react'
 import { useGameSettings } from '../../hooks/useGameSettings'
 import { playSfx } from '../../services/audioService'
+import { speak, speechSupported } from '../../services/speechService'
 import { CHAR_NAMES, charInner, curedHeadInner, zheadInner } from '../../zombieRescue/art'
 import type { CharKey } from '../../zombieRescue/art'
 import { ZONES } from '../../zombieRescue/board'
@@ -398,4 +399,14 @@ export function openWorksheet(table: SheetTable): void {
     a.click()
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/** ปุ่ม 🔊 ฟังโจทย์ (ซ่อนเองบนเครื่องที่อ่านออกเสียงไม่ได้) */
+export function SpeakButton({ text, className = '' }: { text: string; className?: string }) {
+  if (!speechSupported()) return null
+  return (
+    <button type="button" className={`zr-speak ${className}`} onClick={() => speak(text)} aria-label="ฟังโจทย์ อ่านออกเสียง">
+      🔊 ฟังโจทย์
+    </button>
+  )
 }

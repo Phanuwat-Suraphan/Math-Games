@@ -58,6 +58,8 @@ import type { RushBest, RushTable } from '../zombieRescue/rush'
 import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../zombieRescue/vaccineBook'
 import { villagerFor } from '../zombieRescue/villagers'
+import { questionSpeech } from '../zombieRescue/speech'
+import { speak, speechSupported, stopSpeaking } from '../services/speechService'
 import {
   AnswerPad,
   BUDDY,
@@ -69,6 +71,7 @@ import {
   Hearts,
   QuestionVisual,
   HeartBurst,
+  SpeakButton,
   StickerToast,
   VillagerArt,
   ZHead,
@@ -126,6 +129,8 @@ interface SetupState {
   heroes: HeroKey[]
   names: string[]
   easy: boolean
+  /** อ่านโจทย์ให้ฟังทุกข้อที่เปิดขึ้นมา (ไม่เก็บลงเกมค้าง เพราะเป็นความชอบของคนที่นั่งเล่นอยู่ตอนนี้) */
+  autoRead: boolean
 }
 
 const whereText = (pos: number) =>
@@ -191,7 +196,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     return reward
   }
 
-  const [setup, setSetup] = useState<SetupState>({ count: 2, heroes: [...HERO_KEYS], names: [player.name, '', '', ''], easy: false })
+  const [setup, setSetup] = useState<SetupState>({ count: 2, heroes: [...HERO_KEYS], names: [player.name, '', '', ''], easy: false, autoRead: false })
   const [game, setGame] = useState<ZrState | null>(null)
   const [modal, setModal] = useState<Modal | null>(null)
   const [freshModal, setFreshModal] = useState(0)
@@ -265,6 +270,7 @@ export function ZombieRescue({ player }: { player: Player }) {
     setGame(drawn.state)
     const buddy = ctx === 'zombie' ? BUDDY.zombie : BUDDY[stage]
     show({ kind: 'question', ctx, stage, q: drawn.question, buddy: pick(buddy.say), helped: false, attempt: 0, phase: 'ask', outcome: null, line: '', sticker: false })
+    if (setup.autoRead) speak(questionSpeech(drawn.question))
   }
 
   const explore = () => {
@@ -343,6 +349,11 @@ export function ZombieRescue({ player }: { player: Player }) {
     }
     later(step, 330)
   }
+
+  /* หน้าต่างโจทย์ปิดแล้วหยุดเสียงอ่านที่ค้างอยู่ */
+  useEffect(() => {
+    if (modal?.kind !== 'question') stopSpeaking()
+  }, [modal?.kind])
 
   const nextTurn = (state: ZrState) => {
     setGame(endTurn(state))
@@ -885,6 +896,18 @@ function SetupPanel({
         <li>· เหรียญที่ทั้งวงทำได้เข้ากระเป๋าผู้เล่นเครื่องนี้ · ผลของคนที่ 1 ส่งให้แผงคุณครู</li>
       </ul>
 
+      {speechSupported() ? (
+        <button
+          type="button"
+          aria-pressed={setup.autoRead}
+          onClick={() => onChange({ ...setup, autoRead: !setup.autoRead })}
+          className={`mt-4 w-full rounded-xl border px-3 py-2 text-sm font-bold transition ${
+            setup.autoRead ? 'border-gold-300 bg-gold-500/15 text-gold-200' : 'border-white/15 bg-white/5 text-slate-300'
+          }`}
+        >
+          🔊 อ่านโจทย์ให้ฟังทุกข้อ: {setup.autoRead ? 'เปิด' : 'ปิด'} <span className="font-normal">(เหมาะกับน้องที่ยังอ่านไม่คล่อง)</span>
+        </button>
+      ) : null}
       <p className="mt-5 text-center text-sm text-slate-300">
         ทีมของเรา:{' '}
         <b className="text-white">
@@ -1278,6 +1301,7 @@ function QuestionView(props: ModalViewProps & { modal: QuestionModal; pop: strin
           <QuestionVisual visual={q.visual} />
         </div>
         <p className="text-balance text-center text-[21px] font-bold leading-snug">{emphasize(q.text)}</p>
+        <SpeakButton text={questionSpeech(q)} className="mx-auto" />
 
         {modal.helped && modal.phase === 'ask' ? (
           <p className="rounded-2xl border-2 border-dashed bg-white px-3 py-2 text-center font-bold" style={{ borderColor: 'var(--c)' }}>

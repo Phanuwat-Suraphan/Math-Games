@@ -47,6 +47,7 @@
     // สองไฟล์นี้ไม่มีชุดทดสอบเรียกใช้ แต่ใส่ไว้ให้คอมไพล์ในเครื่องได้
     // เพราะเป็นไฟล์ .ts ที่แตะ Web Audio ซึ่งเดิมต้องรอ CI ถึงจะรู้ว่าเรียกผิด
     "src/services/audioService.ts",
+    "src/services/speechService.ts",
     "src/services/musicService.ts",
     "src/services/rewardService.ts",
     "src/services/questService.ts",

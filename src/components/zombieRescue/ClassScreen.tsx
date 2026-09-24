@@ -7,7 +7,9 @@ import type { ClassResult } from '../../zombieRescue/classroom'
 import { RUSH_TABLES } from '../../zombieRescue/rush'
 import type { RushFact, RushTable } from '../../zombieRescue/rush'
 import { villagerFor } from '../../zombieRescue/villagers'
-import { Char, HeartBurst, QuestionVisual, VillagerArt, openWorksheet } from './ZrParts'
+import { Char, HeartBurst, QuestionVisual, SpeakButton, VillagerArt, openWorksheet } from './ZrParts'
+import { factSpeech, revealSpeech } from '../../zombieRescue/speech'
+import { speak, speechSupported, stopSpeaking } from '../../services/speechService'
 
 /**
  * 📺 ทั้งห้องเรียน: ครูเปิดเกมขึ้นจอใหญ่ ถามทั้งห้องทีละข้อ
@@ -40,17 +42,28 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
   const [table, setTable] = useState<RushTable>(2)
   const [count, setCount] = useState<number>(CLASS_COUNTS[0])
   const [think, setThink] = useState<number>(10)
+  /* ห้องเรียนเปิดอ่านโจทย์ไว้ก่อน ครูไม่ต้องอ่านเองทุกข้อ */
+  const [autoRead, setAutoRead] = useState(true)
+  const autoReadRef = useRef(autoRead)
+  autoReadRef.current = autoRead
   const [now, setNow] = useState(() => Date.now())
   const roundRef = useRef<Round | null>(null)
   const timer = useRef<number | null>(null)
 
   useEffect(() => () => {
     if (timer.current) window.clearTimeout(timer.current)
+    stopSpeaking()
   }, [])
 
   const put = (round: Round) => {
+    const before = roundRef.current
     roundRef.current = round
     setPhase({ kind: 'play', round })
+    if (!autoReadRef.current) return
+    const f = round.set[round.index]
+    // อ่านเมื่อขึ้นข้อใหม่ และอ่านเฉลยเมื่อเพิ่งกดเฉลย
+    if (!before || before.set !== round.set || before.index !== round.index) speak(factSpeech(f.groups, f.each))
+    else if (!before.revealed && round.revealed) speak(revealSpeech(f.groups, f.each))
   }
 
   const start = (chosen: RushTable, set: RushFact[]) => {
@@ -88,6 +101,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
 
   const quit = () => {
     if (timer.current) window.clearTimeout(timer.current)
+    stopSpeaking()
     roundRef.current = null
     setPhase({ kind: 'setup' })
     onPlayingChange(false)
@@ -175,6 +189,16 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
             </div>
           </fieldset>
         </div>
+        {speechSupported() ? (
+          <button
+            type="button"
+            aria-pressed={autoRead}
+            onClick={() => setAutoRead(!autoRead)}
+            className={`mt-4 w-full ${choice(autoRead)}`}
+          >
+            <span className="text-sm font-bold text-white">🔊 อ่านโจทย์และเฉลยออกเสียง: {autoRead ? 'เปิด' : 'ปิด'}</span>
+          </button>
+        ) : null}
         <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
           <li>· ใช้คีย์บอร์ดหรือรีโมตพรีเซนต์ได้: ปุ่มถัดไป = เฉลย แล้วกดอีกครั้ง = ห้องตอบถูก · ปุ่มย้อน = ยังไม่ถูก</li>
           <li>· {table === 'mix' ? 'รวมทุกแม่มี 50 ข้อ' : 'หนึ่งแม่มี 10 ข้อ'} ในรอบเดียวไม่ถามข้อเดิมซ้ำ</li>
@@ -277,6 +301,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
               {fact.groups} × {fact.each} = {round.revealed ? <span className="text-green-700">{fact.groups * fact.each}</span> : '?'}
             </p>
           </div>
+          <SpeakButton text={round.revealed ? revealSpeech(fact.groups, fact.each) : factSpeech(fact.groups, fact.each)} />
           {!round.revealed && think > 0 ? (
             <div className="h-3 w-full max-w-xl overflow-hidden rounded-full bg-[#CFE9EE]" aria-hidden="true">
               <div className="h-full rounded-full bg-[#1E9AAE] transition-[width] duration-200" style={{ width: `${(leftMs / (think * 1000)) * 100}%` }} />
