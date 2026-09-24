@@ -6,7 +6,7 @@ import { PRACTICE_LENGTH, buildPracticeSet, checkAnswer } from '../../zombieResc
 import { buildFocusSet, weakFacts } from '../../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../../zombieRescue/vaccineBook'
 import type { PracticeTable, QAnswer, Question } from '../../zombieRescue/questions'
-import { AnswerPad, CHEER, COMFORT, Char, HeartBurst, QuestionVisual, StickerToast, emphasize, pick } from './ZrParts'
+import { AnswerPad, CHEER, COMFORT, Char, HeartBurst, QuestionVisual, StickerToast, emphasize, openWorksheet, pick } from './ZrParts'
 
 /**
  * โหมดฝึกสูตรคูณ: เลือกแม่ แล้วตอบรอบละ 10 ข้อ
@@ -130,6 +130,11 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
         <Button size="lg" fullWidth className="mt-6" onClick={() => begin(table)}>
           🎯 เริ่มฝึก
         </Button>
+        {table !== 'focus' ? (
+          <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table)}>
+            📝 พิมพ์ใบงาน{tableName(table)} ฝึกบนกระดาษ
+          </Button>
+        ) : null}
       </div>
     )
   }

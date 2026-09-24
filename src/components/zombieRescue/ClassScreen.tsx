@@ -7,7 +7,7 @@ import type { ClassResult } from '../../zombieRescue/classroom'
 import { RUSH_TABLES } from '../../zombieRescue/rush'
 import type { RushFact, RushTable } from '../../zombieRescue/rush'
 import { villagerFor } from '../../zombieRescue/villagers'
-import { Char, HeartBurst, QuestionVisual, VillagerArt } from './ZrParts'
+import { Char, HeartBurst, QuestionVisual, VillagerArt, openWorksheet } from './ZrParts'
 
 /**
  * 📺 ทั้งห้องเรียน: ครูเปิดเกมขึ้นจอใหญ่ ถามทั้งห้องทีละข้อ
@@ -182,6 +182,9 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
         </ul>
         <Button size="lg" fullWidth className="mt-6" onClick={() => start(table, buildClassSet(table, count, Math.random))}>
           📺 เริ่มถามทั้งห้อง
+        </Button>
+        <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table)}>
+          📝 พิมพ์ใบงาน{tableName(table)} (A4 · ชุดใหม่ทุกครั้ง · มีเฉลย)
         </Button>
       </div>
     )

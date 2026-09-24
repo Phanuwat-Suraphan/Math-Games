@@ -8,6 +8,8 @@ import { ZONES } from '../../zombieRescue/board'
 import type { AskKind, QAnswer, QVisual, Stage } from '../../zombieRescue/questions'
 import { VILLAGER_VIEWBOX, thanksOf, villagerFor, villagerInner, villagerZombieInner } from '../../zombieRescue/villagers'
 import type { Villager } from '../../zombieRescue/villagers'
+import { buildWorksheet, newSheetSeed, worksheetHtml } from '../../zombieRescue/worksheet'
+import type { SheetTable } from '../../zombieRescue/worksheet'
 
 /**
  * ชิ้นส่วนหน้าจอของ ZOMBIE RESCUE ใช้ร่วมกันระหว่างเกมกระดานกับโหมดฝึกสูตรคูณ
@@ -378,4 +380,22 @@ export function HeartBurst() {
       ))}
     </span>
   )
+}
+
+/**
+ * เปิดใบงานสูตรคูณชุดใหม่ในแท็บใหม่ (หน้า 1 ใบงาน หน้า 2 เฉลย) ให้ครูหรือผู้ปกครองกดพิมพ์
+ * เบราว์เซอร์ที่กันหน้าต่างใหม่จะได้เป็นไฟล์ดาวน์โหลดแทน
+ */
+export function openWorksheet(table: SheetTable): void {
+  playSfx('click')
+  const html = worksheetHtml(buildWorksheet(table, newSheetSeed(Math.random)))
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const win = window.open(url, '_blank')
+  if (!win) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'ใบงานสูตรคูณ-zombie-rescue.html'
+    a.click()
+  }
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }
