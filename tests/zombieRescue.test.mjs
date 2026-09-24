@@ -1008,6 +1008,34 @@ check('➗ แบ่งวัคซีน: หารลงตัวทุกข�
   }
 })
 
+check('📄 รายงาน: ชื่อถูก escape ตัวเลขตรงสมุด ตาราง 50 ช่อง และคำแนะนำเหมาะกับผล', () => {
+  const RP = load('zombieRescue/report')
+  let book = BOOK.emptyBook()
+  for (let g = 1; g <= 10; g += 1) {
+    book = BOOK.noteAnswer(book, { each: 2, groups: g }, true).book
+    book = BOOK.noteAnswer(book, { each: 2, groups: g }, true).book
+  }
+  book = BOOK.noteAnswer(book, { each: 3, groups: 7 }, false).book
+  const html = RP.reportHtml({ name: '<img src=x onerror=alert(1)> มิ้นท์ & "ป.2"', date: '24 กันยายน 2569', book, rushBest: { 2: 12, mix: 7 }, correct: 1234, plays: 3, cures: 1 })
+  assert(!html.includes('<img src=x'), 'ชื่อต้องถูก escape')
+  assert(html.includes('&lt;img src=x onerror=alert(1)&gt; มิ้นท์ &amp; &quot;ป.2&quot;'), 'ชื่อแสดงเป็นข้อความ')
+  assert(html.includes('10/50'), 'จำนวนสติกเกอร์')
+  assert(html.includes('⚡ 12 คน') && html.includes('⚡ 7'), 'สถิติซอมบี้บุก')
+  equal((html.match(/<td>/g) || []).length, 50, 'ตาราง 50 ช่อง')
+  equal((html.match(/em class="ok"/g) || []).length, 10, 'ช่องที่คล่องแล้ว')
+  equal((html.match(/em class="weak"/g) || []).length, 1, 'ช่องที่พลาด')
+  assert(html.includes('<li>7 × 3 = 21</li>'), 'ข้อที่ควรทบทวน')
+  assert(!/NaN|undefined|\[object/.test(html), 'ไม่มีค่าเสีย')
+  const tips = RP.reportTips(book)
+  assert(tips.length >= 1 && tips.length <= 3, 'คำแนะนำ 1–3 ข้อ')
+  assert(tips[0].includes('7 × 3'), 'คำแนะนำแรกพูดถึงข้อที่พลาด')
+  assert(RP.reportTips(BOOK.emptyBook())[0].includes('แม่ 2'), 'ยังไม่เริ่มแนะนำให้เริ่มจากแม่ง่าย')
+  let full = BOOK.emptyBook()
+  for (const f of BOOK.allFacts(full)) { full = BOOK.noteAnswer(full, f, true).book; full = BOOK.noteAnswer(full, f, true).book }
+  assert(RP.reportTips(full).some((t) => t.includes('แบ่งวัคซีน')), 'ครบแล้วแนะนำการหาร')
+  assert(RP.reportHtml({ name: '   ', date: 'x', book: full, rushBest: {}, correct: -5, plays: 0, cures: 0 }).includes('<b>ผู้เล่น</b>'), 'ไม่มีชื่อใช้คำว่าผู้เล่น')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

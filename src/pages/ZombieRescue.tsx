@@ -59,6 +59,7 @@ import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../zombieRescue/vaccineBook'
 import { villagerFor } from '../zombieRescue/villagers'
 import { questionSpeech } from '../zombieRescue/speech'
+import { reportHtml } from '../zombieRescue/report'
 import { speak, speechSupported, stopSpeaking } from '../services/speechService'
 import {
   AnswerPad,
@@ -73,6 +74,7 @@ import {
   HeartBurst,
   SpeakButton,
   StickerToast,
+  openPrintPage,
   VillagerArt,
   ZHead,
   emphasize,
@@ -497,6 +499,21 @@ export function ZombieRescue({ player }: { player: Player }) {
             <VaccineBookScreen
               book={book}
               playerName={player.name}
+              onReport={() => {
+                const rec = recordsOf(player)
+                openPrintPage(
+                  reportHtml({
+                    name: player.name,
+                    date: new Date().toLocaleDateString('th-TH', { dateStyle: 'long' }),
+                    book,
+                    rushBest,
+                    correct: rec.zombieCorrect,
+                    plays: rec.zombiePlays,
+                    cures: rec.zombieCures,
+                  }),
+                  'รายงานสูตรคูณ-zombie-rescue.html',
+                )
+              }}
               onPractice={() => {
                 playSfx('click')
                 setPracticeFocus(true)

@@ -388,14 +388,18 @@ export function HeartBurst() {
  * เบราว์เซอร์ที่กันหน้าต่างใหม่จะได้เป็นไฟล์ดาวน์โหลดแทน
  */
 export function openWorksheet(table: SheetTable): void {
+  openPrintPage(worksheetHtml(buildWorksheet(table, newSheetSeed(Math.random))), 'ใบงานสูตรคูณ-zombie-rescue.html')
+}
+
+/** เปิดหน้า HTML พร้อมพิมพ์ในแท็บใหม่ (ใบงาน รายงาน) กันหน้าต่างใหม่ไว้ก็ดาวน์โหลดเป็นไฟล์แทน */
+export function openPrintPage(html: string, filename: string): void {
   playSfx('click')
-  const html = worksheetHtml(buildWorksheet(table, newSheetSeed(Math.random)))
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
   const win = window.open(url, '_blank')
   if (!win) {
     const a = document.createElement('a')
     a.href = url
-    a.download = 'ใบงานสูตรคูณ-zombie-rescue.html'
+    a.download = filename
     a.click()
   }
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
