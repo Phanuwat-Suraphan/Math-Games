@@ -52,7 +52,9 @@ import {
 import type { AnswerContext, AnswerOutcome, EventDraw, HeroKey, ItemKey, SupplyReward, ZrState } from '../zombieRescue/engine'
 import { TABLES, checkAnswer, practiceReward } from '../zombieRescue/questions'
 import type { QAnswer, Question, Stage } from '../zombieRescue/questions'
-import { clearZombieGame, loadVaccineBook, loadZombieGame, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
+import { clearZombieGame, loadRushBest, loadVaccineBook, loadZombieGame, saveRushBest, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
+import { rushReward, withRushResult } from '../zombieRescue/rush'
+import type { RushBest, RushTable } from '../zombieRescue/rush'
 import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../zombieRescue/vaccineBook'
 import { villagerFor } from '../zombieRescue/villagers'
@@ -76,6 +78,7 @@ import {
 } from '../components/zombieRescue/ZrParts'
 import { PracticeScreen } from '../components/zombieRescue/PracticeScreen'
 import { VaccineBookScreen } from '../components/zombieRescue/VaccineBookScreen'
+import { RushScreen } from '../components/zombieRescue/RushScreen'
 
 /**
  * ZOMBIE RESCUE: ภารกิจรอดชีวิต พิชิตไวรัสซอมบี้ (เกมการคูณ ป.2)
@@ -141,7 +144,7 @@ export function ZombieRescue({ player }: { player: Player }) {
   /* ส่งผลให้แผงคุณครูเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของบัญชีในเครื่องนี้ (เหตุผลเดียวกับเมืองแห่งเวลา) */
   const { logIndicator, currentCode } = useIndicatorLog(player.name)
   const [saved, setSaved] = useState<ZrState | null>(() => loadZombieGame(player.name))
-  const [mode, setMode] = useState<'board' | 'practice' | 'book'>('board')
+  const [mode, setMode] = useState<'board' | 'practice' | 'rush' | 'book'>('board')
   const [practicing, setPracticing] = useState(false)
   const [practiceFocus, setPracticeFocus] = useState(false)
 
@@ -154,12 +157,25 @@ export function ZombieRescue({ player }: { player: Player }) {
   /* สติกเกอร์ที่ได้ระหว่างเกมกระดานนี้ ไว้แห่ขบวนชาวเมืองตอนจบเกม (เกมที่เล่นต่อจากของค้างเริ่มนับใหม่) */
   const [gameStickers, setGameStickers] = useState<Array<{ each: number; groups: number }>>([])
   const bookRef = useRef(book)
-  const noteFact = (q: Question, correct: boolean): boolean => {
+  const noteFact = (q: Pick<Question, 'each' | 'groups'>, correct: boolean): boolean => {
     const noted = noteAnswer(bookRef.current, q, correct)
     bookRef.current = noted.book
     setBook(noted.book)
     saveVaccineBook(player.name, noted.book)
     return noted.newSticker
+  }
+
+  /* ⚡ ซอมบี้บุก!: สถิติดีสุดแยกแม่ เหรียญจ่ายตอนจบรอบ ข้อที่ถูกนับรวมกับ zombieCorrect เหมือนโหมดฝึก */
+  const [rushBest, setRushBest] = useState<RushBest>(() => loadRushBest(player.name))
+  const finishRush = (table: RushTable, cured: number) => {
+    const { best, record } = withRushResult(rushBest, table, cured)
+    if (record) {
+      setRushBest(best)
+      saveRushBest(player.name, best)
+    }
+    const reward = applyBonusPercent(rushReward(cured), totalStats(player).coinBonusPercent)
+    patchPlayer({ coins: player.coins + Math.max(0, reward), records: recordZombiePractice(player, cured) })
+    return { reward, record }
   }
 
   /* จำนวนสติกเกอร์เข้าบันทึกผู้เล่น ให้ถ้วยรางวัลกับหอเกียรติยศเห็น (สมุดที่ได้มาก่อนมีถ้วยก็นับด้วย) */
@@ -421,11 +437,12 @@ export function ZombieRescue({ player }: { player: Player }) {
         <ScreenLayout width="normal">
           <FullscreenButton state={fullscreen} className="mb-3 ml-auto" />
           {!practicing ? (
-            <div className="mb-4 grid grid-cols-3 gap-2" role="tablist" aria-label="เลือกโหมด">
+            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label="เลือกโหมด">
               {(
                 [
                   ['board', '🗺️ ผจญภัยในเมือง', 'เล่นด้วยกัน 1–4 คน'],
                   ['practice', '🎯 ฝึกสูตรคูณ', 'คนเดียว รอบละ 10 ข้อ'],
+                  ['rush', '⚡ ซอมบี้บุก!', 'ท้าเวลา 60 วินาที'],
                   ['book', '📒 สมุดวัคซีน', `สติกเกอร์ ${curedCount(book)}/50${weakFacts(book).length ? ` · พลาด ${weakFacts(book).length}` : ''}`],
                 ] as const
               ).map(([key, label, note]) => (
@@ -450,6 +467,17 @@ export function ZombieRescue({ player }: { player: Player }) {
           ) : null}
           {mode === 'board' ? (
             <SetupPanel setup={setup} onChange={setSetup} onStart={start} saved={saved} onResume={resume} />
+          ) : mode === 'rush' ? (
+            <RushScreen
+              best={rushBest}
+              reduceMotion={!settings.animationsEnabled}
+              onAnswer={(fact, correct) => {
+                logIndicator(ZOMBIE_INDICATOR, correct)
+                return noteFact(fact, correct)
+              }}
+              onFinish={finishRush}
+              onPlayingChange={setPracticing}
+            />
           ) : mode === 'book' ? (
             <VaccineBookScreen
               book={book}

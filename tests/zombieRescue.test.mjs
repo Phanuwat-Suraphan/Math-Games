@@ -829,6 +829,45 @@ check('สุ่มชื่อน่ารักไม่ซ้ำกับค�
   assert(ENG.CUTE_NAMES.includes(ENG.randomCuteName(rng, ENG.CUTE_NAMES)), 'ชื่อถูกใช้หมดก็ยังสุ่มได้')
 })
 
+check('⚡ ซอมบี้บุก!: สำรับครบทุกข้อของแม่ ไม่ถามข้อเดิมติดกัน ทุกข้ออยู่ในสมุด', () => {
+  const RUSH = load('zombieRescue/rush')
+  for (const table of RUSH.RUSH_TABLES) {
+    for (let seed = 1; seed <= 30; seed += 1) {
+      const next = RUSH.rushDeck(table, seeded(seed * 31 + 7))
+      const size = table === 'mix' ? 50 : 10
+      const first = Array.from({ length: size }, () => next())
+      equal(new Set(first.map((f) => `${f.each}x${f.groups}`)).size, size, `สำรับแรกของ ${table} ต้องครบไม่ซ้ำ`)
+      let prev = first[first.length - 1]
+      for (let i = 0; i < size * 4; i += 1) {
+        const f = next()
+        assert(!(f.each === prev.each && f.groups === prev.groups), `${table} ถามข้อเดิมติดกัน`)
+        assert(BOOK.isBookFact(f.each, f.groups), 'ทุกข้อต้องอยู่ในสมุดวัคซีน')
+        if (table !== 'mix') equal(f.each, table, 'แม่ต้องตรงกับที่เลือก')
+        prev = f
+      }
+    }
+  }
+})
+
+check('⚡ ซอมบี้บุก!: ดาว เหรียญ และสถิติดีสุดแยกแม่', () => {
+  const RUSH = load('zombieRescue/rush')
+  equal(RUSH.rushStars(0), 0, 'ไม่ได้ดาว')
+  equal(RUSH.rushStars(RUSH.RUSH_STAR_AT[0]), 1, 'ดาวแรก')
+  equal(RUSH.rushStars(RUSH.RUSH_STAR_AT[2]), 3, 'ดาวครบ')
+  equal(RUSH.rushReward(0), 0, 'ไม่ได้เหรียญ')
+  equal(RUSH.rushReward(7), 3, '2 ข้อต่อเหรียญ')
+  equal(RUSH.rushReward(999), 15, 'เหรียญมีเพดาน')
+  let best = RUSH.parseRushBest({ 2: 8, 3: -1, 5: 'x', mix: 12.7, 7: 40 })
+  equal(JSON.stringify(best), JSON.stringify({ 2: 8, mix: 12 }), 'ทิ้งค่าเสียและแม่ที่ไม่มี')
+  let r = RUSH.withRushResult(best, 2, 6)
+  equal(r.record, false, 'น้อยกว่าเดิมไม่ใช่สถิติใหม่')
+  r = RUSH.withRushResult(best, 2, 9)
+  equal(r.record, true, 'มากกว่าเดิมคือสถิติใหม่')
+  equal(r.best['2'], 9, 'เก็บสถิติใหม่')
+  equal(r.best.mix, 12, 'แม่อื่นไม่เปลี่ยน')
+  equal(RUSH.withRushResult({}, 3, 0).record, false, 'ได้ 0 ไม่นับเป็นสถิติ')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

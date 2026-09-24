@@ -2351,6 +2351,17 @@ main.zr-fullscreen {
   animation: zr-sticker-in 0.4s ease-out;
 }
 
+/* นับถอยหลัง 3 2 1 ของ ⚡ ซอมบี้บุก! */
+.zr-count {
+  color: #e0453a;
+  animation: zr-count 0.6s ease-out;
+}
+
+@keyframes zr-count {
+  from { transform: scale(1.8); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
 @keyframes zr-bob {
   50% { transform: translateY(-3px) rotate(-2deg); }
 }
@@ -2404,6 +2415,7 @@ main.zr-fullscreen {
     transition: none;
   }
 
+  .zr-count,
   .zr-sticker-got,
   .zr-sticker-toast,
   .zr-villager-card,
