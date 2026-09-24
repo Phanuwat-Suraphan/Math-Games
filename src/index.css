@@ -2131,6 +2131,34 @@ main.zr-fullscreen {
   max-width: none;
 }
 
+/* แท็บโหมด: บนมือถือ 2 คอลัมน์ แท็บสุดท้ายที่เหลือเดี่ยวกินเต็มแถว */
+@media (max-width: 639px) {
+  .zr-tabs > :last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 📺 ทั้งห้องเรียน: การ์ดกว้าง ตัวเลขใหญ่ อ่านได้จากหลังห้อง */
+.ta-card.zr-class-card {
+  width: min(1100px, 100%);
+}
+
+.zr-class-expr {
+  font-size: clamp(52px, 9vw, 150px);
+  line-height: 1.05;
+  white-space: nowrap;
+}
+
+.zr-class-villager {
+  width: clamp(96px, 14vw, 220px);
+}
+
+@media (min-width: 1024px) {
+  .zr-class-visual > :first-child {
+    zoom: 1.6;
+  }
+}
+
 /* ป้ายชื่อใต้/เหนือตัวเดินบนกระดาน */
 .zr-pawn-tag {
   font-family: 'Mitr', 'Kanit', sans-serif;

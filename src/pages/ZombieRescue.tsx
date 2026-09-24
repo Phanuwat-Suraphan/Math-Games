@@ -79,6 +79,7 @@ import {
 import { PracticeScreen } from '../components/zombieRescue/PracticeScreen'
 import { VaccineBookScreen } from '../components/zombieRescue/VaccineBookScreen'
 import { RushScreen } from '../components/zombieRescue/RushScreen'
+import { ClassScreen } from '../components/zombieRescue/ClassScreen'
 
 /**
  * ZOMBIE RESCUE: ภารกิจรอดชีวิต พิชิตไวรัสซอมบี้ (เกมการคูณ ป.2)
@@ -144,7 +145,7 @@ export function ZombieRescue({ player }: { player: Player }) {
   /* ส่งผลให้แผงคุณครูเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของบัญชีในเครื่องนี้ (เหตุผลเดียวกับเมืองแห่งเวลา) */
   const { logIndicator, currentCode } = useIndicatorLog(player.name)
   const [saved, setSaved] = useState<ZrState | null>(() => loadZombieGame(player.name))
-  const [mode, setMode] = useState<'board' | 'practice' | 'rush' | 'book'>('board')
+  const [mode, setMode] = useState<'board' | 'practice' | 'rush' | 'class' | 'book'>('board')
   const [practicing, setPracticing] = useState(false)
   const [practiceFocus, setPracticeFocus] = useState(false)
 
@@ -434,15 +435,16 @@ export function ZombieRescue({ player }: { player: Player }) {
     return (
       <>
         <TopBar player={player} title="ZOMBIE RESCUE" backTo="/menu" backLabel="กลับเมนู" />
-        <ScreenLayout width="normal">
+        <ScreenLayout width={mode === 'class' ? 'wide' : 'normal'} className={fullscreen.active && mode === 'class' ? 'zr-fullscreen' : ''}>
           <FullscreenButton state={fullscreen} className="mb-3 ml-auto" />
           {!practicing ? (
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label="เลือกโหมด">
+            <div className="zr-tabs mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5" role="tablist" aria-label="เลือกโหมด">
               {(
                 [
                   ['board', '🗺️ ผจญภัยในเมือง', 'เล่นด้วยกัน 1–4 คน'],
                   ['practice', '🎯 ฝึกสูตรคูณ', 'คนเดียว รอบละ 10 ข้อ'],
                   ['rush', '⚡ ซอมบี้บุก!', 'ท้าเวลา 60 วินาที'],
+                  ['class', '📺 ทั้งห้องเรียน', 'ครูเปิดขึ้นจอใหญ่'],
                   ['book', '📒 สมุดวัคซีน', `สติกเกอร์ ${curedCount(book)}/50${weakFacts(book).length ? ` · พลาด ${weakFacts(book).length}` : ''}`],
                 ] as const
               ).map(([key, label, note]) => (
@@ -467,6 +469,8 @@ export function ZombieRescue({ player }: { player: Player }) {
           ) : null}
           {mode === 'board' ? (
             <SetupPanel setup={setup} onChange={setSetup} onStart={start} saved={saved} onResume={resume} />
+          ) : mode === 'class' ? (
+            <ClassScreen onPlayingChange={setPracticing} />
           ) : mode === 'rush' ? (
             <RushScreen
               best={rushBest}
