@@ -979,6 +979,35 @@ check('🔊 ฟังโจทย์: อ่านได้ทุกข้อ �
   }
 })
 
+check('➗ แบ่งวัคซีน: หารลงตัวทุกข้อ ตรวจคำตอบถูก คำใบ้พากลับสูตรคูณ และไม่บอกคำตอบ', () => {
+  const SP = load('zombieRescue/speech')
+  for (const table of [2, 3, 4, 5, 10, 'mix']) {
+    for (let seed = 1; seed <= 80; seed += 1) {
+      const set = Q.buildDivisionSet(table, seeded(seed * 7 + 3))
+      equal(set.length, Q.PRACTICE_LENGTH, 'จำนวนข้อ')
+      if (table !== 'mix') {
+        equal(new Set(set.map((q) => q.groups)).size, 10, 'แม่เดียวใช้คำตอบครบ 1–10')
+        assert(set.every((q) => q.each === table), 'ตัวหารคือแม่ที่เลือก')
+      }
+      equal(set.filter((q) => q.key === 'div-story').length, 5, 'โจทย์ปัญหา 5 ข้อ')
+      for (const q of set) {
+        equal(q.product, q.groups * q.each, 'ตัวตั้งหารลงตัว')
+        equal(q.visual.text, `${q.product} ÷ ${q.each} = □`, 'นิพจน์การหาร')
+        equal(Q.expectedNumber(q), q.groups, 'คำตอบคือผลหาร')
+        assert(Q.checkAnswer(q, { kind: 'number', value: q.groups }), 'ตอบถูกต้องผ่าน')
+        assert(!Q.checkAnswer(q, { kind: 'number', value: q.product }), 'ตอบตัวตั้งต้องไม่ผ่าน')
+        equal(q.hint, `นึกถึงสูตรคูณ: □ × ${q.each} = ${q.product}`, 'คำใบ้')
+        if (q.key === 'div-story' && q.groups !== q.each) {
+          assert(!new RegExp(`(^|\\D)${q.groups}(\\D|$)`).test(q.text), `โจทย์ปัญหาบอกคำตอบ: ${q.text}`)
+        }
+        const spoken = SP.questionSpeech(q)
+        assert(spoken.includes('หาร') || q.key === 'div-story', `อ่านข้อหารต้องมีคำว่าหาร: ${spoken}`)
+        assert(!/[×÷=□?]/.test(spoken) && !spoken.includes('ช่องว่าง'), `เสียงอ่านข้อหาร: ${spoken}`)
+      }
+    }
+  }
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
