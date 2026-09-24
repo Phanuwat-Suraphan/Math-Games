@@ -10,6 +10,8 @@ import { parseSavedGame } from './engine'
 import type { ZrState } from './engine'
 import { emptyBook, parseBook } from './vaccineBook'
 import type { VaccineBook } from './vaccineBook'
+import { parseRushBest } from './rush'
+import type { RushBest } from './rush'
 
 const KEY = 'math-adventure:zombie:v1'
 
@@ -89,6 +91,36 @@ export function saveVaccineBook(owner: string, book: VaccineBook): boolean {
   if (!storage) return false
   try {
     storage.setItem(BOOK_KEY, JSON.stringify({ ...readBooks(storage), [owner]: book }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/* ── สถิติดีสุดของ ⚡ ซอมบี้บุก! ──────────────────────────── */
+
+const RUSH_KEY = 'math-adventure:zombie-rush:v1'
+
+function readRush(storage: Storage): Record<string, unknown> {
+  try {
+    const raw: unknown = JSON.parse(storage.getItem(RUSH_KEY) ?? '{}')
+    return typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function loadRushBest(owner: string): RushBest {
+  const storage = getStorage()
+  if (!storage) return {}
+  return parseRushBest(readRush(storage)[owner])
+}
+
+export function saveRushBest(owner: string, best: RushBest): boolean {
+  const storage = getStorage()
+  if (!storage) return false
+  try {
+    storage.setItem(RUSH_KEY, JSON.stringify({ ...readRush(storage), [owner]: best }))
     return true
   } catch {
     return false
