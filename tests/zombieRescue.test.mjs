@@ -798,6 +798,37 @@ check('ลิงก์ใบประกาศ: ชุดพิมพ์อ่�
   for (const t of Q.TABLES) assert(KIT.book.tables.includes(t), `ชุดพิมพ์ต้องรู้จักแม่ ${t}`)
 })
 
+check('ตั้งชื่อตัวละครได้ทุกคน: ไม่ใส่ใช้ชื่อตัวละคร ชื่อซ้ำเติมเลข ยาวเกินถูกตัด', () => {
+  const names = ENG.playerNames([
+    { hero: 'scientist', name: '  ข้าว  ' },
+    { hero: 'doctor', name: 'ข้าว' },
+    { hero: 'scout', name: '' },
+    { hero: 'dog', name: 'ก'.repeat(30) },
+  ])
+  equal(names[0], 'ข้าว', 'ตัดช่องว่างหัวท้าย')
+  equal(names[1], 'ข้าว 2', 'ชื่อซ้ำเติมเลข')
+  equal(names[2], ENG.HERO_INFO.scout.name, 'ไม่ใส่ใช้ชื่อตัวละคร')
+  equal(names[3].length, ENG.NAME_MAX, 'ยาวเกินถูกตัด')
+  const dup = ENG.playerNames([{ hero: 'scout', name: '' }, { hero: 'doctor', name: ENG.HERO_INFO.scout.name }])
+  equal(new Set(dup).size, 2, 'ชื่อที่พิมพ์ซ้ำกับชื่อตัวละครของอีกคนต้องไม่ซ้ำกัน')
+  const game = ENG.createGame([{ hero: 'scientist', name: 'มิ้นท์' }, { hero: 'dog', name: 'มิ้นท์' }], false, seeded(1))
+  equal(JSON.stringify(game.players.map((p) => p.name)), JSON.stringify(['มิ้นท์', 'มิ้นท์ 2']), 'เกมใช้ชื่อที่ไม่ซ้ำ')
+})
+
+check('สุ่มชื่อน่ารักไม่ซ้ำกับคนในวง และไม่ซ้ำชื่อชาวเมือง', () => {
+  const VIL = load('zombieRescue/villagers')
+  for (const n of ENG.CUTE_NAMES) {
+    assert(!VIL.VILLAGER_NAMES.includes(n), `ชื่อ ${n} ซ้ำกับชาวเมือง`)
+    assert(Array.from(n).length <= ENG.NAME_MAX, `ชื่อ ${n} ยาวเกิน`)
+  }
+  const rng = seeded(77)
+  for (let i = 0; i < 300; i += 1) {
+    const taken = ENG.CUTE_NAMES.slice(0, i % ENG.CUTE_NAMES.length)
+    assert(!taken.includes(ENG.randomCuteName(rng, taken)), 'ต้องไม่ซ้ำกับชื่อที่มีคนใช้แล้ว')
+  }
+  assert(ENG.CUTE_NAMES.includes(ENG.randomCuteName(rng, ENG.CUTE_NAMES)), 'ชื่อถูกใช้หมดก็ยังสุ่มได้')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

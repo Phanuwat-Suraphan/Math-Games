@@ -5,6 +5,7 @@ import { ResultCodeCard } from '../components/ResultCodeCard'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { useGame } from '../context/useGame'
+import { useFullscreen } from '../hooks/useFullscreen'
 import { useGameSettings } from '../hooks/useGameSettings'
 import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { useMusic } from '../hooks/useMusic'
@@ -23,6 +24,7 @@ import {
   ITEM_KEYS,
   MAX_LIVES,
   MAX_PLAYERS,
+  NAME_MAX,
   SKATE_STEPS,
   answerQuestion,
   appReward,
@@ -37,6 +39,8 @@ import {
   move,
   nextQuestion,
   openSupply,
+  playerNames,
+  randomCuteName,
   rest,
   reviewOf,
   spendItem,
@@ -133,6 +137,7 @@ export function ZombieRescue({ player }: { player: Player }) {
   useMusic('adventure')
   const { patchPlayer } = useGame()
   const { settings } = useGameSettings()
+  const fullscreen = useFullscreen()
   /* ส่งผลให้แผงคุณครูเฉพาะผู้เล่นคนที่ 1 ซึ่งเป็นเจ้าของบัญชีในเครื่องนี้ (เหตุผลเดียวกับเมืองแห่งเวลา) */
   const { logIndicator, currentCode } = useIndicatorLog(player.name)
   const [saved, setSaved] = useState<ZrState | null>(() => loadZombieGame(player.name))
@@ -414,6 +419,7 @@ export function ZombieRescue({ player }: { player: Player }) {
       <>
         <TopBar player={player} title="ZOMBIE RESCUE" backTo="/menu" backLabel="กลับเมนู" />
         <ScreenLayout width="normal">
+          <FullscreenButton state={fullscreen} className="mb-3 ml-auto" />
           {!practicing ? (
             <div className="mb-4 grid grid-cols-3 gap-2" role="tablist" aria-label="เลือกโหมด">
               {(
@@ -482,7 +488,7 @@ export function ZombieRescue({ player }: { player: Player }) {
   return (
     <>
       <TopBar player={player} title="ZOMBIE RESCUE" backTo="/menu" backLabel="กลับเมนู" />
-      <ScreenLayout width="wide">
+      <ScreenLayout width="wide" className={fullscreen.active ? 'zr-fullscreen' : ''}>
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="ta-board zr-board">
             <svg viewBox={BOARD_VIEWBOX} className="mx-auto block h-auto max-h-[calc(100vh-140px)] w-full" role="img" aria-label="แผนที่เมือง ZOMBIE RESCUE">
@@ -496,6 +502,10 @@ export function ZombieRescue({ player }: { player: Player }) {
                   const [x, y] = cured ? CURE_POSITION : SQUARE_POSITIONS[shownPos(i)]
                   const offset = [[-4, -4], [4, -4], [-4, 4], [4, 4]][i]
                   const now = i === game.turn
+                  // ตัวบนติดป้ายชื่อไว้เหนือหัว ตัวล่างไว้ใต้เท้า ตัวซ้ายชิดขวาไปทางซ้าย ตัวขวาเริ่มไปทางขวา
+                  // ป้ายของคนที่ยืนช่องเดียวกันจึงไม่ทับกัน
+                  const tagY = offset[1] < 0 ? -8.2 : 10.4
+                  const tag = pawnTag(p.name)
                   return (
                     <g key={i} className={`ta-pawn ${now ? 'ta-pawn-now' : ''}`} style={{ transform: `translate(${x + offset[0]}px, ${y + offset[1]}px)` }}>
                       <g>
@@ -503,6 +513,16 @@ export function ZombieRescue({ player }: { player: Player }) {
                         <circle r="5.8" fill="#fff" stroke={HERO_INFO[p.hero].color} strokeWidth={now ? 1.6 : 1} />
                         <svg x="-4.9" y="-5.9" width="9.8" height="11.8" viewBox="0 0 40 48" dangerouslySetInnerHTML={{ __html: charInner(p.hero) }} />
                       </g>
+                      <text
+                        className="zr-pawn-tag"
+                        x={offset[0] < 0 ? 2.2 : -2.2}
+                        y={tagY}
+                        textAnchor={offset[0] < 0 ? 'end' : 'start'}
+                        fill={HERO_INFO[p.hero].color}
+                        fontSize={now ? 3.6 : 3.1}
+                      >
+                        {tag}
+                      </text>
                     </g>
                   )
                 })}
@@ -510,6 +530,7 @@ export function ZombieRescue({ player }: { player: Player }) {
           </div>
 
           <div className="flex flex-col gap-3">
+            <FullscreenButton state={fullscreen} className="self-end" />
             <section className="panel panel-corners p-4" aria-live="polite">
               <div className="flex items-center gap-3">
                 <Char k={me.hero} className="w-16 flex-none" />
@@ -642,6 +663,38 @@ export function ZombieRescue({ player }: { player: Player }) {
   )
 }
 
+/* ── ป้ายชื่อบนกระดาน ── */
+
+/** สระบน สระล่าง และวรรณยุกต์ของไทยไม่กินที่ในแนวนอน จึงไม่นับเป็นตัวอักษร */
+const THAI_MARK = /[\u0E31\u0E34-\u0E3A\u0E47-\u0E4E]/
+const TAG_MAX = 8
+
+/** ย่อชื่อให้พอดีป้ายเล็กบนกระดาน แต่เก็บเลขท้ายของชื่อซ้ำ (ต้น 2) ไว้เสมอ */
+function pawnTag(name: string): string {
+  const chars = Array.from(name)
+  const width = (list: string[]) => list.filter((c) => !THAI_MARK.test(c)).length
+  if (width(chars) <= TAG_MAX) return name
+  const suffix = name.match(/ \d+$/)?.[0] ?? ''
+  const head = Array.from(name.slice(0, name.length - suffix.length))
+  const out: string[] = []
+  for (const c of head) {
+    if (!THAI_MARK.test(c) && width(out) >= TAG_MAX - 2 - Array.from(suffix).length) break
+    out.push(c)
+  }
+  return out.join('') + '…' + suffix
+}
+
+/* ── ปุ่มเต็มจอ (ซ่อนเองบนเครื่องที่ขยายเต็มจอไม่ได้ เช่น iPhone) ── */
+
+function FullscreenButton({ state, className = '' }: { state: ReturnType<typeof useFullscreen>; className?: string }) {
+  if (!state.supported) return null
+  return (
+    <button type="button" onClick={() => void state.toggle()} className={`zr-fs-btn ${className}`} aria-pressed={state.active}>
+      {state.active ? '🗗 ออกจากเต็มจอ' : '⛶ เต็มจอ (ขึ้นจอใหญ่)'}
+    </button>
+  )
+}
+
 /* ── หน้าตั้งค่า ─────────────────────────────────────────── */
 
 function SetupPanel({
@@ -718,20 +771,40 @@ function SetupPanel({
         <div className="grid gap-3">
           {Array.from({ length: setup.count }, (_, slot) => (
             <div key={slot} className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-300">คนที่ {slot + 1}</span>
-                <input
-                  value={setup.names[slot] ?? ''}
-                  maxLength={16}
-                  placeholder="ชื่อ (ไม่ใส่ก็ได้)"
-                  aria-label={`ชื่อผู้เล่นคนที่ ${slot + 1}`}
-                  onChange={(event) => {
-                    const names = [...setup.names]
-                    names[slot] = event.target.value
-                    onChange({ ...setup, names })
-                  }}
-                  className="min-w-0 flex-1 rounded-lg border border-white/15 bg-night-900/60 px-3 py-1.5 text-sm text-white placeholder:text-slate-500"
-                />
+              <div className="flex items-center gap-3">
+                <Char k={setup.heroes[slot]} className="zr-bob w-12 flex-none" />
+                <div className="min-w-0 flex-1">
+                  <label htmlFor={`zr-name-${slot}`} className="block text-sm font-bold text-slate-200">
+                    คนที่ {slot + 1} · ✏️ ตั้งชื่อตัวละคร
+                  </label>
+                  <div className="mt-1 flex gap-2">
+                    <input
+                      id={`zr-name-${slot}`}
+                      value={setup.names[slot] ?? ''}
+                      maxLength={NAME_MAX}
+                      placeholder={`เช่น ข้าวปั้น (ไม่ใส่ = ${HERO_INFO[setup.heroes[slot]].name})`}
+                      onChange={(event) => {
+                        const names = [...setup.names]
+                        names[slot] = event.target.value
+                        onChange({ ...setup, names })
+                      }}
+                      className="zr-name-input min-w-0 flex-1"
+                    />
+                    <button
+                      type="button"
+                      className="zr-dice-name"
+                      aria-label={`สุ่มชื่อน่ารักให้คนที่ ${slot + 1}`}
+                      title="สุ่มชื่อ"
+                      onClick={() => {
+                        const names = [...setup.names]
+                        names[slot] = randomCuteName(Math.random, names.slice(0, setup.count).filter((_, i) => i !== slot))
+                        onChange({ ...setup, names })
+                      }}
+                    >
+                      🎲
+                    </button>
+                  </div>
+                </div>
               </div>
               <div className="mt-2 grid grid-cols-4 gap-2" role="group" aria-label={`ตัวละครของคนที่ ${slot + 1}`}>
                 {HERO_KEYS.map((hero) => (
@@ -780,7 +853,13 @@ function SetupPanel({
         <li>· เหรียญที่ทั้งวงทำได้เข้ากระเป๋าผู้เล่นเครื่องนี้ · ผลของคนที่ 1 ส่งให้แผงคุณครู</li>
       </ul>
 
-      <Button size="lg" fullWidth className="mt-6" onClick={onStart}>
+      <p className="mt-5 text-center text-sm text-slate-300">
+        ทีมของเรา:{' '}
+        <b className="text-white">
+          {playerNames(setup.heroes.slice(0, setup.count).map((hero, i) => ({ hero, name: setup.names[i] ?? '' }))).join(' · ')}
+        </b>
+      </p>
+      <Button size="lg" fullWidth className="mt-3" onClick={onStart}>
         🧟 เริ่มภารกิจ!
       </Button>
       <p className="mt-4 text-center text-sm text-slate-300">
