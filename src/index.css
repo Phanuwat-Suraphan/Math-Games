@@ -2110,6 +2110,23 @@ html[data-animations='off'] *::after {
   color: var(--tc);
 }
 
+/* ปุ่ม 🔊 ฟังโจทย์บนการ์ดโจทย์ (การ์ดพื้นสว่าง) */
+.zr-speak {
+  display: block;
+  width: fit-content;
+  border-radius: 999px;
+  border: 2px solid var(--c, #1e9aae);
+  background: #fff;
+  padding: 4px 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #23324a;
+}
+
+.zr-speak:hover {
+  background: var(--bg, #e4f7fa);
+}
+
 /* ปุ่มเต็มจอ และหน้าเกมตอนเต็มจอ (ขึ้นจอใหญ่หน้าห้อง) */
 .zr-fs-btn {
   display: block;

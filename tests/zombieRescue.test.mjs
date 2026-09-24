@@ -957,6 +957,28 @@ check('📝 ใบงาน: หน้า HTML มีใบงานกับเ
   assert(n >= 1000 && n <= 9999, 'เลขชุด 4 หลัก')
 })
 
+check('🔊 ฟังโจทย์: อ่านได้ทุกข้อ ไม่เหลือเครื่องหมาย และไม่บอกคำตอบ', () => {
+  const SP = load('zombieRescue/speech')
+  equal(SP.mathSpeech('6 × 3 = ?'), '6 คูณ 3 เท่ากับเท่าไร', 'อ่านนิพจน์')
+  equal(SP.mathSpeech('□ × 4 = 8'), 'ช่องว่าง คูณ 4 เท่ากับ 8', 'อ่านช่องว่าง')
+  equal(SP.factSpeech(7, 3), '7 คูณ 3 เท่ากับเท่าไร', 'อ่านโจทย์สั้น')
+  equal(SP.revealSpeech(7, 3), '7 คูณ 3 เท่ากับ 21', 'อ่านเฉลย')
+  const rng = seeded(606)
+  const all = []
+  for (const stage of [1, 2, 3, 4, 5, 'boss']) for (let i = 0; i < 1500; i += 1) all.push(Q.makeQuestion(stage, rng, { easy: i % 3 === 0 }))
+  for (const t of [2, 3, 4, 5, 10, 'mix']) all.push(...Q.buildPracticeSet(t, rng))
+  for (const q of all) {
+    const text = SP.questionSpeech(q)
+    assert(text.length > 5, `อ่านว่างเปล่า ${q.key}`)
+    assert(!/[×=□?+]/.test(text), `เหลือเครื่องหมายที่เสียงอ่านข้าม: ${text}`)
+    if (q.ask === 'missing') assert(text.includes('ช่องว่าง'), 'ข้อหา □ ต้องบอกว่ามีช่องว่าง')
+    if (q.ask === 'product') {
+      const shown = q.visual.kind === 'expr' ? q.visual.text : q.text
+      if (!shown.includes(String(q.product))) assert(!new RegExp(`(^|\\D)${q.product}(\\D|$)`).test(text), `เสียงอ่านบอกคำตอบ ${q.key}: ${text}`)
+    }
+  }
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
