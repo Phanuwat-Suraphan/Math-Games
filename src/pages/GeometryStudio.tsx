@@ -156,6 +156,7 @@ import {
   projectOnLine,
   regularPolygon,
   snapDeg,
+  softSnapDeg,
   snapEnd,
   snapToGrid,
   toCm,
@@ -528,6 +529,16 @@ export function GeometryStudio() {
     return snapWithInfo(p).point
   }
 
+  /**
+   * รูปนี้เป็นของ "วัดมุม" หรือไม่
+   *
+   * ป้ายวัดมุมไม่ใช่รูปที่วาด แต่เป็นเครื่องมือที่ทาบลงไปบนของที่มีอยู่แล้ว
+   * แม่เหล็กจึงต้องไม่ยุ่งกับมัน ไม่งั้นการเลื่อนให้ทาบเส้นในรูปแบบฝึกจะทำไม่ได้เลย
+   */
+  function isMeasuring(id: string): boolean {
+    return board.shapes.some((shape) => shape.id === id && shape.kind === 'angle')
+  }
+
   /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
   function penEnd(start: Point, raw: Point, guided: boolean): Point {
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
@@ -866,7 +877,12 @@ export function GeometryStudio() {
       }
 
       case 'angle': {
-        const point = snapPoint(raw)
+        /*
+         * วัดมุมต้องลงตรงที่จิ้มเป๊ะ ๆ ไม่ดูดเข้าจุดอื่นและไม่ดูดเข้าช่องตาราง
+         * เพราะสิ่งที่วัดบ่อยที่สุดคือมุมในรูปจากแบบฝึกที่วางไว้ ซึ่งไม่มีจุดให้ดูดสักจุด
+         * ถ้ายังดูดอยู่ ปลายแขนจะกระโดดไปเกาะเส้นที่เด็กวาดไว้ก่อนหน้า แล้วองศาที่ได้ก็ผิด
+         */
+        const point = raw
         const picks = [...anglePicks, point]
         if (picks.length < 3) {
           setAnglePicks(picks)
@@ -952,8 +968,8 @@ export function GeometryStudio() {
 
   /** ตำแหน่งและสถานะของวงแหวนเคอร์เซอร์ ณ จุดที่ปลายปากกาอยู่ */
   function cursorAt(raw: Point): { point: Point; onTarget: boolean } {
-    /* สองเครื่องมือนี้ไม่ได้วาดอะไร จึงไม่ควรหลอกว่าปลายดินสอจะไปลงที่จุดอื่น */
-    if (tool === 'select' || tool === 'eraser' || tool === 'paint') {
+    /* เครื่องมือเหล่านี้ไม่ได้ดูดเข้าจุดไหน จึงไม่ควรหลอกว่าปลายดินสอจะไปลงที่อื่น */
+    if (tool === 'select' || tool === 'eraser' || tool === 'paint' || tool === 'angle') {
       return { point: raw, onTarget: false }
     }
     return snapWithInfo(raw)
@@ -1080,7 +1096,7 @@ export function GeometryStudio() {
          * เด็กจึงเอามุมของรูปไปแปะให้ชนจุดอื่นได้พอดี ซึ่งเป็นสิ่งที่ตั้งใจจะทำจริง
          */
         const wanted = { x: raw.x - drag.grab.x, y: raw.y - drag.grab.y }
-        const landed = snapPoint(wanted)
+        const landed = isMeasuring(drag.id) ? wanted : snapPoint(wanted)
         if (!drag.marked) dispatch({ type: 'mark' })
         dispatch({
           type: 'live',
@@ -1095,7 +1111,8 @@ export function GeometryStudio() {
       }
 
       case 'vertex': {
-        const landed = snapPoint(raw)
+        /* ลากแขนของมุมที่วัดไว้ต้องอิสระเหมือนตอนวาง ไม่งั้นแก้ให้ทาบเส้นในรูปไม่ได้ */
+        const landed = isMeasuring(drag.id) ? raw : snapPoint(raw)
         if (!drag.marked) dispatch({ type: 'mark' })
         dispatch({
           type: 'live',
@@ -1113,7 +1130,12 @@ export function GeometryStudio() {
         } else if (drag.part === 'rotate') {
           setProtractor({
             ...protractor,
-            rotation: snapDeg(angleOf(protractor.center, raw), snapOn ? 5 : 1),
+            /*
+             * หมุนได้อิสระ เหลือแรงดูดไว้แคบ ๆ รอบขีดที่ลงตัว
+             * เส้นในรูปแบบฝึกไม่ได้เอียงเป็นจำนวนเท่าของ 5° สักเส้น
+             * ถ้าดูดทีละ 5° เต็ม ๆ จะทาบขอบครึ่งวงกลมกับเส้นในหนังสือไม่ได้เลย
+             */
+            rotation: softSnapDeg(angleOf(protractor.center, raw), 5, snapOn ? 2 : 0),
           })
         } else {
           setProtractor({
@@ -1127,7 +1149,10 @@ export function GeometryStudio() {
         if (drag.part === 'resize') {
           setRuler({ ...ruler, lengthCm: rulerLengthFromPointer(ruler.origin, ruler.rotation, raw) })
         } else if (drag.part === 'rotate') {
-          setRuler({ ...ruler, rotation: snapDeg(angleOf(ruler.origin, raw), snapOn ? 5 : 1) })
+          setRuler({
+            ...ruler,
+            rotation: softSnapDeg(angleOf(ruler.origin, raw), 5, snapOn ? 2 : 0),
+          })
         } else {
           setRuler({ ...ruler, origin: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y } })
         }
