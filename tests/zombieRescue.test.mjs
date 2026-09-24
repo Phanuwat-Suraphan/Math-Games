@@ -903,6 +903,60 @@ check('📺 ทั้งห้องเรียน: ดาวของห้อ
   equal(JSON.stringify(missed), JSON.stringify([{ each: 3, groups: 7 }, { each: 5, groups: 9 }]), 'ข้อที่พลาดไม่ซ้ำ ตามลำดับ')
 })
 
+check('📝 ใบงาน: 20 ข้อตามตอน เฉลยถูกทุกข้อ ตรงเงื่อนไข และชุดเดิมได้ผลเดิม', () => {
+  const WS = load('zombieRescue/worksheet')
+  const RUSH = load('zombieRescue/rush')
+  equal(WS.SHEET_TOTAL, 20, 'รวม 20 ข้อ')
+  for (const table of RUSH.RUSH_TABLES) {
+    for (let seed = 1000; seed < 1060; seed += 1) {
+      const sheet = WS.buildWorksheet(table, seed)
+      equal(sheet.items.length, 20, `จำนวนข้อ ${table}/${seed}`)
+      let n = 0
+      for (const part of WS.SHEET_PARTS) {
+        const mine = sheet.items.slice(n, n + part.count)
+        n += part.count
+        for (const it of mine) {
+          if (part.kind === 'missing') assert(it.kind === 'missingGroups' || it.kind === 'missingEach', 'ตอนที่ 2 ต้องเป็นข้อหา □')
+          else equal(it.kind, part.kind, 'ชนิดข้อตรงกับตอน')
+        }
+        const keys = mine.map((it) => `${it.each}x${it.groups}`)
+        if (table !== 'mix' && part.kind !== 'picture') equal(new Set(keys).size, keys.length, `ภายในตอนไม่ซ้ำ ${table}/${seed}/${part.kind}`)
+      }
+      for (const it of sheet.items) {
+        equal(it.product, it.groups * it.each, 'ผลคูณ')
+        assert(BOOK.isBookFact(it.each, it.groups), 'ต้องเป็นคู่ในสมุดวัคซีน')
+        if (table !== 'mix') equal(it.each, table, 'แม่ตรงกับที่เลือก')
+        if (it.kind !== 'product') assert(it.groups >= 2, 'ข้อหา □ ภาพ และโจทย์ปัญหา ต้องมีอย่างน้อย 2 กลุ่ม')
+        if (it.kind === 'picture') assert(it.groups * it.each <= Q.MAX_DRAWN, 'ภาพไม่เกิน 30 ชิ้น')
+        if (it.kind === 'story') {
+          assert(it.text.includes(String(it.groups)) && it.text.includes(String(it.each)), 'โจทย์ปัญหาต้องบอกตัวเลขครบ')
+          assert(!new RegExp(`(^|\\D)${it.product}(\\D|$)`).test(it.text) || it.product === it.groups || it.product === it.each, 'โจทย์ปัญหาต้องไม่บอกคำตอบ')
+        }
+        const ans = WS.answerOf(it)
+        if (it.kind === 'missingGroups') equal(ans, `□ = ${it.groups}`, 'เฉลยหา □ กลุ่ม')
+        if (it.kind === 'missingEach') equal(ans, `□ = ${it.each}`, 'เฉลยหา □ แม่')
+        if (it.kind === 'product') equal(ans, String(it.product), 'เฉลยผลคูณ')
+      }
+      equal(JSON.stringify(WS.buildWorksheet(table, seed)), JSON.stringify(sheet), 'ชุดเดิมต้องได้โจทย์เดิม')
+    }
+  }
+  const a = JSON.stringify(WS.buildWorksheet(3, 1234).items)
+  const b = JSON.stringify(WS.buildWorksheet(3, 1235).items)
+  assert(a !== b, 'เลขชุดต่างกันต้องได้โจทย์ต่างกัน')
+})
+
+check('📝 ใบงาน: หน้า HTML มีใบงานกับเฉลย เลขชุดตรงกัน ไม่มีค่าเสีย', () => {
+  const WS = load('zombieRescue/worksheet')
+  const html = WS.worksheetHtml(WS.buildWorksheet('mix', 4321))
+  equal((html.match(/class="page/g) || []).length, 2, 'ต้องมี 2 หน้า')
+  equal((html.match(/ชุดที่ 4321/g) || []).length >= 4, true, 'เลขชุดอยู่ทั้งใบงานและเฉลย')
+  assert(!/NaN|undefined|null|\[object/.test(html), 'ไม่มีค่าเสียใน HTML')
+  equal((html.match(/<li[ >]/g) || []).length, 40, 'โจทย์ 20 ข้อ + เฉลย 20 ข้อ')
+  assert(html.includes('@page{size:A4 portrait'), 'ตั้งกระดาษ A4')
+  const n = WS.newSheetSeed(seeded(5))
+  assert(n >= 1000 && n <= 9999, 'เลขชุด 4 หลัก')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
