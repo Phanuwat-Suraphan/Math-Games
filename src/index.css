@@ -2110,6 +2110,71 @@ html[data-animations='off'] *::after {
   color: var(--tc);
 }
 
+/* ปุ่มเต็มจอ และหน้าเกมตอนเต็มจอ (ขึ้นจอใหญ่หน้าห้อง) */
+.zr-fs-btn {
+  display: block;
+  width: fit-content;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.zr-fs-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+main.zr-fullscreen {
+  max-width: none;
+}
+
+/* ป้ายชื่อใต้/เหนือตัวเดินบนกระดาน */
+.zr-pawn-tag {
+  font-family: 'Mitr', 'Kanit', sans-serif;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 1.1px;
+  stroke-linejoin: round;
+}
+
+/* ช่องตั้งชื่อตัวละครในหน้าเริ่มเกม */
+.zr-name-input {
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  background: #fffdf6;
+  padding: 7px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #23324a;
+}
+
+.zr-name-input::placeholder {
+  color: #8a97ab;
+  font-weight: 400;
+}
+
+.zr-name-input:focus {
+  outline: 3px solid #fcd34d;
+  outline-offset: 1px;
+}
+
+.zr-dice-name {
+  flex: none;
+  width: 42px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 20px;
+}
+
+.zr-dice-name:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* ลิงก์พิมพ์ใบประกาศเมื่อครบแม่ หรือครบทั้งเล่ม */
 .zr-cert-link {
   display: block;

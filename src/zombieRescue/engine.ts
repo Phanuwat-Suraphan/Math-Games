@@ -139,12 +139,44 @@ export function shuffle<T>(list: readonly T[], rng: Rng): T[] {
   return out
 }
 
+/** ชื่อตัวละครยาวได้เท่านี้ (ช่องชื่อในหน้าเริ่มเกมก็จำกัดเท่ากัน) */
+export const NAME_MAX = 16
+
+/** ชื่อน่ารักสำหรับปุ่ม 🎲 สุ่มชื่อ (ไม่ซ้ำกับชื่อชาวเมืองในสมุดวัคซีน เพื่อไม่ให้สับสนว่าใครเป็นใคร) */
+export const CUTE_NAMES = [
+  'กัปตันแครอท', 'ฮีโร่ถั่วงอก', 'หมอมะม่วง', 'ไข่ดาวผู้กล้า', 'สายฟ้าจิ๋ว', 'ดาวเหนือ', 'ลูกเจี๊ยบ', 'ป๊อปคอร์น',
+  'ขนมเปี๊ยะ', 'จรวดน้อย', 'ปุยนุ่น', 'เต่าทอง', 'แมวส้ม', 'ลูกโป่ง', 'หมีน้อย', 'เป็ดเหลือง',
+]
+
+/** สุ่มชื่อน่ารักที่ยังไม่มีใครในวงใช้ */
+export function randomCuteName(rng: Rng, taken: string[]): string {
+  const free = CUTE_NAMES.filter((n) => !taken.includes(n))
+  const list = free.length ? free : CUTE_NAMES
+  return list[Math.floor(rng() * list.length)]
+}
+
+/**
+ * ชื่อที่ใช้ในเกมของแต่ละคน: ไม่ใส่ใช้ชื่อตัวละคร ยาวเกินตัดที่ NAME_MAX
+ * ชื่อซ้ำกันเติมเลขต่อท้าย (ต้น, ต้น 2) เพราะป้าย "ตาของ…" กับป้ายชื่อบนกระดานต้องบอกได้ว่าเป็นใคร
+ */
+export function playerNames(players: NewPlayer[]): string[] {
+  const out: string[] = []
+  for (const p of players) {
+    const base = p.name.trim().replace(/\s+/g, ' ').slice(0, NAME_MAX) || HERO_INFO[p.hero].name
+    let name = base
+    for (let n = 2; out.includes(name); n += 1) name = `${base} ${n}`
+    out.push(name)
+  }
+  return out
+}
+
 export function createGame(players: NewPlayer[], easy: boolean, rng: Rng): ZrState {
   const list = players.slice(0, MAX_PLAYERS)
   if (list.length === 0) list.push({ name: '', hero: 'scientist' })
+  const names = playerNames(list)
   return {
-    players: list.map((p) => ({
-      name: p.name.trim() || HERO_INFO[p.hero].name,
+    players: list.map((p, i) => ({
+      name: names[i],
       hero: p.hero,
       pos: START,
       lives: MAX_LIVES,
