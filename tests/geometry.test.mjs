@@ -1934,6 +1934,64 @@ check('ครึ่งวงกลมและไม้บรรทัดต้�
   close(G.softSnapDeg(90, 0, 2), 90, 0.0001, 'ไม่มีขีดให้ดูดต้องคืนค่าเดิม')
 })
 
+check('ตั้งมาตราส่วนรูปแบบฝึกต้องคำนวณอัตราย่อขยายถูก', () => {
+  /*
+   * ครูลากทาบด้านที่หนังสือบอกว่ายาว 4 ซม. แล้วเส้นที่ทาบยาว 80 พิกเซลบนกระดาษ
+   * ซึ่งเท่ากับ 2 ซม. ตามสเกลของกระดาษ แปลว่าต้องขยายรูปสองเท่า
+   * ของในรูปจึงจะยาวเท่าที่หนังสือบอก แล้วไม้บรรทัดกับป้ายความยาวเดิมก็อ่านค่าถูกทันที
+   */
+  close(PH.scaleFactorFor(80, 4, G.PX_PER_CM), 2, 0.0001, 'คำนวณอัตราขยายผิด')
+  close(PH.scaleFactorFor(160, 4, G.PX_PER_CM), 1, 0.0001, 'รูปที่สเกลตรงอยู่แล้วต้องไม่ถูกย่อขยาย')
+  close(PH.scaleFactorFor(320, 4, G.PX_PER_CM), 0.5, 0.0001, 'รูปที่ใหญ่เกินต้องถูกย่อลงครึ่งหนึ่ง')
+
+  /* ลากทาบพลาดสั้น ๆ ไม่ควรทำให้รูปพองจนเต็มจอจนหาทางกลับไม่เจอ */
+  assert(
+    PH.scaleFactorFor(2, 40, G.PX_PER_CM) <= PH.MAX_SCALE_FACTOR,
+    'อัตราขยายต้องมีเพดาน',
+  )
+  assert(
+    PH.scaleFactorFor(4000, 0.5, G.PX_PER_CM) >= PH.MIN_SCALE_FACTOR,
+    'อัตราย่อต้องมีพื้น',
+  )
+
+  /* ค่าที่เป็นไปไม่ได้ต้องไม่ทำให้รูปหายไปหรือกลายเป็น NaN */
+  close(PH.scaleFactorFor(0, 4, G.PX_PER_CM), 1, 0.0001, 'ลากยาวศูนย์ต้องไม่เปลี่ยนขนาด')
+  close(PH.scaleFactorFor(80, 0, G.PX_PER_CM), 1, 0.0001, 'ความยาวจริงศูนย์ต้องไม่เปลี่ยนขนาด')
+  close(PH.scaleFactorFor(80, -4, G.PX_PER_CM), 1, 0.0001, 'ความยาวติดลบต้องไม่เปลี่ยนขนาด')
+})
+
+check('เพดานการย่อขยายของรูปต้องตรงกับที่ตัวย่อขยายทำจริง', () => {
+  /*
+   * ถ้าสองที่นี้ไม่ตรงกัน ครูจะตั้งมาตราส่วนแล้วได้รูปที่ไม่ตรงตามที่บอก
+   * โดยไม่มีอะไรเตือนเลยสักอย่าง
+   */
+  const photo = {
+    id: 'photo',
+    kind: 'photo',
+    color: '#000',
+    width: 3,
+    at: { x: 300, y: 300 },
+    imageWidth: 100,
+    imageHeight: 100,
+    src: 'data:image/jpeg;base64,AAAA',
+    fade: 0,
+  }
+  const huge = S.scaleShape(photo, 999, { x: 300, y: 300 })
+  close(
+    huge.imageWidth / photo.imageWidth,
+    PH.MAX_SCALE_FACTOR,
+    0.0001,
+    'เพดานของตัวย่อขยายไม่ตรงกับค่าที่ประกาศไว้',
+  )
+  const tiny = S.scaleShape(photo, 0.0001, { x: 300, y: 300 })
+  close(
+    tiny.imageWidth / photo.imageWidth,
+    PH.MIN_SCALE_FACTOR,
+    0.0001,
+    'พื้นของตัวย่อขยายไม่ตรงกับค่าที่ประกาศไว้',
+  )
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

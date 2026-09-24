@@ -60,6 +60,28 @@ export function fitOnPaper(
   return { width: width * factor, height: height * factor }
 }
 
+/**
+ * ย่อขยายได้มากที่สุดกี่เท่าในการตั้งมาตราส่วนหนึ่งครั้ง
+ * ต้องตรงกับเพดานของ scaleShape ใน shapes.ts ไม่งั้นตัวเลขที่บอกกับที่ทำจริงจะไม่ตรงกัน
+ */
+export const MIN_SCALE_FACTOR = 0.15
+export const MAX_SCALE_FACTOR = 4
+
+/**
+ * ต้องย่อขยายรูปกี่เท่า ให้ของที่วัดในรูปยาวเท่าของจริง
+ *
+ * วิธีนี้ทำให้ไม่ต้องมีหน่วยวัดสองชุดในหัวเด็ก
+ * พอรูปถูกขยายจนสเกลตรงกับกระดาษแล้ว ไม้บรรทัดกับป้ายบอกความยาวที่มีอยู่เดิม
+ * ก็อ่านค่าถูกต้องทันทีทั้งหมด โดยไม่ต้องแก้อะไรในส่วนอื่นเลย
+ */
+export function scaleFactorFor(drawnPx: number, realCm: number, pxPerCm: number): number {
+  if (drawnPx <= 0 || realCm <= 0 || pxPerCm <= 0) return 1
+  const factor = (realCm * pxPerCm) / drawnPx
+  if (!Number.isFinite(factor)) return 1
+  /* กันการลากทาบสั้นเป็นสิบพิกเซลแล้วรูปพองจนเต็มจอจนหาทางกลับไม่เจอ */
+  return Math.min(MAX_SCALE_FACTOR, Math.max(MIN_SCALE_FACTOR, factor))
+}
+
 /** ขนาดข้อมูลโดยประมาณของ data URL หน่วยเป็นไบต์ */
 export function approxBytes(dataUrl: string): number {
   const comma = dataUrl.indexOf(',')
