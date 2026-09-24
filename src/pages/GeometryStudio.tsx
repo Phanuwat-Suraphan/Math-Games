@@ -80,6 +80,7 @@ import {
   approxBytes,
   fitOnPaper,
   isImageType,
+  scaleFactorFor,
   shrinkTo,
 } from '../geometry/photos'
 import { LABEL_LEASH, clampLeash, offsetOf } from '../geometry/labels'
@@ -222,6 +223,8 @@ type Drag =
     }
   /** ลากจุดเดียวของรูปเพื่อแก้รูปทรง */
   | { kind: 'vertex'; id: string; vertexKey: string; marked: boolean }
+  /** ลากทาบของที่รู้ความยาวในรูปแบบฝึก เพื่อตั้งมาตราส่วนของรูปนั้น */
+  | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
 
@@ -252,6 +255,16 @@ export function GeometryStudio() {
   const [sheetCount, setSheetCount] = useState(SHEET_COUNTS[1])
   const [sheetKinds, setSheetKinds] = useState<ItemKind[]>(['measure'])
   const [sheet, setSheet] = useState<WorksheetItem[] | null>(null)
+
+  /*
+   * การตั้งมาตราส่วนของรูปแบบฝึก
+   * line คือเส้นที่ลากทาบของที่รู้ความยาว ยังไม่ได้บอกว่ามันยาวจริงเท่าไร
+   */
+  const [calibrate, setCalibrate] = useState<{
+    id: string
+    line: { a: Point; b: Point } | null
+  } | null>(null)
+  const [realCm, setRealCm] = useState('4')
 
   /* ช่องเลือกไฟล์ที่ซ่อนไว้ สำหรับแท็บเล็ตที่กด Ctrl+V ไม่ได้ */
   const photoInputRef = useRef<HTMLInputElement | null>(null)
@@ -817,6 +830,15 @@ export function GeometryStudio() {
       return
     }
 
+    /*
+     * ระหว่างตั้งมาตราส่วน การลากบนกระดาษคือการทาบวัด ไม่ใช่การใช้เครื่องมือที่เลือกอยู่
+     * ต้องดักก่อนเข้า switch ไม่งั้นครูที่ลากทาบจะได้เส้นจริงติดกระดาษไปด้วยทุกครั้ง
+     */
+    if (calibrate && !calibrate.line) {
+      setDrag({ kind: 'calibrate', start: raw, end: raw })
+      return
+    }
+
     switch (tool) {
       case 'select': {
         const found = findShapeAt(board.shapes, raw, hitRange)
@@ -1124,6 +1146,10 @@ export function GeometryStudio() {
         return
       }
 
+      case 'calibrate':
+        setDrag({ ...drag, end: raw })
+        return
+
       case 'protractor':
         if (drag.part === 'resize') {
           setProtractor({ ...protractor, radius: protractorRadiusFromPointer(protractor.center, raw) })
@@ -1178,6 +1204,17 @@ export function GeometryStudio() {
     const raw = toPaper(event)
 
     switch (drag.kind) {
+      case 'calibrate': {
+        /* ลากสั้นเกินไปคือการจิ้มพลาด ไม่ใช่การทาบวัด ถ้ารับไว้จะได้มาตราส่วนที่เพี้ยนมาก */
+        if (distance(drag.start, raw) >= 20) {
+          setCalibrate(calibrate ? { ...calibrate, line: { a: drag.start, b: raw } } : null)
+          say('เส้นนี้ยาวจริงกี่เซนติเมตร ใส่ตัวเลขที่แผงขวาได้เลย')
+        } else {
+          say('ลากทาบให้ยาวกว่านี้หน่อยนะ')
+        }
+        break
+      }
+
       case 'pen': {
         const end = penEnd(drag.start, raw, drag.guided)
         if (distance(drag.start, end) >= 6) {
@@ -1475,6 +1512,40 @@ export function GeometryStudio() {
 
     image.onerror = () => say('รูปนี้เปิดไม่ได้ ลองรูปอื่นนะ')
     image.src = dataUrl
+  }
+
+  /** เริ่มตั้งมาตราส่วนของรูปที่เลือกอยู่ */
+  function startCalibrate(id: string) {
+    setCalibrate({ id, line: null })
+    setTool('select')
+    say('ลากทาบของที่รู้ความยาวในรูป เช่น ด้านที่โจทย์บอกว่ายาว 4 ซม.')
+    playSfx('click')
+  }
+
+  /**
+   * ย่อขยายรูปให้ของในรูปยาวเท่าของจริง
+   *
+   * ไม่ได้เก็บมาตราส่วนไว้เป็นตัวเลขแยกต่างหาก แต่ขยายตัวรูปจริง ๆ ให้สเกลตรงกับกระดาษ
+   * ไม้บรรทัด ป้ายบอกความยาว และทุกอย่างที่มีอยู่เดิมจึงอ่านค่าถูกทันที
+   * โดยไม่ต้องให้เด็กจำว่าตัวเลขไหนเป็นหน่วยของรูปและตัวเลขไหนเป็นหน่วยของกระดาษ
+   */
+  function applyCalibrate() {
+    if (!calibrate?.line) return
+    const target = board.shapes.find((shape) => shape.id === calibrate.id)
+    if (!target || target.kind !== 'photo') {
+      setCalibrate(null)
+      return
+    }
+    const wanted = Number(realCm)
+    if (!Number.isFinite(wanted) || wanted <= 0) {
+      say('ใส่ความยาวจริงเป็นตัวเลขก่อนนะ')
+      return
+    }
+    const factor = scaleFactorFor(distance(calibrate.line.a, calibrate.line.b), wanted, PX_PER_CM)
+    editSelected(scaleShape(target, factor, shapeCenter(target)))
+    setCalibrate(null)
+    playSfx('correct')
+    say('ตั้งมาตราส่วนแล้ว วัดในรูปด้วยไม้บรรทัดได้เลย ตัวเลขจะตรงกับในหนังสือ')
   }
 
   function addPhotoFile(file: File) {
@@ -2460,6 +2531,50 @@ export function GeometryStudio() {
                   </g>
                 ) : null}
 
+                {/* เส้นที่ลากทาบตอนตั้งมาตราส่วน ไม่ใช่เส้นจริงบนกระดาษ จึงไม่ติดไปกับงาน */}
+                {(drag.kind === 'calibrate' || calibrate?.line) && calibrate ? (
+                  <g pointerEvents="none" className="geo-no-export">
+                    {(() => {
+                      const line =
+                        drag.kind === 'calibrate'
+                          ? { a: drag.start, b: drag.end }
+                          : calibrate.line
+                      if (!line) return null
+                      const middle = {
+                        x: (line.a.x + line.b.x) / 2,
+                        y: (line.a.y + line.b.y) / 2,
+                      }
+                      return (
+                        <>
+                          <line
+                            x1={line.a.x}
+                            y1={line.a.y}
+                            x2={line.b.x}
+                            y2={line.b.y}
+                            stroke="#0891b2"
+                            strokeWidth={4}
+                            strokeLinecap="round"
+                            strokeDasharray="10 6"
+                          />
+                          <circle cx={line.a.x} cy={line.a.y} r={6} fill="#0891b2" />
+                          <circle cx={line.b.x} cy={line.b.y} r={6} fill="#0891b2" />
+                          <text
+                            x={middle.x}
+                            y={middle.y - 14}
+                            fontSize={16}
+                            fontWeight={800}
+                            fill="#0e7490"
+                            textAnchor="middle"
+                            fontFamily="Kanit, sans-serif"
+                          >
+                            ทาบของที่รู้ความยาว
+                          </text>
+                        </>
+                      )
+                    })()}
+                  </g>
+                ) : null}
+
                 {previewPolygon ? (
                   <polygon
                     points={previewPolygon.map((point) => `${point.x},${point.y}`).join(' ')}
@@ -3002,6 +3117,86 @@ export function GeometryStudio() {
                 บนกระดาษมีปุ่ม ⤢ ไว้ลากย่อขยาย และปุ่ม ↻ ไว้ลากหมุน
                 ทั้งสองอย่างทำรอบใจกลางรูป รูปจึงอยู่ที่เดิม
               </p>
+
+              {/*
+                ตั้งมาตราส่วนของรูปแบบฝึก
+                รูปที่วางมาจะใหญ่เล็กตามที่ถ่ายมา ไม่ได้ตรงกับเซนติเมตรบนกระดาษเลย
+                ถ้าไม่ตั้งมาตราส่วน ความยาวที่วัดในรูปจะเป็นตัวเลขที่ไม่มีความหมาย
+              */}
+              {selected && selected.kind === 'photo' ? (
+                <div className="mt-3 rounded-2xl bg-cyan-50 p-3">
+                  <p className="text-sm font-extrabold text-cyan-800">📏 มาตราส่วนของรูป</p>
+
+                  {calibrate?.id === selected.id ? (
+                    <>
+                      <p className="mt-1 text-xs font-semibold text-cyan-800">
+                        {calibrate.line
+                          ? 'เส้นที่ทาบไว้ยาวจริงกี่เซนติเมตร'
+                          : 'ลากทาบของที่รู้ความยาวในรูป เช่น ด้านที่โจทย์บอกว่ายาว 4 ซม.'}
+                      </p>
+
+                      {calibrate.line ? (
+                        <>
+                          <div className="geo-field mt-2">
+                            <span className="flex-1">ยาวจริง</span>
+                            <input
+                              type="number"
+                              value={realCm}
+                              min={0.5}
+                              max={50}
+                              step={0.5}
+                              onChange={(event) => setRealCm(event.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter') applyCalibrate()
+                              }}
+                              aria-label="ความยาวจริงเป็นเซนติเมตร"
+                            />
+                            <span className="w-8 text-left">ซม.</span>
+                          </div>
+                          <div className="mt-2 flex gap-2">
+                            <button
+                              type="button"
+                              onClick={applyCalibrate}
+                              className="geo-chip geo-chip-strong flex-1"
+                            >
+                              ✅ ตั้งเลย
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCalibrate({ id: selected.id, line: null })}
+                              className="geo-chip flex-1"
+                            >
+                              ↩️ ลากใหม่
+                            </button>
+                          </div>
+                        </>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => setCalibrate(null)}
+                        className="geo-chip mt-2 w-full"
+                      >
+                        ✖️ เลิกตั้งมาตราส่วน
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-1 text-xs font-semibold text-cyan-800">
+                        ทาบของที่รู้ความยาวในรูปหนึ่งเส้น แล้วบอกว่ามันยาวจริงเท่าไร
+                        เดี๋ยวจะย่อขยายรูปให้สเกลตรงกับกระดาษ วัดด้วยไม้บรรทัดแล้วตัวเลขจะตรงกับในหนังสือ
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => startCalibrate(selected.id)}
+                        className="geo-chip geo-chip-strong mt-2 w-full"
+                      >
+                        📏 ตั้งมาตราส่วน
+                      </button>
+                    </>
+                  )}
+                </div>
+              ) : null}
 
               <button type="button" onClick={removeSelected} className="geo-chip mt-3 w-full">
                 🗑️ ลบรูปนี้
