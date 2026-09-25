@@ -18,6 +18,8 @@
 import { createRng } from '../math/rng'
 import { NEAR_PLANE, toView, vec3 } from '../safezone/vector3'
 import type { Camera, Vec3, Viewport } from '../safezone/vector3'
+import { drawFace, isBlinking } from './faces'
+import type { FaceMood } from './faces'
 import { ASTEROID_BELT, EARTH_MOON, PLANETS, SUN } from './planets'
 import type { Planet, PlanetId } from './planets'
 import {
@@ -60,6 +62,10 @@ export interface SolarFrame {
   now: number
   reduceMotion: boolean
   pixelRatio: number
+  /** วาดหน้าตาน่ารักบนดาว ไม่ใส่คือไม่มีหน้า (เกมยานสำรวจวาดดาวแบบภาพจริง) */
+  faces?: boolean
+  /** ดาวที่ตื่นแล้ว ดวงอื่นหลับอยู่ ไม่ใส่คือตื่นทุกดวง ใช้เฉพาะตอนเปิด faces */
+  awake?: readonly BodyId[]
 }
 
 /* ------------------------------------------------------------------ *
@@ -691,6 +697,23 @@ function drawSelection(ctx: CanvasRenderingContext2D, body: BodyOnScreen, frame:
  * วาดทั้งเฟรม
  * ------------------------------------------------------------------ */
 
+/** ท่าทางของดาวแต่ละดวง: ยังหลับ ถูกเลือกอยู่ (ตื่นเต้น) หรือยิ้มเฉย ๆ */
+function moodOf(id: BodyId, frame: SolarFrame): FaceMood {
+  if (id !== 'sun' && frame.awake && !frame.awake.includes(id)) return 'sleep'
+  return frame.selected === id ? 'wow' : 'happy'
+}
+
+function faceOn(ctx: CanvasRenderingContext2D, body: BodyOnScreen, order: number, frame: SolarFrame): void {
+  if (!frame.faces) return
+  drawFace(ctx, body.x, body.y, body.radius, {
+    mood: moodOf(body.id, frame),
+    blink: isBlinking(frame.now, order, frame.reduceMotion),
+    now: frame.now,
+    reduceMotion: frame.reduceMotion,
+    pixelRatio: frame.pixelRatio,
+  })
+}
+
 export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewport, frame: SolarFrame): BodyOnScreen[] {
   const camera = cameraFor(frame.view)
   drawBackground(ctx, viewport, camera, frame)
@@ -702,7 +725,13 @@ export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewpor
 
   for (const body of bodies) {
     if (body.id === 'sun') {
-      items.push({ depth: body.depth, draw: () => drawSun(ctx, body, frame) })
+      items.push({
+        depth: body.depth,
+        draw: () => {
+          drawSun(ctx, body, frame)
+          faceOn(ctx, body, 0, frame)
+        },
+      })
       continue
     }
     const planet = PLANETS.find((candidate) => candidate.id === body.id) as Planet
@@ -710,7 +739,13 @@ export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewpor
     const spin = visualSpin(planet, frame.spinSeconds)
     const rings = ringHalves(ctx, planet, center, body, camera, viewport)
     if (rings.back) items.push(rings.back)
-    items.push({ depth: body.depth, draw: () => drawPlanetBody(ctx, body, planet, center, camera, spin) })
+    items.push({
+      depth: body.depth,
+      draw: () => {
+        drawPlanetBody(ctx, body, planet, center, camera, spin)
+        faceOn(ctx, body, planet.order, frame)
+      },
+    })
     if (rings.front) items.push(rings.front)
   }
 

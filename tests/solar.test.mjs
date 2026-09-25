@@ -38,6 +38,7 @@ const Q = load('solar/questions')
 const T = load('solar/trip')
 const Store = load('solar/storage')
 const R = load('solar/render')
+const Faces = load('solar/faces')
 const { createRng } = load('math/rng')
 
 let passed = 0
@@ -869,6 +870,56 @@ check('วาดได้ทั้งตอนปิดการเคลื่�
     }),
   )
   assert(ctx.state.nan === 0, 'มีพิกัด NaN')
+})
+
+check('หน้าตาน่ารักของดาววาดได้จากมุมกล้องสุ่ม ทั้งตอนตื่น หลับ และถูกเลือก ไม่มีรัศมีติดลบหรือพิกัด NaN', () => {
+  const rng = createRng('solar-faces')
+  const targets = [{ x: 0, y: 0, z: 0 }, ...P.PLANETS.map((planet) => S.planetPosition(planet, 9000))]
+  for (let index = 0; index < 600; index += 1) {
+    const ctx = mockContext()
+    const view = S.clampView({
+      target: rng.pick(targets),
+      yaw: rng.next() * Math.PI * 2,
+      pitch: rng.next() * 2 - 0.5,
+      distance: rng.chance(0.5) ? S.MIN_DISTANCE + rng.next() * 3 : rng.next() * 120,
+    })
+    R.drawSolarSystem(
+      ctx,
+      VIEWPORT,
+      frameFor(view, {
+        days: rng.next() * 60_000,
+        now: rng.next() * 100_000,
+        reduceMotion: rng.chance(0.3),
+        selected: rng.pick(['sun', ...P.PLANETS.map((planet) => planet.id)]),
+        faces: true,
+        awake: rng.chance(0.5) ? ['earth', 'saturn'] : undefined,
+      }),
+    )
+    assert(ctx.state.nan === 0, `มุมที่ ${index} มีพิกัด NaN ${ctx.state.nan} ครั้ง`)
+  }
+})
+
+check('ดาวที่เล็กบนจอเกินไปไม่ถูกวาดหน้า และกะพริบตาไม่พร้อมกันทุกดวง', () => {
+  let calls = 0
+  const counting = new Proxy(mockContext(), {
+    get(target, key) {
+      const value = target[key]
+      if (typeof value !== 'function') return value
+      return (...args) => {
+        calls += 1
+        return value.apply(target, args)
+      }
+    },
+  })
+  Faces.drawFace(counting, 50, 50, Faces.FACE_MIN_RADIUS - 1, { mood: 'happy', blink: false, now: 0, reduceMotion: false, pixelRatio: 1 })
+  assert(calls === 0, 'ดาวเล็กยังถูกวาดหน้า')
+  Faces.drawFace(counting, 50, 50, 40, { mood: 'sleep', blink: false, now: 0, reduceMotion: false, pixelRatio: 2 })
+  assert(calls > 0, 'ดาวใหญ่ไม่ถูกวาดหน้า')
+  const blinking = (now) => P.PLANETS.filter((planet) => Faces.isBlinking(now, planet.order, false)).length
+  let most = 0
+  for (let now = 0; now < 10_000; now += 20) most = Math.max(most, blinking(now))
+  assert(most <= 2, `กะพริบพร้อมกันได้ถึง ${most} ดวง`)
+  assert(!Faces.isBlinking(0, 0, true), 'ปิดการเคลื่อนไหวแล้วยังกะพริบ')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

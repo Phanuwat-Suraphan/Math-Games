@@ -96,6 +96,8 @@ export class SolarScene {
   private labels = true
   private orbits = true
   private reduceMotion: boolean
+  private faces = false
+  private awake: BodyId[] | undefined = undefined
 
   private bodies: BodyOnScreen[] = []
   private readonly pointers = new Map<number, { x: number; y: number }>()
@@ -177,6 +179,16 @@ export class SolarScene {
 
   setAim(value: boolean): void {
     this.aim = value
+  }
+
+  /** หน้าตาน่ารักบนดาว ภารกิจแปดดาวเปิด เกมยานสำรวจปิดไว้ */
+  setFaces(value: boolean): void {
+    this.faces = value
+  }
+
+  /** ดาวที่ตื่นแล้ว ดวงอื่นวาดเป็นหลับตามี z ลอย ส่ง undefined คือตื่นทุกดวง */
+  setAwake(ids: readonly BodyId[] | undefined): void {
+    this.awake = ids ? [...ids] : undefined
   }
 
   setLabels(value: boolean): void {
@@ -384,6 +396,8 @@ export class SolarScene {
       now,
       reduceMotion: this.reduceMotion,
       pixelRatio: ratio,
+      faces: this.faces,
+      awake: this.awake,
     })
   }
 

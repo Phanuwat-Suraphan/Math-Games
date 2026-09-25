@@ -19,7 +19,7 @@ import {
 } from '../../planetQuest/eclipse'
 import type { EclipseReport, LabState, LabTask } from '../../planetQuest/eclipse'
 import { labStars } from '../../planetQuest/games'
-import { ChoiceList, Explain, ProgressDots } from './QuestParts'
+import { ChoiceList, Explain, ProgressDots, useReaction } from './QuestParts'
 import type { StageGameProps } from './QuestParts'
 
 /**
@@ -237,6 +237,7 @@ export function EclipseLab({ seed, onFinish }: StageGameProps) {
   const [taskMiss, setTaskMiss] = useState<string | null>(null)
   const [wrong, setWrong] = useState<string[]>([])
   const [solved, setSolved] = useState(false)
+  const react = useReaction()
 
   const step = steps[index] as Step
   const report = eclipseAt(lab)
@@ -259,11 +260,13 @@ export function EclipseLab({ seed, onFinish }: StageGameProps) {
     if (step.kind !== 'task' || taskDone) return
     if (report.kind === step.task.goal) {
       playSfx('correct')
+      react('good')
       setTaskDone(true)
       setTaskMiss(null)
       return
     }
     playSfx('wrong')
+    react('oops')
     setMistakes((count) => count + 1)
     setTaskMiss(
       report.kind === 'none'
@@ -276,10 +279,12 @@ export function EclipseLab({ seed, onFinish }: StageGameProps) {
     if (!question || solved) return
     if (option === question.answer) {
       playSfx('correct')
+      react('good')
       setSolved(true)
       return
     }
     playSfx('wrong')
+    react('oops')
     setMistakes((count) => count + 1)
     setWrong((current) => [...current, option])
   }

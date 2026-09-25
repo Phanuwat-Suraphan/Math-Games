@@ -4,11 +4,14 @@ import { Button } from '../components/Button'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { AsteroidStage } from '../components/planetQuest/AsteroidField'
+import { Bubble, BuddyBar, Confetti, PlanetBuddy } from '../components/planetQuest/Buddy'
+import type { BuddyMood, ReactionEvent } from '../components/planetQuest/Buddy'
 import { EclipseLab } from '../components/planetQuest/EclipseLab'
 import { ExplorePanel } from '../components/planetQuest/ExplorePanel'
 import { LearnPanel } from '../components/planetQuest/LearnPanel'
 import type { LessonFocus } from '../components/planetQuest/LearnPanel'
-import type { StageGameProps, StageOutcome } from '../components/planetQuest/QuestParts'
+import { ReactionContext } from '../components/planetQuest/QuestParts'
+import type { Reaction, StageGameProps, StageOutcome } from '../components/planetQuest/QuestParts'
 import {
   ConnectStage,
   MemoryStage,
@@ -17,10 +20,21 @@ import {
   TimelineStage,
   TrueFalseStage,
 } from '../components/planetQuest/WordGames'
-import { PlanetDot, Stars } from '../components/solar/SpaceParts'
+import { Stars } from '../components/solar/SpaceParts'
 import { useGame } from '../context/useGame'
 import { useMusic } from '../hooks/useMusic'
 import { playSfx } from '../services/audioService'
+import {
+  BUDDIES,
+  WELCOME_LINE,
+  awakePlanets,
+  buddyFor,
+  buddyStatus,
+  goodbyeLine,
+  sleepyLine,
+  wakeLine,
+} from '../planetQuest/buddies'
+import type { BuddyStatus } from '../planetQuest/buddies'
 import { LESSONS } from '../planetQuest/lessons'
 import { COINS_PER_STAR, STAGES, stageFor } from '../planetQuest/stages'
 import type { StageKind } from '../planetQuest/stages'
@@ -52,7 +66,14 @@ import type { Player } from '../types/player'
  *
  * สลับโหมดได้ตลอดโดยฉากไม่ถูกสร้างใหม่ ยานยังจอดอยู่ที่เดิม
  * ระหว่างเล่นเกมในโหมดฝึกฝน ฉากหดเหลือแถบเตี้ย ๆ ไม่ดันตัวเกมลงไปใต้จอ
+ *
+ * ดาวทุกดวงเป็นเพื่อนดาวที่มีหน้าตาและนิสัยของตัวเอง (ดู planetQuest/buddies.ts)
+ * ดาวที่ยังไม่มีใครไปเยี่ยมหลับอยู่ บินไปถึงแล้วดาวจะตื่น เป็นเป้าหมายเล็ก ๆ ให้อยากไปให้ครบ
+ * ระหว่างเล่นเกม ดาวเจ้าบ้านเชียร์เมื่อตอบถูกและปลอบเมื่อพลาด
  */
+
+/** สีหน้าของเพื่อนดาวบนปุ่มเลือกดาว */
+const STATUS_MOOD: Record<BuddyStatus, BuddyMood> = { sleep: 'sleep', happy: 'happy', star: 'love' }
 
 type Mode = 'home' | 'explore' | 'learn' | 'practice'
 type PracticePhase = 'hub' | 'flying' | 'landed' | 'playing' | 'result'
@@ -89,12 +110,18 @@ export function PlanetQuest({ player }: { player: Player }) {
   const [outcome, setOutcome] = useState<(StageOutcome & { coins: number; best: boolean }) | null>(null)
   const [seed, setSeed] = useState(() => `${player.name}-${Date.now()}`)
   const [notice, setNotice] = useState<string | null>(null)
+  /** ดาวที่เพิ่งถูกปลุกเป็นครั้งแรก ดาวดวงนั้นจะทักด้วยประโยคตื่นนอน */
+  const [justWoke, setJustWoke] = useState<PlanetId | null>(null)
+  const [reaction, setReaction] = useState<ReactionEvent | null>(null)
+  const reactionCount = useRef(0)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<SolarScene | null>(null)
 
   const stage = stageFor(selected)
   const planet = getPlanet(selected)
+  const buddy = buddyFor(selected)
+  const statusOf = (id: PlanetId): BuddyStatus => buddyStatus(id, progress.best[id], progress.visited)
 
   const updateProgress = useCallback((change: (current: QuestProgress) => QuestProgress) => {
     setProgress((current) => {
@@ -120,6 +147,7 @@ export function PlanetQuest({ player }: { player: Player }) {
     arrive: (id) => {
       setShipAt(id)
       setFlying(false)
+      if (buddyStatus(id, progress.best[id], progress.visited) === 'sleep') setJustWoke(id)
       // บินไปถึงดาวไหนก็ได้ของที่ระลึกของดาวนั้น ไม่ว่าจะอยู่โหมดไหนตอนยานถึง
       updateProgress((current) => markVisited(current, id))
       if (mode === 'practice' && phase === 'flying') {
@@ -145,6 +173,7 @@ export function PlanetQuest({ player }: { player: Player }) {
     )
     scene.setSpeed(2)
     scene.setAutoSpin(true)
+    scene.setFaces(true)
     scene.start()
     sceneRef.current = scene
     return () => {
@@ -169,7 +198,13 @@ export function PlanetQuest({ player }: { player: Player }) {
         ? progress.visited
         : PLANETS.filter((item) => progress.best[item.id] !== undefined).map((item) => item.id),
     )
+    scene.setAwake(awakePlanets(progress.best, progress.visited))
   }, [flying, mode, phase, progress, selected, shipAt])
+
+  const react = useCallback((kind: Reaction, streak = 1) => {
+    reactionCount.current += 1
+    setReaction({ id: reactionCount.current, kind, streak })
+  }, [])
 
   const enterMode = useCallback((next: Mode) => {
     playSfx('click')
@@ -178,6 +213,7 @@ export function PlanetQuest({ player }: { player: Player }) {
     scene?.overview()
     setNotice(null)
     setOutcome(null)
+    setJustWoke(null)
     setPhase('hub')
     setMode(next)
   }, [])
@@ -240,6 +276,8 @@ export function PlanetQuest({ player }: { player: Player }) {
     setSeed(`${player.name}-${selected}-${Date.now()}`)
     setOutcome(null)
     setNotice(null)
+    setJustWoke(null)
+    setReaction(null)
     setPhase('playing')
   }, [player.name, selected])
 
@@ -325,6 +363,30 @@ export function PlanetQuest({ player }: { player: Player }) {
             <p className="mt-1 text-sm text-slate-300">
               ออกเดินทางไปรู้จักระบบสุริยะ จะเที่ยวเล่น อ่านบทเรียน หรือลุยเกมก่อนก็ได้
             </p>
+            <div className="pq-parade mt-4">
+              {BUDDIES.map((item, index) => {
+                const status = statusOf(item.id)
+                return (
+                  <span
+                    key={item.id}
+                    className={reduceMotion ? '' : 'pq-bob'}
+                    style={{ animationDelay: `${index * -0.35}s` }}
+                    title={item.nickname}
+                  >
+                    <PlanetBuddy
+                      planet={getPlanet(item.id)}
+                      size="min(9.5vw, 56px)"
+                      mood={STATUS_MOOD[status]}
+                      crown={status === 'star'}
+                      animate={!reduceMotion}
+                    />
+                  </span>
+                )
+              })}
+            </div>
+            <Bubble tail="top" className="mx-auto mt-2 max-w-md text-center">
+              <span className="text-sm font-black">{WELCOME_LINE}</span>
+            </Bubble>
             <div className="mt-4 grid gap-3 sm:grid-cols-3">
               {MODES.map((item) => (
                 <button key={item.id} type="button" onClick={() => enterMode(item.id)} className="pq-mode">
@@ -346,6 +408,8 @@ export function PlanetQuest({ player }: { player: Player }) {
             shipAt={shipAt}
             flying={flying}
             visited={progress.visited}
+            status={statusOf(selected)}
+            justWoke={justWoke === selected}
             reduceMotion={reduceMotion}
             onSelect={(id) => handlersRef.current.pick(id)}
             onFly={fly}
@@ -369,6 +433,7 @@ export function PlanetQuest({ player }: { player: Player }) {
               <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {STAGES.map((item) => {
                   const best = progress.best[item.planet]
+                  const status = statusOf(item.planet)
                   return (
                     <li key={item.planet}>
                       <button
@@ -378,14 +443,26 @@ export function PlanetQuest({ player }: { player: Player }) {
                         className={`sol-option ${selected === item.planet ? 'sol-option-on' : ''}`}
                       >
                         <span className="flex items-center gap-2">
-                          <PlanetDot planet={getPlanet(item.planet)} size={22} />
+                          <PlanetBuddy
+                            planet={getPlanet(item.planet)}
+                            size={38}
+                            mood={selected === item.planet && status !== 'sleep' ? 'wow' : STATUS_MOOD[status]}
+                            crown={status === 'star'}
+                            animate={!reduceMotion}
+                          />
                           <span className="font-black text-white">{getPlanet(item.planet).name}</span>
                         </span>
                         <span className="mt-1 block text-xs text-slate-300">
                           {item.icon} {item.title}
                         </span>
                         <span className="mt-1 block text-sm">
-                          {best !== undefined ? <Stars count={best} /> : <span className="text-xs text-slate-500">ยังไม่ได้ลงจอด</span>}
+                          {best !== undefined ? (
+                            <Stars count={best} />
+                          ) : status === 'sleep' ? (
+                            <span className="text-xs text-slate-400">💤 ยังหลับอยู่</span>
+                          ) : (
+                            <span className="text-xs text-slate-400">ยังไม่ได้เล่น</span>
+                          )}
                         </span>
                       </button>
                     </li>
@@ -396,7 +473,14 @@ export function PlanetQuest({ player }: { player: Player }) {
 
             <div className="sol-comms p-4 sm:p-5">
               <div className="flex items-center gap-3">
-                <PlanetDot planet={planet} size={40} />
+                <PlanetBuddy
+                  planet={planet}
+                  size={72}
+                  mood={statusOf(selected) === 'sleep' ? 'sleep' : 'happy'}
+                  crown={statusOf(selected) === 'star'}
+                  animate={!reduceMotion}
+                  className={reduceMotion ? '' : 'pq-bob'}
+                />
                 <div className="min-w-0">
                   <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">ดาวปลายทาง</p>
                   <h2 className="text-xl font-black text-white">
@@ -404,6 +488,12 @@ export function PlanetQuest({ player }: { player: Player }) {
                   </h2>
                 </div>
               </div>
+              <Bubble tail="top" className="mt-3">
+                <span className="text-xs font-bold text-slate-500">{buddy.nickname}</span>
+                <span className="block text-sm font-black">
+                  {statusOf(selected) === 'sleep' ? sleepyLine(buddy) : buddy.invite}
+                </span>
+              </Bubble>
               <p className="mt-2 text-sm text-slate-200">{stage.howTo}</p>
               <div className="mt-4">
                 <Button size="lg" onClick={flyOrLand} icon={selected === shipAt ? '🛬' : '🚀'} silent disabled={flying}>
@@ -434,9 +524,25 @@ export function PlanetQuest({ player }: { player: Player }) {
         ) : null}
 
         {mode === 'practice' && phase === 'landed' ? (
-          <section className="sol-comms mt-4 p-5 sm:p-6">
+          <section className="sol-comms relative mt-4 p-5 sm:p-6">
+            {justWoke === selected && !reduceMotion ? <Confetti seed={`wake-${selected}`} count={14} spread={140} /> : null}
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">🛬 ลงจอดที่{planet.name}แล้ว</p>
-            <h2 className="mt-1 text-2xl font-black text-white">
+            <div className="mt-2 flex items-center gap-3">
+              <span className={reduceMotion ? '' : 'pq-hop'}>
+                <PlanetBuddy
+                  planet={planet}
+                  size={96}
+                  mood="wow"
+                  crown={statusOf(selected) === 'star'}
+                  animate={!reduceMotion}
+                />
+              </span>
+              <Bubble className="min-w-0 flex-1">
+                <span className="text-xs font-bold text-slate-500">{buddy.nickname}</span>
+                <span className="block text-base font-black">{justWoke === selected ? wakeLine(buddy) : buddy.invite}</span>
+              </Bubble>
+            </div>
+            <h2 className="mt-3 text-2xl font-black text-white">
               {stage.icon} {stage.title}
             </h2>
             <p className="mt-2 text-sm text-slate-200">{stage.howTo}</p>
@@ -462,19 +568,35 @@ export function PlanetQuest({ player }: { player: Player }) {
                 ออกจากด่าน
               </Button>
             </div>
-            <Game key={seed} seed={seed} reduceMotion={reduceMotion} onFinish={finish} />
+            <BuddyBar planet={planet} buddy={buddy} reaction={reaction} reduceMotion={reduceMotion} />
+            <ReactionContext.Provider value={react}>
+              <Game key={seed} seed={seed} reduceMotion={reduceMotion} onFinish={finish} />
+            </ReactionContext.Provider>
           </section>
         ) : null}
 
         {mode === 'practice' && phase === 'result' && outcome ? (
-          <section className="sol-panel mt-4 p-5 text-center sm:p-7">
+          <section className="sol-panel relative mt-4 p-5 text-center sm:p-7">
+            {outcome.stars === 3 && !reduceMotion ? <Confetti seed={seed} count={22} spread={200} /> : null}
             <div className="sol-stamp-big mx-auto">
-              <PlanetDot planet={planet} size={60} />
-              <p className="mt-2 text-lg font-black text-white">{planet.name}</p>
+              <span className={reduceMotion ? '' : 'pq-hop'}>
+                <PlanetBuddy
+                  planet={planet}
+                  size={84}
+                  mood={outcome.stars === 3 ? 'love' : 'happy'}
+                  crown={outcome.stars === 3}
+                  animate={!reduceMotion}
+                />
+              </span>
+              <p className="mt-1 text-lg font-black text-white">{planet.name}</p>
               <p className="text-2xl">
                 <Stars count={outcome.stars} />
               </p>
             </div>
+            <Bubble tail="top" className="mx-auto mt-3 max-w-md">
+              <span className="text-xs font-bold text-slate-500">{buddy.nickname}</span>
+              <span className="block text-base font-black">{goodbyeLine(buddy, outcome.stars)}</span>
+            </Bubble>
             <p className="mt-4 text-base font-bold text-slate-100">{outcome.summary}</p>
             <p className="mt-1 text-sm text-gold-300">
               +{outcome.coins} เหรียญ{outcome.best ? ' · สถิติใหม่ของดาวดวงนี้!' : ''}

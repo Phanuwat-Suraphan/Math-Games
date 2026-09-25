@@ -38,6 +38,7 @@ const Lessons = load('planetQuest/lessons')
 const Stages = load('planetQuest/stages')
 const Eclipse = load('planetQuest/eclipse')
 const Planets = load('solar/planets')
+const Buddies = load('planetQuest/buddies')
 
 /* ---------------- เว็บเซิร์ฟเวอร์เล็ก ๆ สำหรับไฟล์ที่ build แล้ว ---------------- */
 
@@ -344,6 +345,9 @@ try {
     for (const title of ['โหมดสำรวจ', 'โหมดเรียนรู้', 'โหมดฝึกฝน']) {
       await page.locator('button.pq-mode', { hasText: title }).waitFor()
     }
+    const parade = await page.locator('.pq-parade .pq-buddy').count()
+    if (parade !== 8) throw new Error(`หน้าแรกมีเพื่อนดาว ${parade} ดวง`)
+    await page.getByText(Buddies.WELCOME_LINE, { exact: true }).waitFor()
     await wait(800)
     await shot('planets-home')
   })
@@ -353,6 +357,8 @@ try {
     await page.locator('button.sol-chip', { hasText: 'ดาวอังคาร' }).click()
     await button('บินไปเที่ยวดาวอังคาร').click()
     await page.getByText('📸 ถึงดาวอังคารแล้ว! ได้ของที่ระลึกของดาวอังคาร').waitFor({ timeout: 20_000 })
+    // ไปถึงครั้งแรก ดาวอังคารเพิ่งตื่น ทักด้วยประโยคตื่นนอน
+    await page.getByText(Buddies.wakeLine(Buddies.buddyFor('mars')), { exact: true }).waitFor()
   })
 
   await step('โหมดสำรวจ: เลื่อนน้ำหนักแล้วตาชั่งบนดาวอังคารอ่านค่าถูก', async () => {
@@ -399,22 +405,30 @@ try {
     await planetOption(name).and(page.locator('[aria-pressed="true"]')).waitFor()
   })
 
-  await step('โหมดฝึกฝน: เข้าได้และเห็นดาวครบแปดดวง', async () => {
+  await step('โหมดฝึกฝน: เข้าได้และเห็นดาวครบแปดดวง ดาวที่ยังไม่เคยไปหลับอยู่', async () => {
     await button('🎮 โหมดฝึกฝน').click()
     await page.locator('nav[aria-label="เลือกดาว"] button.sol-option').nth(7).waitFor()
+    await planetOption('ดาวพุธ').filter({ hasText: '💤 ยังหลับอยู่' }).waitFor()
+    const marsAsleep = await planetOption('ดาวอังคาร').filter({ hasText: '💤 ยังหลับอยู่' }).count()
+    if (marsAsleep > 0) throw new Error('ดาวอังคารไปเที่ยวมาแล้วแต่ยังหลับอยู่')
   })
 
   for (const stage of Stages.STAGES) {
     const name = Planets.getPlanet(stage.planet).name
     await step(`โหมดฝึกฝน · ${name}: ${stage.title}`, async () => {
+      const buddy = Buddies.buddyFor(stage.planet)
       await planetOption(name).click()
       await clickFirstVisible([`บินไป${name}`, `ลงจอดที่${name}`])
       await button('เริ่มเลย!').waitFor({ timeout: 20_000 })
+      // ดาวเจ้าบ้านทักตอนลงจอด ถ้าเพิ่งถูกปลุกจะทักด้วยประโยคตื่นนอนแทน
+      await page.getByText(buddy.invite, { exact: true }).or(page.getByText(Buddies.wakeLine(buddy), { exact: true })).waitFor()
       await button('เริ่มเลย!').click()
+      await page.getByText(Buddies.readyLine(buddy), { exact: true }).waitFor()
       await PLAYERS[stage.kind]()
       await resultButton().waitFor({ timeout: 10_000 })
       if (stage.kind !== 'memory') {
         await page.locator('.sol-stamp-big [aria-label="ได้ 3 ดาวจาก 3 ดาว"]').waitFor()
+        await page.getByText(Buddies.goodbyeLine(buddy, 3), { exact: true }).waitFor()
       }
       await shot(`planets-${stage.planet}`)
       await resultButton().click()

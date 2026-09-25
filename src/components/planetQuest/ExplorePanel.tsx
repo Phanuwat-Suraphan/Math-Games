@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { Button } from '../Button'
-import { PlanetDot } from '../solar/SpaceParts'
 import { playSfx } from '../../services/audioService'
+import { buddyFor, buddyStatus, sleepyLine, wakeLine } from '../../planetQuest/buddies'
+import type { BuddyStatus } from '../../planetQuest/buddies'
 import { PLANETS, formatNumber, getPlanet } from '../../solar/planets'
 import type { Planet, PlanetId } from '../../solar/planets'
+import { Bubble, PlanetBuddy } from './Buddy'
 import { EclipseSandbox } from './EclipseLab'
 
 /**
@@ -38,12 +40,18 @@ function dayLength(planet: Planet): string {
  */
 function Postcard({
   planet,
+  status,
+  justWoke,
+  reduceMotion,
   weight,
   age,
   onWeight,
   onAge,
 }: {
   planet: Planet
+  status: BuddyStatus
+  justWoke: boolean
+  reduceMotion: boolean
   weight: number
   age: number
   onWeight: (value: number) => void
@@ -52,16 +60,30 @@ function Postcard({
   const weightHere = Math.round((weight * planet.gravityTenths) / 10)
   const ageHere = (age * 365.25) / planet.orbitDays
   const feel = temperatureFeel(planet)
+  const buddy = buddyFor(planet.id)
 
   return (
     <div className="sol-panel p-4 sm:p-5">
       <div className="flex items-center gap-3">
-        <PlanetDot planet={planet} size={44} />
+        <PlanetBuddy
+          planet={planet}
+          size={72}
+          mood={status === 'sleep' ? 'sleep' : justWoke ? 'wow' : 'happy'}
+          crown={status === 'star'}
+          animate={!reduceMotion}
+          className={reduceMotion ? '' : 'pq-bob'}
+        />
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">โปสการ์ดจากอวกาศ</p>
           <h3 className="text-2xl font-black text-white">{planet.name}</h3>
         </div>
       </div>
+      <Bubble tail="top" className="mt-3">
+        <span className="text-xs font-bold text-slate-500">{buddy.nickname}</span>
+        <span className="block text-sm font-black">
+          {status === 'sleep' ? sleepyLine(buddy) : justWoke ? wakeLine(buddy) : buddy.intro}
+        </span>
+      </Bubble>
       <p className="mt-3 text-base text-slate-100">✨ {planet.facts[0]}</p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -119,6 +141,8 @@ export function ExplorePanel({
   shipAt,
   flying,
   visited,
+  status,
+  justWoke,
   reduceMotion,
   onSelect,
   onFly,
@@ -127,6 +151,10 @@ export function ExplorePanel({
   shipAt: PlanetId
   flying: boolean
   visited: readonly PlanetId[]
+  /** เพื่อนดาวของดาวที่เลือกยังหลับ ตื่นแล้ว หรือได้สามดาวแล้ว */
+  status: BuddyStatus
+  /** ดาวที่เลือกเพิ่งถูกปลุกจากการบินมาถึงครั้งนี้ */
+  justWoke: boolean
   reduceMotion: boolean
   onSelect: (id: PlanetId) => void
   onFly: (id: PlanetId) => void
@@ -148,7 +176,12 @@ export function ExplorePanel({
                 onClick={() => onSelect(item.id)}
                 className={`sol-chip ${selected === item.id ? 'sol-chip-on' : ''}`}
               >
-                <PlanetDot planet={item} />
+                <PlanetBuddy
+                  planet={item}
+                  size={26}
+                  mood={buddyStatus(item.id, undefined, visited) === 'sleep' ? 'sleep' : 'happy'}
+                  animate={false}
+                />
                 <span>{item.name}</span>
                 {visited.includes(item.id) ? <span aria-label="เคยไปเที่ยวแล้ว">📸</span> : null}
               </button>
@@ -172,7 +205,16 @@ export function ExplorePanel({
         </span>
       </div>
 
-      <Postcard planet={planet} weight={weight} age={age} onWeight={setWeight} onAge={setAge} />
+      <Postcard
+        planet={planet}
+        status={status}
+        justWoke={justWoke}
+        reduceMotion={reduceMotion}
+        weight={weight}
+        age={age}
+        onWeight={setWeight}
+        onAge={setAge}
+      />
 
       <div className="sol-comms p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">

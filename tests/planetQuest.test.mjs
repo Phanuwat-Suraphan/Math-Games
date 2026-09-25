@@ -35,6 +35,7 @@ const Store = load('planetQuest/storage')
 const Engine = load('minigames/engine')
 const P = load('solar/planets')
 const L = load('planetQuest/lessons')
+const Bd = load('planetQuest/buddies')
 
 let passed = 0
 const failures = []
@@ -437,6 +438,63 @@ check('ของที่ระลึกและบทเรียนที่�
   assert(parsed.lessons.join() === 'tech', `บทเรียนอ่านได้ ${parsed.lessons.join()}`)
   const old = Store.parseProgress({ owner: 'ต้นกล้า', best: { venus: 2 }, plays: 1 }, 'ต้นกล้า')
   assert(old.visited.length === 0 && old.lessons.length === 0 && old.best.venus === 2, 'ข้อมูลรุ่นก่อนที่ยังไม่มีสองช่องนี้อ่านไม่ได้')
+})
+
+// ---------- เพื่อนดาว ----------
+
+check('ดาวทั้งแปดมีเพื่อนดาวของตัวเอง ชื่อเล่นไม่ซ้ำ และมีประโยคครบทุกช่อง', () => {
+  assert(Bd.BUDDIES.length === P.PLANETS.length, `มีเพื่อนดาว ${Bd.BUDDIES.length} ดวง`)
+  for (const planet of P.PLANETS) {
+    const buddy = Bd.buddyFor(planet.id)
+    assert(buddy.nickname && buddy.intro && buddy.invite, `${planet.name} ขาดชื่อเล่นหรือประโยคแนะนำตัว`)
+    assert(buddy.cheers.length >= 3, `${planet.name} มีประโยคเชียร์แค่ ${buddy.cheers.length} แบบ`)
+    assert(buddy.oops.length >= 2, `${planet.name} มีประโยคปลอบแค่ ${buddy.oops.length} แบบ`)
+  }
+  const names = Bd.BUDDIES.map((buddy) => buddy.nickname)
+  assert(new Set(names).size === names.length, 'ชื่อเล่นซ้ำกัน')
+})
+
+check('ประโยคของเพื่อนดาวสั้นพอใส่กล่องคำพูดบนจอโทรศัพท์ และประโยคเดียวกันไม่อยู่สองที่', () => {
+  const seen = new Set()
+  for (const buddy of Bd.BUDDIES) {
+    for (const line of [buddy.intro, buddy.invite, ...buddy.cheers, ...buddy.oops]) {
+      assert(line.length <= 80, `${buddy.nickname}: "${line}" ยาว ${line.length} ตัวอักษร`)
+      assert(!seen.has(line), `ประโยค "${line}" ซ้ำ`)
+      seen.add(line)
+    }
+  }
+})
+
+check('ประโยคปลอบตอนพลาดไม่มีคำตำหนิ เด็กพลาดแล้วยังอยากเล่นต่อ', () => {
+  for (const buddy of Bd.BUDDIES) {
+    for (const line of buddy.oops) {
+      for (const word of ['ผิด', 'แย่', 'โง่', 'ไม่เก่ง', 'ห่วย']) {
+        assert(!line.includes(word), `${buddy.nickname}: "${line}" มีคำว่า "${word}"`)
+      }
+    }
+  }
+})
+
+check('ดาวยังหลับจนกว่าจะไปเยี่ยม ได้สามดาวแล้วสวมมงกุฎ และโลกตื่นอยู่เสมอ', () => {
+  assert(Bd.buddyStatus('mars', undefined, []) === 'sleep', 'ดาวที่ยังไม่เคยไปไม่หลับ')
+  assert(Bd.buddyStatus('mars', undefined, ['mars']) === 'happy', 'ไปเยี่ยมแล้วยังไม่ตื่น')
+  assert(Bd.buddyStatus('mars', 2, []) === 'happy', 'เล่นแล้วได้สองดาวยังหลับอยู่')
+  assert(Bd.buddyStatus('mars', 3, ['mars']) === 'star', 'ได้สามดาวแล้วไม่ได้มงกุฎ')
+  assert(Bd.buddyStatus('earth', undefined, []) === 'happy', 'โลกหลับทั้งที่เราอยู่ที่นี่')
+  const awake = Bd.awakePlanets({ saturn: 1 }, ['venus'])
+  assert(awake.join() === 'venus,earth,saturn', `ดาวที่ตื่นคือ ${awake.join()}`)
+})
+
+check('ประโยคหมุนเวียนไม่ซ้ำติดกัน คอมโบเริ่มพูดตั้งแต่สามข้อ และคำลาเปลี่ยนตามจำนวนดาว', () => {
+  const buddy = Bd.buddyFor('saturn')
+  for (let count = 0; count < 12; count += 1) {
+    assert(Bd.lineFor(buddy.cheers, count) !== Bd.lineFor(buddy.cheers, count + 1), `ข้อ ${count} กับ ${count + 1} พูดซ้ำกัน`)
+  }
+  assert(Bd.lineFor([], 3) === '', 'รายการว่างทำให้พัง')
+  assert(Bd.comboLine(Bd.COMBO_FROM).includes(String(Bd.COMBO_FROM)), 'ประโยคคอมโบไม่บอกจำนวน')
+  const byStars = [1, 2, 3].map((stars) => Bd.goodbyeLine(buddy, stars))
+  assert(new Set(byStars).size === 3, 'คำลาเหมือนกันทุกจำนวนดาว')
+  assert(byStars.every((line) => line.includes(buddy.nickname)), 'คำลาไม่มีชื่อเล่นของดาว')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

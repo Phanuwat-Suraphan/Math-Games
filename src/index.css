@@ -1313,12 +1313,195 @@ html[data-animations='off'] *::after {
   background: rgba(22, 101, 52, 0.25);
 }
 
+/*
+ * เพื่อนดาว · ดาวหน้าตาน่ารักที่คุยกับเด็ก
+ *
+ * อนิเมชันทุกตัวเล่นเฉพาะเมื่อหน้าจอใส่คลาสให้ หน้าจอไม่ใส่คลาสเลยเมื่อปิดการเคลื่อนไหวในเกม
+ * และกฎ prefers-reduced-motion ด้านล่างปิดให้อีกชั้นตามการตั้งค่าของเครื่อง
+ */
+.pq-buddy {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.pq-buddy svg {
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+
+/* ดาวที่ยังหลับสีจางลงนิดหน่อย พอให้รู้ว่ายังไม่ตื่น แต่ยังจำได้ว่าเป็นดวงไหน */
+.pq-buddy-sleep svg {
+  filter: saturate(0.55) brightness(0.88) drop-shadow(0 4px 6px rgba(0, 0, 0, 0.35));
+}
+
+.pq-bob {
+  display: inline-block;
+  animation: pq-bob 3.2s ease-in-out infinite;
+}
+
+.pq-hop {
+  display: inline-block;
+  animation: pq-hop 0.6s ease-out;
+}
+
+.pq-shake {
+  display: inline-block;
+  animation: pq-shake 0.5s ease-in-out;
+}
+
+/* กะพริบตา ย่อตาในแนวตั้งแป๊บเดียวทุกห้าวินาทีโดยประมาณ */
+.pq-blink {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pq-blink 4.6s infinite;
+}
+
+.pq-zzz {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: pq-zzz 2.4s ease-in-out infinite;
+}
+
+.pq-zzz-late {
+  animation-delay: -1.2s;
+}
+
+/* กล่องคำพูดสีขาวแบบการ์ตูน ตัวอักษรสีเข้มอ่านง่ายบนพื้นอวกาศ */
+.pq-bubble {
+  position: relative;
+  border-radius: 1.1rem;
+  border: 2px solid #c7d2fe;
+  background: #ffffff;
+  color: #1e1b4b;
+  padding: 0.55rem 0.85rem;
+  line-height: 1.45;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.7);
+}
+
+.pq-bubble::after {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: #ffffff;
+  border: 2px solid #c7d2fe;
+  transform: rotate(45deg);
+}
+
+.pq-bubble-left::after {
+  left: -8px;
+  top: 50%;
+  margin-top: -7px;
+  border-top-color: transparent;
+  border-right-color: transparent;
+}
+
+.pq-bubble-top::after {
+  top: -8px;
+  left: 28px;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* แถบเพื่อนดาวเหนือเกม */
+.pq-buddybar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: linear-gradient(90deg, rgba(76, 29, 149, 0.35), rgba(15, 23, 42, 0.4));
+  padding: 0.5rem 0.75rem;
+}
+
+/*
+ * เพื่อนดาวทั้งแปดเรียงแถวเดียวบนหน้าแรก
+ * ขนาดตัวละครผูกกับความกว้างจอ (9.5vw) จอโทรศัพท์ 390 พิกเซลจึงยังเรียงแถวเดียวได้ไม่ตกบรรทัด
+ */
+.pq-parade {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+/*
+ * พลุดาว คลุมเต็มกล่องที่ใส่ แล้วตัดขอบทิ้ง
+ * ดาวที่บินออกนอกกล่องจึงไม่ทำให้หน้าเว็บกว้างเกินจอ
+ */
+.pq-confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.pq-confetti > span {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  font-size: 20px;
+  line-height: 1;
+  opacity: 0;
+  animation: pq-confetti 1.2s ease-out forwards;
+}
+
+@keyframes pq-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px) rotate(-3deg); }
+}
+
+@keyframes pq-hop {
+  0% { transform: scale(0.85); }
+  35% { transform: translateY(-10px) scale(1.08); }
+  65% { transform: translateY(0) scale(0.97, 1.03); }
+  100% { transform: none; }
+}
+
+@keyframes pq-shake {
+  20% { transform: translateX(-4px) rotate(-5deg); }
+  40% { transform: translateX(4px) rotate(5deg); }
+  60% { transform: translateX(-3px) rotate(-3deg); }
+  80% { transform: translateX(2px); }
+}
+
+@keyframes pq-blink {
+  0%, 94%, 100% { transform: scaleY(1); }
+  96% { transform: scaleY(0.1); }
+}
+
+@keyframes pq-zzz {
+  0% { opacity: 0; transform: translate(0, 4px) scale(0.7); }
+  40% { opacity: 1; }
+  100% { opacity: 0; transform: translate(6px, -10px) scale(1.1); }
+}
+
+@keyframes pq-confetti {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1.1); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .pq-rock-float,
   .pq-rock-boom,
   .pq-pop,
-  .pq-drop-in {
+  .pq-drop-in,
+  .pq-bob,
+  .pq-hop,
+  .pq-shake,
+  .pq-blink,
+  .pq-zzz {
     animation-name: none;
+  }
+
+  .pq-confetti {
+    display: none;
   }
 }
 
