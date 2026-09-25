@@ -25,6 +25,7 @@ import { Journal } from './pages/Journal'
 import { Tower } from './pages/Tower'
 import { Farm } from './pages/Farm'
 import { SafeZone } from './pages/SafeZone'
+import { SolarSystem } from './pages/SolarSystem'
 import { Teacher } from './pages/Teacher'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
@@ -100,6 +101,12 @@ function GameRoutes() {
           path="/safezone"
           element={
             <RequirePlayer render={(player) => <SafeZone player={player} />} />
+          }
+        />
+        <Route
+          path="/solar"
+          element={
+            <RequirePlayer render={(player) => <SolarSystem player={player} />} />
           }
         />
         <Route
