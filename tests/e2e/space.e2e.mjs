@@ -302,8 +302,9 @@ async function playTimeline() {
 
 async function playRiddle() {
   for (let guard = 0; guard < 10 && !(await atResult()); guard += 1) {
-    const first = await page.locator('.sol-comms ol li').first().innerText()
-    const riddle = Content.RIDDLES.find((entry) => first.includes(entry.clues[0]))
+    // เทียบทั้งประโยค ใบ้แรกของบางดวงเป็นส่วนหนึ่งของอีกดวง เช่น "ชั้นนอก" กับ "ชั้นนอกสีน้ำเงิน"
+    const first = (await page.locator('.sol-comms ol li').first().innerText()).replace(/^ใบ้ \d+\s*/, '').trim()
+    const riddle = Content.RIDDLES.find((entry) => entry.clues[0] === first)
     if (!riddle) throw new Error(`ไม่รู้จักปริศนา "${first}"`)
     await option(riddle.answer).click()
     await clickFirstVisible(['คดีต่อไป', 'ปิดคดี'])
