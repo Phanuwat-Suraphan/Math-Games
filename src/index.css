@@ -763,6 +763,284 @@ html[data-animations='off'] *::after {
   letter-spacing: 0.04em;
 }
 
+/* ---------- ยานสำรวจระบบสุริยะ ---------- */
+
+/*
+ * กรอบของฉากอวกาศ
+ *
+ * สูงตามสัดส่วนจอกว้าง แต่ไม่เกินสองในสามของความสูงจอ
+ * บนโทรศัพท์แนวนอน ฉากที่สูงเต็มจอจะดันแผงใบ้กับปุ่มบินลงไปใต้จอจนต้องเลื่อนหา
+ * และไม่ต่ำกว่า 300px เพราะบนโทรศัพท์แนวตั้งฉากที่เตี้ยเกินไปแตะดาวไม่โดน
+ */
+.sol-stage {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(125, 211, 252, 0.3);
+  background: #02030b;
+  aspect-ratio: 16 / 10;
+  min-height: 300px;
+  max-height: 66vh;
+  width: 100%;
+  box-shadow:
+    inset 0 0 60px -10px rgba(56, 189, 248, 0.25),
+    0 24px 60px -30px rgba(0, 0, 0, 0.95);
+}
+
+/* ห้ามเบราว์เซอร์เลื่อนหน้าหรือซูมทั้งหน้าเองตอนลากนิ้วบนฉาก ไม่งั้นลากหมุนกล้องไม่ได้ */
+.sol-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sol-canvas:active {
+  cursor: grabbing;
+}
+
+.sol-hud {
+  border-radius: 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(4, 8, 26, 0.7);
+  padding: 0.4rem 0.7rem;
+  backdrop-filter: blur(6px);
+}
+
+/* ปุ่มซูมบนฉาก ใหญ่พอสำหรับนิ้วเด็ก และมองเห็นบนพื้นหลังอวกาศที่มืด */
+.sol-ctrl {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(125, 211, 252, 0.45);
+  background: rgba(8, 20, 45, 0.78);
+  color: #e0f2fe;
+  font-size: 1.25rem;
+  font-weight: 800;
+  backdrop-filter: blur(6px);
+}
+
+.sol-ctrl:hover {
+  background: rgba(14, 116, 144, 0.55);
+}
+
+.sol-toggle {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #cbd5e1;
+}
+
+.sol-toggle:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.sol-toggle-on {
+  border-color: rgba(103, 232, 249, 0.6);
+  background: rgba(8, 145, 178, 0.28);
+  color: #ecfeff;
+}
+
+.sol-chip {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(19, 26, 58, 0.85);
+  padding: 0.4rem 1rem 0.4rem 0.55rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.sol-chip:hover {
+  background: rgba(39, 50, 104, 0.95);
+}
+
+.sol-chip-on {
+  border-color: #67e8f9;
+  background: rgba(8, 47, 73, 0.95);
+  color: #cffafe;
+  box-shadow: 0 0 18px -6px rgba(103, 232, 249, 0.9);
+}
+
+/* ดาวที่เลือกไปแล้วและไม่ใช่ปลายทาง ยังกดได้ แต่จางลงพร้อมกากบาท ไม่ได้บอกด้วยสีอย่างเดียว */
+.sol-chip-miss {
+  opacity: 0.55;
+  text-decoration: line-through;
+}
+
+/* จุดสีของดาว ไล่แสงจากมุมซ้ายบนให้ดูเป็นลูกกลม */
+.sol-dot {
+  display: inline-block;
+  flex: none;
+  border-radius: 999px;
+  background: radial-gradient(circle at 32% 30%, var(--dot-light), var(--dot) 62%, rgba(0, 0, 0, 0.55) 100%);
+  box-shadow: inset -2px -2px 4px rgba(0, 0, 0, 0.35);
+}
+
+.sol-panel {
+  position: relative;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.01) 40%),
+    linear-gradient(180deg, rgba(20, 30, 70, 0.92), rgba(6, 10, 30, 0.95));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 18px 42px -20px rgba(0, 0, 0, 0.9);
+}
+
+/* แผงวิทยุของศูนย์บัญชาการ ขอบฟ้าเรืองแสง แยกให้เห็นว่าเป็นข้อความที่ต้องอ่าน */
+.sol-comms {
+  position: relative;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(8, 145, 178, 0.22), transparent 70%),
+    linear-gradient(180deg, rgba(4, 17, 40, 0.96), rgba(2, 8, 22, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(165, 243, 252, 0.16),
+    0 0 30px -14px rgba(34, 211, 238, 0.75);
+}
+
+.sol-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.4rem 0.7rem;
+}
+
+.sol-option {
+  display: block;
+  width: 100%;
+  min-height: 60px;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(19, 26, 58, 0.85);
+  padding: 0.75rem 1rem;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.sol-option:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.sol-option-on {
+  border-color: #67e8f9;
+  background: rgba(8, 47, 73, 0.95);
+  box-shadow: 0 0 22px -8px rgba(103, 232, 249, 0.9);
+}
+
+/* ตัวเลือกคำตอบ สูงอย่างน้อย 56px ตามแนวทางปุ่มสำหรับเด็ก */
+.sol-opt {
+  display: flex;
+  min-height: 56px;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-radius: 1rem;
+  border: 2px solid rgba(125, 211, 252, 0.35);
+  background: rgba(12, 22, 52, 0.9);
+  padding: 0.6rem 1rem;
+  text-align: left;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #f1f5f9;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+}
+
+.sol-opt:hover:not(:disabled) {
+  border-color: #67e8f9;
+}
+
+.sol-opt:active:not(:disabled) {
+  transform: translateY(2px);
+}
+
+.sol-opt-right {
+  border-color: #4ade80;
+  background: rgba(22, 101, 52, 0.45);
+}
+
+.sol-opt-wrong {
+  border-color: rgba(251, 113, 133, 0.7);
+  background: rgba(136, 19, 55, 0.3);
+  color: #fecdd3;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+
+.sol-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 1rem;
+  border: 2px dashed rgba(252, 211, 77, 0.55);
+  background: rgba(252, 211, 77, 0.06);
+  padding: 0.6rem 0.3rem;
+  text-align: center;
+}
+
+/* ช่องที่ยังไม่มีตราประทับ จางลงแต่ยังเห็นว่ามีดาวดวงนี้รออยู่ */
+.sol-stamp-empty {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: transparent;
+  opacity: 0.55;
+}
+
+.sol-stamp-big {
+  display: flex;
+  width: 190px;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 999px;
+  border: 3px dashed rgba(252, 211, 77, 0.8);
+  background: radial-gradient(circle, rgba(252, 211, 77, 0.14), transparent 70%);
+  padding: 1.4rem 1rem;
+  animation: sol-stamp-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes sol-stamp-in {
+  from {
+    transform: scale(1.6) rotate(-12deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(-4deg);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sol-stamp-big {
+    animation-name: none;
+    transform: rotate(-4deg);
+  }
+}
+
 /* ---------- โดมสีเขียว ---------- */
 
 /*

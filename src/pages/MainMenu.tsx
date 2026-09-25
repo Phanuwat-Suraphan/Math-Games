@@ -91,6 +91,14 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-sky-500/30 to-leaf-600/10',
   },
   {
+    to: '/solar',
+    emoji: '🪐',
+    glow: '#38bdf8',
+    label: 'ยานสำรวจระบบสุริยะ',
+    description: 'บินสำรวจดาวเคราะห์ทั้งแปดดวงในฉากสามมิติ ถอดใบ้พิกัด แล้วแก้โจทย์จากข้อมูลจริงของดาว',
+    accent: 'from-sky-500/30 to-arcane-600/10',
+  },
+  {
     to: '/farm',
     emoji: '🌱',
     art: { kind: 'scene', id: 'world-1' },

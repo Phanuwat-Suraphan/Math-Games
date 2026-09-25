@@ -36,6 +36,7 @@
     "src/roguelike/**/*.ts",
     "src/survivor/**/*.ts",
     "src/safezone/**/*.ts",
+    "src/solar/**/*.ts",
     "src/render3d/**/*.ts",
     "src/farm/**/*.ts",
     "src/timeAdventure/**/*.ts",
