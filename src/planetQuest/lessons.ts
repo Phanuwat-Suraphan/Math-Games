@@ -43,11 +43,14 @@ export interface Lesson {
   title: string
   slides: readonly LessonSlide[]
   check: ChoiceQuestion
+  /** ดาวในโหมดฝึกฝนที่ใช้ความรู้ของบทนี้ จบบทแล้วมีปุ่มพาไปเล่นต่อทันที */
+  practice: PlanetId
 }
 
 export const LESSONS: readonly Lesson[] = [
   {
     id: 'family',
+    practice: 'jupiter',
     emoji: '☀️',
     title: 'ครอบครัวระบบสุริยะ',
     slides: [
@@ -99,6 +102,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'stars',
+    practice: 'venus',
     emoji: '✨',
     title: 'ดาวฤกษ์ vs ดาวเคราะห์',
     slides: [
@@ -142,6 +146,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'planets',
+    practice: 'mercury',
     emoji: '🪐',
     title: 'ดาวเคราะห์ทั้งแปด',
     slides: [
@@ -188,6 +193,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'solar-eclipse',
+    practice: 'earth',
     emoji: '🌑',
     title: 'สุริยุปราคา',
     slides: [
@@ -231,6 +237,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'lunar-eclipse',
+    practice: 'earth',
     emoji: '🔴',
     title: 'จันทรุปราคา',
     slides: [
@@ -272,6 +279,7 @@ export const LESSONS: readonly Lesson[] = [
   },
   {
     id: 'tech',
+    practice: 'mars',
     emoji: '🚀',
     title: 'เทคโนโลยีอวกาศ',
     slides: [

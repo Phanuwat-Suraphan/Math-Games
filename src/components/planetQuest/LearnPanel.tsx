@@ -5,7 +5,9 @@ import { createRng } from '../../math/rng'
 import { eclipseAt } from '../../planetQuest/eclipse'
 import { LESSONS } from '../../planetQuest/lessons'
 import type { Lesson, LessonDiagram, LessonSlide } from '../../planetQuest/lessons'
-import { PLANETS } from '../../solar/planets'
+import { PLANETS, getPlanet } from '../../solar/planets'
+import type { PlanetId } from '../../solar/planets'
+import { stageFor } from '../../planetQuest/stages'
 import { ChoiceList, Explain, ProgressDots } from './QuestParts'
 import { SkyView, TopView } from './EclipseLab'
 
@@ -147,12 +149,14 @@ function LessonView({
   onFocus,
   onComplete,
   onExit,
+  onPractice,
 }: {
   lesson: Lesson
   done: boolean
   onFocus: (focus: LessonFocus) => void
   onComplete: () => void
   onExit: () => void
+  onPractice: (planet: PlanetId) => void
 }) {
   const [index, setIndex] = useState(0)
   const [wrong, setWrong] = useState<string[]>([])
@@ -203,7 +207,7 @@ function LessonView({
           </div>
           {solved ? (
             <Explain tone="good" title="ถูกต้อง! จบบทนี้แล้ว 🎉">
-              {lesson.check.explain}
+              {lesson.check.explain} · ลองใช้ความรู้นี้ในเกม{stageFor(lesson.practice).title}บน{getPlanet(lesson.practice).name}ดูไหม
             </Explain>
           ) : wrong.length > 0 ? (
             <p className="mt-2 text-sm font-semibold text-ember-200">ยังไม่ใช่ ลองย้อนไปอ่านการ์ดอีกครั้งก็ได้นะ</p>
@@ -220,9 +224,14 @@ function LessonView({
             {index + 1 === lesson.slides.length ? 'ไปเช็กความเข้าใจ' : 'ต่อไป'}
           </Button>
         ) : solved ? (
-          <Button onClick={onExit} icon="📚">
-            เลือกบทต่อไป
-          </Button>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="secondary" onClick={() => onPractice(lesson.practice)} icon="🎮">
+              {`ไปฝึกที่${getPlanet(lesson.practice).name}`}
+            </Button>
+            <Button onClick={onExit} icon="📚">
+              เลือกบทต่อไป
+            </Button>
+          </div>
         ) : null}
       </div>
     </div>
@@ -233,10 +242,12 @@ export function LearnPanel({
   finished,
   onFocus,
   onComplete,
+  onPractice,
 }: {
   finished: readonly string[]
   onFocus: (focus: LessonFocus) => void
   onComplete: (lessonId: string) => void
+  onPractice: (planet: PlanetId) => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
   const lesson = LESSONS.find((item) => item.id === open)
@@ -254,6 +265,7 @@ export function LearnPanel({
             setOpen(null)
             onFocus('overview')
           }}
+          onPractice={onPractice}
         />
       </section>
     )

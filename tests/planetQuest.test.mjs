@@ -293,6 +293,7 @@ check('บทเรียนหกบท ครอบคลุมหัวข้
   for (const lesson of L.LESSONS) {
     assert(lesson.slides.length >= 3 && lesson.slides.length <= 4, `${lesson.id} มี ${lesson.slides.length} การ์ด`)
     assert(unique(lesson.slides.map((slide) => slide.id)), `${lesson.id} การ์ดซ้ำ`)
+    assert(P.isPlanetId(lesson.practice), `${lesson.id} ชี้ไปฝึกที่ดาวที่ไม่มีอยู่`)
     const check = lesson.check
     assert(check.wrong.length === 3 && unique([check.answer, ...check.wrong]), `${lesson.id} ตัวเลือกไม่ครบหรือซ้ำ`)
     for (const slide of lesson.slides) {
@@ -304,6 +305,13 @@ check('บทเรียนหกบท ครอบคลุมหัวข้
       if (slide.reveals) assert(unique(slide.reveals.map((reveal) => reveal.label)), `${slide.id} ปุ่มเปิดดูซ้ำ`)
     }
   }
+})
+
+check('จบบทเรียนแล้วพาไปฝึกที่ดาวที่ใช้ความรู้บทนั้นจริง', () => {
+  const kindOf = (id) => St.stageFor(L.lessonById(id).practice).kind
+  assert(kindOf('solar-eclipse') === 'eclipse' && kindOf('lunar-eclipse') === 'eclipse', 'บทอุปราคาไม่ได้พาไปห้องทดลองอุปราคา')
+  assert(kindOf('tech') === 'connect' || kindOf('tech') === 'timeline', 'บทเทคโนโลยีอวกาศไม่ได้พาไปด่านเทคโนโลยี')
+  assert(kindOf('family') === 'sort', 'บทครอบครัวระบบสุริยะไม่ได้พาไปด่านคัดแยกสมาชิก')
 })
 
 check('ภาพประกอบบทอุปราคาตรงกับเนื้อหาที่เขียน', () => {

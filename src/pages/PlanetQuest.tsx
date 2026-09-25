@@ -208,6 +208,19 @@ export function PlanetQuest({ player }: { player: Player }) {
     [updateProgress],
   )
 
+  /** จบบทเรียนแล้วไปเล่นดาวที่ใช้ความรู้บทนั้นต่อทันที */
+  const practiceFromLesson = useCallback((planet: PlanetId) => {
+    playSfx('click')
+    const scene = sceneRef.current
+    scene?.setAutoSpin(false)
+    scene?.overview()
+    setNotice(null)
+    setOutcome(null)
+    setSelected(planet)
+    setPhase('hub')
+    setMode('practice')
+  }, [])
+
   /* ---------------- ฝึกฝน ---------------- */
 
   const flyOrLand = useCallback(() => {
@@ -340,7 +353,14 @@ export function PlanetQuest({ player }: { player: Player }) {
         ) : null}
 
         {/* ---------------- เรียนรู้ ---------------- */}
-        {mode === 'learn' ? <LearnPanel finished={progress.lessons} onFocus={focusLesson} onComplete={completeLesson} /> : null}
+        {mode === 'learn' ? (
+          <LearnPanel
+            finished={progress.lessons}
+            onFocus={focusLesson}
+            onComplete={completeLesson}
+            onPractice={practiceFromLesson}
+          />
+        ) : null}
 
         {/* ---------------- ฝึกฝน ---------------- */}
         {mode === 'practice' && phase === 'hub' ? (
