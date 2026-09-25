@@ -78,6 +78,9 @@ jobs:
       - name: ทดสอบยานสำรวจระบบสุริยะ (ข้อมูลดาว ใบ้พิกัด โจทย์ ทริป และการวาดฉากสามมิติ)
         run: node tests/solar.test.mjs /tmp/logic
 
+      - name: ทดสอบภารกิจแปดดาว (วิทยาศาสตร์ ป.6 เนื้อหา เกมแปดแบบ บทเรียน และห้องทดลองอุปราคา)
+        run: node tests/planetQuest.test.mjs /tmp/logic
+
       - name: ทดสอบโดมสีเขียว (ฟาร์ม สมุดบัญชี รหัสฟาร์ม และสมดุลเกม)
         run: node tests/farm.test.mjs /tmp/logic
 
@@ -110,3 +113,44 @@ jobs:
 
       - name: ทดสอบเกมการ์ด Divisor Duel
         run: node src/divisorDuel/web/test.mjs /tmp/duel
+
+  # เปิดเว็บที่ build แล้วใน Chromium แล้วให้บอตกดเล่นเกมอวกาศจนจบจริงทุกโหมด
+  # ชุดทดสอบข้างบนตรวจแค่ตรรกะ ข้อนี้ตรวจว่าหน้าจอ React กดเล่นได้จริงไม่มี error
+  browser:
+    name: เล่นเกมอวกาศในเบราว์เซอร์จริง
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: ติดตั้ง dependency
+        run: npm install
+
+      - name: build เว็บจริง
+        run: npm run build
+
+      # บอตอ่านเฉลยจากไฟล์เนื้อหาตัวจริง จึงต้องคอมไพล์ตรรกะเกมก่อน
+      - name: คอมไพล์ตรรกะเกมให้บอตอ่านเฉลย
+        run: npx tsc -p tsconfig.tests.json --outDir /tmp/logic
+
+      # ไม่ใส่ playwright ใน package.json เพราะใช้แค่ขั้นนี้ขั้นเดียว
+      - name: ติดตั้ง Playwright และ Chromium
+        run: |
+          npm install --no-save playwright@1.56.1
+          npx playwright install --with-deps chromium
+
+      - name: บอตเล่นภารกิจแปดดาวครบทุกโหมด และยานสำรวจระบบสุริยะหนึ่งทริป
+        run: node tests/e2e/space.e2e.mjs dist /tmp/logic
+
+      # ภาพหน้าจอทุกขั้น ดาวน์โหลดได้จากหน้าสรุปของการรันนี้
+      - name: เก็บภาพหน้าจอ
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: space-game-screenshots
+          path: test-results/
+          retention-days: 7

@@ -37,6 +37,7 @@
     "src/survivor/**/*.ts",
     "src/safezone/**/*.ts",
     "src/solar/**/*.ts",
+    "src/planetQuest/**/*.ts",
     "src/render3d/**/*.ts",
     "src/farm/**/*.ts",
     "src/timeAdventure/**/*.ts",

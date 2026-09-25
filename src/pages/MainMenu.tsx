@@ -99,6 +99,14 @@ const MENU_ITEMS: MenuItem[] = [
     accent: 'from-sky-500/30 to-arcane-600/10',
   },
   {
+    to: '/planets',
+    emoji: '🛸',
+    glow: '#a78bfa',
+    label: 'ภารกิจแปดดาว',
+    description: 'วิทยาศาสตร์ ป.6 เรื่องระบบสุริยะ มีโหมดสำรวจ เรียนรู้ และฝึกฝน ลงจอดแปดดาวเจอแปดเกม',
+    accent: 'from-arcane-500/30 to-sky-600/10',
+  },
+  {
     to: '/farm',
     emoji: '🌱',
     art: { kind: 'scene', id: 'world-1' },

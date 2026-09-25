@@ -35,3 +35,6 @@ pnpm-debug.log*
 # cache
 .eslintcache
 *.tsbuildinfo
+
+# ภาพหน้าจอจากชุดทดสอบในเบราว์เซอร์
+test-results
