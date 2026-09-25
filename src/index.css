@@ -1041,6 +1041,287 @@ html[data-animations='off'] *::after {
   }
 }
 
+/* ---------- ภารกิจแปดดาว ---------- */
+
+/*
+ * ตอนเล่นเกมบนดาว ฉากสามมิติหดเหลือแถบเตี้ยด้านบน
+ * ยังเห็นดาวที่ลงจอดอยู่ แต่ไม่ดันตัวเกมลงไปใต้จอของโทรศัพท์
+ */
+.pq-stage-mini {
+  aspect-ratio: auto;
+  height: 150px;
+  min-height: 150px;
+}
+
+.pq-lab {
+  background: #050818;
+}
+
+.pq-opt-center {
+  justify-content: center;
+}
+
+/* หลอดความร้อนของยานบนดาวศุกร์ ไล่จากส้มไปแดง */
+.pq-heat {
+  background: linear-gradient(90deg, #fbbf24, #f97316, #e11d48);
+}
+
+.pq-bin {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  border-radius: 1rem;
+  border: 2px dashed rgba(167, 139, 250, 0.45);
+  background: rgba(30, 27, 75, 0.55);
+  padding: 0.75rem;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.pq-bin:hover:not(:disabled) {
+  border-color: #c4b5fd;
+  background: rgba(76, 29, 149, 0.45);
+}
+
+.pq-bin-on {
+  border-style: solid;
+  border-color: #4ade80;
+  background: rgba(22, 101, 52, 0.35);
+}
+
+/* สนามอุกกาบาตของดาวเสาร์ */
+.pq-field {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(227, 209, 166, 0.3);
+  background:
+    radial-gradient(1px 1px at 12% 20%, #e2e8f0, transparent),
+    radial-gradient(1px 1px at 70% 12%, #e2e8f0, transparent),
+    radial-gradient(1px 1px at 88% 60%, #e2e8f0, transparent),
+    radial-gradient(1px 1px at 30% 80%, #e2e8f0, transparent),
+    radial-gradient(1px 1px at 55% 55%, #cbd5e1, transparent),
+    linear-gradient(180deg, #0b1026, #02030b);
+}
+
+.pq-rock {
+  position: absolute;
+  display: flex;
+  width: 30%;
+  min-height: 86px;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  border-radius: 46% 54% 42% 58% / 55% 45% 55% 45%;
+  border: 2px solid rgba(214, 196, 170, 0.55);
+  background: radial-gradient(circle at 35% 30%, #8b7d6b, #5b5044 60%, #3b342d);
+  box-shadow: inset -6px -8px 14px rgba(0, 0, 0, 0.45), 0 10px 24px -12px rgba(0, 0, 0, 0.9);
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  line-height: 1.3;
+  color: #fff7ed;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.pq-rock:hover:not(:disabled) {
+  border-color: #67e8f9;
+}
+
+.pq-rock-float {
+  animation: pq-float 3.2s ease-in-out infinite;
+}
+
+@keyframes pq-float {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) rotate(-2deg);
+  }
+  50% {
+    transform: translate(-50%, calc(-50% - 8px)) rotate(2deg);
+  }
+}
+
+/* ก้อนที่ยิงผิดแตกร้าวและจางลง ยังอ่านได้ว่าเคยเลือกอะไรไป */
+.pq-rock-cracked {
+  opacity: 0.4;
+  text-decoration: line-through;
+  animation-name: none;
+}
+
+.pq-rock-boom {
+  border-color: #fde68a;
+  background: radial-gradient(circle, #fff7d1, #fbbf24 40%, #ea580c 75%, #7c2d12);
+  color: #431407;
+  text-shadow: none;
+  animation: pq-boom 0.5s ease-out both;
+}
+
+@keyframes pq-boom {
+  from {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+}
+
+.pq-ship {
+  position: absolute;
+  transform: translate(-50%, -50%) rotate(-45deg);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+/* ประลองอะไรมาก่อนของดาวยูเรนัส */
+.pq-duel {
+  display: flex;
+  min-height: 170px;
+  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.25rem;
+  border: 2px solid rgba(125, 211, 252, 0.35);
+  background: linear-gradient(180deg, rgba(30, 41, 90, 0.9), rgba(8, 12, 32, 0.95));
+  padding: 1rem;
+  text-align: center;
+  transition: transform 0.12s ease, border-color 0.15s ease;
+}
+
+.pq-duel:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: #67e8f9;
+}
+
+.pq-duel-right {
+  border-color: #4ade80;
+  background: linear-gradient(180deg, rgba(22, 101, 52, 0.55), rgba(8, 32, 20, 0.9));
+}
+
+.pq-duel-wrong {
+  border-color: rgba(251, 113, 133, 0.75);
+  background: linear-gradient(180deg, rgba(136, 19, 55, 0.45), rgba(40, 8, 18, 0.9));
+}
+
+/* คะแนนเด้งขึ้นเหนือแถบคะแนน แล้วจางหาย */
+.pq-pop {
+  position: absolute;
+  right: 1rem;
+  top: -0.4rem;
+  font-size: 1.25rem;
+  font-weight: 900;
+  color: #fde68a;
+  text-shadow: 0 2px 8px rgba(251, 191, 36, 0.7);
+  pointer-events: none;
+  animation: pq-pop 0.9s ease-out both;
+}
+
+@keyframes pq-pop {
+  from {
+    transform: translateY(8px) scale(0.8);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-22px) scale(1.15);
+    opacity: 0;
+  }
+}
+
+.pq-combo {
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f97316, #e11d48);
+  padding: 0.1rem 0.6rem;
+  color: #fff7ed;
+}
+
+/* ของชิ้นใหม่ที่ต้องคัดแยกหล่นลงมาจากสายพาน */
+.pq-drop-in {
+  animation: pq-drop-in 0.35s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes pq-drop-in {
+  from {
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* การ์ดเลือกโหมดบนหน้าแรก */
+.pq-mode {
+  display: block;
+  width: 100%;
+  min-height: 180px;
+  border-radius: 1.5rem;
+  border: 1px solid rgba(167, 139, 250, 0.4);
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(139, 92, 246, 0.3), transparent 70%),
+    linear-gradient(180deg, rgba(30, 27, 75, 0.9), rgba(8, 10, 32, 0.95));
+  padding: 1.25rem;
+  text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pq-mode:hover {
+  transform: translateY(-4px);
+  border-color: #c4b5fd;
+  box-shadow: 0 0 30px -10px rgba(167, 139, 250, 0.9);
+}
+
+/* ของเล่นในโปสการ์ดของโหมดสำรวจ */
+.pq-toy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.8rem 1rem;
+}
+
+/* แถบเลื่อนตัวใหญ่ นิ้วเด็กจับง่าย */
+.pq-range {
+  width: 100%;
+  height: 28px;
+  accent-color: #67e8f9;
+  cursor: pointer;
+}
+
+.pq-reveal {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  border-radius: 1rem;
+  border: 2px dashed rgba(252, 211, 77, 0.5);
+  background: rgba(252, 211, 77, 0.06);
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.pq-reveal-open {
+  border-style: solid;
+  border-color: rgba(74, 222, 128, 0.6);
+  background: rgba(22, 101, 52, 0.25);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pq-rock-float,
+  .pq-rock-boom,
+  .pq-pop,
+  .pq-drop-in {
+    animation-name: none;
+  }
+}
+
 /* ---------- โดมสีเขียว ---------- */
 
 /*

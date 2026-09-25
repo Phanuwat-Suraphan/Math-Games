@@ -78,6 +78,9 @@ jobs:
       - name: ทดสอบยานสำรวจระบบสุริยะ (ข้อมูลดาว ใบ้พิกัด โจทย์ ทริป และการวาดฉากสามมิติ)
         run: node tests/solar.test.mjs /tmp/logic
 
+      - name: ทดสอบภารกิจแปดดาว (วิทยาศาสตร์ ป.6 เนื้อหา เกมแปดแบบ บทเรียน และห้องทดลองอุปราคา)
+        run: node tests/planetQuest.test.mjs /tmp/logic
+
       - name: ทดสอบโดมสีเขียว (ฟาร์ม สมุดบัญชี รหัสฟาร์ม และสมดุลเกม)
         run: node tests/farm.test.mjs /tmp/logic
 

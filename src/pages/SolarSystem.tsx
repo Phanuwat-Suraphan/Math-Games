@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '../components/Button'
+import { PlanetDot, Stars } from '../components/solar/SpaceParts'
 import { ScreenLayout } from '../components/ScreenLayout'
 import { TopBar } from '../components/TopBar'
 import { useGame } from '../context/useGame'
@@ -93,36 +93,6 @@ function thaiDate(days: number): string {
 
 function todayDays(): number {
   return daysSinceJ2000(new Date())
-}
-
-function Stars({ count, max = 3 }: { count: number; max?: number }) {
-  return (
-    <span aria-label={`ได้ ${count} ดาวจาก ${max} ดาว`} className="whitespace-nowrap">
-      {Array.from({ length: max }, (_, index) => (
-        <span key={index} aria-hidden="true" className={index < count ? 'text-gold-300' : 'text-slate-600'}>
-          ★
-        </span>
-      ))}
-    </span>
-  )
-}
-
-/** จุดสีของดาว ใช้ในปุ่มเลือกดาวและตราประทับ */
-function PlanetDot({ planet, size = 18 }: { planet: Planet; size?: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      className="sol-dot"
-      style={
-        {
-          width: size,
-          height: size,
-          '--dot': planet.color,
-          '--dot-light': planet.highlight,
-        } as CSSProperties
-      }
-    />
-  )
 }
 
 /**

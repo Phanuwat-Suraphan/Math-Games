@@ -26,6 +26,7 @@ import { Tower } from './pages/Tower'
 import { Farm } from './pages/Farm'
 import { SafeZone } from './pages/SafeZone'
 import { SolarSystem } from './pages/SolarSystem'
+import { PlanetQuest } from './pages/PlanetQuest'
 import { Teacher } from './pages/Teacher'
 import { Survivor } from './pages/Survivor'
 import { DivisorDuel } from './pages/DivisorDuel'
@@ -107,6 +108,12 @@ function GameRoutes() {
           path="/solar"
           element={
             <RequirePlayer render={(player) => <SolarSystem player={player} />} />
+          }
+        />
+        <Route
+          path="/planets"
+          element={
+            <RequirePlayer render={(player) => <PlanetQuest player={player} />} />
           }
         />
         <Route
