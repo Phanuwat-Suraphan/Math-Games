@@ -177,6 +177,7 @@ export function PlanetBuddy({
   crown = false,
   animate = true,
   className = '',
+  delay = 0,
 }: {
   planet: Planet
   /** พิกเซล หรือความยาวแบบ CSS เช่น "min(9.5vw, 56px)" ให้ย่อขยายตามจอ */
@@ -186,6 +187,8 @@ export function PlanetBuddy({
   /** ปิดเมื่อผู้เล่นปิดการเคลื่อนไหวในการตั้งค่า */
   animate?: boolean
   className?: string
+  /** เลื่อนจังหวะลอยขึ้นลง (วินาที) ดาวที่เรียงกันหลายดวงจะได้ไม่ลอยพร้อมกันเป๊ะ */
+  delay?: number
 }) {
   const id = useId().replace(/:/g, '')
   const fill = `pq-buddy-fill-${id}`
@@ -196,7 +199,7 @@ export function PlanetBuddy({
     <span
       aria-hidden="true"
       className={`pq-buddy ${mood === 'sleep' ? 'pq-buddy-sleep' : ''} ${className}`}
-      style={{ width: size, height: size }}
+      style={{ width: size, height: size, animationDelay: delay ? `${delay}s` : undefined }}
     >
       <svg viewBox="-12 -14 124 124" width="100%" height="100%">
         <defs>

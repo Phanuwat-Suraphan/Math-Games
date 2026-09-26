@@ -498,27 +498,25 @@ export function PlanetQuest({ player }: { player: Player }) {
               {BUDDIES.map((item, index) => {
                 const status = statusOf(item.id)
                 const poked = cardPoke?.id === item.id ? cardPoke.count : 0
+                // ลอยขึ้นลงที่ตัวดาวข้างในปุ่ม ไม่ใช่ที่ตัวปุ่ม ปุ่มจึงอยู่กับที่ แตะโดนง่าย
                 return (
-                  <span
+                  <PokeButton
                     key={item.id}
-                    className={reduceMotion ? '' : 'pq-bob'}
-                    style={{ animationDelay: `${index * -0.35}s` }}
+                    label={`จิ้ม${item.nickname}`}
+                    count={poked}
+                    reduceMotion={reduceMotion}
+                    onPoke={() => pokeBody(item.id, 'card')}
                   >
-                    <PokeButton
-                      label={`จิ้ม${item.nickname}`}
-                      count={poked}
-                      reduceMotion={reduceMotion}
-                      onPoke={() => pokeBody(item.id, 'card')}
-                    >
-                      <PlanetBuddy
-                        planet={getPlanet(item.id)}
-                        size="min(9.5vw, 56px)"
-                        mood={poked && status !== 'sleep' ? 'love' : STATUS_MOOD[status]}
-                        crown={status === 'star'}
-                        animate={!reduceMotion}
-                      />
-                    </PokeButton>
-                  </span>
+                    <PlanetBuddy
+                      planet={getPlanet(item.id)}
+                      size="min(9.5vw, 56px)"
+                      mood={poked && status !== 'sleep' ? 'love' : STATUS_MOOD[status]}
+                      crown={status === 'star'}
+                      animate={!reduceMotion}
+                      className={reduceMotion ? '' : 'pq-bob'}
+                      delay={index * -0.35}
+                    />
+                  </PokeButton>
                 )
               })}
             </div>
