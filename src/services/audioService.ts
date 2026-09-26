@@ -33,6 +33,8 @@ export type SfxName =
   | 'pickup'
   | 'gameOver'
   | 'victory'
+  // เสียงเล่น ๆ
+  | 'boing'
 
 let audioContext: AudioContext | null = null
 let soundEnabled = true
@@ -148,6 +150,12 @@ const PATTERNS: Record<SfxName, ToneStep[]> = {
     { frequency: 659, duration: 0.13, delay: 0.12, type: 'square', gain: 0.13 },
     { frequency: 784, duration: 0.13, delay: 0.24, type: 'square', gain: 0.13 },
     { frequency: 1046, duration: 0.5, delay: 0.36, type: 'square', gain: 0.15 },
+  ],
+
+  /* จิ้มดาว เด้งขึ้นแล้วเด้งลงเหมือนสปริง ไม่ดังเกินเพราะเด็กชอบจิ้มรัว ๆ */
+  boing: [
+    { frequency: 260, sweepTo: 620, duration: 0.09, delay: 0, type: 'triangle', gain: 0.12 },
+    { frequency: 620, sweepTo: 380, duration: 0.16, delay: 0.08, type: 'sine', gain: 0.1 },
   ],
 }
 
@@ -274,6 +282,7 @@ const lastPlayedAt = new Map<SfxName, number>()
 
 /** เสียงที่ดังถี่มากจนต้องกันไว้ พร้อมช่วงห่างขั้นต่ำเป็นวินาที */
 const MIN_GAP: Partial<Record<SfxName, number>> = {
+  boing: 0.12,
   hit: 0.055,
   kill: 0.05,
   zap: 0.07,

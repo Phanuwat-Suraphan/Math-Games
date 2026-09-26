@@ -783,6 +783,11 @@ function mockContext() {
     clip() {},
     setLineDash() {},
     translate: (x, y) => coords(x, y),
+    scale: (x, y) => coords(x, y),
+    drawImage: (_, x, y, w, h) => {
+      coords(x, y, w, h)
+      radius('drawImage', w, h)
+    },
     rotate: (angle) => coords(angle),
     moveTo: (x, y) => coords(x, y),
     lineTo: (x, y) => coords(x, y),
@@ -893,6 +898,10 @@ check('หน้าตาน่ารักของดาววาดได้�
         selected: rng.pick(['sun', ...P.PLANETS.map((planet) => planet.id)]),
         faces: true,
         awake: rng.chance(0.5) ? ['earth', 'saturn'] : undefined,
+        // ดาวที่ถูกจิ้มเมื่อไม่นาน รวมถึงจิ้มอนาคต (นาฬิกาย้อน) กับจิ้มนานมาแล้ว
+        poke: rng.chance(0.7) ? { id: rng.pick(['sun', ...P.PLANETS.map((planet) => planet.id)]), at: rng.next() * 100_000 } : null,
+        shipLook: rng.chance(0.5) ? { fin: '#8b5cf6', bodyTop: '#ffffff', bodyBottom: '#c4b5fd', window: '#fcd34d' } : undefined,
+        companion: rng.chance(0.5) ? { complete: true, naturalWidth: 100 } : rng.chance(0.5) ? { complete: false, naturalWidth: 0 } : null,
       }),
     )
     assert(ctx.state.nan === 0, `มุมที่ ${index} มีพิกัด NaN ${ctx.state.nan} ครั้ง`)

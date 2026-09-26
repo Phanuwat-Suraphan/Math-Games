@@ -39,6 +39,7 @@ const Stages = load('planetQuest/stages')
 const Eclipse = load('planetQuest/eclipse')
 const Planets = load('solar/planets')
 const Buddies = load('planetQuest/buddies')
+const Companions = load('planetQuest/companions')
 
 /* ---------------- เว็บเซิร์ฟเวอร์เล็ก ๆ สำหรับไฟล์ที่ build แล้ว ---------------- */
 
@@ -348,6 +349,16 @@ try {
     const parade = await page.locator('.pq-parade .pq-buddy').count()
     if (parade !== 8) throw new Error(`หน้าแรกมีเพื่อนดาว ${parade} ดวง`)
     await page.getByText(Buddies.WELCOME_LINE, { exact: true }).waitFor()
+    const first = Companions.companionFor(Companions.DEFAULT_COMPANION)
+    await page.getByText(`${first.name}พร้อมออกเดินทางแล้ว!`, { exact: false }).waitFor()
+  })
+
+  await step('หน้าแรก: จิ้มเพื่อนดาวแล้วดาวหัวเราะและเล่าเรื่องของตัวเอง', async () => {
+    await button('จิ้มน้องโลก').click()
+    await page.getByText(Buddies.pokeLine('earth', 1, false).text, { exact: true }).waitFor()
+    await button('จิ้มน้องพุธ').click()
+    // ดาวพุธยังไม่มีใครไปเยี่ยม จิ้มแล้วละเมอ
+    await page.getByText(Buddies.sleepyPokeLine(Buddies.buddyFor('mercury')), { exact: true }).waitFor()
     await wait(800)
     await shot('planets-home')
   })
@@ -359,6 +370,31 @@ try {
     await page.getByText('📸 ถึงดาวอังคารแล้ว! ได้ของที่ระลึกของดาวอังคาร').waitFor({ timeout: 20_000 })
     // ไปถึงครั้งแรก ดาวอังคารเพิ่งตื่น ทักด้วยประโยคตื่นนอน
     await page.getByText(Buddies.wakeLine(Buddies.buddyFor('mars')), { exact: true }).waitFor()
+    // เพื่อนร่วมทางทักตอนถึงด้วย นี่คือเที่ยวบินแรก
+    const friend = Companions.companionFor(Companions.DEFAULT_COMPANION)
+    await page.getByText(Companions.arriveLine(friend, 'ดาวอังคาร', 1), { exact: true }).waitFor()
+  })
+
+  await step('โหมดสำรวจ: สมุดของที่ระลึกมีแปดใบ แตะโปสการ์ดดาวอังคารแล้วพลิกดูความลับ', async () => {
+    await button('เปิดสมุด').click()
+    const cards = await page.locator('.pq-album > li').count()
+    if (cards !== 8) throw new Error(`สมุดมีโปสการ์ด ${cards} ใบ`)
+    await page.getByRole('button', { name: 'โปสการ์ดดาวอังคาร แตะเพื่อพลิกดูความลับ' }).click()
+    await page.getByRole('button', { name: /^ความลับของน้องอังคาร/ }).waitFor()
+    const locked = await page.locator('.pq-album .pq-card-locked').count()
+    if (locked !== 6) throw new Error(`โปสการ์ดที่ยังหลับมี ${locked} ใบ ควรมี 6 ใบ (ไปแล้วแค่โลกกับดาวอังคาร)`)
+    await shot('planets-album')
+    await button('ปิดสมุด').click()
+  })
+
+  await step('โหมดสำรวจ: อู่ต่อยานเปลี่ยนสียานได้ และเพื่อนที่ยังไม่มาเลือกไม่ได้', async () => {
+    await button('เข้าอู่ต่อยาน').click()
+    await button('ม่วงกาแล็กซี').click()
+    await page.locator('button.pq-swatch[aria-pressed="true"]', { hasText: 'ม่วงกาแล็กซี' }).waitFor()
+    const locked = await page.locator('button.pq-friend-pick:disabled').count()
+    if (locked !== Companions.COMPANIONS.length - 1) throw new Error(`เพื่อนที่ยังล็อกอยู่มี ${locked} ตัว`)
+    await shot('planets-workshop')
+    await button('ออกจากอู่').click()
   })
 
   await step('โหมดสำรวจ: เลื่อนน้ำหนักแล้วตาชั่งบนดาวอังคารอ่านค่าถูก', async () => {
@@ -393,6 +429,14 @@ try {
     await page.getByText(`อ่านจบแล้ว ${Lessons.LESSONS.length}/${Lessons.LESSONS.length} บท · เลือกบทไหนก่อนก็ได้`).waitFor()
   })
 
+  await step('เพื่อนใหม่: อ่านบทเรียนครบสองบทแล้วบ็อบบี้มาขอเป็นเพื่อนร่วมทาง', async () => {
+    const bobby = Companions.companionFor('bobby')
+    await page.getByText(bobby.intro, { exact: true }).waitFor()
+    await shot('planets-new-friend')
+    await button(`ชวน${bobby.name}ขึ้นยาน`).click()
+    await page.getByText(bobby.intro, { exact: true }).waitFor({ state: 'detached' })
+  })
+
   await step('โหมดเรียนรู้: จบบทแล้วปุ่มไปฝึกพาไปดาวที่ใช้ความรู้บทนั้น', async () => {
     const lesson = Lessons.LESSONS.find((item) => item.id === 'solar-eclipse')
     const name = Planets.getPlanet(lesson.practice).name
@@ -422,6 +466,12 @@ try {
       await button('เริ่มเลย!').waitFor({ timeout: 20_000 })
       // ดาวเจ้าบ้านทักตอนลงจอด ถ้าเพิ่งถูกปลุกจะทักด้วยประโยคตื่นนอนแทน
       await page.getByText(buddy.invite, { exact: true }).or(page.getByText(Buddies.wakeLine(buddy), { exact: true })).waitFor()
+      // บ็อบบี้ที่ชวนขึ้นยานไว้ทักตอนถึงด้วย
+      const bobby = Companions.companionFor('bobby')
+      await page
+        .getByText(Companions.arriveLine(bobby, name, 0), { exact: true })
+        .or(page.getByText(Companions.arriveLine(bobby, name, 1), { exact: true }))
+        .waitFor()
       await button('เริ่มเลย!').click()
       await page.getByText(Buddies.readyLine(buddy), { exact: true }).waitFor()
       await PLAYERS[stage.kind]()

@@ -1451,6 +1451,204 @@ html[data-animations='off'] *::after {
   animation: pq-confetti 1.2s ease-out forwards;
 }
 
+/* ปุ่มจิ้มเพื่อนดาว ตัวปุ่มไม่มีกรอบ เห็นแค่ตัวดาว */
+.pq-poke {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  line-height: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pq-poke:focus-visible {
+  outline: 3px solid #fcd34d;
+  outline-offset: 2px;
+}
+
+.pq-squish {
+  display: inline-block;
+  animation: pq-squish 0.7s ease-out;
+}
+
+/* สมุดของที่ระลึก · โปสการ์ดพลิกได้ */
+.pq-album {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+@media (min-width: 640px) {
+  .pq-album {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.pq-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 210px;
+  border-radius: 1.1rem;
+  perspective: 800px;
+  text-align: center;
+}
+
+.pq-card-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.5);
+  padding: 0.75rem;
+}
+
+.pq-card-inner {
+  position: absolute;
+  inset: 0;
+  display: block;
+  transform-style: preserve-3d;
+  transition: transform 0.55s ease;
+}
+
+.pq-card-on .pq-card-inner {
+  transform: rotateY(180deg);
+}
+
+.pq-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1.1rem;
+  border: 2px solid rgba(252, 211, 77, 0.45);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(139, 92, 246, 0.35), transparent 70%),
+    linear-gradient(180deg, rgba(30, 27, 75, 0.95), rgba(8, 10, 32, 0.98));
+  padding: 0.75rem;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.pq-card-back {
+  transform: rotateY(180deg);
+  border-color: rgba(103, 232, 249, 0.5);
+  background:
+    radial-gradient(120% 80% at 50% 100%, rgba(8, 145, 178, 0.35), transparent 70%),
+    linear-gradient(180deg, rgba(8, 20, 45, 0.97), rgba(2, 8, 22, 0.98));
+}
+
+/* อู่ต่อยาน */
+.pq-rocket {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.45));
+}
+
+.pq-flame {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: pq-flame 0.35s ease-in-out infinite alternate;
+}
+
+.pq-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 40px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.3rem 0.8rem 0.3rem 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.pq-swatch-on {
+  border-color: #fcd34d;
+  background: rgba(252, 211, 77, 0.15);
+  box-shadow: 0 0 14px -4px rgba(252, 211, 77, 0.8);
+}
+
+.pq-swatch-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+}
+
+/* เพื่อนร่วมทาง */
+.pq-friend {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.pq-friend svg {
+  display: block;
+  overflow: visible;
+}
+
+/* ยังไม่มา เห็นเป็นเงา รู้ว่ามีเพื่อนรออยู่แต่ยังไม่เห็นหน้า */
+.pq-friend-locked svg {
+  filter: brightness(0) opacity(0.45);
+}
+
+.pq-friend-pick {
+  display: flex;
+  width: 100%;
+  min-height: 118px;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  border-radius: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 0.5rem;
+  text-align: center;
+}
+
+.pq-friend-pick:disabled {
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+.pq-friend-pick-on {
+  border-color: #fcd34d;
+  background: rgba(252, 211, 77, 0.12);
+  box-shadow: 0 0 16px -4px rgba(252, 211, 77, 0.8);
+}
+
+/* การ์ดเพื่อนใหม่ */
+.pq-newfriend {
+  border-radius: 1.5rem;
+  border: 2px solid rgba(252, 211, 77, 0.55);
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(250, 204, 21, 0.22), transparent 60%),
+    linear-gradient(180deg, rgba(49, 46, 129, 0.95), rgba(15, 12, 45, 0.97));
+  box-shadow: 0 0 40px -14px rgba(252, 211, 77, 0.8);
+}
+
+@keyframes pq-squish {
+  0% { transform: scale(1); }
+  20% { transform: scale(1.18, 0.82); }
+  40% { transform: scale(0.88, 1.12); }
+  60% { transform: scale(1.06, 0.95); }
+  80% { transform: scale(0.98, 1.02); }
+  100% { transform: none; }
+}
+
+@keyframes pq-flame {
+  from { transform: scaleY(0.85); opacity: 0.85; }
+  to { transform: scaleY(1.15); opacity: 1; }
+}
+
 @keyframes pq-bob {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-5px) rotate(-3deg); }
@@ -1496,8 +1694,14 @@ html[data-animations='off'] *::after {
   .pq-hop,
   .pq-shake,
   .pq-blink,
-  .pq-zzz {
+  .pq-zzz,
+  .pq-squish,
+  .pq-flame {
     animation-name: none;
+  }
+
+  .pq-card-inner {
+    transition: none;
   }
 
   .pq-confetti {

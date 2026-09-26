@@ -5,12 +5,18 @@
  *   โหมดสำรวจ  ดาวที่เคยบินไปเที่ยวแล้ว (ของที่ระลึก)
  *   โหมดเรียนรู้ บทเรียนที่อ่านจบแล้ว
  *   โหมดฝึกฝน  ดาวที่ดีที่สุดของแต่ละด่าน กับจำนวนครั้งที่เล่น
+ * และยานที่แต่งเองในอู่ต่อยาน (สียานกับเพื่อนร่วมทางที่นั่งไปด้วย)
+ * กับรายชื่อเพื่อนร่วมทางที่เคยทักทายกันแล้ว การ์ดเพื่อนใหม่จะได้ขึ้นแค่ครั้งเดียวต่อตัว
  * แยกคีย์จากข้อมูลผู้เล่นหลักเหมือนโหมดอื่น ข้อมูลเสียจึงเสียแค่ส่วนนี้
  */
 
 import { PLANET_IDS, isPlanetId } from '../solar/planets'
 import type { PlanetId } from '../solar/planets'
 import { LESSONS } from './lessons'
+import { DEFAULT_COMPANION, isCompanionId } from './companions'
+import type { CompanionId } from './companions'
+import { DEFAULT_COLOR, isShipColorId } from './ship'
+import type { ShipColorId } from './ship'
 
 const KEY = 'math-adventure:planet-quest:v1'
 
@@ -20,10 +26,21 @@ export interface QuestProgress {
   plays: number
   visited: PlanetId[]
   lessons: string[]
+  ship: { color: ShipColorId; companion: CompanionId }
+  /** เพื่อนร่วมทางที่ทักทายกันแล้ว */
+  met: CompanionId[]
 }
 
 export function emptyProgress(owner: string): QuestProgress {
-  return { owner, best: {}, plays: 0, visited: [], lessons: [] }
+  return {
+    owner,
+    best: {},
+    plays: 0,
+    visited: [],
+    lessons: [],
+    ship: { color: DEFAULT_COLOR, companion: DEFAULT_COMPANION },
+    met: [DEFAULT_COMPANION],
+  }
 }
 
 /** อ่านความคืบหน้า ช่องที่เสียถูกทิ้งเป็นช่อง ๆ ไม่ทิ้งทั้งก้อน */
@@ -53,7 +70,30 @@ export function parseProgress(raw: unknown, owner: string): QuestProgress {
       ...new Set(record.lessons.filter((id): id is string => typeof id === 'string' && known.has(id))),
     ]
   }
+  if (typeof record.ship === 'object' && record.ship !== null) {
+    // สีกับเพื่อนร่วมทางตรวจแยกกัน สีที่ถูกลบไปแล้วไม่ทำให้เพื่อนที่เลือกไว้หายไปด้วย
+    const ship = record.ship as Record<string, unknown>
+    progress.ship = {
+      color: isShipColorId(ship.color) ? ship.color : DEFAULT_COLOR,
+      companion: isCompanionId(ship.companion) ? ship.companion : DEFAULT_COMPANION,
+    }
+  }
+  if (Array.isArray(record.met)) {
+    progress.met = [...new Set([DEFAULT_COMPANION, ...record.met.filter(isCompanionId)])]
+  }
   return progress
+}
+
+/** ทักทายเพื่อนร่วมทางตัวใหม่แล้ว การ์ดเพื่อนใหม่ของตัวนี้จะไม่ขึ้นอีก */
+export function markMet(progress: QuestProgress, companion: CompanionId): QuestProgress {
+  if (progress.met.includes(companion)) return progress
+  return { ...progress, met: [...progress.met, companion] }
+}
+
+export function setShip(progress: QuestProgress, ship: Partial<QuestProgress['ship']>): QuestProgress {
+  const next = { ...progress.ship, ...ship }
+  if (next.color === progress.ship.color && next.companion === progress.ship.companion) return progress
+  return { ...progress, ship: next }
 }
 
 export function markVisited(progress: QuestProgress, planet: PlanetId): QuestProgress {

@@ -4,6 +4,7 @@ import { createRng } from '../../math/rng'
 import { COMBO_FROM, comboLine, lineFor, readyLine } from '../../planetQuest/buddies'
 import type { Buddy } from '../../planetQuest/buddies'
 import type { Planet } from '../../solar/planets'
+import type { BodyId } from '../../solar/space'
 import type { Reaction } from './QuestParts'
 
 /**
@@ -242,6 +243,41 @@ export function PlanetBuddy({
         ) : null}
       </svg>
     </span>
+  )
+}
+
+/** ดาวที่เพิ่งถูกจิ้ม ทั้งในฉากสามมิติ (scene) และบนการ์ด (card) */
+export interface PokeState {
+  id: BodyId
+  /** นับเพิ่มทุกครั้งที่จิ้ม ใช้เล่นอนิเมชันใหม่และหมุนเวียนประโยค */
+  count: number
+  source: 'scene' | 'card'
+}
+
+/**
+ * ปุ่มจิ้มเพื่อนดาว แตะแล้วดาวเด้งดึ๋ง ใช้ครอบเพื่อนดาวที่ไม่ได้อยู่ในปุ่มอื่น
+ * (ปุ่มซ้อนปุ่มใช้ไม่ได้ เพื่อนดาวบนปุ่มเลือกดาวจึงจิ้มไม่ได้)
+ */
+export function PokeButton({
+  label,
+  count,
+  reduceMotion,
+  onPoke,
+  children,
+}: {
+  label: string
+  /** จำนวนครั้งที่ดาวดวงนี้ถูกจิ้ม 0 คือยังไม่ถูกจิ้ม */
+  count: number
+  reduceMotion: boolean
+  onPoke: () => void
+  children: ReactNode
+}) {
+  return (
+    <button type="button" className="pq-poke" aria-label={label} onClick={onPoke}>
+      <span key={count} className={count > 0 && !reduceMotion ? 'pq-squish' : 'inline-block'}>
+        {children}
+      </span>
+    </button>
   )
 }
 

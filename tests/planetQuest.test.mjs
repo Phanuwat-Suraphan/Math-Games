@@ -36,6 +36,9 @@ const Engine = load('minigames/engine')
 const P = load('solar/planets')
 const L = load('planetQuest/lessons')
 const Bd = load('planetQuest/buddies')
+const Cm = load('planetQuest/companions')
+const Art = load('planetQuest/companionArt')
+const Ship = load('planetQuest/ship')
 
 let passed = 0
 const failures = []
@@ -495,6 +498,101 @@ check('ประโยคหมุนเวียนไม่ซ้ำติด�
   const byStars = [1, 2, 3].map((stars) => Bd.goodbyeLine(buddy, stars))
   assert(new Set(byStars).size === 3, 'คำลาเหมือนกันทุกจำนวนดาว')
   assert(byStars.every((line) => line.includes(buddy.nickname)), 'คำลาไม่มีชื่อเล่นของดาว')
+})
+
+check('จิ้มดาวแล้วดาวเล่าเรื่องจริงคนละเรื่อง ประโยคไม่ซ้ำ ดาวที่หลับละเมอ และดวงอาทิตย์ก็หัวเราะได้', () => {
+  const seen = new Set()
+  for (const buddy of Bd.BUDDIES) {
+    assert(buddy.pokes.length >= 3, `${buddy.nickname} มีประโยคตอนถูกจิ้มแค่ ${buddy.pokes.length} แบบ`)
+    for (const line of buddy.pokes) {
+      assert(line.length <= 80, `${buddy.nickname}: "${line}" ยาวเกิน`)
+      assert(!seen.has(line), `ประโยค "${line}" ซ้ำ`)
+      seen.add(line)
+    }
+  }
+  const awake = Bd.pokeLine('mars', 0, false)
+  assert(awake.nickname === 'น้องอังคาร' && Bd.buddyFor('mars').pokes.includes(awake.text), 'จิ้มดาวอังคารแล้วไม่ได้ประโยคของดาวอังคาร')
+  const asleep = Bd.pokeLine('mars', 0, true)
+  assert(asleep.text === Bd.sleepyPokeLine(Bd.buddyFor('mars')), 'ดาวที่หลับไม่ละเมอ')
+  const sun = Bd.pokeLine('sun', 4, true)
+  assert(sun.nickname === Bd.SUN_NICKNAME && Bd.SUN_POKES.includes(sun.text), 'ดวงอาทิตย์หลับหรือพูดประโยคของดาวดวงอื่น')
+})
+
+// ---------- เพื่อนร่วมทาง ----------
+
+check('เพื่อนร่วมทางทุกตัวมีชื่อไม่ซ้ำ มีเรื่องเล่าครบ และประโยคตอนออกบินกับตอนถึงใส่ชื่อดาวได้', () => {
+  const names = Cm.COMPANIONS.map((companion) => companion.name)
+  assert(new Set(names).size === names.length, 'ชื่อเพื่อนร่วมทางซ้ำกัน')
+  for (const companion of Cm.COMPANIONS) {
+    assert(companion.facts.length >= 3, `${companion.name} มีเรื่องเล่าแค่ ${companion.facts.length} เรื่อง`)
+    for (const line of [companion.intro, ...companion.facts]) {
+      assert(line.length <= 90, `${companion.name}: "${line}" ยาวเกินกล่องคำพูด`)
+    }
+    for (const line of [...companion.takeoff, ...companion.arrive]) {
+      assert(line.includes('{planet}'), `${companion.name}: "${line}" ไม่มีที่ใส่ชื่อดาว`)
+    }
+    const takeoff = Cm.takeoffLine(companion, 'ดาวอังคาร', 3)
+    assert(takeoff.includes('ดาวอังคาร') && !takeoff.includes('{'), `ประโยคออกบิน "${takeoff}" แทนชื่อดาวไม่ครบ`)
+    assert(Cm.arriveLine(companion, 'ดาวเสาร์', -1).includes('ดาวเสาร์'), 'เลขเที่ยวบินติดลบทำให้พัง')
+    assert(Cm.flightFact(companion, 7).length > 0, `${companion.name} ไม่มีเรื่องเล่าระหว่างบิน`)
+  }
+})
+
+check('เพื่อนใหม่มาตามเงื่อนไขที่เล่นได้จริงทุกตัว ตัวแรกมาตั้งแต่เริ่ม และคำใบ้บอกว่าทำไปแล้วเท่าไร', () => {
+  const none = { awake: 1, lessons: 0, stars: 0 }
+  assert(Cm.unlockedCompanions(none).join() === Cm.DEFAULT_COMPANION, 'ตอนเริ่มมีเพื่อนมากกว่าหรือน้อยกว่าหนึ่งตัว')
+  const everything = { awake: P.PLANETS.length, lessons: L.LESSONS.length, stars: 24 }
+  assert(Cm.unlockedCompanions(everything).length === Cm.COMPANIONS.length, 'เล่นครบทุกอย่างแล้วยังมีเพื่อนที่ไม่มา')
+  for (const companion of Cm.COMPANIONS) {
+    const hint = Cm.unlockHint(companion, none)
+    assert(hint.length > 0 && !hint.includes('undefined'), `คำใบ้ของ${companion.name}ว่าง`)
+  }
+  const momo = Cm.companionFor('momo')
+  assert(!Cm.isUnlocked(momo, { awake: 2, lessons: 0, stars: 0 }) && Cm.isUnlocked(momo, { awake: 3, lessons: 0, stars: 0 }), 'โมโม่ไม่มาตามเงื่อนไขปลุกดาวสามดวง')
+  assert(Cm.unlockHint(momo, { awake: 9, lessons: 0, stars: 0 }).includes('ตอนนี้ 3'), 'คำใบ้นับเกินจำนวนที่ต้องการ')
+  const fresh = Cm.newFriends({ awake: 3, lessons: 2, stars: 0 }, ['pukpik'])
+  assert(fresh.join() === 'momo,bobby', `เพื่อนใหม่คือ ${fresh.join()}`)
+  assert(Cm.newFriends({ awake: 3, lessons: 2, stars: 0 }, ['pukpik', 'momo', 'bobby']).length === 0, 'เพื่อนที่ทักแล้วขึ้นการ์ดซ้ำ')
+})
+
+check('ภาพเพื่อนร่วมทางทุกตัววาดได้ ไม่มีค่าเสีย และชื่อไล่สีไม่ชนกันเมื่อขึ้นจอพร้อมกัน', () => {
+  const ids = new Map()
+  for (const companion of Cm.COMPANIONS) {
+    const art = Art.companionArt(companion.id)
+    assert(art.length > 200, `ภาพ${companion.name}ว่าง`)
+    assert(!/NaN|undefined|Infinity/.test(art), `ภาพ${companion.name}มีค่าเสีย`)
+    for (const [, id] of art.matchAll(/id="([^"]+)"/g)) {
+      assert(!ids.has(id) || ids.get(id) === companion.id, `ชื่อ ${id} ชนกันระหว่าง${ids.get(id)}กับ${companion.id}`)
+      ids.set(id, companion.id)
+    }
+    const file = Art.companionSvgFile(companion.id)
+    assert(file.includes('xmlns="http://www.w3.org/2000/svg"') && file.includes('width="100"'), 'ไฟล์ภาพไม่มี xmlns หรือขนาด ผืนผ้าใบบางเบราว์เซอร์จะไม่วาด')
+  }
+})
+
+check('ยานที่แต่งเองถูกเก็บ ค่าที่เสียถูกแทนด้วยค่าเริ่มต้นทีละช่อง และเพื่อนที่ทักแล้วไม่หายไป', () => {
+  const fresh = Store.emptyProgress('ต้นกล้า')
+  assert(fresh.ship.color === Ship.DEFAULT_COLOR && fresh.ship.companion === Cm.DEFAULT_COMPANION, 'ค่าเริ่มต้นของยานไม่ถูก')
+  assert(fresh.met.join() === Cm.DEFAULT_COMPANION, 'ตอนเริ่มยังไม่รู้จักเพื่อนตัวแรก')
+  const saved = Store.parseProgress({ owner: 'ต้นกล้า', ship: { color: 'purple', companion: 'momo' }, met: ['momo', 'momo', 'ghost'] }, 'ต้นกล้า')
+  assert(saved.ship.color === 'purple' && saved.ship.companion === 'momo', 'อ่านยานที่แต่งไว้ไม่ได้')
+  assert(saved.met.join() === 'pukpik,momo', `เพื่อนที่ทักแล้วคือ ${saved.met.join()}`)
+  const broken = Store.parseProgress({ owner: 'ต้นกล้า', ship: { color: 'rainbow', companion: 'momo' } }, 'ต้นกล้า')
+  assert(broken.ship.color === Ship.DEFAULT_COLOR && broken.ship.companion === 'momo', 'สีเสียทำให้เพื่อนที่เลือกไว้หายไปด้วย')
+  const old = Store.parseProgress({ owner: 'ต้นกล้า', best: { venus: 2 } }, 'ต้นกล้า')
+  assert(old.ship.companion === Cm.DEFAULT_COMPANION && old.met.length === 1, 'ข้อมูลรุ่นก่อนที่ยังไม่มียานอ่านไม่ได้')
+  assert(Store.setShip(fresh, { color: fresh.ship.color }) === fresh, 'เลือกสีเดิมแล้วถูกนับเป็นการเปลี่ยน')
+  const changed = Store.setShip(fresh, { companion: 'draco' })
+  assert(changed.ship.companion === 'draco' && changed.ship.color === fresh.ship.color, 'เปลี่ยนเพื่อนแล้วสีหาย')
+  const met = Store.markMet(fresh, 'fufu')
+  assert(met.met.includes('fufu') && Store.markMet(met, 'fufu') === met, 'ทักเพื่อนซ้ำแล้วถูกเพิ่มซ้ำ')
+  const colors = Ship.SHIP_COLORS.map((color) => color.id)
+  assert(new Set(colors).size === colors.length, 'สียานซ้ำกัน')
+  for (const color of Ship.SHIP_COLORS) {
+    for (const value of [color.fin, color.bodyTop, color.bodyBottom, color.window]) {
+      assert(/^#[0-9a-f]{6}$/i.test(value), `สี ${value} ของ${color.name}ไม่ใช่รหัสสี`)
+    }
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

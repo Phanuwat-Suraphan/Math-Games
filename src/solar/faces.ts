@@ -8,7 +8,7 @@
  * ซึ่งชุดทดสอบการวาดตรวจรัศมีติดลบได้ครบ
  */
 
-export type FaceMood = 'happy' | 'wow' | 'sleep'
+export type FaceMood = 'happy' | 'wow' | 'sleep' | 'giggle'
 
 const TAU = Math.PI * 2
 const INK = '#1b1537'
@@ -59,7 +59,14 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, y: number, ra
   ctx.strokeStyle = INK
   ctx.fillStyle = INK
   ctx.lineWidth = line
-  if (style.mood === 'sleep' || style.blink) {
+  if (style.mood === 'giggle') {
+    // หัวเราะจนตาหยี ^ ^
+    for (const side of [-1, 1]) {
+      ctx.beginPath()
+      ctx.arc(x + side * eyeGap, eyeY + r * 0.05, r * 0.09, 1.15 * Math.PI, 1.85 * Math.PI)
+      ctx.stroke()
+    }
+  } else if (style.mood === 'sleep' || style.blink) {
     // ตาปิดเป็นเส้นโค้งคว่ำ ดูหลับสบาย ไม่ใช่ตาเศร้า
     for (const side of [-1, 1]) {
       ctx.beginPath()
@@ -89,7 +96,7 @@ export function drawFace(ctx: CanvasRenderingContext2D, x: number, y: number, ra
   const mouthY = y + r * 0.2
   ctx.strokeStyle = INK
   ctx.fillStyle = INK
-  if (style.mood === 'wow') {
+  if (style.mood === 'wow' || style.mood === 'giggle') {
     ctx.beginPath()
     ctx.ellipse(x, mouthY + r * 0.02, r * 0.11, r * 0.1, 0, 0, TAU)
     ctx.fill()
