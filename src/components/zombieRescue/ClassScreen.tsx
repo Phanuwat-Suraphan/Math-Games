@@ -8,7 +8,7 @@ import { RUSH_TABLES } from '../../zombieRescue/rush'
 import type { RushFact, RushTable } from '../../zombieRescue/rush'
 import { villagerFor } from '../../zombieRescue/villagers'
 import { Char, HeartBurst, QuestionVisual, SpeakButton, VillagerArt, openWorksheet } from './ZrParts'
-import { factSpeech, revealSpeech } from '../../zombieRescue/speech'
+import { divFactSpeech, divRevealSpeech, factSpeech, revealSpeech } from '../../zombieRescue/speech'
 import { speak, speechSupported, stopSpeaking } from '../../services/speechService'
 
 /**
@@ -22,9 +22,14 @@ import { speak, speechSupported, stopSpeaking } from '../../services/speechServi
 const COLORS = { '--c': '#1E9AAE', '--bg': '#E4F7FA' } as CSSProperties
 const LABEL: Record<string, string> = { '2': '×2', '3': '×3', '4': '×4', '5': '×5', '10': '×10', mix: 'รวม' }
 const tableName = (t: RushTable) => (t === 'mix' ? 'รวมทุกแม่' : `แม่ ${t}`)
+/** ✖ ถามสูตรคูณ หรือ ➗ ถามการหาร (ใช้คำว่า "หารด้วย") */
+type Op = 'mul' | 'div'
+const nameOf = (op: Op, t: RushTable) => (op === 'div' ? (t === 'mix' ? '➗ หารด้วย 2 3 4 5 10' : `➗ หารด้วย ${t}`) : tableName(t))
+const factText = (op: Op, f: RushFact) => (op === 'div' ? `${f.groups * f.each} ÷ ${f.each} = ${f.groups}` : `${f.groups} × ${f.each} = ${f.groups * f.each}`)
 const CURE_MS = 900
 
 interface Round {
+  op: Op
   table: RushTable
   set: RushFact[]
   index: number
@@ -42,6 +47,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
   const [table, setTable] = useState<RushTable>(2)
   const [count, setCount] = useState<number>(CLASS_COUNTS[0])
   const [think, setThink] = useState<number>(10)
+  const [op, setOp] = useState<Op>('mul')
   /* ห้องเรียนเปิดอ่านโจทย์ไว้ก่อน ครูไม่ต้องอ่านเองทุกข้อ */
   const [autoRead, setAutoRead] = useState(true)
   const autoReadRef = useRef(autoRead)
@@ -62,15 +68,17 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
     if (!autoReadRef.current) return
     const f = round.set[round.index]
     // อ่านเมื่อขึ้นข้อใหม่ และอ่านเฉลยเมื่อเพิ่งกดเฉลย
-    if (!before || before.set !== round.set || before.index !== round.index) speak(factSpeech(f.groups, f.each))
-    else if (!before.revealed && round.revealed) speak(revealSpeech(f.groups, f.each))
+    const ask = round.op === 'div' ? divFactSpeech : factSpeech
+    const tell = round.op === 'div' ? divRevealSpeech : revealSpeech
+    if (!before || before.set !== round.set || before.index !== round.index) speak(ask(f.groups, f.each))
+    else if (!before.revealed && round.revealed) speak(tell(f.groups, f.each))
   }
 
-  const start = (chosen: RushTable, set: RushFact[]) => {
+  const start = (chosen: RushTable, set: RushFact[], withOp: Op = op) => {
     playSfx('levelUp')
     onPlayingChange(true)
     setTable(chosen)
-    put({ table: chosen, set, index: 0, results: [], revealed: false, marked: null, shownAt: Date.now() })
+    put({ op: withOp, table: chosen, set, index: 0, results: [], revealed: false, marked: null, shownAt: Date.now() })
   }
 
   const reveal = useCallback(() => {
@@ -157,12 +165,24 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
           <br />
           กด ⛶ เต็มจอ ด้านบนก่อนเริ่ม จะเห็นชัดทั้งห้อง
         </p>
-        <fieldset className="mt-5">
-          <legend className="mb-2 text-sm font-bold text-white">แม่สูตรคูณ</legend>
+        <div className="mt-5 grid grid-cols-2 gap-2" role="group" aria-label="ถามอะไร">
+          {(
+            [
+              ['mul', '✖ สูตรคูณ'],
+              ['div', '➗ การหาร (หารด้วย)'],
+            ] as const
+          ).map(([key, label]) => (
+            <button key={key} type="button" aria-pressed={op === key} onClick={() => setOp(key)} className={choice(op === key)}>
+              <span className="font-bold text-white">{label}</span>
+            </button>
+          ))}
+        </div>
+        <fieldset className="mt-4">
+          <legend className="mb-2 text-sm font-bold text-white">{op === 'div' ? 'หารด้วยเท่าไร' : 'แม่สูตรคูณ'}</legend>
           <div className="grid grid-cols-3 gap-2">
             {RUSH_TABLES.map((t) => (
               <button key={String(t)} type="button" aria-pressed={table === t} onClick={() => setTable(t)} className={choice(table === t)}>
-                <span className="font-display text-2xl text-white">{LABEL[String(t)]}</span>
+                <span className="font-display text-2xl text-white">{op === 'div' && t !== 'mix' ? `÷${t}` : LABEL[String(t)]}</span>
               </button>
             ))}
           </div>
@@ -207,8 +227,8 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
         <Button size="lg" fullWidth className="mt-6" onClick={() => start(table, buildClassSet(table, count, Math.random))}>
           📺 เริ่มถามทั้งห้อง
         </Button>
-        <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table)}>
-          📝 พิมพ์ใบงาน{tableName(table)} (A4 · ชุดใหม่ทุกครั้ง · มีเฉลย)
+        <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table, op)}>
+          📝 พิมพ์ใบงาน{op === 'div' ? `การหาร ${nameOf('div', table).replace('➗ ', '')}` : tableName(table)} (A4 · ชุดใหม่ทุกครั้ง · มีเฉลย)
         </Button>
       </div>
     )
@@ -223,7 +243,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
     return (
       <div className="ta-card ta-cute ta-card-pop mx-auto zr-class-card" style={COLORS}>
         <div className="ta-card-head">
-          <span>📺 จบรอบ · {tableName(phase.round.table)}</span>
+          <span>📺 จบรอบ · {nameOf(phase.round.op, phase.round.table)}</span>
           <span className="text-[#FFE27A]">
             {'★'.repeat(stars)}
             {'☆'.repeat(3 - stars)}
@@ -243,7 +263,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
           {missed.length ? (
             <div className="rounded-2xl bg-white px-3 py-2 text-left">
               <p className="font-bold">🔁 ข้อที่ห้องควรทวน</p>
-              <p className="mt-1 text-lg">{missed.map((f) => `${f.groups} × ${f.each} = ${f.groups * f.each}`).join(' · ')}</p>
+              <p className="mt-1 text-lg">{missed.map((f) => factText(phase.round.op, f)).join(' · ')}</p>
             </div>
           ) : (
             <p className="text-xl font-bold text-green-700">ทั้งห้องตอบถูกทุกข้อ เก่งมาก! 🎉</p>
@@ -252,8 +272,8 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
             <Button variant="secondary" onClick={quit}>
               ตั้งค่าใหม่
             </Button>
-            {missed.length ? <Button onClick={() => start(phase.round.table, missed)}>🔁 ซ่อมเฉพาะข้อที่พลาด ({missed.length})</Button> : null}
-            <Button onClick={() => start(phase.round.table, buildClassSet(phase.round.table, phase.round.set.length, Math.random))}>📺 อีกรอบ</Button>
+            {missed.length ? <Button onClick={() => start(phase.round.table, missed, phase.round.op)}>🔁 ซ่อมเฉพาะข้อที่พลาด ({missed.length})</Button> : null}
+            <Button onClick={() => start(phase.round.table, buildClassSet(phase.round.table, phase.round.set.length, Math.random), phase.round.op)}>📺 อีกรอบ</Button>
           </div>
         </div>
       </div>
@@ -270,7 +290,7 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2 text-white">
         <p className="font-bold">
-          ข้อ {round.index + 1} / {round.set.length} <span className="font-normal text-slate-400">· {tableName(round.table)}</span>
+          ข้อ {round.index + 1} / {round.set.length} <span className="font-normal text-slate-400">· {nameOf(round.op, round.table)}</span>
         </p>
         <p className="font-bold">💉 รักษาแล้ว {round.results.filter((r) => r.correct).length} คน</p>
         <Button variant="ghost" onClick={quit}>
@@ -298,10 +318,24 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
           <div className="flex flex-wrap items-center justify-center gap-6">
             <VillagerArt v={v} cured={cured} className={`zr-class-villager flex-none ${cured ? 'zr-bob' : 'zr-sway'}`} />
             <p className="zr-class-expr font-display tabular-nums">
-              {fact.groups} × {fact.each} = {round.revealed ? <span className="text-green-700">{fact.groups * fact.each}</span> : '?'}
+              {round.op === 'div' ? (
+                <>
+                  {fact.groups * fact.each} ÷ {fact.each} = {round.revealed ? <span className="text-green-700">{fact.groups}</span> : '?'}
+                </>
+              ) : (
+                <>
+                  {fact.groups} × {fact.each} = {round.revealed ? <span className="text-green-700">{fact.groups * fact.each}</span> : '?'}
+                </>
+              )}
             </p>
           </div>
-          <SpeakButton text={round.revealed ? revealSpeech(fact.groups, fact.each) : factSpeech(fact.groups, fact.each)} />
+          <SpeakButton
+            text={
+              round.op === 'div'
+                ? (round.revealed ? divRevealSpeech : divFactSpeech)(fact.groups, fact.each)
+                : (round.revealed ? revealSpeech : factSpeech)(fact.groups, fact.each)
+            }
+          />
           {!round.revealed && think > 0 ? (
             <div className="h-3 w-full max-w-xl overflow-hidden rounded-full bg-[#CFE9EE]" aria-hidden="true">
               <div className="h-full rounded-full bg-[#1E9AAE] transition-[width] duration-200" style={{ width: `${(leftMs / (think * 1000)) * 100}%` }} />
@@ -311,7 +345,9 @@ export function ClassScreen({ onPlayingChange }: { onPlayingChange: (playing: bo
             <div className="zr-class-visual">
               <QuestionVisual visual={classVisual(fact)} />
               <p className="mt-2 text-lg font-bold text-slate-600">
-                {fact.groups} กลุ่ม กลุ่มละ {fact.each} รวมเป็น {fact.groups * fact.each}
+                {round.op === 'div'
+                  ? `${fact.groups * fact.each} แบ่งเป็นกลุ่มละ ${fact.each} ได้ ${fact.groups} กลุ่ม · คิดจาก ${fact.groups} × ${fact.each} = ${fact.groups * fact.each}`
+                  : `${fact.groups} กลุ่ม กลุ่มละ ${fact.each} รวมเป็น ${fact.groups * fact.each}`}
               </p>
             </div>
           ) : (
