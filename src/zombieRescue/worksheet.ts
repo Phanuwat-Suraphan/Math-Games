@@ -15,12 +15,14 @@
  */
 
 import { zheadInner } from './art'
-import { MAX_DRAWN, TABLES } from './questions'
+import { MAX_DRAWN, TABLES, divisionQuestion } from './questions'
 import type { Rng, Table } from './questions'
 import { villagerAt, villagerInner, villagerZombieInner, VILLAGER_COUNT, VILLAGER_VIEWBOX } from './villagers'
 
 export type SheetTable = Table | 'mix'
-export type SheetKind = 'product' | 'missingGroups' | 'missingEach' | 'picture' | 'story'
+export type SheetKind = 'product' | 'missingGroups' | 'missingEach' | 'picture' | 'story' | 'divide' | 'family' | 'circle' | 'divStory'
+/** ✖ ใบงานสูตรคูณ หรือ ➗ ใบงานการหาร (แบ่งวัคซีน) */
+export type SheetOp = 'mul' | 'div'
 
 export interface SheetItem {
   kind: SheetKind
@@ -34,6 +36,7 @@ export interface SheetItem {
 
 export interface Worksheet {
   table: SheetTable
+  op: SheetOp
   seed: number
   items: SheetItem[]
 }
@@ -46,6 +49,19 @@ export const SHEET_PARTS: Array<{ kind: SheetKind | 'missing'; count: number; ti
   { kind: 'story', count: 2, title: 'ตอนที่ 4 · โจทย์ปัญหา' },
 ]
 export const SHEET_TOTAL = SHEET_PARTS.reduce((s, p) => s + p.count, 0)
+
+/**
+ * ใบงานการหาร 20 ข้อ ใช้คู่เดียวกับสูตรคูณ: ตัวหารคือแม่ คำตอบคือจำนวนกลุ่ม
+ * ตอนที่ 3 ให้วงล้อมซอมบี้ทีละกลุ่มบนกระดาษ ซึ่งเป็นความหมายของการหารแบบแบ่งกลุ่มละเท่า ๆ กันโดยตรง
+ */
+export const DIV_SHEET_PARTS: Array<{ kind: SheetKind; count: number; title: string }> = [
+  { kind: 'divide', count: 8, title: 'ตอนที่ 1 · หาผลหาร' },
+  { kind: 'family', count: 6, title: 'ตอนที่ 2 · คิดจากสูตรคูณ เติม □ ให้ครบทั้งสองประโยค' },
+  { kind: 'circle', count: 4, title: 'ตอนที่ 3 · วงล้อมซอมบี้ทีละกลุ่ม แล้วนับว่าได้กี่กลุ่ม' },
+  { kind: 'divStory', count: 2, title: 'ตอนที่ 4 · โจทย์ปัญหาการหาร' },
+]
+
+export const partsOf = (op: SheetOp) => (op === 'div' ? DIV_SHEET_PARTS : SHEET_PARTS)
 
 const STORIES: Array<{ text: (g: number, e: number) => string; unit: string }> = [
   { text: (g, e) => `ชาวเมือง ${g} กลุ่ม กลุ่มละ ${e} คน ต้องฉีดวัคซีนคนละ 1 เข็ม ต้องใช้วัคซีนทั้งหมดกี่เข็ม`, unit: 'เข็ม' },
@@ -85,10 +101,23 @@ function pick(table: SheetTable, count: number, ok: (g: number, e: Table) => boo
   return out
 }
 
-export function buildWorksheet(table: SheetTable, seed: number): Worksheet {
+export function buildWorksheet(table: SheetTable, seed: number, op: SheetOp = 'mul'): Worksheet {
   const rng = seeded(seed)
   const item = (kind: SheetKind, [groups, each]: [number, Table]): SheetItem => ({ kind, groups, each, product: groups * each })
   const items: SheetItem[] = []
+  if (op === 'div') {
+    items.push(...pick(table, 8, () => true, rng).map((p) => item('divide', p)))
+    items.push(...pick(table, 6, (g) => g >= 2, rng).map((p) => item('family', p)))
+    items.push(...pick(table, 4, (g, e) => g >= 2 && g * e <= MAX_DRAWN, rng).map((p) => item('circle', p)))
+    const first = Math.floor(rng() * 4)
+    items.push(
+      ...pick(table, 2, (g) => g >= 2, rng).map(([g, e], i) => {
+        const q = divisionQuestion(g, e, first + i)
+        return { ...item('divStory', [g, e]), text: q.text, unit: q.unit }
+      }),
+    )
+    return { table, op, seed, items }
+  }
   items.push(...pick(table, 8, () => true, rng).map((p) => item('product', p)))
   items.push(...pick(table, 6, (g) => g >= 2, rng).map((p, i) => item(i % 2 === 0 ? 'missingGroups' : 'missingEach', p)))
   items.push(...pick(table, 4, (g, e) => g >= 2 && g * e <= MAX_DRAWN, rng).map((p) => item('picture', p)))
@@ -96,7 +125,7 @@ export function buildWorksheet(table: SheetTable, seed: number): Worksheet {
   items.push(
     ...pick(table, 2, (g) => g >= 2, rng).map(([g, e], i) => ({ ...item('story', [g, e]), text: stories[i].text(g, e), unit: stories[i].unit })),
   )
-  return { table, seed, items }
+  return { table, op, seed, items }
 }
 
 /** เฉลยของหนึ่งข้อเป็นข้อความสั้น */
@@ -112,6 +141,14 @@ export function answerOf(it: SheetItem): string {
       return `${it.groups} × ${it.each} = ${it.product}`
     case 'story':
       return `${it.groups} × ${it.each} = ${it.product} ตอบ ${it.product} ${it.unit ?? ''}`.trim()
+    case 'divide':
+      return String(it.groups)
+    case 'family':
+      return `□ = ${it.groups} (${it.groups} × ${it.each} = ${it.product} · ${it.product} ÷ ${it.each} = ${it.groups})`
+    case 'circle':
+      return `${it.groups} กลุ่ม (${it.product} ÷ ${it.each} = ${it.groups})`
+    case 'divStory':
+      return `${it.product} ÷ ${it.each} = ${it.groups} ตอบ ${it.groups} ${it.unit ?? ''}`.trim()
   }
 }
 
@@ -138,14 +175,24 @@ function itemHtml(it: SheetItem, n: number): string {
     }
     case 'story':
       return `<li class="story"><b>${n}.</b> ${it.text}<div class="sent">ประโยคการคูณ ${line} × ${line} = ${line} &nbsp; ตอบ ${line} ${it.unit ?? ''}</div></li>`
+    case 'divide':
+      return `<li><b>${n}.</b> ${it.product} ÷ ${it.each} = ${line}</li>`
+    case 'family':
+      return `<li><b>${n}.</b> ${box} × ${it.each} = ${it.product} <span class="then">จึง</span> ${it.product} ÷ ${it.each} = ${box}</li>`
+    case 'circle':
+      return `<li class="pic"><b>${n}.</b> ซอมบี้ ${it.product} ตัว วงล้อมทีละ ${it.each} ตัว<div class="dots">${zhead(4.4).repeat(it.product)}</div><div class="sent">ได้ ${line} กลุ่ม &nbsp; ${it.product} ÷ ${it.each} = ${line}</div></li>`
+    case 'divStory':
+      return `<li class="story"><b>${n}.</b> ${it.text}<div class="sent">ประโยคการหาร ${line} ÷ ${line} = ${line} &nbsp; ตอบ ${line} ${it.unit ?? ''}</div></li>`
   }
 }
 
 /** หน้า HTML ทั้งไฟล์ พร้อมพิมพ์ (เปิดในแท็บใหม่แล้วกดพิมพ์) */
 export function worksheetHtml(sheet: Worksheet): string {
-  const { items, table, seed } = sheet
+  const { items, table, seed, op } = sheet
+  const title = op === 'div' ? 'ใบงานการหาร (แบ่งวัคซีน)' : 'ใบงานสูตรคูณ'
+  const label = op === 'div' ? (table === 'mix' ? 'หารด้วย 2 3 4 5 10' : `หารด้วย ${table}`) : tableLabel(table)
   let n = 0
-  const parts = SHEET_PARTS.map((part) => {
+  const parts = partsOf(op).map((part) => {
     const mine = items.slice(n, n + part.count)
     const html = `<section class="part"><h3>${part.title}</h3><ol class="${part.kind}">${mine.map((it, i) => itemHtml(it, n + i + 1)).join('')}</ol></section>`
     n += part.count
@@ -157,7 +204,7 @@ export function worksheetHtml(sheet: Worksheet): string {
   const setNo = `ชุดที่ ${seed}`
   return `<!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ใบงานสูตรคูณ ${tableLabel(table)} · ${setNo}</title>
+<title>${title} ${label} · ${setNo}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mali:wght@500;600;700&family=Mitr:wght@400;500;600&display=swap">
 <style>
   :root{color-scheme:light; --ink:#23324A; --dim:#5D6B82; --teal:#1E9AAE}
@@ -175,9 +222,12 @@ export function worksheetHtml(sheet: Worksheet): string {
   .part{margin-top:2.8mm}
   .part h3{margin:0 0 1.6mm; font:600 11.5pt "Mitr",sans-serif; color:var(--teal)}
   ol{list-style:none; margin:0; padding:0; font-size:14pt}
-  ol.product, ol.missing{display:grid; grid-template-columns:repeat(4,1fr); gap:3mm 4mm}
+  ol.product, ol.missing, ol.divide{display:grid; grid-template-columns:repeat(4,1fr); gap:3mm 4mm}
+  ol.family{display:grid; grid-template-columns:repeat(2,1fr); gap:3mm 6mm; font-size:13pt}
+  .then{font-size:10pt; color:var(--dim); margin:0 1.5mm}
+  .dots{display:flex; flex-wrap:wrap; gap:1mm; max-width:82mm; margin:1.2mm 0 1.4mm}
   ol.missing{grid-template-columns:repeat(3,1fr)}
-  ol.picture{display:grid; grid-template-columns:repeat(2,1fr); gap:3mm 6mm}
+  ol.picture, ol.circle{display:grid; grid-template-columns:repeat(2,1fr); gap:3mm 6mm}
   ol b{font:600 10pt "Mitr",sans-serif; color:var(--dim); margin-right:1.5mm}
   .ln{display:inline-block; width:14mm; border-bottom:.35mm solid var(--ink); vertical-align:-1mm}
   .bx{display:inline-block; width:9mm; height:9mm; border:.45mm solid var(--ink); border-radius:1.6mm; vertical-align:middle}
@@ -185,7 +235,8 @@ export function worksheetHtml(sheet: Worksheet): string {
   .grps{display:flex; flex-wrap:wrap; gap:1.2mm; margin:.8mm 0 1.6mm}
   .grp{display:inline-grid; gap:.3mm; padding:.8mm; border:.35mm solid var(--teal); border-radius:2mm}
   .sent{font-size:13pt}
-  ol.story li{font-size:12pt; line-height:1.6; margin-bottom:2.4mm}
+  ol.story li, ol.divStory li{font-size:12pt; line-height:1.6; margin-bottom:2.4mm}
+  ol.circle li{font-size:11.5pt}
   .score{display:flex; align-items:center; gap:4mm; margin-top:4mm; padding:2.4mm 3mm; background:#F0FAF3; border-radius:3mm; font-size:10.5pt}
   .score .heads{display:flex; flex-wrap:wrap; gap:.8mm}
   .score b{font:600 13pt "Mitr",sans-serif; white-space:nowrap}
@@ -196,16 +247,16 @@ export function worksheetHtml(sheet: Worksheet): string {
   @page{size:A4 portrait; margin:0}
   @media print{ body{background:#fff} .bar{display:none} .page{margin:0; box-shadow:none; break-after:page} .page:last-child{break-after:auto} }
 </style></head><body>
-<div class="bar"><span>📝 ใบงานสูตรคูณ ${tableLabel(table)} · ${setNo}</span><button type="button" onclick="window.print()">🖨️ พิมพ์ (หน้า 1 ใบงาน · หน้า 2 เฉลย)</button></div>
+<div class="bar"><span>📝 ${title} ${label} · ${setNo}</span><button type="button" onclick="window.print()">🖨️ พิมพ์ (หน้า 1 ใบงาน · หน้า 2 เฉลย)</button></div>
 <div class="page">
-  <header>${svg(villagerZombieInner(villagerAt(12)), VILLAGER_VIEWBOX, 16)}<h1>📝 ใบงานสูตรคูณ ${tableLabel(table)}<small>ZOMBIE RESCUE · ช่วยชาวเมืองด้วยการคูณ!</small></h1><div class="deco">${deco}</div></header>
+  <header>${svg(villagerZombieInner(villagerAt(12)), VILLAGER_VIEWBOX, 16)}<h1>📝 ${title} ${label}<small>ZOMBIE RESCUE · ${op === 'div' ? 'แบ่งวัคซีนให้ชาวเมืองกลุ่มละเท่า ๆ กัน!' : 'ช่วยชาวเมืองด้วยการคูณ!'}</small></h1><div class="deco">${deco}</div></header>
   <div class="who"><span>ชื่อ</span><span>ชั้น</span><span>เลขที่</span><span>วันที่</span></div>
   ${parts}
   <div class="score">${cured}<div>ตอบถูกข้อละ 1 คน ระบายหน้าซอมบี้ให้เป็นคนตามจำนวนข้อที่ถูก<div class="heads">${zhead(5.4).repeat(SHEET_TOTAL)}</div></div><b>ได้ ____ / ${SHEET_TOTAL}</b></div>
-  <div class="foot"><span>ZOMBIE RESCUE · ใบงานสูตรคูณ ป.2</span><span>${setNo}</span></div>
+  <div class="foot"><span>ZOMBIE RESCUE · ${title} ป.2</span><span>${setNo}</span></div>
 </div>
 <div class="page key">
-  <h2>🔑 เฉลยใบงาน ${tableLabel(table)} · ${setNo}</h2>
+  <h2>🔑 เฉลย${title} ${label} · ${setNo}</h2>
   <p>ประโยคการคูณที่สลับตัวคูณ (เช่น 4 × 3 กับ 3 × 4) ถือว่าถูก เพราะหนังสือแต่ละเล่มเรียงไม่เหมือนกัน</p>
   <ol>${key}</ol>
   <div class="foot"><span>ZOMBIE RESCUE · เฉลยสำหรับครู</span><span>${setNo}</span></div>

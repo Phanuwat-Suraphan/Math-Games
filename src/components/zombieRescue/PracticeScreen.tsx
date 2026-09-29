@@ -64,6 +64,9 @@ interface Round {
 type Phase = { kind: 'choose' } | { kind: 'play'; round: Round } | { kind: 'done'; round: Round; reward: number }
 
 const tableName = (table: Choice) => (table === 'focus' ? 'ข้อที่ยังพลาด' : table === 'mix' ? 'รวมทุกแม่' : `แม่ ${table}`)
+/** ชื่อของรอบหาร ใช้คำว่า "หารด้วย" ตามที่ครูสอน */
+const divName = (table: Choice) => (table === 'mix' ? 'หารด้วย 2 3 4 5 10' : `หารด้วย ${table}`)
+const roundName = (op: Op, table: Choice) => (op === 'div' ? `➗ ${divName(table)}` : tableName(table))
 
 export function PracticeScreen({ playerName, book, startFocus = false, onAnswer, onFinish, onPlayingChange }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: 'choose' })
@@ -124,7 +127,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
           ))}
         </div>
         <fieldset className="mt-4">
-          <legend className="mb-2 text-sm font-bold text-white">{op === 'div' ? 'แบ่งทีละเท่าไร (ตัวหาร)' : 'เลือกแม่สูตรคูณ'}</legend>
+          <legend className="mb-2 text-sm font-bold text-white">{op === 'div' ? 'หารด้วยเท่าไร' : 'เลือกแม่สูตรคูณ'}</legend>
           <div className="grid grid-cols-3 gap-2">
             {CHOICES.map((choice) => (
               <button
@@ -136,8 +139,10 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
                   table === choice.key ? 'border-gold-300 bg-gold-500/15' : 'border-white/15 bg-white/5 hover:border-white/30'
                 }`}
               >
-                <span className="block font-display text-2xl text-white">{choice.label}</span>
-                <span className="block text-xs text-slate-300">{choice.note}</span>
+                <span className="block font-display text-2xl text-white">
+                  {op === 'div' && choice.key !== 'mix' ? choice.label.replace('×', '÷') : choice.label}
+                </span>
+                <span className="block text-xs text-slate-300">{op === 'div' ? (choice.key === 'mix' ? 'หารปนกันทุกแบบ' : divName(choice.key)) : choice.note}</span>
               </button>
             ))}
           </div>
@@ -160,7 +165,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
         <ul className="mt-5 space-y-1.5 text-sm text-slate-300">
           <li>· ถูกข้อละ 🪙 1 เหรียญ ถูกหมดทั้งรอบได้โบนัส</li>
           {op === 'div' ? (
-            <li>· การหารคือการคูณย้อนกลับ: 12 ÷ 3 = □ คิดจาก □ × 3 = 12 (ข้อหารไม่นับลงสมุดวัคซีนและตัวชี้วัดการคูณ)</li>
+            <li>· 12 หารด้วย 3 (12 ÷ 3 = □) คิดจากสูตรคูณ □ × 3 = 12 (ข้อหารไม่นับลงสมุดวัคซีนและตัวชี้วัดการคูณ)</li>
           ) : (
             <li>· ผลของ {playerName} ส่งให้แผงคุณครูในตัวชี้วัด "การคูณ (ป.2)"</li>
           )}
@@ -168,9 +173,9 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
         <Button size="lg" fullWidth className="mt-6" onClick={() => begin(table)}>
           🎯 เริ่มฝึก
         </Button>
-        {table !== 'focus' && op === 'mul' ? (
-          <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table)}>
-            📝 พิมพ์ใบงาน{tableName(table)} ฝึกบนกระดาษ
+        {table !== 'focus' ? (
+          <Button variant="secondary" fullWidth className="mt-3" onClick={() => openWorksheet(table, op)}>
+            📝 พิมพ์ใบงาน{op === 'div' ? `การหาร ${divName(table)}` : tableName(table)} ฝึกบนกระดาษ
           </Button>
         ) : null}
       </div>
@@ -186,7 +191,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
     return (
       <div className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
-          <span>🎯 จบรอบฝึก · {round.op === 'div' ? '➗ หาร ' : ''}{tableName(round.table)}</span>
+          <span>🎯 จบรอบฝึก · {roundName(round.op, round.table)}</span>
           <span className="text-[#FFE27A]">{'★'.repeat(stars)}{'☆'.repeat(3 - stars)}</span>
         </div>
         <div className="grid gap-3 px-5 pb-5 pt-1 text-center">
@@ -261,8 +266,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
         <p className="text-sm font-bold text-white">
           {round.retrying ? `🔁 รอบแก้ตัว ข้อ ${round.retryIndex + 1} / ${round.retry.length}` : `ข้อ ${round.index + 1} / ${round.questions.length}`}
           <span className="ml-2 font-normal text-slate-400">
-            {round.op === 'div' ? '➗ หาร ' : ''}
-            {tableName(round.table)}
+            {roundName(round.op, round.table)}
           </span>
         </p>
         <Button variant="ghost" onClick={stop}>
@@ -284,7 +288,7 @@ export function PracticeScreen({ playerName, book, startFocus = false, onAnswer,
       <div key={cardKey} className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
           <span>{round.op === 'div' ? '➗ แบ่งวัคซีน' : '🎯 ฝึกสูตรคูณ'}</span>
-          <span className="text-sm">{round.retrying ? 'ลองอีกครั้ง!' : `${round.op === 'div' ? '➗ ' : ''}${tableName(round.table)}`}</span>
+          <span className="text-sm">{round.retrying ? 'ลองอีกครั้ง!' : roundName(round.op, round.table)}</span>
         </div>
         <div className="flex flex-col gap-3 px-[18px] pb-[18px] pt-1.5">
           <div className="flex flex-col items-center gap-2">

@@ -19,7 +19,7 @@ export function mathSpeech(text: string): string {
   return text
     .replace(/□/g, ' ช่องว่าง ')
     .replace(/×/g, ' คูณ ')
-    .replace(/÷/g, ' หาร ')
+    .replace(/÷/g, ' หารด้วย ')
     .replace(/\+/g, ' บวก ')
     .replace(/=\s*\?/g, ' เท่ากับเท่าไร ')
     .replace(/=/g, ' เท่ากับ ')
@@ -33,7 +33,7 @@ export function questionSpeech(q: Question): string {
   const v = q.visual
   // ข้อหาร: ข้อตรง ๆ อ่านนิพจน์ ข้อโจทย์ปัญหาอ่านเรื่อง (โจทย์ปัญหามีตัวเลขครบในเรื่องแล้ว)
   if (q.key === 'div-story') return mathSpeech(q.text)
-  if (q.key === 'div-expr') return `${q.product} หาร ${q.each} เท่ากับเท่าไร`
+  if (q.key === 'div-expr') return `${q.product} หารด้วย ${q.each} เท่ากับเท่าไร`
   if (v.kind === 'expr') {
     return mathSpeech(v.text) + (q.ask === 'missing' ? ' ช่องว่างคือเลขอะไร' : '')
   }
@@ -49,3 +49,7 @@ export const factSpeech = (groups: number, each: number): string => `${groups} �
 
 /** อ่านเฉลย */
 export const revealSpeech = (groups: number, each: number): string => `${groups} คูณ ${each} เท่ากับ ${groups * each}`
+
+/** อ่านข้อหาร ใช้คำว่า "หารด้วย" ตามที่ครูสอน (ตัวตั้ง หารด้วย ตัวหาร) */
+export const divFactSpeech = (groups: number, each: number): string => `${groups * each} หารด้วย ${each} เท่ากับเท่าไร`
+export const divRevealSpeech = (groups: number, each: number): string => `${groups * each} หารด้วย ${each} เท่ากับ ${groups}`

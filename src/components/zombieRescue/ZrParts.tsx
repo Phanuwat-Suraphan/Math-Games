@@ -10,7 +10,7 @@ import type { AskKind, QAnswer, QVisual, Stage } from '../../zombieRescue/questi
 import { VILLAGER_VIEWBOX, thanksOf, villagerFor, villagerInner, villagerZombieInner } from '../../zombieRescue/villagers'
 import type { Villager } from '../../zombieRescue/villagers'
 import { buildWorksheet, newSheetSeed, worksheetHtml } from '../../zombieRescue/worksheet'
-import type { SheetTable } from '../../zombieRescue/worksheet'
+import type { SheetOp, SheetTable } from '../../zombieRescue/worksheet'
 
 /**
  * ชิ้นส่วนหน้าจอของ ZOMBIE RESCUE ใช้ร่วมกันระหว่างเกมกระดานกับโหมดฝึกสูตรคูณ
@@ -387,8 +387,11 @@ export function HeartBurst() {
  * เปิดใบงานสูตรคูณชุดใหม่ในแท็บใหม่ (หน้า 1 ใบงาน หน้า 2 เฉลย) ให้ครูหรือผู้ปกครองกดพิมพ์
  * เบราว์เซอร์ที่กันหน้าต่างใหม่จะได้เป็นไฟล์ดาวน์โหลดแทน
  */
-export function openWorksheet(table: SheetTable): void {
-  openPrintPage(worksheetHtml(buildWorksheet(table, newSheetSeed(Math.random))), 'ใบงานสูตรคูณ-zombie-rescue.html')
+export function openWorksheet(table: SheetTable, op: SheetOp = 'mul'): void {
+  openPrintPage(
+    worksheetHtml(buildWorksheet(table, newSheetSeed(Math.random), op)),
+    op === 'div' ? 'ใบงานการหาร-zombie-rescue.html' : 'ใบงานสูตรคูณ-zombie-rescue.html',
+  )
 }
 
 /** เปิดหน้า HTML พร้อมพิมพ์ในแท็บใหม่ (ใบงาน รายงาน) กันหน้าต่างใหม่ไว้ก็ดาวน์โหลดเป็นไฟล์แทน */
