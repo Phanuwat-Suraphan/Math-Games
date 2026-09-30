@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { Button } from '../Button'
 import { playSfx } from '../../services/audioService'
-import { RUSH_SECONDS, RUSH_STAR_AT, RUSH_TABLES, rushDeck, rushStars } from '../../zombieRescue/rush'
-import type { RushBest, RushFact, RushTable } from '../../zombieRescue/rush'
+import { RUSH_SECONDS, RUSH_STAR_AT, RUSH_TABLES, rushAnswer, rushDeck, rushKey, rushStars } from '../../zombieRescue/rush'
+import type { RushBest, RushFact, RushOp, RushTable } from '../../zombieRescue/rush'
 import type { QAnswer } from '../../zombieRescue/questions'
 import { villagerFor } from '../../zombieRescue/villagers'
 import { AnswerPad, Char, HeartBurst, StickerToast, VillagerArt } from './ZrParts'
@@ -20,11 +20,15 @@ import { AnswerPad, Char, HeartBurst, StickerToast, VillagerArt } from './ZrPart
 const COLORS = { '--c': '#E0453A', '--bg': '#FFF0EC' } as CSSProperties
 const LABEL: Record<string, string> = { '2': '×2', '3': '×3', '4': '×4', '5': '×5', '10': '×10', mix: 'รวม' }
 const tableName = (t: RushTable) => (t === 'mix' ? 'รวมทุกแม่' : `แม่ ${t}`)
+/** ชื่อรอบ การหารใช้คำว่า "หารด้วย" */
+const nameOf = (op: RushOp, t: RushTable) => (op === 'div' ? (t === 'mix' ? 'หารด้วย 2 3 4 5 10' : `หารด้วย ${t}`) : tableName(t))
+const factText = (op: RushOp, f: RushFact) => (op === 'div' ? `${f.groups * f.each} ÷ ${f.each} = ${f.groups}` : `${f.groups} × ${f.each} = ${f.groups * f.each}`)
 /** เวลาที่ค้างผลให้เห็นก่อนไปคนถัดไป (ถูกสั้น ผิดนานพอให้อ่านเฉลย) */
 const SHOW_RIGHT_MS = 380
 const SHOW_WRONG_MS = 1300
 
 interface Round {
+  op: RushOp
   table: RushTable
   fact: RushFact
   /** ลำดับข้อ ใช้เป็น key ให้แป้นตอบล้างค่าทุกข้อ */
@@ -36,23 +40,24 @@ interface Round {
 
 type Phase =
   | { kind: 'choose' }
-  | { kind: 'count'; table: RushTable; left: number }
+  | { kind: 'count'; op: RushOp; table: RushTable; left: number }
   | { kind: 'play'; round: Round }
   | { kind: 'done'; round: Round; reward: number; record: boolean }
 
 interface Props {
   best: RushBest
   reduceMotion: boolean
-  /** จดผลหนึ่งข้อ (สมุดวัคซีน แผงคุณครู) คืน true เมื่อได้สติกเกอร์ใหม่ */
-  onAnswer: (fact: RushFact, correct: boolean) => boolean
+  /** จดผลหนึ่งข้อ (สมุดวัคซีน แผงคุณครู) คืน true เมื่อได้สติกเกอร์ใหม่ · ข้อหารหน้าหลักไม่จดลงสมุด */
+  onAnswer: (fact: RushFact, correct: boolean, op: RushOp) => boolean
   /** จบรอบ: หน้าหลักจ่ายเหรียญ บันทึกสถิติ แล้วคืนเหรียญที่ได้และบอกว่าทำลายสถิติไหม */
-  onFinish: (table: RushTable, cured: number, answered: number) => { reward: number; record: boolean }
+  onFinish: (table: RushTable, cured: number, answered: number, op: RushOp) => { reward: number; record: boolean }
   onPlayingChange: (playing: boolean) => void
 }
 
 export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingChange }: Props) {
   const [phase, setPhase] = useState<Phase>({ kind: 'choose' })
   const [table, setTable] = useState<RushTable>(2)
+  const [op, setOp] = useState<RushOp>('mul')
   const [left, setLeft] = useState(RUSH_SECONDS)
   const deck = useRef<() => RushFact>(() => ({ each: 2, groups: 1 }))
   const startedAt = useRef(0)
@@ -80,7 +85,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     if (!round || finished.current) return
     finished.current = true
     clearTimers()
-    const { reward, record } = onFinishRef.current(round.table, round.cured.length, round.cured.length + round.missed.length)
+    const { reward, record } = onFinishRef.current(round.table, round.cured.length, round.cured.length + round.missed.length, round.op)
     playSfx(record || rushStars(round.cured.length) === 3 ? 'victory' : 'coin')
     setPhase({ kind: 'done', round: { ...round, feedback: null }, reward, record })
   }
@@ -98,7 +103,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     // finish อ่านรอบล่าสุดจาก ref จึงไม่ต้องอยู่ใน dependency
   }, [playing])
 
-  const begin = (chosen: RushTable) => {
+  const begin = (chosen: RushTable, withOp: RushOp = op) => {
     playSfx('click')
     clearTimers()
     setTable(chosen)
@@ -108,7 +113,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     const go = () => {
       startedAt.current = Date.now()
       setLeft(RUSH_SECONDS)
-      setRound({ table: chosen, fact: deck.current(), n: 0, cured: [], missed: [], feedback: null })
+      setRound({ op: withOp, table: chosen, fact: deck.current(), n: 0, cured: [], missed: [], feedback: null })
       playSfx('levelUp')
     }
     if (reduceMotion) {
@@ -119,7 +124,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     ;[3, 2, 1].forEach((n, i) =>
       timers.current.push(
         window.setTimeout(() => {
-          setPhase({ kind: 'count', table: chosen, left: n })
+          setPhase({ kind: 'count', op: withOp, table: chosen, left: n })
           playSfx('click')
         }, i * 700),
       ),
@@ -138,8 +143,8 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     const round = roundRef.current
     if (!round || round.feedback || finished.current || value.kind !== 'number') return
     const { fact } = round
-    const correct = value.value === fact.each * fact.groups
-    const sticker = onAnswer(fact, correct)
+    const correct = value.value === rushAnswer(round.op, fact)
+    const sticker = onAnswer(fact, correct, round.op)
     playSfx(correct ? 'correct' : 'wrong')
     const shown: Round = {
       ...round,
@@ -175,7 +180,27 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
           รักษาให้ได้มากที่สุดใน {RUSH_SECONDS} วินาที · ตอบผิดไม่เสียอะไร นอกจากเวลา
         </p>
         <fieldset className="mt-5">
-          <legend className="mb-2 text-sm font-bold text-white">เลือกแม่สูตรคูณ</legend>
+          <div className="mb-3 grid grid-cols-2 gap-2" role="group" aria-label="ท้าเวลาอะไร">
+            {(
+              [
+                ['mul', '✖ สูตรคูณ'],
+                ['div', '➗ การหาร (หารด้วย)'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={op === key}
+                onClick={() => setOp(key)}
+                className={`rounded-xl border-2 p-2.5 text-center font-bold text-white transition ${
+                  op === key ? 'border-gold-300 bg-gold-500/15' : 'border-white/15 bg-white/5 hover:border-white/30'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <legend className="mb-2 text-sm font-bold text-white">{op === 'div' ? 'หารด้วยเท่าไร' : 'เลือกแม่สูตรคูณ'}</legend>
           <div className="grid grid-cols-3 gap-2">
             {RUSH_TABLES.map((t) => (
               <button
@@ -187,8 +212,8 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
                   table === t ? 'border-gold-300 bg-gold-500/15' : 'border-white/15 bg-white/5 hover:border-white/30'
                 }`}
               >
-                <span className="block font-display text-2xl text-white">{LABEL[String(t)]}</span>
-                <span className="block text-xs text-slate-300">{best[String(t)] ? `ดีสุด ${best[String(t)]} คน` : 'ยังไม่เคยเล่น'}</span>
+                <span className="block font-display text-2xl text-white">{op === 'div' && t !== 'mix' ? `÷${t}` : LABEL[String(t)]}</span>
+                <span className="block text-xs text-slate-300">{best[rushKey(op, t)] ? `ดีสุด ${best[rushKey(op, t)]} คน` : 'ยังไม่เคยเล่น'}</span>
               </button>
             ))}
           </div>
@@ -211,7 +236,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     return (
       <div className="ta-card ta-cute mx-auto" style={COLORS}>
         <div className="ta-card-head">
-          <span>⚡ ซอมบี้บุก! · {tableName(phase.table)}</span>
+          <span>⚡ ซอมบี้บุก! · {nameOf(phase.op, phase.table)}</span>
         </div>
         <div className="grid place-items-center gap-2 px-5 py-10 text-center">
           <p key={phase.left} className="zr-count font-display text-7xl">
@@ -231,7 +256,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
     return (
       <div className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
-          <span>⚡ หมดเวลา! · {tableName(round.table)}</span>
+          <span>⚡ หมดเวลา! · {nameOf(round.op, round.table)}</span>
           <span className="text-[#FFE27A]">
             {'★'.repeat(stars)}
             {'☆'.repeat(3 - stars)}
@@ -239,7 +264,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
         </div>
         <div className="grid gap-3 px-5 pb-5 pt-1 text-center">
           <p className="text-2xl font-bold">รักษาได้ {round.cured.length} คน</p>
-          {record ? <p className="zr-sticker-toast rounded-2xl bg-[#FFF4C2] px-3 py-2 font-bold text-amber-800">🏆 ทำลายสถิติ{tableName(round.table)}!</p> : null}
+          {record ? <p className="zr-sticker-toast rounded-2xl bg-[#FFF4C2] px-3 py-2 font-bold text-amber-800">🏆 ทำลายสถิติ{nameOf(round.op, round.table)}!</p> : null}
           {round.cured.length ? (
             <ul className="flex flex-wrap justify-center gap-1" aria-label="ชาวเมืองที่รักษาได้">
               {round.cured.map((f, i) => (
@@ -252,20 +277,20 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
             <p className="text-slate-600">ไม่เป็นไร ลองใหม่อีกรอบนะ ค่อย ๆ ตอบก็ได้</p>
           )}
           <p className="text-sm text-slate-600">
-            ตอบทั้งหมด {round.cured.length + round.missed.length} ข้อ · ดีสุด {Math.max(best[String(round.table)] ?? 0, round.cured.length)} คน
+            ตอบทั้งหมด {round.cured.length + round.missed.length} ข้อ · ดีสุด {Math.max(best[rushKey(round.op, round.table)] ?? 0, round.cured.length)} คน
           </p>
           <p className="rounded-2xl bg-white px-3 py-2 font-bold text-amber-700">ได้ 🪙 {reward} เหรียญเข้ากระเป๋า</p>
           {missed.length ? (
             <div className="rounded-2xl bg-white px-3 py-2 text-left text-sm">
               <p className="font-bold">🔁 ข้อที่ควรทวน</p>
-              <p className="mt-1">{missed.map((f) => `${f.groups} × ${f.each} = ${f.groups * f.each}`).join(' · ')}</p>
+              <p className="mt-1">{missed.map((f) => factText(round.op, f)).join(' · ')}</p>
             </div>
           ) : null}
           <div className="flex flex-wrap justify-center gap-3">
             <Button variant="secondary" onClick={stop}>
               เปลี่ยนแม่
             </Button>
-            <Button onClick={() => begin(round.table)}>⚡ อีกรอบ</Button>
+            <Button onClick={() => begin(round.table, round.op)}>⚡ อีกรอบ</Button>
           </div>
         </div>
       </div>
@@ -295,7 +320,7 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
       <div key={round.n} className="ta-card ta-cute ta-card-pop mx-auto" style={COLORS}>
         <div className="ta-card-head">
           <span>⚡ ซอมบี้บุก!</span>
-          <span className="text-sm">{tableName(round.table)}</span>
+          <span className="text-sm">{nameOf(round.op, round.table)}</span>
         </div>
         <div className="relative flex flex-col gap-3 px-[18px] pb-[18px] pt-2">
           {feedback?.correct ? <HeartBurst /> : null}
@@ -304,7 +329,8 @@ export function RushScreen({ best, reduceMotion, onAnswer, onFinish, onPlayingCh
             <div className="text-left">
               <p className="text-sm font-bold text-slate-500">น้อง{v.name}</p>
               <p className="font-display text-4xl tabular-nums">
-                {fact.groups} × {fact.each} = {feedback ? <span className={feedback.correct ? 'text-green-700' : 'text-red-600'}>{fact.groups * fact.each}</span> : '?'}
+                {round.op === 'div' ? `${fact.groups * fact.each} ÷ ${fact.each}` : `${fact.groups} × ${fact.each}`} ={' '}
+                {feedback ? <span className={feedback.correct ? 'text-green-700' : 'text-red-600'}>{rushAnswer(round.op, fact)}</span> : '?'}
               </p>
               {feedback ? (
                 <p className={`font-bold ${feedback.correct ? 'text-green-700' : 'text-red-600'}`}>{feedback.correct ? 'หายป่วยแล้ว! 💉' : 'ยังไม่ใช่ จำไว้นะ'}</p>

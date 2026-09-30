@@ -1072,6 +1072,22 @@ check('📝 ใบงานการหาร: 20 ข้อตามตอน �
   equal(SP.mathSpeech('12 ÷ 3 = □'), '12 หารด้วย 3 เท่ากับ ช่องว่าง', 'แปลง ÷ เป็นหารด้วย')
 })
 
+check('⚡ ซอมบี้บุก! แบบหาร: คำตอบคือผลหาร สถิติแยกจากสูตรคูณ และอ่านสถิติเดิมได้', () => {
+  const RUSH = load('zombieRescue/rush')
+  equal(RUSH.rushAnswer('mul', { each: 4, groups: 8 }), 32, 'สูตรคูณตอบผลคูณ')
+  equal(RUSH.rushAnswer('div', { each: 4, groups: 8 }), 8, 'การหารตอบผลหาร')
+  equal(RUSH.rushKey('mul', 3), '3', 'คีย์สูตรคูณเหมือนเดิม')
+  equal(RUSH.rushKey('div', 3), 'div:3', 'คีย์การหาร')
+  let best = RUSH.parseRushBest({ 3: 9, 'div:3': 4, 'div:mix': 6, 'div:7': 9, 'div:4': -2 })
+  equal(JSON.stringify(best), JSON.stringify({ 3: 9, 'div:3': 4, 'div:mix': 6 }), 'อ่านทั้งสองแบบ ทิ้งค่าเสีย')
+  let r = RUSH.withRushResult(best, 3, 7, 'div')
+  equal(r.record, true, 'สถิติการหารใหม่')
+  equal(r.best['div:3'], 7, 'เก็บที่คีย์การหาร')
+  equal(r.best['3'], 9, 'สถิติสูตรคูณไม่เปลี่ยน')
+  r = RUSH.withRushResult(best, 3, 8)
+  equal(r.record, false, 'ค่าเริ่มต้นยังเป็นสูตรคูณ')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {
