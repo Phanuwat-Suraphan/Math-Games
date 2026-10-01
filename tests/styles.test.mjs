@@ -237,6 +237,10 @@ const REQUIRED_CLASSES = [
   'pq-friend-pick',
   'pq-friend-pick-on',
   'pq-newfriend',
+  'pq-surface',
+  'pq-walkpad',
+  'pq-walkkey',
+  'pq-walkkey-jump',
 
   // โดมสีเขียว
   'farm-stage',

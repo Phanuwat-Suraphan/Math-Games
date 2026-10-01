@@ -9,6 +9,7 @@ import type { BuddyMood, PokeState, ReactionEvent } from '../components/planetQu
 import { CompanionSay, NewFriendCard } from '../components/planetQuest/Companion'
 import { EclipseLab } from '../components/planetQuest/EclipseLab'
 import { ExplorePanel } from '../components/planetQuest/ExplorePanel'
+import { SurfaceWalk } from '../components/planetQuest/SurfaceWalk'
 import { LearnPanel } from '../components/planetQuest/LearnPanel'
 import type { LessonFocus } from '../components/planetQuest/LearnPanel'
 import { ReactionContext } from '../components/planetQuest/QuestParts'
@@ -42,12 +43,14 @@ import { arriveLine, celebrateLine, companionFor, flightFact, newFriends, takeof
 import type { CompanionId, JourneyStats } from '../planetQuest/companions'
 import { LESSONS } from '../planetQuest/lessons'
 import { shipColor } from '../planetQuest/ship'
+import { landLabel, surfaceFor } from '../planetQuest/surface'
 import type { ShipColorId } from '../planetQuest/ship'
 import { COINS_PER_STAR, STAGES, stageFor } from '../planetQuest/stages'
 import type { StageKind } from '../planetQuest/stages'
 import {
   clearedCount,
   loadProgress,
+  markDiscovered,
   markLesson,
   markMet,
   markVisited,
@@ -80,6 +83,9 @@ import type { Player } from '../types/player'
  * ดาวที่ยังไม่มีใครไปเยี่ยมหลับอยู่ บินไปถึงแล้วดาวจะตื่น เป็นเป้าหมายเล็ก ๆ ให้อยากไปให้ครบ
  * ระหว่างเล่นเกม ดาวเจ้าบ้านเชียร์เมื่อตอบถูกและปลอบเมื่อพลาด
  */
+
+/** เหรียญที่ได้ตอนเดินสำรวจครบทุกจุดบนดาวหนึ่งดวง */
+const EXPLORER_COINS = 10
 
 /** สีหน้าของเพื่อนดาวบนปุ่มเลือกดาว */
 const STATUS_MOOD: Record<BuddyStatus, BuddyMood> = { sleep: 'sleep', happy: 'happy', star: 'love' }
@@ -130,6 +136,8 @@ export function PlanetQuest({ player }: { player: Player }) {
   const [flight, setFlight] = useState(0)
   /** เพื่อนร่วมทางทักตอนยานถึงในโหมดสำรวจ */
   const [arrived, setArrived] = useState<PlanetId | null>(null)
+  /** กำลังลงไปเดินบนผิวดาวดวงไหน ออกจากผิวดาวแล้วกลับไปหน้าเดิม (โหมดสำรวจหรือหน้าลงจอด) */
+  const [walking, setWalking] = useState<PlanetId | null>(null)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<SolarScene | null>(null)
@@ -315,9 +323,33 @@ export function PlanetQuest({ player }: { player: Player }) {
     setJustWoke(null)
     setArrived(null)
     setPoke(null)
+    setWalking(null)
     setPhase('hub')
     setMode(next)
   }, [])
+
+  /** ลงจากยานไปเดินบนผิวดาว */
+  const land = useCallback((id: PlanetId) => {
+    playSfx('pickup')
+    setNotice(null)
+    setPoke(null)
+    setWalking(id)
+  }, [])
+
+  /** สำรวจครบทุกจุดบนดาวดวงไหน ได้เหรียญพิเศษหนึ่งครั้งต่อดาว */
+  const discover = useCallback(
+    (poi: string) => {
+      if (!walking) return
+      const found = progress.surface[walking] ?? []
+      if (found.includes(poi)) return
+      updateProgress((current) => markDiscovered(current, walking, poi))
+      if (found.length + 1 === surfaceFor(walking).pois.length) {
+        playSfx('levelUp')
+        patchPlayer({ coins: player.coins + EXPLORER_COINS })
+      }
+    },
+    [patchPlayer, player.coins, progress.surface, updateProgress, walking],
+  )
 
   const fly = useCallback((target: PlanetId) => {
     const scene = sceneRef.current
@@ -414,7 +446,8 @@ export function PlanetQuest({ player }: { player: Player }) {
     <>
       <TopBar player={player} title="ภารกิจแปดดาว · วิทยาศาสตร์ ป.6" backTo="/menu" />
       <ScreenLayout width="wide">
-        <div className={`sol-stage ${miniStage ? 'pq-stage-mini' : ''}`}>
+        {/* ระหว่างเดินบนผิวดาว ฉากระบบสุริยะถูกซ่อนไว้ ไม่ได้ถูกทำลาย กลับขึ้นยานแล้วยานยังอยู่ที่เดิม */}
+        <div className={`sol-stage ${miniStage ? 'pq-stage-mini' : ''} ${walking ? 'hidden' : ''}`}>
           <canvas
             ref={canvasRef}
             className="sol-canvas"
@@ -487,6 +520,22 @@ export function PlanetQuest({ player }: { player: Player }) {
           />
         ) : null}
 
+        {walking ? (
+          <SurfaceWalk
+            key={walking}
+            planetId={walking}
+            companion={progress.ship.companion}
+            shipColorId={progress.ship.color}
+            discovered={progress.surface[walking] ?? []}
+            reduceMotion={reduceMotion}
+            onDiscover={discover}
+            onExit={() => {
+              playSfx('click')
+              setWalking(null)
+            }}
+          />
+        ) : (
+          <>
         {/* ---------------- หน้าแรก เลือกโหมด ---------------- */}
         {mode === 'home' ? (
           <section className="mt-4">
@@ -566,6 +615,7 @@ export function PlanetQuest({ player }: { player: Player }) {
             stats={stats}
             onPoke={(id) => pokeBody(id, 'card')}
             onShip={changeShip}
+            onLand={land}
             reduceMotion={reduceMotion}
             onSelect={choose}
             onFly={fly}
@@ -731,6 +781,9 @@ export function PlanetQuest({ player }: { player: Player }) {
               <Button size="lg" onClick={startGame} icon="▶️">
                 เริ่มเลย!
               </Button>
+              <Button variant="secondary" onClick={() => land(selected)} icon={surfaceFor(selected).kind === 'gas' ? '🎈' : '🧑‍🚀'}>
+                {landLabel(selected)}
+              </Button>
               <Button variant="ghost" onClick={backToShip}>
                 กลับขึ้นยาน
               </Button>
@@ -799,6 +852,8 @@ export function PlanetQuest({ player }: { player: Player }) {
             </div>
           </section>
         ) : null}
+          </>
+        )}
       </ScreenLayout>
     </>
   )

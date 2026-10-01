@@ -40,6 +40,7 @@ const Eclipse = load('planetQuest/eclipse')
 const Planets = load('solar/planets')
 const Buddies = load('planetQuest/buddies')
 const Companions = load('planetQuest/companions')
+const Surface = load('planetQuest/surface')
 
 /* ---------------- เว็บเซิร์ฟเวอร์เล็ก ๆ สำหรับไฟล์ที่ build แล้ว ---------------- */
 
@@ -395,6 +396,24 @@ try {
     if (locked !== Companions.COMPANIONS.length - 1) throw new Error(`เพื่อนที่ยังล็อกอยู่มี ${locked} ตัว`)
     await shot('planets-workshop')
     await button('ออกจากอู่').click()
+  })
+
+  await step('เดินสำรวจผิวดาว: ลงไปเดินบนดาวอังคาร กระโดด เดินไปถึงภูเขาไฟโอลิมปัส แล้วสำรวจได้', async () => {
+    const mars = Planets.getPlanet('mars')
+    await button(Surface.landLabel('mars')).click()
+    await page.getByText(Surface.jumpLine(mars), { exact: true }).waitFor()
+    await page.keyboard.press('Space')
+    await page.keyboard.down('ArrowRight')
+    const scan = button('สำรวจภูเขาไฟโอลิมปัส')
+    await scan.waitFor({ timeout: 20_000 })
+    await page.keyboard.up('ArrowRight')
+    await scan.click()
+    const olympus = Surface.surfaceFor('mars').pois.find((poi) => poi.id === 'olympus')
+    await page.getByText(olympus.fact, { exact: true }).waitFor()
+    await page.getByText(`${Planets.getPlanet('mars').name} · 🔍 1/${Surface.surfaceFor('mars').pois.length}`, { exact: true }).waitFor()
+    await shot('planets-surface')
+    await button('กลับขึ้นยาน').click()
+    await button(Surface.landLabel('mars')).waitFor()
   })
 
   await step('โหมดสำรวจ: เลื่อนน้ำหนักแล้วตาชั่งบนดาวอังคารอ่านค่าถูก', async () => {

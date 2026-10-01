@@ -39,6 +39,9 @@ const Bd = load('planetQuest/buddies')
 const Cm = load('planetQuest/companions')
 const Art = load('planetQuest/companionArt')
 const Ship = load('planetQuest/ship')
+const Sf = load('planetQuest/surface')
+const SfR = load('planetQuest/surfaceRender')
+const { createRng } = load('math/rng')
 
 let passed = 0
 const failures = []
@@ -593,6 +596,170 @@ check('ยานที่แต่งเองถูกเก็บ ค่าท
       assert(/^#[0-9a-f]{6}$/i.test(value), `สี ${value} ของ${color.name}ไม่ใช่รหัสสี`)
     }
   }
+})
+
+// ---------- เดินสำรวจผิวดาว ----------
+
+check('ดาวทุกดวงลงไปเดินได้ ดาวชั้นในเป็นพื้นหิน ดาวชั้นนอกเป็นดาวแก๊สที่ต้องลอยเหนือเมฆ', () => {
+  for (const planet of P.PLANETS) {
+    const surface = Sf.surfaceFor(planet.id)
+    const inner = ['mercury', 'venus', 'earth', 'mars'].includes(planet.id)
+    assert(surface.kind === (inner ? 'rock' : 'gas'), `${planet.name} เป็นพื้นแบบ ${surface.kind}`)
+    assert(Sf.landLabel(planet.id).includes(inner ? 'เดินสำรวจผิว' : 'ลอยเหนือเมฆ'), `ปุ่มลงจอดของ${planet.name}บอกผิดว่าเดินหรือลอย`)
+  }
+  assert(!Sf.surfaceFor('venus').sunVisible, 'มองเห็นดวงอาทิตย์จากพื้นดาวศุกร์ ทั้งที่เมฆหนาทึบ')
+  assert(Sf.surfaceFor('mercury').skyExtras.includes('stars'), 'ท้องฟ้าดาวพุธไม่มืด ทั้งที่ไม่มีอากาศ')
+  assert(Sf.surfaceFor('saturn').skyExtras.includes('rings'), 'มองขึ้นจากดาวเสาร์ไม่เห็นวงแหวน')
+  for (const id of ['mercury', 'venus']) {
+    assert(Sf.surfaceFor(id).caution, `${P.getPlanet(id).name}ร้อนจัดแต่ไม่บอกว่าของจริงมนุษย์ไปไม่ได้`)
+  }
+})
+
+check('จุดสำรวจทุกดาวมีอย่างน้อยสามจุด ไม่ซ้อนกันและไม่ทับยาน แม้บนจอโทรศัพท์ที่ดาวเล็กที่สุด', () => {
+  const smallest = SfR.surfaceLayout(320, 260).radius
+  const seen = new Set()
+  for (const surface of Sf.SURFACES) {
+    assert(surface.pois.length >= 3, `${surface.planet} มีจุดสำรวจ ${surface.pois.length} จุด`)
+    const spots = [0, ...surface.pois.map((poi) => poi.angle)]
+    for (let a = 0; a < spots.length; a += 1) {
+      for (let b = a + 1; b < spots.length; b += 1) {
+        const gap = Math.abs(Sf.angleGap(spots[a], spots[b])) * smallest
+        assert(gap > Sf.REACH * 2, `${surface.planet} มีจุดห่างกันแค่ ${Math.round(gap)} พิกเซล ยืนตรงกลางแล้วสำรวจได้สองจุด`)
+      }
+    }
+    for (const poi of surface.pois) {
+      assert(poi.fact.length <= 130 && poi.title.length <= 30, `${poi.title} ยาวเกินกล่อง`)
+      assert(!seen.has(poi.fact), `เรื่อง "${poi.fact}" ซ้ำ`)
+      seen.add(poi.fact)
+      assert(Sf.isPoiOf(surface.planet, poi.id), `${poi.id} ไม่ถูกนับเป็นจุดของ${surface.planet}`)
+    }
+  }
+})
+
+check('กระโดดสูงแปรผกผันกับแรงโน้มถ่วงจริง ดาวอังคารสูงกว่าโลก 2.5 เท่า แล้วตกกลับลงพื้นเสมอ', () => {
+  const highest = (planet) => {
+    let state = Sf.startState()
+    let top = 0
+    state = Sf.stepWalk(state, { left: false, right: false, jump: true }, 1 / 120, 800, planet)
+    for (let frame = 0; frame < 2000; frame += 1) {
+      state = Sf.stepWalk(state, { left: false, right: false, jump: false }, 1 / 120, 800, planet)
+      top = Math.max(top, state.height)
+    }
+    assert(state.height === 0 && state.velocity === 0, `${planet.name}กระโดดแล้วไม่ตกถึงพื้น`)
+    return top
+  }
+  const earth = highest(P.getPlanet('earth'))
+  const mars = highest(P.getPlanet('mars'))
+  const jupiter = highest(P.getPlanet('jupiter'))
+  assert(Math.abs(mars / earth - 2.5) < 0.05, `ดาวอังคารกระโดดได้ ${(mars / earth).toFixed(2)} เท่าของโลก`)
+  assert(Math.abs(earth / jupiter - 2.4) < 0.05, `ดาวพฤหัสบดีเตี้ยกว่าโลก ${(earth / jupiter).toFixed(2)} เท่า`)
+  assert(Math.abs(earth - Sf.jumpHeight(P.getPlanet('earth'))) < 2, 'ความสูงที่จำลองได้ไม่ตรงกับสูตร')
+  assert(Sf.jumpHeight(P.getPlanet('mars')) < 200, 'กระโดดบนดาวอังคารสูงจนหลุดขอบจอ')
+  // กดกระโดดกลางอากาศไม่ได้กระโดดซ้ำ
+  let state = Sf.stepWalk(Sf.startState(), { left: false, right: false, jump: true }, 0.05, 800, P.getPlanet('earth'))
+  const rising = state.velocity
+  state = Sf.stepWalk(state, { left: false, right: false, jump: true }, 0.05, 800, P.getPlanet('earth'))
+  assert(state.velocity < rising, 'กดกระโดดกลางอากาศแล้วพุ่งขึ้นอีก')
+})
+
+check('เดินรอบดาวได้ครบวง มุมไม่หลุดช่วง เวลาค้างนานไม่ทำให้วาร์ป และเดินไปถึงจุดสำรวจได้ทุกจุด', () => {
+  const planet = P.getPlanet('mars')
+  const surface = Sf.surfaceFor('mars')
+  let state = Sf.startState()
+  const found = new Set()
+  for (let frame = 0; frame < 6000; frame += 1) {
+    state = Sf.stepWalk(state, { left: false, right: true, jump: false }, 1 / 60, 500, planet)
+    assert(state.angle >= 0 && state.angle < Math.PI * 2, `มุมหลุดช่วง ${state.angle}`)
+    const poi = Sf.poiInReach(state, surface, 500)
+    if (poi) found.add(poi.id)
+  }
+  assert(found.size === surface.pois.length, `เดินรอบดาวแล้วเจอจุดสำรวจแค่ ${found.size} จุด`)
+  assert(state.facing === 1 && state.walking, 'เดินขวาแล้วไม่หันขวา')
+  const frozen = Sf.stepWalk(Sf.startState(), { left: true, right: false, jump: false }, 10, 500, planet)
+  assert(Math.abs(Sf.angleGap(Sf.startState().angle, frozen.angle)) * 500 < 10, 'แท็บค้างนานแล้วกลับมาผู้เล่นวาร์ปไปไกล')
+  assert(frozen.facing === -1, 'เดินซ้ายแล้วไม่หันซ้าย')
+  assert(Sf.poiInReach(Sf.startState(), surface, 500) === null, 'ยืนข้างยานแล้วสำรวจได้ทั้งที่ไม่มีจุดสำรวจ')
+})
+
+check('ประโยคเรื่องดวงอาทิตย์และการกระโดดคำนวณจากข้อมูลจริง', () => {
+  assert(Sf.sunLine(P.getPlanet('mercury')).includes('ใหญ่กว่า') && Sf.sunLine(P.getPlanet('mercury')).includes('2.6'), Sf.sunLine(P.getPlanet('mercury')))
+  assert(Sf.sunLine(P.getPlanet('neptune')).includes('เล็กกว่า') && Sf.sunLine(P.getPlanet('neptune')).includes('30'), Sf.sunLine(P.getPlanet('neptune')))
+  assert(Sf.sunLine(P.getPlanet('earth')).includes('เท่าที่เราเห็น'), Sf.sunLine(P.getPlanet('earth')))
+  assert(Sf.jumpLine(P.getPlanet('mars')).includes('สูงกว่าบนโลก 2.5 เท่า'), Sf.jumpLine(P.getPlanet('mars')))
+  assert(Sf.jumpLine(P.getPlanet('jupiter')).includes('เตี้ยกว่าบนโลก 2.4 เท่า'), Sf.jumpLine(P.getPlanet('jupiter')))
+  assert(Sf.jumpLine(P.getPlanet('earth')).includes('พอ ๆ กับบนโลก'), Sf.jumpLine(P.getPlanet('earth')))
+})
+
+check('จุดที่สำรวจแล้วถูกเก็บ ไม่ซ้ำ และจุดที่ไม่รู้จักหรือดาวที่ไม่มีอยู่ถูกทิ้ง', () => {
+  const fresh = Store.emptyProgress('ต้นกล้า')
+  const one = Store.markDiscovered(fresh, 'mars', 'olympus')
+  assert(Store.markDiscovered(one, 'mars', 'olympus') === one, 'สำรวจจุดเดิมซ้ำแล้วถูกนับซ้ำ')
+  assert(Store.discoveredCount(Store.markDiscovered(one, 'venus', 'volcano')) === 2, 'นับจุดที่สำรวจแล้วรวมทุกดาวไม่ถูก')
+  const parsed = Store.parseProgress(
+    { owner: 'ต้นกล้า', surface: { mars: ['olympus', 'olympus', 'fake'], pluto: ['x'], venus: 'volcano', saturn: ['olympus'] } },
+    'ต้นกล้า',
+  )
+  assert(parsed.surface.mars.join() === 'olympus', `อ่านจุดของดาวอังคารได้ ${parsed.surface.mars}`)
+  assert(Object.keys(parsed.surface).join() === 'mars', `ดาวที่เก็บไว้คือ ${Object.keys(parsed.surface)}`)
+})
+
+check('วาดผิวดาวได้ทุกดวงจากตำแหน่งสุ่มหลายร้อยแบบ ไม่มีรัศมีติดลบหรือพิกัด NaN', () => {
+  const state = { nan: 0 }
+  const bad = (...values) => {
+    if (values.some((value) => typeof value === 'number' && !Number.isFinite(value))) state.nan += 1
+  }
+  const radius = (name, ...values) => {
+    for (const value of values) if (!Number.isFinite(value) || value < 0) throw new Error(`${name} ได้รัศมี ${value}`)
+  }
+  const gradient = () => ({ addColorStop: () => undefined })
+  const ctx = new Proxy(
+    {
+      arc: (x, y, rr) => (bad(x, y), radius('arc', rr)),
+      ellipse: (x, y, rx, ry, rot) => (bad(x, y, rot), radius('ellipse', rx, ry)),
+      createRadialGradient: (x0, y0, r0, x1, y1, r1) => (bad(x0, y0, x1, y1), radius('createRadialGradient', r0, r1), gradient()),
+      createLinearGradient: (...values) => (bad(...values), gradient()),
+      drawImage: (_, x, y, w, h) => (bad(x, y), radius('drawImage', w, h)),
+      measureText: (text) => ({ width: text.length * 7 }),
+    },
+    {
+      get(target, key) {
+        if (key in target) return target[key]
+        return (...values) => bad(...values)
+      },
+      set(_, key, value) {
+        if (typeof value === 'number') bad(value)
+        return true
+      },
+    },
+  )
+  const rng = createRng('surface-render')
+  const image = { complete: true, naturalWidth: 100 }
+  for (let index = 0; index < 400; index += 1) {
+    const surface = rng.pick(Sf.SURFACES)
+    const walk = Object.assign(Sf.startState(), {
+      angle: rng.next() * Math.PI * 2,
+      height: rng.next() * 160,
+      facing: rng.chance(0.5) ? 1 : -1,
+      walking: rng.chance(0.5),
+      stride: rng.next() * 30,
+    })
+    const width = rng.pick([320, 390, 800, 1280]) * rng.pick([1, 2])
+    const height = rng.pick([260, 360, 440]) * rng.pick([1, 2])
+    SfR.drawSurface(ctx, { width, height }, {
+      surface,
+      planet: P.getPlanet(surface.planet),
+      state: walk,
+      companionAngle: walk.angle - 0.05,
+      discovered: rng.chance(0.5) ? surface.pois.map((poi) => poi.id) : [],
+      near: rng.chance(0.5) ? surface.pois[0].id : null,
+      companion: rng.chance(0.7) ? image : null,
+      shipLook: Ship.shipColor('mint'),
+      now: rng.next() * 100_000,
+      reduceMotion: rng.chance(0.3),
+      pixelRatio: rng.pick([1, 2]),
+    })
+  }
+  assert(state.nan === 0, `มีพิกัด NaN ${state.nan} ครั้ง`)
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

@@ -6,6 +6,7 @@ import { buddyFor, buddyStatus, pokeLine, sleepyLine, wakeLine } from '../../pla
 import type { BuddyStatus } from '../../planetQuest/buddies'
 import type { CompanionId, JourneyStats } from '../../planetQuest/companions'
 import type { ShipColorId } from '../../planetQuest/ship'
+import { landLabel, surfaceFor } from '../../planetQuest/surface'
 import { PLANETS, formatNumber, getPlanet } from '../../solar/planets'
 import type { Planet, PlanetId } from '../../solar/planets'
 import { Bubble, PlanetBuddy, PokeButton } from './Buddy'
@@ -210,6 +211,7 @@ export function ExplorePanel({
   onFly,
   onPoke,
   onShip,
+  onLand,
 }: {
   selected: PlanetId
   shipAt: PlanetId
@@ -230,6 +232,8 @@ export function ExplorePanel({
   onFly: (id: PlanetId) => void
   onPoke: (id: PlanetId) => void
   onShip: (change: { color?: ShipColorId; companion?: CompanionId }) => void
+  /** ลงไปเดินบนผิวดาวที่ยานจอดอยู่ */
+  onLand: (id: PlanetId) => void
 }) {
   const [sandbox, setSandbox] = useState(false)
   const [album, setAlbum] = useState(false)
@@ -274,6 +278,11 @@ export function ExplorePanel({
         >
           {flying ? 'กำลังบิน…' : selected === shipAt ? `ยานจอดอยู่ที่${planet.name}` : `บินไปเที่ยว${planet.name}`}
         </Button>
+        {selected === shipAt && !flying ? (
+          <Button size="lg" variant="secondary" icon={surfaceFor(selected).kind === 'gas' ? '🎈' : '🧑‍🚀'} onClick={() => onLand(selected)}>
+            {landLabel(selected)}
+          </Button>
+        ) : null}
         <span className="text-sm font-bold text-slate-300">
           📸 ของที่ระลึก {visited.length}/{PLANETS.length} ดาว
         </span>

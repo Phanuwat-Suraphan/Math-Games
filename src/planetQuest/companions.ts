@@ -199,6 +199,11 @@ export function flightFact(companion: Companion, flight: number): string {
   return pick(companion.facts, flight)
 }
 
+/** เพื่อนร่วมทางตื่นเต้นตอนเจอจุดสำรวจบนผิวดาว */
+export function discoveryLine(companion: Companion, title: string): string {
+  return `ว้าว! ${companion.name}จด${title}ลงบันทึกนักสำรวจให้แล้วนะ`
+}
+
 /** เพื่อนร่วมทางดีใจกับผลของด่าน */
 export function celebrateLine(companion: Companion, stars: number): string {
   if (stars >= 3) return `${companion.name}เต้นระบำฉลองสามดาว! 💃`
