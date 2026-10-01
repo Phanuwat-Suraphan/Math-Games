@@ -11,6 +11,8 @@ import type { ZrState } from './engine'
 import { emptyBook, parseBook } from './vaccineBook'
 import type { VaccineBook } from './vaccineBook'
 import { parseRushBest } from './rush'
+import { parseDaily } from './daily'
+import type { DailyState } from './daily'
 import type { RushBest } from './rush'
 
 const KEY = 'math-adventure:zombie:v1'
@@ -121,6 +123,35 @@ export function saveRushBest(owner: string, best: RushBest): boolean {
   if (!storage) return false
   try {
     storage.setItem(RUSH_KEY, JSON.stringify({ ...readRush(storage), [owner]: best }))
+    return true
+  } catch {
+    return false
+  }
+}
+
+/* ── 🌞 ภารกิจประจำวัน ───────────────────────────────────── */
+
+const DAILY_KEY = 'math-adventure:zombie-daily:v1'
+
+function readDaily(storage: Storage): Record<string, unknown> {
+  try {
+    const raw: unknown = JSON.parse(storage.getItem(DAILY_KEY) ?? '{}')
+    return typeof raw === 'object' && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function loadDaily(owner: string): DailyState {
+  const storage = getStorage()
+  return storage ? parseDaily(readDaily(storage)[owner]) : parseDaily(null)
+}
+
+export function saveDaily(owner: string, state: DailyState): boolean {
+  const storage = getStorage()
+  if (!storage) return false
+  try {
+    storage.setItem(DAILY_KEY, JSON.stringify({ ...readDaily(storage), [owner]: state }))
     return true
   } catch {
     return false

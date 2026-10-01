@@ -1088,6 +1088,54 @@ check('⚡ ซอมบี้บุก! แบบหาร: คำตอบค�
   equal(r.record, false, 'ค่าเริ่มต้นยังเป็นสูตรคูณ')
 })
 
+check('🌞 ภารกิจประจำวัน: วันละชุดเดียว ข้อที่พลาดมาก่อน นับไฟต่อเนื่อง และข้ามเดือนข้ามปีได้', () => {
+  const D = load('zombieRescue/daily')
+  const REC = load('services/recordService')
+  equal(D.dayKey(new Date(2026, 0, 5)), '2026-01-05', 'วันที่ตามเวลาในเครื่อง')
+  equal(D.prevDay('2026-03-01'), '2026-02-28', 'ข้ามเดือน')
+  equal(D.prevDay('2028-03-01'), '2028-02-29', 'ปีอธิกสุรทิน')
+  equal(D.prevDay('2027-01-01'), '2026-12-31', 'ข้ามปี')
+  let book = BOOK.emptyBook()
+  book = BOOK.noteAnswer(book, { each: 3, groups: 7 }, false).book
+  book = BOOK.noteAnswer(book, { each: 4, groups: 6 }, false).book
+  const a = D.dailySet(book, '2026-10-01')
+  equal(a.length, D.DAILY_LENGTH, '5 ข้อ')
+  equal(JSON.stringify(a), JSON.stringify(D.dailySet(book, '2026-10-01')), 'วันเดียวกันได้ชุดเดิม')
+  assert(JSON.stringify(a) !== JSON.stringify(D.dailySet(book, '2026-10-02')), 'คนละวันได้ชุดต่างกัน')
+  const keys = a.map((q) => `${q.each}x${q.groups}`)
+  assert(keys.includes('3x7') && keys.includes('4x6'), 'ข้อที่พลาดต้องอยู่ในชุดวันนี้')
+  equal(new Set(keys).size, 5, 'ไม่มีข้อซ้ำ')
+  for (const q of a) {
+    assert(BOOK.isBookFact(q.each, q.groups), 'อยู่ในสมุดวัคซีน')
+    assert(Q.checkAnswer(q, { kind: 'number', value: Q.expectedNumber(q) }), 'เฉลยตรวจผ่าน')
+  }
+  let st = D.emptyDaily()
+  equal(D.liveStreak(st, '2026-10-01'), 0, 'ยังไม่เคยทำ')
+  st = D.completeDaily(st, '2026-10-01')
+  equal(st.streak, 1, 'วันแรก')
+  equal(D.completeDaily(st, '2026-10-01'), st, 'ทำซ้ำวันเดียวกันไม่นับเพิ่ม')
+  st = D.completeDaily(st, '2026-10-02')
+  st = D.completeDaily(st, '2026-10-03')
+  equal(st.streak, 3, 'ติดต่อกัน 3 วัน')
+  equal(D.liveStreak(st, '2026-10-04'), 3, 'วันถัดมายังไม่ทำ ไฟยังไม่ดับ')
+  equal(D.liveStreak(st, '2026-10-05'), 0, 'ขาดไปหนึ่งวัน ไฟดับ')
+  st = D.completeDaily(st, '2026-10-05')
+  equal(st.streak, 1, 'ขาดแล้วเริ่มนับใหม่')
+  equal(st.best, 3, 'สถิติยาวสุดยังอยู่')
+  for (let i = 6; i <= 31; i += 1) st = D.completeDaily(st, `2026-10-${String(i).padStart(2, '0')}`)
+  equal(st.days.length, D.DAILY_HISTORY, 'เก็บวันย้อนหลังไม่เกิน 14 วัน')
+  equal(D.calendarDays('2026-10-31').length, D.DAILY_HISTORY, 'ปฏิทิน 14 ช่อง')
+  equal(D.calendarDays('2026-10-31')[13], '2026-10-31', 'ช่องสุดท้ายคือวันนี้')
+  equal(D.dailyReward(1), 6, 'เหรียญวันแรก')
+  equal(D.dailyReward(50), 12, 'โบนัสไฟมีเพดาน')
+  equal(JSON.stringify(D.parseDaily({ last: 'x', streak: 9, best: -1, days: ['2026-10-01', 'bad', '2026-10-01'] })), JSON.stringify({ last: '', streak: 0, best: 0, days: ['2026-10-01'] }), 'ค่าเสียถูกทิ้ง')
+  const player = { records: REC.createEmptyRecords() }
+  player.records = REC.recordZombieDaily(player, 4, 5)
+  player.records = REC.recordZombieDaily(player, 5, 2)
+  equal(player.records.zombieStreakBest, 5, 'เก็บไฟยาวสุด')
+  equal(player.records.zombieCorrect, 9, 'นับข้อที่ถูก')
+})
+
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */
 
 check('ตัวชี้วัดการคูณ ป.2 ต่อท้ายรายการและไม่นับเป็นตัวชี้วัด ป.4', () => {

@@ -485,6 +485,7 @@ function parseRecords(raw: unknown): PlayerRecords {
     zombieCures: count(raw.zombieCures),
     zombieCorrect: count(raw.zombieCorrect),
     zombieStickers: Math.min(50, count(raw.zombieStickers)),
+    zombieStreakBest: count(raw.zombieStreakBest),
   }
 }
 

@@ -73,4 +73,6 @@ export interface PlayerRecords {
    * สติกเกอร์ไม่มีวันหาย ค่านี้จึงเก็บเฉพาะค่าที่มากที่สุด
    */
   zombieStickers: number
+  /** ภารกิจประจำวัน: ไฟต่อเนื่องยาวที่สุด (วัน) เก็บค่ามากที่สุด */
+  zombieStreakBest: number
 }
