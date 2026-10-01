@@ -3,6 +3,7 @@ import { buddyFor, buddyStatus } from '../../planetQuest/buddies'
 import { COMPANIONS, companionFor, isUnlocked, unlockHint } from '../../planetQuest/companions'
 import type { CompanionId, JourneyStats } from '../../planetQuest/companions'
 import { SHIP_COLORS, shipColor } from '../../planetQuest/ship'
+import { nativeFor } from '../../planetQuest/surfaceWorld'
 import type { ShipColorId } from '../../planetQuest/ship'
 import { PLANETS, formatNumber } from '../../solar/planets'
 import type { PlanetId } from '../../solar/planets'
@@ -21,10 +22,13 @@ import { CompanionArt } from './Companion'
 export function SouvenirAlbum({
   visited,
   best,
+  gifts,
   reduceMotion,
 }: {
   visited: readonly PlanetId[]
   best: Partial<Record<PlanetId, number>>
+  /** ดาวที่ได้ของฝากจากชาวดาวแล้ว ของฝากโชว์อยู่หลังโปสการ์ด */
+  gifts: readonly PlanetId[]
   reduceMotion: boolean
 }) {
   const [flipped, setFlipped] = useState<PlanetId[]>([])
@@ -40,6 +44,7 @@ export function SouvenirAlbum({
         {collected === PLANETS.length
           ? '🏆 สะสมโปสการ์ดครบแปดดาวแล้ว! นักสำรวจตัวจริง'
           : `เก็บได้ ${collected}/${PLANETS.length} ใบ · ใบที่ยังหลับอยู่ บินไปเยี่ยมแล้วจะได้โปสการ์ด`}
+        {` · 🎁 ของฝากจากชาวดาว ${gifts.length}/${PLANETS.length}`}
       </p>
       <ul className="pq-album">
         {PLANETS.map((planet) => {
@@ -86,6 +91,11 @@ export function SouvenirAlbum({
                     <span className="mt-2 block text-[11px] text-slate-300">
                       🌙 ดวงจันทร์ {formatNumber(planet.moons)} ดวง · 🌡️ {formatNumber(planet.meanTempC)} °C
                     </span>
+                    {gifts.includes(planet.id) ? (
+                      <span className="mt-1 block text-[11px] font-bold text-pink-200">
+                        🎁 {nativeFor(planet.id).gift.emoji} {nativeFor(planet.id).gift.name}
+                      </span>
+                    ) : null}
                   </span>
                 </span>
               </button>

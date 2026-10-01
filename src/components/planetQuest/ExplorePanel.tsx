@@ -200,6 +200,7 @@ export function ExplorePanel({
   flying,
   visited,
   best,
+  gifts,
   status,
   justWoke,
   poke,
@@ -221,6 +222,8 @@ export function ExplorePanel({
   status: BuddyStatus
   /** ดาวที่ได้ในโหมดฝึกฝน ใช้วาดมงกุฎบนโปสการ์ดในสมุด */
   best: Partial<Record<PlanetId, number>>
+  /** ดาวที่ได้ของฝากจากชาวดาวแล้ว */
+  gifts: readonly PlanetId[]
   /** ดาวที่เลือกเพิ่งถูกปลุกจากการบินมาถึงครั้งนี้ */
   justWoke: boolean
   poke: PokeState | null
@@ -309,7 +312,7 @@ export function ExplorePanel({
         closeLabel="ปิดสมุด"
         onToggle={() => setAlbum((value) => !value)}
       >
-        <SouvenirAlbum visited={visited} best={best} reduceMotion={reduceMotion} />
+        <SouvenirAlbum visited={visited} best={best} gifts={gifts} reduceMotion={reduceMotion} />
       </ToyBox>
 
       <ToyBox

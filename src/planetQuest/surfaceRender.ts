@@ -3,6 +3,8 @@ import type { ShipLook } from '../solar/render'
 import type { Planet } from '../solar/planets'
 import { angleGap, sunScale } from './surface'
 import type { Poi, PoiKind, Surface, WalkState } from './surface'
+import { SUN_ANGLE, daylight, sunHeight } from './surfaceWorld'
+import type { Native, Sparkle } from './surfaceWorld'
 
 /**
  * วาดผิวดาวลงผืนผ้าใบ
@@ -48,7 +50,34 @@ export interface SurfaceFrame {
   now: number
   reduceMotion: boolean
   pixelRatio: number
+  /** ดาวแสงของดาวดวงนี้ กับลำดับของดวงที่เก็บไปแล้ว */
+  sparkles?: readonly Sparkle[]
+  collected?: readonly number[]
+  /** ชาวดาว กับว่าอยู่ใกล้พอจะคุยไหม และให้ของฝากไปแล้วหรือยัง */
+  native?: Native
+  nativeNear?: boolean
+  gifted?: boolean
 }
+
+/* ---------------- สี ---------------- */
+
+function parseHex(color: string): [number, number, number] {
+  const hex = color.replace('#', '')
+  const value = Number.parseInt(hex.length === 3 ? hex.replace(/./g, (c) => c + c) : hex, 16)
+  if (!Number.isFinite(value)) return [0, 0, 0]
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255]
+}
+
+/** ผสมสีสองสีแบบเส้นตรง t = 0 ได้สีแรก t = 1 ได้สีที่สอง */
+export function mixColor(from: string, to: string, t: number): string {
+  const a = parseHex(from)
+  const b = parseHex(to)
+  const k = Math.min(1, Math.max(0, t))
+  const channel = (index: 0 | 1 | 2): number => Math.round(a[index] + (b[index] - a[index]) * k)
+  return `rgb(${channel(0)}, ${channel(1)}, ${channel(2)})`
+}
+
+const NIGHT_SKY: readonly [string, string] = ['#020617', '#111a3a']
 
 const r = (value: number): number => Math.max(0.1, value)
 
@@ -56,21 +85,35 @@ const r = (value: number): number => Math.max(0.1, value)
 
 function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number, frame: SurfaceFrame, unit: number): void {
   const { surface, now, reduceMotion } = frame
+  const light = daylight(frame.state.angle)
   const sky = ctx.createLinearGradient(0, 0, 0, height)
-  sky.addColorStop(0, surface.sky[0])
-  sky.addColorStop(1, surface.sky[1])
+  sky.addColorStop(0, mixColor(NIGHT_SKY[0], surface.sky[0], light))
+  sky.addColorStop(1, mixColor(NIGHT_SKY[1], surface.sky[1], light))
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, width, height)
 
+  // แสงเย็นที่ขอบฟ้า บนดาวอังคารเป็นสีฟ้า ซึ่งเป็นเรื่องจริงที่รถสำรวจถ่ายภาพไว้ได้
+  const dusk = 1 - Math.min(1, Math.abs(light - 0.45) * 2.2)
+  if (dusk > 0) {
+    const glow = ctx.createLinearGradient(0, height * 0.35, 0, height * 0.8)
+    const tint = surface.planet === 'mars' ? '96, 165, 250' : '251, 146, 60'
+    glow.addColorStop(0, `rgba(${tint}, 0)`)
+    glow.addColorStop(1, `rgba(${tint}, ${(0.55 * dusk).toFixed(3)})`)
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, width, height)
+  }
+
   const extras = surface.skyExtras
-  if (extras.includes('stars')) {
+  // ดาวบนฟ้าเห็นตอนกลางคืนทุกดวง ส่วนดาวที่ไม่มีอากาศอย่างดาวพุธเห็นได้แม้กลางวัน
+  const starAlpha = Math.max(extras.includes('stars') ? 1 : 0, 1 - light)
+  if (starAlpha > 0.02) {
     const rng = createRng(`surface-stars-${surface.planet}`)
     ctx.fillStyle = '#ffffff'
     for (let index = 0; index < 70; index += 1) {
       const x = rng.next() * width
       const y = rng.next() * height * 0.7
       const twinkle = reduceMotion ? 0.7 : 0.45 + 0.45 * Math.sin(now / 600 + index)
-      ctx.globalAlpha = twinkle
+      ctx.globalAlpha = twinkle * starAlpha
       ctx.beginPath()
       ctx.arc(x, y, r((0.6 + rng.next() * 1.1) * unit), 0, TAU)
       ctx.fill()
@@ -143,7 +186,7 @@ function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number, f
   }
 
   if (extras.includes('clouds')) {
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = mixColor('#475569', '#ffffff', light)
     for (let index = 0; index < 4; index += 1) {
       const drift = reduceMotion ? 0 : now / 90_000
       const x = (((index * 0.31 + drift) % 1.3) - 0.15) * width
@@ -172,8 +215,12 @@ function drawSky(ctx: CanvasRenderingContext2D, width: number, height: number, f
 }
 
 function drawSun(ctx: CanvasRenderingContext2D, width: number, height: number, frame: SurfaceFrame, unit: number): void {
-  const x = width * 0.8
-  const y = height * 0.2
+  // ดวงอาทิตย์อยู่ทิศเดิมเสมอ เดินไปทางไหนดวงอาทิตย์ก็เลื่อนตามมุมที่เดิน ตกลับขอบฟ้าเมื่อเดินไปอีกฝั่ง
+  const rel = angleGap(frame.state.angle, SUN_ANGLE)
+  const groundY = height * 0.74
+  const x = width / 2 + Math.sin(rel) * width * 0.42
+  const y = groundY - sunHeight(frame.state.angle) * groundY * 0.82
+  if (y > groundY + 40 * unit) return
   if (!frame.surface.sunVisible) {
     // มองไม่เห็นดวงอาทิตย์ เห็นแค่แสงเรือง ๆ ผ่านเมฆ
     const glow = ctx.createRadialGradient(x, y, r(4 * unit), x, y, r(120 * unit))
@@ -580,6 +627,169 @@ function drawMarker(ctx: CanvasRenderingContext2D, poi: Poi, unit: number, frame
   ctx.fillText(found ? '✓' : '?', 0, y + unit)
 }
 
+/** ดาวแสง ห้าแฉก หมุนช้า ๆ และเรืองแสง ยิ่งมืดยิ่งเห็นชัด */
+function drawSparkle(ctx: CanvasRenderingContext2D, unit: number, frame: SurfaceFrame, index: number): void {
+  const u = unit
+  const spin = frame.reduceMotion ? 0 : frame.now / 700 + index
+  const glow = ctx.createRadialGradient(0, 0, r(2 * u), 0, 0, r(20 * u))
+  glow.addColorStop(0, 'rgba(253, 224, 71, 0.6)')
+  glow.addColorStop(1, 'rgba(253, 224, 71, 0)')
+  ctx.fillStyle = glow
+  ctx.beginPath()
+  ctx.arc(0, 0, r(20 * u), 0, TAU)
+  ctx.fill()
+  ctx.save()
+  ctx.rotate(spin)
+  ctx.fillStyle = '#fde047'
+  ctx.strokeStyle = '#ca8a04'
+  ctx.lineWidth = 1.5 * u
+  ctx.beginPath()
+  for (let point = 0; point < 10; point += 1) {
+    const size = (point % 2 === 0 ? 10 : 4.2) * u
+    const angle = (point / 10) * TAU - Math.PI / 2
+    if (point === 0) ctx.moveTo(Math.cos(angle) * size, Math.sin(angle) * size)
+    else ctx.lineTo(Math.cos(angle) * size, Math.sin(angle) * size)
+  }
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+  ctx.restore()
+}
+
+/**
+ * ชาวดาว ตัวกลม ๆ แบบเดียวกันทุกดาว ต่างกันที่สี จำนวนตา หนวด และของประจำตัว
+ * ชาวดาวยูเรนัสนอนตะแคงเหมือนดาวบ้านเกิด
+ */
+function drawNative(ctx: CanvasRenderingContext2D, unit: number, frame: SurfaceFrame, native: Native): void {
+  const u = unit
+  const look = native.look
+  const wave = frame.reduceMotion ? 0 : Math.sin(frame.now / 180) * (frame.nativeNear ? 0.7 : 0.2)
+  ctx.save()
+  if (look.sideways) {
+    ctx.translate(0, -16 * u)
+    ctx.rotate(Math.PI / 2)
+    ctx.translate(0, 16 * u)
+  }
+  if (look.extra === 'cloud') {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)'
+    for (const [x, size] of [
+      [-14, 9],
+      [0, 12],
+      [14, 9],
+    ] as const) {
+      ctx.beginPath()
+      ctx.arc(x * u, -2 * u, r(size * u), 0, TAU)
+      ctx.fill()
+    }
+  }
+  const body = ctx.createRadialGradient(-6 * u, -26 * u, r(3 * u), 0, -16 * u, r(22 * u))
+  body.addColorStop(0, '#ffffff')
+  body.addColorStop(0.25, look.color)
+  body.addColorStop(1, mixColor(look.color, '#1e1b4b', 0.45))
+  // แขนโบกมือ
+  ctx.strokeStyle = look.color
+  ctx.lineWidth = 5 * u
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(14 * u, -18 * u)
+  ctx.lineTo((22 + wave * 6) * u, (-30 - wave * 6) * u)
+  ctx.moveTo(-14 * u, -16 * u)
+  ctx.lineTo(-21 * u, -8 * u)
+  ctx.stroke()
+  for (let index = 0; index < look.antennae; index += 1) {
+    const side = look.antennae === 1 ? 0 : index === 0 ? -1 : 1
+    ctx.strokeStyle = mixColor(look.color, '#1e1b4b', 0.3)
+    ctx.lineWidth = 2 * u
+    ctx.beginPath()
+    ctx.moveTo(side * 6 * u, -32 * u)
+    ctx.lineTo(side * 11 * u, -44 * u)
+    ctx.stroke()
+    ctx.fillStyle = '#fde047'
+    ctx.beginPath()
+    ctx.arc(side * 11 * u, -45 * u, r(3.2 * u), 0, TAU)
+    ctx.fill()
+  }
+  if (look.extra === 'horns') {
+    ctx.fillStyle = '#fef3c7'
+    for (const side of [-1, 1]) {
+      ctx.beginPath()
+      ctx.moveTo(side * 6 * u, -32 * u)
+      ctx.lineTo(side * 13 * u, -42 * u)
+      ctx.lineTo(side * 13 * u, -30 * u)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
+  if (look.extra === 'leaf') {
+    ctx.fillStyle = '#15803d'
+    ctx.beginPath()
+    ctx.ellipse(5 * u, -38 * u, r(7 * u), r(3.5 * u), -0.6, 0, TAU)
+    ctx.fill()
+  }
+  ctx.fillStyle = body
+  ctx.beginPath()
+  ctx.ellipse(0, -16 * u, r(16 * u), r(17 * u), 0, 0, TAU)
+  ctx.fill()
+  if (look.extra === 'ring') {
+    ctx.strokeStyle = '#d97706'
+    ctx.lineWidth = 2.5 * u
+    ctx.beginPath()
+    ctx.ellipse(0, -12 * u, r(24 * u), r(6 * u), -0.15, 0, TAU)
+    ctx.stroke()
+  }
+  // ตา
+  const eyes = look.eyes === 1 ? [0] : look.eyes === 2 ? [-6, 6] : [-8, 0, 8]
+  for (const x of eyes) {
+    const size = look.eyes === 1 ? 6 : 3.6
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc(x * u, -20 * u, r((size + 1.4) * u), 0, TAU)
+    ctx.fill()
+    ctx.fillStyle = '#1b1537'
+    ctx.beginPath()
+    ctx.arc(x * u, -19.5 * u, r(size * u), 0, TAU)
+    ctx.fill()
+    ctx.fillStyle = '#ffffff'
+    ctx.beginPath()
+    ctx.arc((x - size * 0.35) * u, -21 * u, r(size * 0.35 * u), 0, TAU)
+    ctx.fill()
+  }
+  ctx.fillStyle = 'rgba(255, 143, 176, 0.7)'
+  ctx.beginPath()
+  ctx.ellipse(-10 * u, -12 * u, r(3.5 * u), r(2 * u), 0, 0, TAU)
+  ctx.ellipse(10 * u, -12 * u, r(3.5 * u), r(2 * u), 0, 0, TAU)
+  ctx.fill()
+  ctx.strokeStyle = '#1b1537'
+  ctx.lineWidth = 2 * u
+  ctx.beginPath()
+  ctx.arc(0, -12 * u, r(4 * u), 0.15 * Math.PI, 0.85 * Math.PI)
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawNativeMarker(ctx: CanvasRenderingContext2D, unit: number, frame: SurfaceFrame, native: Native): void {
+  const bob = frame.reduceMotion ? 0 : Math.sin(frame.now / 300 + native.angle) * 3 * unit
+  const y = (native.look.sideways ? -44 : -64) * unit + bob
+  if (frame.nativeNear) {
+    ctx.fillStyle = 'rgba(252, 211, 77, 0.35)'
+    ctx.beginPath()
+    ctx.arc(0, y, r(19 * unit), 0, TAU)
+    ctx.fill()
+  }
+  ctx.fillStyle = frame.gifted ? '#22c55e' : '#f472b6'
+  ctx.strokeStyle = '#1e1b4b'
+  ctx.lineWidth = 2 * unit
+  ctx.beginPath()
+  ctx.arc(0, y, r(12 * unit), 0, TAU)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = '#1e1b4b'
+  ctx.font = `900 ${Math.round(15 * unit)}px sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(frame.gifted ? '✓' : '!', 0, y + unit)
+}
+
 /** ยานจอดตั้งตรงอยู่ที่มุม 0 สีเดียวกับยานที่แต่งในอู่ */
 function drawShip(ctx: CanvasRenderingContext2D, unit: number, frame: SurfaceFrame): void {
   const u = unit
@@ -731,14 +941,44 @@ export function drawSurface(
   drawGround(ctx, layout, frame)
 
   const { surface, state } = frame
+  const gas = surface.kind === 'gas'
+  const native = frame.native
+  const nativeLift = (gas ? 12 : 0) * unit + (frame.reduceMotion || !gas ? 0 : Math.sin(frame.now / 500) * 4 * unit)
+
+  // ชั้นแรก ของบนพื้นทุกชิ้น ซึ่งจะมืดลงตอนกลางคืน
   for (const poi of surface.pois) {
-    onSurface(ctx, layout, state.angle, poi.angle, liftOf(poi.kind, surface) * unit, () => {
-      drawSprite(ctx, poi.kind, unit, frame)
-      drawMarker(ctx, poi, unit, frame)
-    })
+    onSurface(ctx, layout, state.angle, poi.angle, liftOf(poi.kind, surface) * unit, () => drawSprite(ctx, poi.kind, unit, frame))
+  }
+  onSurface(ctx, layout, state.angle, 0, (gas ? 8 : 0) * unit, () => drawShip(ctx, unit, frame))
+  if (native) onSurface(ctx, layout, state.angle, native.angle, nativeLift, () => drawNative(ctx, unit, frame, native))
+
+  // กลางคืนทั้งฉากมืดลง แต่ป้าย ดาวแสง เพื่อน และตัวเราวาดทีหลัง จึงยังเห็นชัด
+  const night = 1 - daylight(state.angle)
+  if (night > 0.02) {
+    ctx.fillStyle = `rgba(2, 6, 23, ${(night * 0.5).toFixed(3)})`
+    ctx.fillRect(0, 0, width, height)
   }
 
-  onSurface(ctx, layout, state.angle, 0, (surface.kind === 'gas' ? 8 : 0) * unit, () => drawShip(ctx, unit, frame))
+  for (const poi of surface.pois) {
+    onSurface(ctx, layout, state.angle, poi.angle, liftOf(poi.kind, surface) * unit, () => drawMarker(ctx, poi, unit, frame))
+  }
+  if (native) onSurface(ctx, layout, state.angle, native.angle, nativeLift, () => drawNativeMarker(ctx, unit, frame, native))
+  const collected = frame.collected ?? []
+  ;(frame.sparkles ?? []).forEach((sparkle, index) => {
+    if (collected.includes(index)) return
+    onSurface(ctx, layout, state.angle, sparkle.angle, (sparkle.height + 14) * frame.pixelRatio, () => drawSparkle(ctx, unit, frame, index))
+  })
+
+  // ไฟฉายบนหมวกตอนกลางคืน
+  if (night > 0.3) {
+    const lamp = ctx.createRadialGradient(layout.cx, layout.groundY - 30 * unit, r(6 * unit), layout.cx, layout.groundY - 30 * unit, r(90 * unit))
+    lamp.addColorStop(0, `rgba(254, 249, 195, ${(0.35 * night).toFixed(3)})`)
+    lamp.addColorStop(1, 'rgba(254, 249, 195, 0)')
+    ctx.fillStyle = lamp
+    ctx.beginPath()
+    ctx.arc(layout.cx, layout.groundY - 30 * unit, r(90 * unit), 0, TAU)
+    ctx.fill()
+  }
 
   const friend = frame.companion
   if (friend && friend.complete && friend.naturalWidth > 0) {

@@ -41,6 +41,7 @@ const Planets = load('solar/planets')
 const Buddies = load('planetQuest/buddies')
 const Companions = load('planetQuest/companions')
 const Surface = load('planetQuest/surface')
+const World = load('planetQuest/surfaceWorld')
 
 /* ---------------- เว็บเซิร์ฟเวอร์เล็ก ๆ สำหรับไฟล์ที่ build แล้ว ---------------- */
 
@@ -398,20 +399,40 @@ try {
     await button('ออกจากอู่').click()
   })
 
-  await step('เดินสำรวจผิวดาว: ลงไปเดินบนดาวอังคาร กระโดด เดินไปถึงภูเขาไฟโอลิมปัส แล้วสำรวจได้', async () => {
+  await step('เดินสำรวจผิวดาว: ลงไปเดินบนดาวอังคาร เก็บดาวแสงระหว่างทาง แล้วสำรวจภูเขาไฟโอลิมปัส', async () => {
     const mars = Planets.getPlanet('mars')
     await button(Surface.landLabel('mars')).click()
     await page.getByText(Surface.jumpLine(mars), { exact: true }).waitFor()
-    await page.keyboard.press('Space')
+    await page.getByText(World.timeLine('day', mars), { exact: true }).waitFor()
+    // เดินไปทางขวา ผ่านดาวแสงดวงแรกที่อยู่ติดพื้น ไปถึงภูเขาไฟโอลิมปัส
     await page.keyboard.down('ArrowRight')
     const scan = button('สำรวจภูเขาไฟโอลิมปัส')
     await scan.waitFor({ timeout: 20_000 })
     await page.keyboard.up('ArrowRight')
+    await page.getByText(`⭐ ดาวแสง 1/${World.sparklesFor(mars).length}`, { exact: true }).waitFor()
     await scan.click()
     const olympus = Surface.surfaceFor('mars').pois.find((poi) => poi.id === 'olympus')
     await page.getByText(olympus.fact, { exact: true }).waitFor()
-    await page.getByText(`${Planets.getPlanet('mars').name} · 🔍 1/${Surface.surfaceFor('mars').pois.length}`, { exact: true }).waitFor()
+    await page.getByText(`${mars.name} · 🔍 1/${Surface.surfaceFor('mars').pois.length}`, { exact: true }).waitFor()
+    await page.keyboard.press('Space')
     await shot('planets-surface')
+  })
+
+  await step('ชาวดาว: เดินไปหามาร์ตี้ ตอบคำถามเรื่องดาวอังคาร แล้วได้ของฝาก', async () => {
+    const native = World.nativeFor('mars')
+    await wait(2000)
+    await page.keyboard.down('ArrowLeft')
+    const talk = button(`คุยกับ${native.name}`)
+    await talk.waitFor({ timeout: 25_000 })
+    await page.keyboard.up('ArrowLeft')
+    await talk.click()
+    await page.getByText(native.question.text, { exact: true }).waitFor()
+    // ตอบผิดก่อนหนึ่งครั้ง ชาวดาวต้องให้ลองใหม่ได้ ไม่จบเกม
+    await option(native.question.wrong[0]).click()
+    await page.getByText(`${native.name}: ยังไม่ใช่นะ ลองอีกทีสิ ไม่เป็นไรเลย`, { exact: true }).waitFor()
+    await option(native.question.answer).click()
+    await page.getByText(`ได้ของฝาก ${native.gift.emoji} ${native.gift.name}`, { exact: true }).waitFor()
+    await shot('planets-native')
     await button('กลับขึ้นยาน').click()
     await button(Surface.landLabel('mars')).waitFor()
   })

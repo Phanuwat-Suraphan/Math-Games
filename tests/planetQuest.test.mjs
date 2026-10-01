@@ -41,6 +41,7 @@ const Art = load('planetQuest/companionArt')
 const Ship = load('planetQuest/ship')
 const Sf = load('planetQuest/surface')
 const SfR = load('planetQuest/surfaceRender')
+const SW = load('planetQuest/surfaceWorld')
 const { createRng } = load('math/rng')
 
 let passed = 0
@@ -757,9 +758,107 @@ check('วาดผิวดาวได้ทุกดวงจากตำแ�
       now: rng.next() * 100_000,
       reduceMotion: rng.chance(0.3),
       pixelRatio: rng.pick([1, 2]),
+      sparkles: SW.sparklesFor(P.getPlanet(surface.planet)),
+      collected: rng.chance(0.5) ? [0, 2] : [],
+      native: rng.chance(0.8) ? SW.nativeFor(surface.planet) : undefined,
+      nativeNear: rng.chance(0.5),
+      gifted: rng.chance(0.5),
     })
   }
   assert(state.nan === 0, `มีพิกัด NaN ${state.nan} ครั้ง`)
+})
+
+check('เดินไปอีกฝั่งของดาวแล้วเป็นกลางคืน ยานจอดฝั่งกลางวัน และฟ้าค่อย ๆ มืดไม่วาบ', () => {
+  assert(SW.daylight(SW.SUN_ANGLE) === 1 && SW.timeOfDay(SW.SUN_ANGLE) === 'day', 'ใต้ดวงอาทิตย์ไม่ใช่กลางวัน')
+  assert(SW.daylight(SW.SUN_ANGLE + Math.PI) === 0 && SW.timeOfDay(SW.SUN_ANGLE + Math.PI) === 'night', 'อีกฝั่งของดาวไม่มืด')
+  assert(SW.timeOfDay(Sf.startState().angle) === 'day', 'ลงจากยานมาเจอกลางคืนทันที')
+  let previous = SW.daylight(0)
+  let sawDusk = false
+  for (let step = 1; step <= 1000; step += 1) {
+    const angle = (step / 1000) * Math.PI * 2
+    const light = SW.daylight(angle)
+    assert(Math.abs(light - previous) < 0.03, `ฟ้าสว่างวาบที่มุม ${angle.toFixed(2)}`)
+    assert(light >= 0 && light <= 1, `ความสว่าง ${light} หลุดช่วง`)
+    if (SW.timeOfDay(angle) === 'dusk') sawDusk = true
+    previous = light
+  }
+  assert(sawDusk, 'ไม่มีช่วงใกล้ค่ำเลย')
+  for (const surface of Sf.SURFACES) {
+    const night = surface.pois.some((poi) => SW.timeOfDay(poi.angle) !== 'day')
+    assert(night, `${surface.planet} ไม่มีจุดสำรวจฝั่งกลางคืน เด็กจะไม่ได้เดินไปเจอกลางคืนเลย`)
+  }
+  assert(SW.timeLine('dusk', P.getPlanet('mars')).includes('สีฟ้า'), 'พระอาทิตย์ตกบนดาวอังคารไม่ได้บอกว่าเป็นสีฟ้า')
+  assert(SW.timeLine('night', P.getPlanet('earth')).includes('หันหนีดวงอาทิตย์'), 'กลางคืนไม่ได้อธิบายว่าเกิดจากอะไร')
+})
+
+check('ดาวแสงห้าดวงบนทุกดาว ดวงแรกเดินผ่านก็เก็บได้ และเก็บครบได้ด้วยการกระโดดบนดาวของมันเอง', () => {
+  const radius = 600
+  for (const planet of P.PLANETS) {
+    const sparkles = SW.sparklesFor(planet)
+    assert(sparkles.length === Store.SPARKLES_PER_PLANET, `${planet.name} มีดาวแสง ${sparkles.length} ดวง`)
+    assert(sparkles[0].height <= SW.BODY_HEIGHT, `ดาวแสงดวงแรกบน${planet.name}ต้องกระโดดถึงจะเก็บได้`)
+    for (const sparkle of sparkles) {
+      assert(sparkle.height <= Sf.jumpHeight(planet) + SW.BODY_HEIGHT, `ดาวแสงบน${planet.name}สูงจนกระโดดไม่ถึง`)
+    }
+    // บอตเดินไปหาดาวแสงทีละดวง ถึงแล้วกระโดด ต้องเก็บครบทุกดวง
+    const got = new Set()
+    for (const [index, sparkle] of sparkles.entries()) {
+      let state = { ...Sf.startState(), angle: sparkle.angle - 30 / radius }
+      for (let frame = 0; frame < 600 && !got.has(index); frame += 1) {
+        const gap = Sf.angleGap(state.angle, sparkle.angle) * radius
+        const input = { left: gap < -4, right: gap > 4, jump: Math.abs(gap) < 18 }
+        state = Sf.stepWalk(state, input, 1 / 60, radius, planet)
+        if (SW.catchesSparkle(state, sparkle, radius)) got.add(index)
+      }
+    }
+    assert(got.size === sparkles.length, `บน${planet.name}เก็บดาวแสงได้แค่ ${got.size} ดวง`)
+  }
+  const mars = SW.sparklesFor(P.getPlanet('mars'))
+  assert(mars.some(SW.tooHighOnEarth), 'บนดาวอังคารไม่มีดาวแสงที่สูงเกินกว่าจะกระโดดถึงบนโลก')
+  assert(!SW.sparklesFor(P.getPlanet('earth')).some(SW.tooHighOnEarth), 'บนโลกมีดาวแสงที่โลกกระโดดไม่ถึง')
+  // ลอยอยู่สูงเหนือหัวมากแล้วไม่นับว่าเก็บได้
+  const high = { angle: 1, height: 400 }
+  assert(!SW.catchesSparkle({ ...Sf.startState(), angle: 1 }, high, radius), 'ยืนอยู่ใต้ดาวแสงที่สูงลิบแล้วเก็บได้')
+})
+
+check('ชาวดาวมีครบทุกดาว คำถามเป็นเรื่องของดาวบ้านเกิด ตัวเลือกไม่ซ้ำ และยืนห่างจากจุดสำรวจกับยาน', () => {
+  const smallest = SfR.surfaceLayout(320, 260).radius
+  assert(SW.NATIVES.length === P.PLANETS.length, `มีชาวดาว ${SW.NATIVES.length} ตัว`)
+  const gifts = new Set()
+  for (const planet of P.PLANETS) {
+    const native = SW.nativeFor(planet.id)
+    const { question } = native
+    assert(!question.wrong.includes(question.answer), `คำตอบของ${native.name}อยู่ในตัวเลือกผิด`)
+    assert(new Set([question.answer, ...question.wrong]).size === question.wrong.length + 1, `ตัวเลือกของ${native.name}ซ้ำกัน`)
+    assert(question.wrong.length >= 2 && question.explain.length > 0, `คำถามของ${native.name}ไม่ครบ`)
+    assert(!gifts.has(native.gift.name), `ของฝาก ${native.gift.name} ซ้ำ`)
+    gifts.add(native.gift.name)
+    const spots = [0, ...Sf.surfaceFor(planet.id).pois.map((poi) => poi.angle)]
+    for (const spot of spots) {
+      const gap = Math.abs(Sf.angleGap(spot, native.angle)) * smallest
+      assert(gap > Sf.REACH * 2, `${native.name}ยืนใกล้จุดอื่นเกินไป (${Math.round(gap)} พิกเซล)`)
+    }
+    const at = { ...Sf.startState(), angle: native.angle }
+    assert(SW.nearNative(at, native, 500, Sf.REACH) && !SW.nearNative(Sf.startState(), native, 500, Sf.REACH), `คุยกับ${native.name}ได้ผิดที่`)
+  }
+  assert(SW.nativeFor('uranus').look.sideways, 'ชาวดาวยูเรนัสไม่นอนตะแคงตามดาวบ้านเกิด')
+})
+
+check('ดาวแสงกับของฝากถูกเก็บไม่ซ้ำ และค่าที่เสียหรือเกินช่วงถูกทิ้ง', () => {
+  const fresh = Store.emptyProgress('ต้นกล้า')
+  const one = Store.collectSparkle(fresh, 'mars', 2)
+  assert(Store.collectSparkle(one, 'mars', 2) === one, 'เก็บดาวแสงดวงเดิมซ้ำแล้วถูกนับซ้ำ')
+  assert(Store.collectSparkle(one, 'mars', 9) === one, 'เก็บดาวแสงที่ไม่มีอยู่ได้')
+  const gift = Store.receiveGift(one, 'mars')
+  assert(Store.receiveGift(gift, 'mars') === gift && gift.gifts.join() === 'mars', 'ได้ของฝากซ้ำ')
+  const parsed = Store.parseProgress(
+    { owner: 'ต้นกล้า', sparkles: { mars: [0, 0, 4, 5, -1, 1.5, 'x'], pluto: [1] }, gifts: ['mars', 'mars', 'pluto'] },
+    'ต้นกล้า',
+  )
+  assert(parsed.sparkles.mars.join() === '0,4', `อ่านดาวแสงได้ ${parsed.sparkles.mars}`)
+  assert(Object.keys(parsed.sparkles).join() === 'mars' && parsed.gifts.join() === 'mars', 'ดาวที่ไม่มีอยู่ค้างในข้อมูล')
+  const old = Store.parseProgress({ owner: 'ต้นกล้า' }, 'ต้นกล้า')
+  assert(old.gifts.length === 0 && Object.keys(old.sparkles).length === 0, 'ข้อมูลรุ่นก่อนอ่านไม่ได้')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

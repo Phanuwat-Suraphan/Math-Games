@@ -241,6 +241,7 @@ const REQUIRED_CLASSES = [
   'pq-walkpad',
   'pq-walkkey',
   'pq-walkkey-jump',
+  'pq-native-talk',
 
   // โดมสีเขียว
   'farm-stage',

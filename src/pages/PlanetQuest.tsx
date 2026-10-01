@@ -50,13 +50,16 @@ import type { StageKind } from '../planetQuest/stages'
 import {
   clearedCount,
   loadProgress,
+  collectSparkle,
   markDiscovered,
   markLesson,
   markMet,
   markVisited,
+  receiveGift,
   recordStage,
   saveProgress,
   setShip,
+  SPARKLES_PER_PLANET,
   totalStars,
 } from '../planetQuest/storage'
 import type { QuestProgress } from '../planetQuest/storage'
@@ -86,6 +89,9 @@ import type { Player } from '../types/player'
 
 /** เหรียญที่ได้ตอนเดินสำรวจครบทุกจุดบนดาวหนึ่งดวง */
 const EXPLORER_COINS = 10
+/** เหรียญจากการเก็บดาวแสงครบหนึ่งดาว และจากของฝากของชาวดาว */
+const SPARKLE_COINS = 5
+const GIFT_COINS = 5
 
 /** สีหน้าของเพื่อนดาวบนปุ่มเลือกดาว */
 const STATUS_MOOD: Record<BuddyStatus, BuddyMood> = { sleep: 'sleep', happy: 'happy', star: 'love' }
@@ -351,6 +357,28 @@ export function PlanetQuest({ player }: { player: Player }) {
     [patchPlayer, player.coins, progress.surface, updateProgress, walking],
   )
 
+  const catchSparkle = useCallback(
+    (index: number) => {
+      if (!walking) return
+      const found = progress.sparkles[walking] ?? []
+      if (found.includes(index)) return
+      updateProgress((current) => collectSparkle(current, walking, index))
+      if (found.length + 1 === SPARKLES_PER_PLANET) {
+        playSfx('levelUp')
+        patchPlayer({ coins: player.coins + SPARKLE_COINS })
+      } else {
+        playSfx('coin')
+      }
+    },
+    [patchPlayer, player.coins, progress.sparkles, updateProgress, walking],
+  )
+
+  const takeGift = useCallback(() => {
+    if (!walking || progress.gifts.includes(walking)) return
+    updateProgress((current) => receiveGift(current, walking))
+    patchPlayer({ coins: player.coins + GIFT_COINS })
+  }, [patchPlayer, player.coins, progress.gifts, updateProgress, walking])
+
   const fly = useCallback((target: PlanetId) => {
     const scene = sceneRef.current
     if (!scene || scene.isFlying() || target === shipAt) return
@@ -527,8 +555,12 @@ export function PlanetQuest({ player }: { player: Player }) {
             companion={progress.ship.companion}
             shipColorId={progress.ship.color}
             discovered={progress.surface[walking] ?? []}
+            collected={progress.sparkles[walking] ?? []}
+            gifted={progress.gifts.includes(walking)}
             reduceMotion={reduceMotion}
             onDiscover={discover}
+            onSparkle={catchSparkle}
+            onGift={takeGift}
             onExit={() => {
               playSfx('click')
               setWalking(null)
@@ -607,6 +639,7 @@ export function PlanetQuest({ player }: { player: Player }) {
             flying={flying}
             visited={progress.visited}
             best={progress.best}
+            gifts={progress.gifts}
             status={statusOf(selected)}
             justWoke={justWoke === selected}
             poke={cardPoke}

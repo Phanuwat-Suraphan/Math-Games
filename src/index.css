@@ -1646,6 +1646,15 @@ html[data-animations='off'] *::after {
   touch-action: none;
 }
 
+/* กล่องคุยกับชาวดาว */
+.pq-native-talk {
+  border-radius: 1.25rem;
+  border: 2px solid rgba(244, 114, 182, 0.55);
+  background:
+    radial-gradient(120% 80% at 10% 0%, rgba(244, 114, 182, 0.22), transparent 65%),
+    linear-gradient(180deg, rgba(49, 16, 60, 0.95), rgba(15, 8, 30, 0.97));
+}
+
 /* ปุ่มเดินตัวใหญ่ นิ้วเด็กกดค้างได้ง่าย ไม่เลือกข้อความเวลากดนาน ๆ */
 .pq-walkpad {
   display: grid;

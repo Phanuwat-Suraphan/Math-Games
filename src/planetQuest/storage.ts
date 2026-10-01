@@ -7,7 +7,7 @@
  *   โหมดฝึกฝน  ดาวที่ดีที่สุดของแต่ละด่าน กับจำนวนครั้งที่เล่น
  * และยานที่แต่งเองในอู่ต่อยาน (สียานกับเพื่อนร่วมทางที่นั่งไปด้วย)
  * กับรายชื่อเพื่อนร่วมทางที่เคยทักทายกันแล้ว การ์ดเพื่อนใหม่จะได้ขึ้นแค่ครั้งเดียวต่อตัว
- * และจุดบนผิวดาวที่เดินไปสำรวจแล้ว
+ * และของบนผิวดาว: จุดที่สำรวจแล้ว ดาวแสงที่เก็บได้ และของฝากจากชาวดาว
  * แยกคีย์จากข้อมูลผู้เล่นหลักเหมือนโหมดอื่น ข้อมูลเสียจึงเสียแค่ส่วนนี้
  */
 
@@ -33,7 +33,14 @@ export interface QuestProgress {
   met: CompanionId[]
   /** จุดบนผิวดาวที่สำรวจแล้ว แยกตามดาว */
   surface: Partial<Record<PlanetId, string[]>>
+  /** ลำดับของดาวแสงที่เก็บได้ แยกตามดาว */
+  sparkles: Partial<Record<PlanetId, number[]>>
+  /** ดาวที่ได้ของฝากจากชาวดาวแล้ว */
+  gifts: PlanetId[]
 }
+
+/** จำนวนดาวแสงบนดาวแต่ละดวง ต้องตรงกับ sparklesFor ใน surfaceWorld.ts */
+export const SPARKLES_PER_PLANET = 5
 
 export function emptyProgress(owner: string): QuestProgress {
   return {
@@ -45,6 +52,8 @@ export function emptyProgress(owner: string): QuestProgress {
     ship: { color: DEFAULT_COLOR, companion: DEFAULT_COMPANION },
     met: [DEFAULT_COMPANION],
     surface: {},
+    sparkles: {},
+    gifts: [],
   }
 }
 
@@ -94,7 +103,30 @@ export function parseProgress(raw: unknown, owner: string): QuestProgress {
       if (known.length > 0) progress.surface[planet] = known
     }
   }
+  if (typeof record.sparkles === 'object' && record.sparkles !== null) {
+    for (const [planet, found] of Object.entries(record.sparkles as Record<string, unknown>)) {
+      if (!isPlanetId(planet) || !Array.isArray(found)) continue
+      const valid = found.filter(
+        (index): index is number => typeof index === 'number' && Number.isInteger(index) && index >= 0 && index < SPARKLES_PER_PLANET,
+      )
+      if (valid.length > 0) progress.sparkles[planet] = [...new Set(valid)]
+    }
+  }
+  if (Array.isArray(record.gifts)) {
+    progress.gifts = [...new Set(record.gifts.filter(isPlanetId))]
+  }
   return progress
+}
+
+export function collectSparkle(progress: QuestProgress, planet: PlanetId, index: number): QuestProgress {
+  const found = progress.sparkles[planet] ?? []
+  if (found.includes(index) || index < 0 || index >= SPARKLES_PER_PLANET) return progress
+  return { ...progress, sparkles: { ...progress.sparkles, [planet]: [...found, index] } }
+}
+
+export function receiveGift(progress: QuestProgress, planet: PlanetId): QuestProgress {
+  if (progress.gifts.includes(planet)) return progress
+  return { ...progress, gifts: [...progress.gifts, planet] }
 }
 
 export function markDiscovered(progress: QuestProgress, planet: PlanetId, poi: string): QuestProgress {
