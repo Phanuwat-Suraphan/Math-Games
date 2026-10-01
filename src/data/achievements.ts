@@ -507,6 +507,16 @@ export const ACHIEVEMENTS: Achievement[] = [
     unit: 'ช่อง',
     valueOf: (player) => recordsOf(player).zombieStickers,
   }),
+  countGoal({
+    id: 'zombie-daily-7',
+    name: 'หมอเวรประจำวัน',
+    description: 'ทำภารกิจประจำวันของ ZOMBIE RESCUE ติดต่อกัน 7 วัน',
+    emoji: '🔥',
+    category: 'trial',
+    goal: 7,
+    unit: 'วัน',
+    valueOf: (player) => recordsOf(player).zombieStreakBest,
+  }),
 
   // ── ของสะสม ─────────────────────────────────────────────────
   countGoal({

@@ -11,7 +11,7 @@ import { useIndicatorLog } from '../hooks/useIndicatorLog'
 import { useMusic } from '../hooks/useMusic'
 import { playSfx } from '../services/audioService'
 import { applyBonusPercent, totalStats } from '../services/inventoryService'
-import { recordZombiePractice, recordZombieRescue, recordZombieStickers, recordsOf } from '../services/recordService'
+import { recordZombieDaily, recordZombiePractice, recordZombieRescue, recordZombieStickers, recordsOf } from '../services/recordService'
 import { ZOMBIE_INDICATOR } from '../teacher/indicators'
 import type { Player } from '../types/player'
 import { BOARD_VIEWBOX, CURE_POSITION, SQUARE_POSITIONS, boardArt, charInner } from '../zombieRescue/art'
@@ -52,7 +52,7 @@ import {
 import type { AnswerContext, AnswerOutcome, EventDraw, HeroKey, ItemKey, SupplyReward, ZrState } from '../zombieRescue/engine'
 import { TABLES, checkAnswer, practiceReward } from '../zombieRescue/questions'
 import type { QAnswer, Question, Stage } from '../zombieRescue/questions'
-import { clearZombieGame, loadRushBest, loadVaccineBook, loadZombieGame, saveRushBest, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
+import { clearZombieGame, loadDaily, loadRushBest, saveDaily, loadVaccineBook, loadZombieGame, saveRushBest, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
 import { rushReward, withRushResult } from '../zombieRescue/rush'
 import type { RushBest, RushOp, RushTable } from '../zombieRescue/rush'
 import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
@@ -85,6 +85,9 @@ import { PracticeScreen } from '../components/zombieRescue/PracticeScreen'
 import { VaccineBookScreen } from '../components/zombieRescue/VaccineBookScreen'
 import { RushScreen } from '../components/zombieRescue/RushScreen'
 import { ClassScreen } from '../components/zombieRescue/ClassScreen'
+import { DailyCard } from '../components/zombieRescue/DailyCard'
+import { completeDaily, dailyReward, dayKey } from '../zombieRescue/daily'
+import type { DailyState } from '../zombieRescue/daily'
 
 /**
  * ZOMBIE RESCUE: ภารกิจรอดชีวิต พิชิตไวรัสซอมบี้ (เกมการคูณ ป.2)
@@ -171,6 +174,19 @@ export function ZombieRescue({ player }: { player: Player }) {
     setBook(noted.book)
     saveVaccineBook(player.name, noted.book)
     return noted.newSticker
+  }
+
+  /* 🌞 ภารกิจประจำวัน: วันละ 5 ข้อ นับไฟต่อเนื่อง ตอบถูกจดสมุดวัคซีนเหมือนโหมดฝึก */
+  const [daily, setDaily] = useState<DailyState>(() => loadDaily(player.name))
+  const [dailyPlaying, setDailyPlaying] = useState(false)
+  const today = dayKey(new Date())
+  const finishDaily = (correct: number) => {
+    const next = completeDaily(daily, today)
+    setDaily(next)
+    saveDaily(player.name, next)
+    const reward = applyBonusPercent(dailyReward(next.streak), totalStats(player).coinBonusPercent)
+    patchPlayer({ coins: player.coins + Math.max(0, reward), records: recordZombieDaily(player, correct, next.streak) })
+    return { reward, streak: next.streak }
   }
 
   /* ⚡ ซอมบี้บุก!: สถิติดีสุดแยกแม่ เหรียญจ่ายตอนจบรอบ ข้อที่ถูกนับรวมกับ zombieCorrect เหมือนโหมดฝึก */
@@ -451,6 +467,22 @@ export function ZombieRescue({ player }: { player: Player }) {
         <TopBar player={player} title="ZOMBIE RESCUE" backTo="/menu" backLabel="กลับเมนู" />
         <ScreenLayout width={mode === 'class' ? 'wide' : 'normal'} className={fullscreen.active && mode === 'class' ? 'zr-fullscreen' : ''}>
           <FullscreenButton state={fullscreen} className="mb-3 ml-auto" />
+          {!practicing || dailyPlaying ? (
+            <DailyCard
+              book={book}
+              state={daily}
+              today={today}
+              onAnswer={(q, correct) => {
+                logIndicator(ZOMBIE_INDICATOR, correct)
+                return noteFact(q, correct)
+              }}
+              onFinish={finishDaily}
+              onPlayingChange={(playing) => {
+                setDailyPlaying(playing)
+                setPracticing(playing)
+              }}
+            />
+          ) : null}
           {!practicing ? (
             <div className="zr-tabs mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5" role="tablist" aria-label="เลือกโหมด">
               {(
@@ -481,6 +513,8 @@ export function ZombieRescue({ player }: { player: Player }) {
               ))}
             </div>
           ) : null}
+{dailyPlaying ? null : (
+            <>
           {mode === 'board' ? (
             <SetupPanel setup={setup} onChange={setSetup} onStart={start} saved={saved} onResume={resume} />
           ) : mode === 'class' ? (
@@ -538,6 +572,8 @@ export function ZombieRescue({ player }: { player: Player }) {
               onFinish={finishPractice}
               onPlayingChange={setPracticing}
             />
+          )}
+            </>
           )}
         </ScreenLayout>
       </>

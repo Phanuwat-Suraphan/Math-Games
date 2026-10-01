@@ -45,6 +45,7 @@ export function createEmptyRecords(): PlayerRecords {
     zombieCures: 0,
     zombieCorrect: 0,
     zombieStickers: 0,
+    zombieStreakBest: 0,
   }
 }
 
@@ -84,6 +85,7 @@ export function recordsOf(player: Player): PlayerRecords {
     zombieCures: clamp(raw.zombieCures),
     zombieCorrect: clamp(raw.zombieCorrect),
     zombieStickers: Math.min(ZOMBIE_STICKER_MAX, clamp(raw.zombieStickers)),
+    zombieStreakBest: clamp(raw.zombieStreakBest),
   }
 }
 
@@ -209,6 +211,16 @@ export function recordZombieStickers(player: Player, count: number): PlayerRecor
   const records = recordsOf(player)
   const next = Math.min(ZOMBIE_STICKER_MAX, clamp(count))
   return next > records.zombieStickers ? { ...records, zombieStickers: next } : records
+}
+
+/** บันทึกภารกิจประจำวัน: ข้อที่ถูกนับเข้าตัวนับเดียวกับโหมดฝึก และเก็บไฟต่อเนื่องยาวที่สุด */
+export function recordZombieDaily(player: Player, correct: number, streak: number): PlayerRecords {
+  const records = recordsOf(player)
+  return {
+    ...records,
+    zombieCorrect: clamp(records.zombieCorrect + clamp(correct)),
+    zombieStreakBest: Math.max(records.zombieStreakBest, clamp(streak)),
+  }
 }
 
 /** บันทึกผลหนึ่งรอบของการฝึกสูตรคูณ นับเฉพาะข้อที่ถูก ไม่นับเป็นเกมที่เล่น */
