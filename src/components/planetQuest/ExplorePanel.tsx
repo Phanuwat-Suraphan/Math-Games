@@ -1,11 +1,18 @@
 import { useState } from 'react'
-import type { ChangeEvent } from 'react'
+import type { ChangeEvent, ReactNode } from 'react'
 import { Button } from '../Button'
-import { PlanetDot } from '../solar/SpaceParts'
 import { playSfx } from '../../services/audioService'
+import { buddyFor, buddyStatus, pokeLine, sleepyLine, wakeLine } from '../../planetQuest/buddies'
+import type { BuddyStatus } from '../../planetQuest/buddies'
+import type { CompanionId, JourneyStats } from '../../planetQuest/companions'
+import type { ShipColorId } from '../../planetQuest/ship'
+import { landLabel, surfaceFor } from '../../planetQuest/surface'
 import { PLANETS, formatNumber, getPlanet } from '../../solar/planets'
 import type { Planet, PlanetId } from '../../solar/planets'
+import { Bubble, PlanetBuddy, PokeButton } from './Buddy'
+import type { PokeState } from './Buddy'
 import { EclipseSandbox } from './EclipseLab'
+import { ShipWorkshop, SouvenirAlbum } from './ExploreToys'
 
 /**
  * โหมดสำรวจ · บินเที่ยวรอบระบบสุริยะแบบไม่มีโจทย์
@@ -38,30 +45,63 @@ function dayLength(planet: Planet): string {
  */
 function Postcard({
   planet,
+  status,
+  justWoke,
+  poke,
+  reduceMotion,
   weight,
   age,
   onWeight,
   onAge,
+  onPoke,
 }: {
   planet: Planet
+  status: BuddyStatus
+  justWoke: boolean
+  poke: PokeState | null
+  reduceMotion: boolean
   weight: number
   age: number
   onWeight: (value: number) => void
   onAge: (value: number) => void
+  onPoke: () => void
 }) {
   const weightHere = Math.round((weight * planet.gravityTenths) / 10)
   const ageHere = (age * 365.25) / planet.orbitDays
   const feel = temperatureFeel(planet)
+  const buddy = buddyFor(planet.id)
+  const poked = poke?.id === planet.id ? poke : null
 
   return (
     <div className="sol-panel p-4 sm:p-5">
       <div className="flex items-center gap-3">
-        <PlanetDot planet={planet} size={44} />
+        <PokeButton label={`จิ้ม${buddy.nickname}`} count={poked?.count ?? 0} reduceMotion={reduceMotion} onPoke={onPoke}>
+          <PlanetBuddy
+            planet={planet}
+            size={72}
+            mood={status === 'sleep' ? 'sleep' : poked ? 'love' : justWoke ? 'wow' : 'happy'}
+            crown={status === 'star'}
+            animate={!reduceMotion}
+            className={reduceMotion ? '' : 'pq-bob'}
+          />
+        </PokeButton>
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">โปสการ์ดจากอวกาศ</p>
           <h3 className="text-2xl font-black text-white">{planet.name}</h3>
         </div>
       </div>
+      <Bubble tail="top" className="mt-3">
+        <span className="text-xs font-bold text-slate-500">{buddy.nickname}</span>
+        <span className="block text-sm font-black">
+          {poked
+            ? pokeLine(planet.id, poked.count, status === 'sleep').text
+            : status === 'sleep'
+              ? sleepyLine(buddy)
+              : justWoke
+                ? wakeLine(buddy)
+                : buddy.intro}
+        </span>
+      </Bubble>
       <p className="mt-3 text-base text-slate-100">✨ {planet.facts[0]}</p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -114,24 +154,90 @@ function Postcard({
   )
 }
 
+/** กล่องของเล่นพิเศษหนึ่งกล่อง เปิดดูได้ทีละกล่องหรือพร้อมกันก็ได้ */
+function ToyBox({
+  title,
+  note,
+  open,
+  openLabel,
+  closeLabel,
+  onToggle,
+  children,
+}: {
+  title: string
+  note: string
+  open: boolean
+  openLabel: string
+  closeLabel: string
+  onToggle: () => void
+  children: ReactNode
+}) {
+  return (
+    <div className="sol-comms p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">ของเล่นพิเศษ</p>
+          <p className="text-lg font-black text-white">{title}</p>
+        </div>
+        <Button
+          variant={open ? 'ghost' : 'secondary'}
+          onClick={() => {
+            playSfx('click')
+            onToggle()
+          }}
+        >
+          {open ? closeLabel : openLabel}
+        </Button>
+      </div>
+      {open ? <div className="mt-3">{children}</div> : <p className="mt-1 text-sm text-slate-300">{note}</p>}
+    </div>
+  )
+}
+
 export function ExplorePanel({
   selected,
   shipAt,
   flying,
   visited,
+  best,
+  status,
+  justWoke,
+  poke,
+  shipColor,
+  companion,
+  stats,
   reduceMotion,
   onSelect,
   onFly,
+  onPoke,
+  onShip,
+  onLand,
 }: {
   selected: PlanetId
   shipAt: PlanetId
   flying: boolean
   visited: readonly PlanetId[]
+  /** เพื่อนดาวของดาวที่เลือกยังหลับ ตื่นแล้ว หรือได้สามดาวแล้ว */
+  status: BuddyStatus
+  /** ดาวที่ได้ในโหมดฝึกฝน ใช้วาดมงกุฎบนโปสการ์ดในสมุด */
+  best: Partial<Record<PlanetId, number>>
+  /** ดาวที่เลือกเพิ่งถูกปลุกจากการบินมาถึงครั้งนี้ */
+  justWoke: boolean
+  poke: PokeState | null
+  shipColor: ShipColorId
+  companion: CompanionId
+  stats: JourneyStats
   reduceMotion: boolean
   onSelect: (id: PlanetId) => void
   onFly: (id: PlanetId) => void
+  onPoke: (id: PlanetId) => void
+  onShip: (change: { color?: ShipColorId; companion?: CompanionId }) => void
+  /** ลงไปเดินบนผิวดาวที่ยานจอดอยู่ */
+  onLand: (id: PlanetId) => void
 }) {
   const [sandbox, setSandbox] = useState(false)
+  const [album, setAlbum] = useState(false)
+  const [workshop, setWorkshop] = useState(false)
   const [weight, setWeight] = useState(35)
   const [age, setAge] = useState(11)
   const planet = getPlanet(selected)
@@ -148,7 +254,12 @@ export function ExplorePanel({
                 onClick={() => onSelect(item.id)}
                 className={`sol-chip ${selected === item.id ? 'sol-chip-on' : ''}`}
               >
-                <PlanetDot planet={item} />
+                <PlanetBuddy
+                  planet={item}
+                  size={26}
+                  mood={buddyStatus(item.id, undefined, visited) === 'sleep' ? 'sleep' : 'happy'}
+                  animate={false}
+                />
                 <span>{item.name}</span>
                 {visited.includes(item.id) ? <span aria-label="เคยไปเที่ยวแล้ว">📸</span> : null}
               </button>
@@ -167,37 +278,61 @@ export function ExplorePanel({
         >
           {flying ? 'กำลังบิน…' : selected === shipAt ? `ยานจอดอยู่ที่${planet.name}` : `บินไปเที่ยว${planet.name}`}
         </Button>
+        {selected === shipAt && !flying ? (
+          <Button size="lg" variant="secondary" icon={surfaceFor(selected).kind === 'gas' ? '🎈' : '🧑‍🚀'} onClick={() => onLand(selected)}>
+            {landLabel(selected)}
+          </Button>
+        ) : null}
         <span className="text-sm font-bold text-slate-300">
           📸 ของที่ระลึก {visited.length}/{PLANETS.length} ดาว
         </span>
       </div>
 
-      <Postcard planet={planet} weight={weight} age={age} onWeight={setWeight} onAge={setAge} />
+      <Postcard
+        planet={planet}
+        status={status}
+        justWoke={justWoke}
+        poke={poke}
+        reduceMotion={reduceMotion}
+        weight={weight}
+        age={age}
+        onWeight={setWeight}
+        onAge={setAge}
+        onPoke={() => onPoke(selected)}
+      />
 
-      <div className="sol-comms p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-cyan-300">ของเล่นพิเศษ</p>
-            <p className="text-lg font-black text-white">🌒 ห้องทดลองอุปราคา · เล่นอิสระ</p>
-          </div>
-          <Button
-            variant={sandbox ? 'ghost' : 'secondary'}
-            onClick={() => {
-              playSfx('click')
-              setSandbox((value) => !value)
-            }}
-          >
-            {sandbox ? 'ปิดห้องทดลอง' : 'เปิดห้องทดลอง'}
-          </Button>
-        </div>
-        {sandbox ? (
-          <div className="mt-3">
-            <EclipseSandbox reduceMotion={reduceMotion} />
-          </div>
-        ) : (
-          <p className="mt-1 text-sm text-slate-300">หมุนดวงจันทร์ไปรอบโลก แล้วดูว่าเมื่อไรจะเกิดสุริยุปราคาและจันทรุปราคา</p>
-        )}
-      </div>
+      <ToyBox
+        title="📒 สมุดของที่ระลึก"
+        note="โปสการ์ดของดาวทุกดวงที่ไปเยี่ยมแล้ว แตะพลิกดูความลับของแต่ละดาว"
+        open={album}
+        openLabel="เปิดสมุด"
+        closeLabel="ปิดสมุด"
+        onToggle={() => setAlbum((value) => !value)}
+      >
+        <SouvenirAlbum visited={visited} best={best} reduceMotion={reduceMotion} />
+      </ToyBox>
+
+      <ToyBox
+        title="🛠️ อู่ต่อยาน"
+        note="เลือกสียาน และชวนเพื่อนร่วมทางมอนสเตอร์อวกาศขึ้นยานไปด้วยกัน"
+        open={workshop}
+        openLabel="เข้าอู่ต่อยาน"
+        closeLabel="ออกจากอู่"
+        onToggle={() => setWorkshop((value) => !value)}
+      >
+        <ShipWorkshop color={shipColor} companion={companion} stats={stats} reduceMotion={reduceMotion} onChange={onShip} />
+      </ToyBox>
+
+      <ToyBox
+        title="🌒 ห้องทดลองอุปราคา · เล่นอิสระ"
+        note="หมุนดวงจันทร์ไปรอบโลก แล้วดูว่าเมื่อไรจะเกิดสุริยุปราคาและจันทรุปราคา"
+        open={sandbox}
+        openLabel="เปิดห้องทดลอง"
+        closeLabel="ปิดห้องทดลอง"
+        onToggle={() => setSandbox((value) => !value)}
+      >
+        <EclipseSandbox reduceMotion={reduceMotion} />
+      </ToyBox>
     </section>
   )
 }

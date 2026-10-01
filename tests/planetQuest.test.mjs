@@ -35,6 +35,13 @@ const Store = load('planetQuest/storage')
 const Engine = load('minigames/engine')
 const P = load('solar/planets')
 const L = load('planetQuest/lessons')
+const Bd = load('planetQuest/buddies')
+const Cm = load('planetQuest/companions')
+const Art = load('planetQuest/companionArt')
+const Ship = load('planetQuest/ship')
+const Sf = load('planetQuest/surface')
+const SfR = load('planetQuest/surfaceRender')
+const { createRng } = load('math/rng')
 
 let passed = 0
 const failures = []
@@ -437,6 +444,322 @@ check('ของที่ระลึกและบทเรียนที่�
   assert(parsed.lessons.join() === 'tech', `บทเรียนอ่านได้ ${parsed.lessons.join()}`)
   const old = Store.parseProgress({ owner: 'ต้นกล้า', best: { venus: 2 }, plays: 1 }, 'ต้นกล้า')
   assert(old.visited.length === 0 && old.lessons.length === 0 && old.best.venus === 2, 'ข้อมูลรุ่นก่อนที่ยังไม่มีสองช่องนี้อ่านไม่ได้')
+})
+
+// ---------- เพื่อนดาว ----------
+
+check('ดาวทั้งแปดมีเพื่อนดาวของตัวเอง ชื่อเล่นไม่ซ้ำ และมีประโยคครบทุกช่อง', () => {
+  assert(Bd.BUDDIES.length === P.PLANETS.length, `มีเพื่อนดาว ${Bd.BUDDIES.length} ดวง`)
+  for (const planet of P.PLANETS) {
+    const buddy = Bd.buddyFor(planet.id)
+    assert(buddy.nickname && buddy.intro && buddy.invite, `${planet.name} ขาดชื่อเล่นหรือประโยคแนะนำตัว`)
+    assert(buddy.cheers.length >= 3, `${planet.name} มีประโยคเชียร์แค่ ${buddy.cheers.length} แบบ`)
+    assert(buddy.oops.length >= 2, `${planet.name} มีประโยคปลอบแค่ ${buddy.oops.length} แบบ`)
+  }
+  const names = Bd.BUDDIES.map((buddy) => buddy.nickname)
+  assert(new Set(names).size === names.length, 'ชื่อเล่นซ้ำกัน')
+})
+
+check('ประโยคของเพื่อนดาวสั้นพอใส่กล่องคำพูดบนจอโทรศัพท์ และประโยคเดียวกันไม่อยู่สองที่', () => {
+  const seen = new Set()
+  for (const buddy of Bd.BUDDIES) {
+    for (const line of [buddy.intro, buddy.invite, ...buddy.cheers, ...buddy.oops]) {
+      assert(line.length <= 80, `${buddy.nickname}: "${line}" ยาว ${line.length} ตัวอักษร`)
+      assert(!seen.has(line), `ประโยค "${line}" ซ้ำ`)
+      seen.add(line)
+    }
+  }
+})
+
+check('ประโยคปลอบตอนพลาดไม่มีคำตำหนิ เด็กพลาดแล้วยังอยากเล่นต่อ', () => {
+  for (const buddy of Bd.BUDDIES) {
+    for (const line of buddy.oops) {
+      for (const word of ['ผิด', 'แย่', 'โง่', 'ไม่เก่ง', 'ห่วย']) {
+        assert(!line.includes(word), `${buddy.nickname}: "${line}" มีคำว่า "${word}"`)
+      }
+    }
+  }
+})
+
+check('ดาวยังหลับจนกว่าจะไปเยี่ยม ได้สามดาวแล้วสวมมงกุฎ และโลกตื่นอยู่เสมอ', () => {
+  assert(Bd.buddyStatus('mars', undefined, []) === 'sleep', 'ดาวที่ยังไม่เคยไปไม่หลับ')
+  assert(Bd.buddyStatus('mars', undefined, ['mars']) === 'happy', 'ไปเยี่ยมแล้วยังไม่ตื่น')
+  assert(Bd.buddyStatus('mars', 2, []) === 'happy', 'เล่นแล้วได้สองดาวยังหลับอยู่')
+  assert(Bd.buddyStatus('mars', 3, ['mars']) === 'star', 'ได้สามดาวแล้วไม่ได้มงกุฎ')
+  assert(Bd.buddyStatus('earth', undefined, []) === 'happy', 'โลกหลับทั้งที่เราอยู่ที่นี่')
+  const awake = Bd.awakePlanets({ saturn: 1 }, ['venus'])
+  assert(awake.join() === 'venus,earth,saturn', `ดาวที่ตื่นคือ ${awake.join()}`)
+})
+
+check('ประโยคหมุนเวียนไม่ซ้ำติดกัน คอมโบเริ่มพูดตั้งแต่สามข้อ และคำลาเปลี่ยนตามจำนวนดาว', () => {
+  const buddy = Bd.buddyFor('saturn')
+  for (let count = 0; count < 12; count += 1) {
+    assert(Bd.lineFor(buddy.cheers, count) !== Bd.lineFor(buddy.cheers, count + 1), `ข้อ ${count} กับ ${count + 1} พูดซ้ำกัน`)
+  }
+  assert(Bd.lineFor([], 3) === '', 'รายการว่างทำให้พัง')
+  assert(Bd.comboLine(Bd.COMBO_FROM).includes(String(Bd.COMBO_FROM)), 'ประโยคคอมโบไม่บอกจำนวน')
+  const byStars = [1, 2, 3].map((stars) => Bd.goodbyeLine(buddy, stars))
+  assert(new Set(byStars).size === 3, 'คำลาเหมือนกันทุกจำนวนดาว')
+  assert(byStars.every((line) => line.includes(buddy.nickname)), 'คำลาไม่มีชื่อเล่นของดาว')
+})
+
+check('จิ้มดาวแล้วดาวเล่าเรื่องจริงคนละเรื่อง ประโยคไม่ซ้ำ ดาวที่หลับละเมอ และดวงอาทิตย์ก็หัวเราะได้', () => {
+  const seen = new Set()
+  for (const buddy of Bd.BUDDIES) {
+    assert(buddy.pokes.length >= 3, `${buddy.nickname} มีประโยคตอนถูกจิ้มแค่ ${buddy.pokes.length} แบบ`)
+    for (const line of buddy.pokes) {
+      assert(line.length <= 80, `${buddy.nickname}: "${line}" ยาวเกิน`)
+      assert(!seen.has(line), `ประโยค "${line}" ซ้ำ`)
+      seen.add(line)
+    }
+  }
+  const awake = Bd.pokeLine('mars', 0, false)
+  assert(awake.nickname === 'น้องอังคาร' && Bd.buddyFor('mars').pokes.includes(awake.text), 'จิ้มดาวอังคารแล้วไม่ได้ประโยคของดาวอังคาร')
+  const asleep = Bd.pokeLine('mars', 0, true)
+  assert(asleep.text === Bd.sleepyPokeLine(Bd.buddyFor('mars')), 'ดาวที่หลับไม่ละเมอ')
+  const sun = Bd.pokeLine('sun', 4, true)
+  assert(sun.nickname === Bd.SUN_NICKNAME && Bd.SUN_POKES.includes(sun.text), 'ดวงอาทิตย์หลับหรือพูดประโยคของดาวดวงอื่น')
+})
+
+// ---------- เพื่อนร่วมทาง ----------
+
+check('เพื่อนร่วมทางทุกตัวมีชื่อไม่ซ้ำ มีเรื่องเล่าครบ และประโยคตอนออกบินกับตอนถึงใส่ชื่อดาวได้', () => {
+  const names = Cm.COMPANIONS.map((companion) => companion.name)
+  assert(new Set(names).size === names.length, 'ชื่อเพื่อนร่วมทางซ้ำกัน')
+  for (const companion of Cm.COMPANIONS) {
+    assert(companion.facts.length >= 3, `${companion.name} มีเรื่องเล่าแค่ ${companion.facts.length} เรื่อง`)
+    for (const line of [companion.intro, ...companion.facts]) {
+      assert(line.length <= 90, `${companion.name}: "${line}" ยาวเกินกล่องคำพูด`)
+    }
+    for (const line of [...companion.takeoff, ...companion.arrive]) {
+      assert(line.includes('{planet}'), `${companion.name}: "${line}" ไม่มีที่ใส่ชื่อดาว`)
+    }
+    const takeoff = Cm.takeoffLine(companion, 'ดาวอังคาร', 3)
+    assert(takeoff.includes('ดาวอังคาร') && !takeoff.includes('{'), `ประโยคออกบิน "${takeoff}" แทนชื่อดาวไม่ครบ`)
+    assert(Cm.arriveLine(companion, 'ดาวเสาร์', -1).includes('ดาวเสาร์'), 'เลขเที่ยวบินติดลบทำให้พัง')
+    assert(Cm.flightFact(companion, 7).length > 0, `${companion.name} ไม่มีเรื่องเล่าระหว่างบิน`)
+  }
+})
+
+check('เพื่อนใหม่มาตามเงื่อนไขที่เล่นได้จริงทุกตัว ตัวแรกมาตั้งแต่เริ่ม และคำใบ้บอกว่าทำไปแล้วเท่าไร', () => {
+  const none = { awake: 1, lessons: 0, stars: 0 }
+  assert(Cm.unlockedCompanions(none).join() === Cm.DEFAULT_COMPANION, 'ตอนเริ่มมีเพื่อนมากกว่าหรือน้อยกว่าหนึ่งตัว')
+  const everything = { awake: P.PLANETS.length, lessons: L.LESSONS.length, stars: 24 }
+  assert(Cm.unlockedCompanions(everything).length === Cm.COMPANIONS.length, 'เล่นครบทุกอย่างแล้วยังมีเพื่อนที่ไม่มา')
+  for (const companion of Cm.COMPANIONS) {
+    const hint = Cm.unlockHint(companion, none)
+    assert(hint.length > 0 && !hint.includes('undefined'), `คำใบ้ของ${companion.name}ว่าง`)
+  }
+  const momo = Cm.companionFor('momo')
+  assert(!Cm.isUnlocked(momo, { awake: 2, lessons: 0, stars: 0 }) && Cm.isUnlocked(momo, { awake: 3, lessons: 0, stars: 0 }), 'โมโม่ไม่มาตามเงื่อนไขปลุกดาวสามดวง')
+  assert(Cm.unlockHint(momo, { awake: 9, lessons: 0, stars: 0 }).includes('ตอนนี้ 3'), 'คำใบ้นับเกินจำนวนที่ต้องการ')
+  const fresh = Cm.newFriends({ awake: 3, lessons: 2, stars: 0 }, ['pukpik'])
+  assert(fresh.join() === 'momo,bobby', `เพื่อนใหม่คือ ${fresh.join()}`)
+  assert(Cm.newFriends({ awake: 3, lessons: 2, stars: 0 }, ['pukpik', 'momo', 'bobby']).length === 0, 'เพื่อนที่ทักแล้วขึ้นการ์ดซ้ำ')
+})
+
+check('ภาพเพื่อนร่วมทางทุกตัววาดได้ ไม่มีค่าเสีย และชื่อไล่สีไม่ชนกันเมื่อขึ้นจอพร้อมกัน', () => {
+  const ids = new Map()
+  for (const companion of Cm.COMPANIONS) {
+    const art = Art.companionArt(companion.id)
+    assert(art.length > 200, `ภาพ${companion.name}ว่าง`)
+    assert(!/NaN|undefined|Infinity/.test(art), `ภาพ${companion.name}มีค่าเสีย`)
+    for (const [, id] of art.matchAll(/id="([^"]+)"/g)) {
+      assert(!ids.has(id) || ids.get(id) === companion.id, `ชื่อ ${id} ชนกันระหว่าง${ids.get(id)}กับ${companion.id}`)
+      ids.set(id, companion.id)
+    }
+    const file = Art.companionSvgFile(companion.id)
+    assert(file.includes('xmlns="http://www.w3.org/2000/svg"') && file.includes('width="100"'), 'ไฟล์ภาพไม่มี xmlns หรือขนาด ผืนผ้าใบบางเบราว์เซอร์จะไม่วาด')
+  }
+})
+
+check('ยานที่แต่งเองถูกเก็บ ค่าที่เสียถูกแทนด้วยค่าเริ่มต้นทีละช่อง และเพื่อนที่ทักแล้วไม่หายไป', () => {
+  const fresh = Store.emptyProgress('ต้นกล้า')
+  assert(fresh.ship.color === Ship.DEFAULT_COLOR && fresh.ship.companion === Cm.DEFAULT_COMPANION, 'ค่าเริ่มต้นของยานไม่ถูก')
+  assert(fresh.met.join() === Cm.DEFAULT_COMPANION, 'ตอนเริ่มยังไม่รู้จักเพื่อนตัวแรก')
+  const saved = Store.parseProgress({ owner: 'ต้นกล้า', ship: { color: 'purple', companion: 'momo' }, met: ['momo', 'momo', 'ghost'] }, 'ต้นกล้า')
+  assert(saved.ship.color === 'purple' && saved.ship.companion === 'momo', 'อ่านยานที่แต่งไว้ไม่ได้')
+  assert(saved.met.join() === 'pukpik,momo', `เพื่อนที่ทักแล้วคือ ${saved.met.join()}`)
+  const broken = Store.parseProgress({ owner: 'ต้นกล้า', ship: { color: 'rainbow', companion: 'momo' } }, 'ต้นกล้า')
+  assert(broken.ship.color === Ship.DEFAULT_COLOR && broken.ship.companion === 'momo', 'สีเสียทำให้เพื่อนที่เลือกไว้หายไปด้วย')
+  const old = Store.parseProgress({ owner: 'ต้นกล้า', best: { venus: 2 } }, 'ต้นกล้า')
+  assert(old.ship.companion === Cm.DEFAULT_COMPANION && old.met.length === 1, 'ข้อมูลรุ่นก่อนที่ยังไม่มียานอ่านไม่ได้')
+  assert(Store.setShip(fresh, { color: fresh.ship.color }) === fresh, 'เลือกสีเดิมแล้วถูกนับเป็นการเปลี่ยน')
+  const changed = Store.setShip(fresh, { companion: 'draco' })
+  assert(changed.ship.companion === 'draco' && changed.ship.color === fresh.ship.color, 'เปลี่ยนเพื่อนแล้วสีหาย')
+  const met = Store.markMet(fresh, 'fufu')
+  assert(met.met.includes('fufu') && Store.markMet(met, 'fufu') === met, 'ทักเพื่อนซ้ำแล้วถูกเพิ่มซ้ำ')
+  const colors = Ship.SHIP_COLORS.map((color) => color.id)
+  assert(new Set(colors).size === colors.length, 'สียานซ้ำกัน')
+  for (const color of Ship.SHIP_COLORS) {
+    for (const value of [color.fin, color.bodyTop, color.bodyBottom, color.window]) {
+      assert(/^#[0-9a-f]{6}$/i.test(value), `สี ${value} ของ${color.name}ไม่ใช่รหัสสี`)
+    }
+  }
+})
+
+// ---------- เดินสำรวจผิวดาว ----------
+
+check('ดาวทุกดวงลงไปเดินได้ ดาวชั้นในเป็นพื้นหิน ดาวชั้นนอกเป็นดาวแก๊สที่ต้องลอยเหนือเมฆ', () => {
+  for (const planet of P.PLANETS) {
+    const surface = Sf.surfaceFor(planet.id)
+    const inner = ['mercury', 'venus', 'earth', 'mars'].includes(planet.id)
+    assert(surface.kind === (inner ? 'rock' : 'gas'), `${planet.name} เป็นพื้นแบบ ${surface.kind}`)
+    assert(Sf.landLabel(planet.id).includes(inner ? 'เดินสำรวจผิว' : 'ลอยเหนือเมฆ'), `ปุ่มลงจอดของ${planet.name}บอกผิดว่าเดินหรือลอย`)
+  }
+  assert(!Sf.surfaceFor('venus').sunVisible, 'มองเห็นดวงอาทิตย์จากพื้นดาวศุกร์ ทั้งที่เมฆหนาทึบ')
+  assert(Sf.surfaceFor('mercury').skyExtras.includes('stars'), 'ท้องฟ้าดาวพุธไม่มืด ทั้งที่ไม่มีอากาศ')
+  assert(Sf.surfaceFor('saturn').skyExtras.includes('rings'), 'มองขึ้นจากดาวเสาร์ไม่เห็นวงแหวน')
+  for (const id of ['mercury', 'venus']) {
+    assert(Sf.surfaceFor(id).caution, `${P.getPlanet(id).name}ร้อนจัดแต่ไม่บอกว่าของจริงมนุษย์ไปไม่ได้`)
+  }
+})
+
+check('จุดสำรวจทุกดาวมีอย่างน้อยสามจุด ไม่ซ้อนกันและไม่ทับยาน แม้บนจอโทรศัพท์ที่ดาวเล็กที่สุด', () => {
+  const smallest = SfR.surfaceLayout(320, 260).radius
+  const seen = new Set()
+  for (const surface of Sf.SURFACES) {
+    assert(surface.pois.length >= 3, `${surface.planet} มีจุดสำรวจ ${surface.pois.length} จุด`)
+    const spots = [0, ...surface.pois.map((poi) => poi.angle)]
+    for (let a = 0; a < spots.length; a += 1) {
+      for (let b = a + 1; b < spots.length; b += 1) {
+        const gap = Math.abs(Sf.angleGap(spots[a], spots[b])) * smallest
+        assert(gap > Sf.REACH * 2, `${surface.planet} มีจุดห่างกันแค่ ${Math.round(gap)} พิกเซล ยืนตรงกลางแล้วสำรวจได้สองจุด`)
+      }
+    }
+    for (const poi of surface.pois) {
+      assert(poi.fact.length <= 130 && poi.title.length <= 30, `${poi.title} ยาวเกินกล่อง`)
+      assert(!seen.has(poi.fact), `เรื่อง "${poi.fact}" ซ้ำ`)
+      seen.add(poi.fact)
+      assert(Sf.isPoiOf(surface.planet, poi.id), `${poi.id} ไม่ถูกนับเป็นจุดของ${surface.planet}`)
+    }
+  }
+})
+
+check('กระโดดสูงแปรผกผันกับแรงโน้มถ่วงจริง ดาวอังคารสูงกว่าโลก 2.5 เท่า แล้วตกกลับลงพื้นเสมอ', () => {
+  const highest = (planet) => {
+    let state = Sf.startState()
+    let top = 0
+    state = Sf.stepWalk(state, { left: false, right: false, jump: true }, 1 / 120, 800, planet)
+    for (let frame = 0; frame < 2000; frame += 1) {
+      state = Sf.stepWalk(state, { left: false, right: false, jump: false }, 1 / 120, 800, planet)
+      top = Math.max(top, state.height)
+    }
+    assert(state.height === 0 && state.velocity === 0, `${planet.name}กระโดดแล้วไม่ตกถึงพื้น`)
+    return top
+  }
+  const earth = highest(P.getPlanet('earth'))
+  const mars = highest(P.getPlanet('mars'))
+  const jupiter = highest(P.getPlanet('jupiter'))
+  assert(Math.abs(mars / earth - 2.5) < 0.05, `ดาวอังคารกระโดดได้ ${(mars / earth).toFixed(2)} เท่าของโลก`)
+  assert(Math.abs(earth / jupiter - 2.4) < 0.05, `ดาวพฤหัสบดีเตี้ยกว่าโลก ${(earth / jupiter).toFixed(2)} เท่า`)
+  assert(Math.abs(earth - Sf.jumpHeight(P.getPlanet('earth'))) < 2, 'ความสูงที่จำลองได้ไม่ตรงกับสูตร')
+  assert(Sf.jumpHeight(P.getPlanet('mars')) < 200, 'กระโดดบนดาวอังคารสูงจนหลุดขอบจอ')
+  // กดกระโดดกลางอากาศไม่ได้กระโดดซ้ำ
+  let state = Sf.stepWalk(Sf.startState(), { left: false, right: false, jump: true }, 0.05, 800, P.getPlanet('earth'))
+  const rising = state.velocity
+  state = Sf.stepWalk(state, { left: false, right: false, jump: true }, 0.05, 800, P.getPlanet('earth'))
+  assert(state.velocity < rising, 'กดกระโดดกลางอากาศแล้วพุ่งขึ้นอีก')
+})
+
+check('เดินรอบดาวได้ครบวง มุมไม่หลุดช่วง เวลาค้างนานไม่ทำให้วาร์ป และเดินไปถึงจุดสำรวจได้ทุกจุด', () => {
+  const planet = P.getPlanet('mars')
+  const surface = Sf.surfaceFor('mars')
+  let state = Sf.startState()
+  const found = new Set()
+  for (let frame = 0; frame < 6000; frame += 1) {
+    state = Sf.stepWalk(state, { left: false, right: true, jump: false }, 1 / 60, 500, planet)
+    assert(state.angle >= 0 && state.angle < Math.PI * 2, `มุมหลุดช่วง ${state.angle}`)
+    const poi = Sf.poiInReach(state, surface, 500)
+    if (poi) found.add(poi.id)
+  }
+  assert(found.size === surface.pois.length, `เดินรอบดาวแล้วเจอจุดสำรวจแค่ ${found.size} จุด`)
+  assert(state.facing === 1 && state.walking, 'เดินขวาแล้วไม่หันขวา')
+  const frozen = Sf.stepWalk(Sf.startState(), { left: true, right: false, jump: false }, 10, 500, planet)
+  assert(Math.abs(Sf.angleGap(Sf.startState().angle, frozen.angle)) * 500 < 10, 'แท็บค้างนานแล้วกลับมาผู้เล่นวาร์ปไปไกล')
+  assert(frozen.facing === -1, 'เดินซ้ายแล้วไม่หันซ้าย')
+  assert(Sf.poiInReach(Sf.startState(), surface, 500) === null, 'ยืนข้างยานแล้วสำรวจได้ทั้งที่ไม่มีจุดสำรวจ')
+})
+
+check('ประโยคเรื่องดวงอาทิตย์และการกระโดดคำนวณจากข้อมูลจริง', () => {
+  assert(Sf.sunLine(P.getPlanet('mercury')).includes('ใหญ่กว่า') && Sf.sunLine(P.getPlanet('mercury')).includes('2.6'), Sf.sunLine(P.getPlanet('mercury')))
+  assert(Sf.sunLine(P.getPlanet('neptune')).includes('เล็กกว่า') && Sf.sunLine(P.getPlanet('neptune')).includes('30'), Sf.sunLine(P.getPlanet('neptune')))
+  assert(Sf.sunLine(P.getPlanet('earth')).includes('เท่าที่เราเห็น'), Sf.sunLine(P.getPlanet('earth')))
+  assert(Sf.jumpLine(P.getPlanet('mars')).includes('สูงกว่าบนโลก 2.5 เท่า'), Sf.jumpLine(P.getPlanet('mars')))
+  assert(Sf.jumpLine(P.getPlanet('jupiter')).includes('เตี้ยกว่าบนโลก 2.4 เท่า'), Sf.jumpLine(P.getPlanet('jupiter')))
+  assert(Sf.jumpLine(P.getPlanet('earth')).includes('พอ ๆ กับบนโลก'), Sf.jumpLine(P.getPlanet('earth')))
+})
+
+check('จุดที่สำรวจแล้วถูกเก็บ ไม่ซ้ำ และจุดที่ไม่รู้จักหรือดาวที่ไม่มีอยู่ถูกทิ้ง', () => {
+  const fresh = Store.emptyProgress('ต้นกล้า')
+  const one = Store.markDiscovered(fresh, 'mars', 'olympus')
+  assert(Store.markDiscovered(one, 'mars', 'olympus') === one, 'สำรวจจุดเดิมซ้ำแล้วถูกนับซ้ำ')
+  assert(Store.discoveredCount(Store.markDiscovered(one, 'venus', 'volcano')) === 2, 'นับจุดที่สำรวจแล้วรวมทุกดาวไม่ถูก')
+  const parsed = Store.parseProgress(
+    { owner: 'ต้นกล้า', surface: { mars: ['olympus', 'olympus', 'fake'], pluto: ['x'], venus: 'volcano', saturn: ['olympus'] } },
+    'ต้นกล้า',
+  )
+  assert(parsed.surface.mars.join() === 'olympus', `อ่านจุดของดาวอังคารได้ ${parsed.surface.mars}`)
+  assert(Object.keys(parsed.surface).join() === 'mars', `ดาวที่เก็บไว้คือ ${Object.keys(parsed.surface)}`)
+})
+
+check('วาดผิวดาวได้ทุกดวงจากตำแหน่งสุ่มหลายร้อยแบบ ไม่มีรัศมีติดลบหรือพิกัด NaN', () => {
+  const state = { nan: 0 }
+  const bad = (...values) => {
+    if (values.some((value) => typeof value === 'number' && !Number.isFinite(value))) state.nan += 1
+  }
+  const radius = (name, ...values) => {
+    for (const value of values) if (!Number.isFinite(value) || value < 0) throw new Error(`${name} ได้รัศมี ${value}`)
+  }
+  const gradient = () => ({ addColorStop: () => undefined })
+  const ctx = new Proxy(
+    {
+      arc: (x, y, rr) => (bad(x, y), radius('arc', rr)),
+      ellipse: (x, y, rx, ry, rot) => (bad(x, y, rot), radius('ellipse', rx, ry)),
+      createRadialGradient: (x0, y0, r0, x1, y1, r1) => (bad(x0, y0, x1, y1), radius('createRadialGradient', r0, r1), gradient()),
+      createLinearGradient: (...values) => (bad(...values), gradient()),
+      drawImage: (_, x, y, w, h) => (bad(x, y), radius('drawImage', w, h)),
+      measureText: (text) => ({ width: text.length * 7 }),
+    },
+    {
+      get(target, key) {
+        if (key in target) return target[key]
+        return (...values) => bad(...values)
+      },
+      set(_, key, value) {
+        if (typeof value === 'number') bad(value)
+        return true
+      },
+    },
+  )
+  const rng = createRng('surface-render')
+  const image = { complete: true, naturalWidth: 100 }
+  for (let index = 0; index < 400; index += 1) {
+    const surface = rng.pick(Sf.SURFACES)
+    const walk = Object.assign(Sf.startState(), {
+      angle: rng.next() * Math.PI * 2,
+      height: rng.next() * 160,
+      facing: rng.chance(0.5) ? 1 : -1,
+      walking: rng.chance(0.5),
+      stride: rng.next() * 30,
+    })
+    const width = rng.pick([320, 390, 800, 1280]) * rng.pick([1, 2])
+    const height = rng.pick([260, 360, 440]) * rng.pick([1, 2])
+    SfR.drawSurface(ctx, { width, height }, {
+      surface,
+      planet: P.getPlanet(surface.planet),
+      state: walk,
+      companionAngle: walk.angle - 0.05,
+      discovered: rng.chance(0.5) ? surface.pois.map((poi) => poi.id) : [],
+      near: rng.chance(0.5) ? surface.pois[0].id : null,
+      companion: rng.chance(0.7) ? image : null,
+      shipLook: Ship.shipColor('mint'),
+      now: rng.next() * 100_000,
+      reduceMotion: rng.chance(0.3),
+      pixelRatio: rng.pick([1, 2]),
+    })
+  }
+  assert(state.nan === 0, `มีพิกัด NaN ${state.nan} ครั้ง`)
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

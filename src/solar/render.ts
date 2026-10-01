@@ -18,6 +18,8 @@
 import { createRng } from '../math/rng'
 import { NEAR_PLANE, toView, vec3 } from '../safezone/vector3'
 import type { Camera, Vec3, Viewport } from '../safezone/vector3'
+import { drawFace, isBlinking } from './faces'
+import type { FaceMood } from './faces'
 import { ASTEROID_BELT, EARTH_MOON, PLANETS, SUN } from './planets'
 import type { Planet, PlanetId } from './planets'
 import {
@@ -60,7 +62,30 @@ export interface SolarFrame {
   now: number
   reduceMotion: boolean
   pixelRatio: number
+  /** วาดหน้าตาน่ารักบนดาว ไม่ใส่คือไม่มีหน้า (เกมยานสำรวจวาดดาวแบบภาพจริง) */
+  faces?: boolean
+  /** ดาวที่ตื่นแล้ว ดวงอื่นหลับอยู่ ไม่ใส่คือตื่นทุกดวง ใช้เฉพาะตอนเปิด faces */
+  awake?: readonly BodyId[]
+  /** ดาวที่เพิ่งถูกแตะ ดาวดวงนั้นเด้งดึ๋งแล้วหัวเราะ (at คือเวลาเดียวกับ now) */
+  poke?: { id: BodyId; at: number } | null
+  /** สียานที่แต่งเอง ไม่ใส่คือยานสีเดิม */
+  shipLook?: ShipLook
+  /** รูปเพื่อนร่วมทางที่นั่งไปกับยาน วาดลอยอยู่เหนือยาน รูปที่ยังโหลดไม่เสร็จถูกข้ามไป */
+  companion?: HTMLImageElement | null
 }
+
+/** สีของยานหนึ่งลำ */
+export interface ShipLook {
+  fin: string
+  bodyTop: string
+  bodyBottom: string
+  window: string
+}
+
+const DEFAULT_SHIP: ShipLook = { fin: '#ef4444', bodyTop: '#ffffff', bodyBottom: '#b8c4dc', window: '#38bdf8' }
+
+/** ดาวที่ถูกแตะเด้งดึ๋งนานเท่านี้ แล้วหัวเราะตาหยีไปพร้อมกัน */
+export const POKE_MS = 900
 
 /* ------------------------------------------------------------------ *
  * ของที่สร้างครั้งเดียว
@@ -534,8 +559,10 @@ function drawShip(
     ctx.fill()
   }
 
+  const look = frame.shipLook ?? DEFAULT_SHIP
+
   // ครีบ
-  ctx.fillStyle = '#ef4444'
+  ctx.fillStyle = look.fin
   ctx.beginPath()
   ctx.moveTo(-size * 0.2, -size * 0.18)
   ctx.lineTo(-size * 0.55, -size * 0.42)
@@ -549,8 +576,8 @@ function drawShip(
 
   // ลำตัว
   const body = ctx.createLinearGradient(0, -size * 0.2, 0, size * 0.2)
-  body.addColorStop(0, '#ffffff')
-  body.addColorStop(1, '#b8c4dc')
+  body.addColorStop(0, look.bodyTop)
+  body.addColorStop(1, look.bodyBottom)
   ctx.fillStyle = body
   ctx.beginPath()
   ctx.moveTo(size * 0.6, 0)
@@ -561,11 +588,19 @@ function drawShip(
   ctx.fill()
 
   // หน้าต่าง
-  ctx.fillStyle = '#38bdf8'
+  ctx.fillStyle = look.window
   ctx.beginPath()
   ctx.arc(size * 0.12, 0, size * 0.09, 0, Math.PI * 2)
   ctx.fill()
   ctx.restore()
+
+  // เพื่อนร่วมทางลอยอยู่เหนือยาน ไม่หมุนตามยาน จะได้ไม่กลับหัวตอนยานบินไปทางซ้าย
+  const friend = frame.companion
+  if (friend && friend.complete && friend.naturalWidth > 0) {
+    const bob = frame.reduceMotion ? 0 : Math.sin(frame.now / 260) * size * 0.08
+    const width = Math.max(20 * ratio, size * 1.15)
+    ctx.drawImage(friend, at.x - width / 2, at.y - size * 0.35 - width + bob, width, width)
+  }
 }
 
 interface LabelBox {
@@ -691,6 +726,51 @@ function drawSelection(ctx: CanvasRenderingContext2D, body: BodyOnScreen, frame:
  * วาดทั้งเฟรม
  * ------------------------------------------------------------------ */
 
+/** เวลาที่ผ่านไปตั้งแต่ดาวดวงนี้ถูกแตะ เป็นวินาที ถ้าไม่ได้ถูกแตะอยู่คืนค่า null */
+function pokedFor(id: BodyId, frame: SolarFrame): number | null {
+  const poke = frame.poke
+  if (!poke || poke.id !== id) return null
+  const elapsed = (frame.now - poke.at) / 1000
+  return elapsed >= 0 && elapsed * 1000 < POKE_MS ? elapsed : null
+}
+
+/** ท่าทางของดาวแต่ละดวง: ยังหลับ ถูกแตะ (หัวเราะ) ถูกเลือกอยู่ (ตื่นเต้น) หรือยิ้มเฉย ๆ */
+function moodOf(id: BodyId, frame: SolarFrame): FaceMood {
+  if (id !== 'sun' && frame.awake && !frame.awake.includes(id)) return 'sleep'
+  if (pokedFor(id, frame) !== null) return 'giggle'
+  return frame.selected === id ? 'wow' : 'happy'
+}
+
+/**
+ * วาดของหนึ่งชิ้นแบบเด้งดึ๋ง ยืดกว้างสลับยืดสูงแล้วค่อย ๆ นิ่ง เหมือนจิ้มลูกโป่งน้ำ
+ * ปิดการเคลื่อนไหวแล้วไม่เด้ง แต่ยังหัวเราะให้เห็นว่าแตะโดน
+ */
+function withSquish(ctx: CanvasRenderingContext2D, body: BodyOnScreen, frame: SolarFrame, draw: () => void): void {
+  const elapsed = pokedFor(body.id, frame)
+  if (elapsed === null || frame.reduceMotion) {
+    draw()
+    return
+  }
+  const amount = 0.16 * Math.exp(-elapsed * 4.5) * Math.sin(elapsed * 26)
+  ctx.save()
+  ctx.translate(body.x, body.y)
+  ctx.scale(1 + amount, 1 - amount)
+  ctx.translate(-body.x, -body.y)
+  draw()
+  ctx.restore()
+}
+
+function faceOn(ctx: CanvasRenderingContext2D, body: BodyOnScreen, order: number, frame: SolarFrame): void {
+  if (!frame.faces) return
+  drawFace(ctx, body.x, body.y, body.radius, {
+    mood: moodOf(body.id, frame),
+    blink: isBlinking(frame.now, order, frame.reduceMotion),
+    now: frame.now,
+    reduceMotion: frame.reduceMotion,
+    pixelRatio: frame.pixelRatio,
+  })
+}
+
 export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewport, frame: SolarFrame): BodyOnScreen[] {
   const camera = cameraFor(frame.view)
   drawBackground(ctx, viewport, camera, frame)
@@ -702,7 +782,14 @@ export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewpor
 
   for (const body of bodies) {
     if (body.id === 'sun') {
-      items.push({ depth: body.depth, draw: () => drawSun(ctx, body, frame) })
+      items.push({
+        depth: body.depth,
+        draw: () =>
+          withSquish(ctx, body, frame, () => {
+            drawSun(ctx, body, frame)
+            faceOn(ctx, body, 0, frame)
+          }),
+      })
       continue
     }
     const planet = PLANETS.find((candidate) => candidate.id === body.id) as Planet
@@ -710,7 +797,14 @@ export function drawSolarSystem(ctx: CanvasRenderingContext2D, viewport: Viewpor
     const spin = visualSpin(planet, frame.spinSeconds)
     const rings = ringHalves(ctx, planet, center, body, camera, viewport)
     if (rings.back) items.push(rings.back)
-    items.push({ depth: body.depth, draw: () => drawPlanetBody(ctx, body, planet, center, camera, spin) })
+    items.push({
+      depth: body.depth,
+      draw: () =>
+        withSquish(ctx, body, frame, () => {
+          drawPlanetBody(ctx, body, planet, center, camera, spin)
+          faceOn(ctx, body, planet.order, frame)
+        }),
+    })
     if (rings.front) items.push(rings.front)
   }
 

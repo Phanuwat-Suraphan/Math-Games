@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button } from '../Button'
 import { playSfx } from '../../services/audioService'
 import { asteroidStars, buildAsteroidRound, comboPoints } from '../../planetQuest/games'
-import { Explain, ProgressDots, ScoreBar } from './QuestParts'
+import { Explain, ProgressDots, ScoreBar, useReaction } from './QuestParts'
 import type { StageGameProps } from './QuestParts'
 
 /**
@@ -35,6 +35,7 @@ export function AsteroidStage({ seed, reduceMotion, onFinish }: StageGameProps) 
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const [pop, setPop] = useState<{ id: number; points: number; streak: number } | null>(null)
+  const react = useReaction()
 
   const item = round[index]
   if (!item) return null
@@ -52,9 +53,11 @@ export function AsteroidStage({ seed, reduceMotion, onFinish }: StageGameProps) 
       setStreak(nextStreak)
       setScore((total) => total + points)
       setPop({ id: Date.now(), points, streak: nextStreak })
+      react('good', nextStreak)
       return
     }
     playSfx('hurt')
+    react('oops')
     setStreak(0)
     setMistakes((count) => count + 1)
     setWrong((current) => [...current, option])

@@ -25,7 +25,7 @@ import {
   trueFalseStars,
 } from '../../planetQuest/games'
 import type { TimelineEvent } from '../../planetQuest/content'
-import { ChoiceList, Explain, ProgressDots, ScoreBar } from './QuestParts'
+import { ChoiceList, Explain, ProgressDots, ScoreBar, useReaction } from './QuestParts'
 import type { StageGameProps } from './QuestParts'
 
 /**
@@ -38,12 +38,13 @@ import type { StageGameProps } from './QuestParts'
  * ดาวพุธกับดาวอังคารใช้กระดานของมินิเกมคณิตศาสตร์ตัวเดิม
  */
 
-/** คะแนนกับคอมโบของเกมหนึ่งรอบ */
+/** คะแนนกับคอมโบของเกมหนึ่งรอบ แจ้งเพื่อนดาวทุกครั้งที่ถูกหรือพลาดด้วย */
 function useCombo() {
   const [score, setScore] = useState(0)
   const [streak, setStreak] = useState(0)
   const [pop, setPop] = useState<{ id: number; points: number; streak: number } | null>(null)
   const streakRef = useRef(0)
+  const react = useReaction()
 
   const hit = useCallback(() => {
     streakRef.current += 1
@@ -51,12 +52,14 @@ function useCombo() {
     setStreak(streakRef.current)
     setScore((total) => total + points)
     setPop({ id: Date.now(), points, streak: streakRef.current })
-  }, [])
+    react('good', streakRef.current)
+  }, [react])
 
   const miss = useCallback(() => {
     streakRef.current = 0
     setStreak(0)
-  }, [])
+    react('oops')
+  }, [react])
 
   return { score, streak, pop, hit, miss }
 }
@@ -497,6 +500,8 @@ export function RiddleStage({ seed, onFinish }: StageGameProps) {
   const [points, setPoints] = useState(0)
   const [gained, setGained] = useState(0)
 
+  const react = useReaction()
+
   const riddle = round[index]
   if (!riddle) return null
 
@@ -505,12 +510,14 @@ export function RiddleStage({ seed, onFinish }: StageGameProps) {
     if (option === riddle.answer) {
       const earned = riddlePoints(shown, wrong.length)
       playSfx(earned >= 3 ? 'levelUp' : 'correct')
+      react('good')
       setSolved(true)
       setGained(earned)
       setPoints((total) => total + earned)
       return
     }
     playSfx('wrong')
+    react('oops')
     setWrong((current) => [...current, option])
     // ตอบผิดแล้วเปิดใบ้ถัดไปให้เลย เด็กจะไม่ติดอยู่กับใบ้ที่อ่านแล้วไม่รู้
     setShown((count) => Math.min(riddle.clues.length, count + 1))

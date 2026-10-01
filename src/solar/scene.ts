@@ -33,6 +33,7 @@ import {
   sunSideYaw,
 } from './space'
 import type { BodyId, BodyOnScreen, OrbitView } from './space'
+import type { ShipLook } from './render'
 
 export interface SceneEvents {
   /** แตะโดนดาวหรือดวงอาทิตย์ แตะที่ว่างได้ null */
@@ -96,6 +97,11 @@ export class SolarScene {
   private labels = true
   private orbits = true
   private reduceMotion: boolean
+  private faces = false
+  private awake: BodyId[] | undefined = undefined
+  private poked: { id: BodyId; at: number } | null = null
+  private shipLook: ShipLook | undefined = undefined
+  private companion: HTMLImageElement | null = null
 
   private bodies: BodyOnScreen[] = []
   private readonly pointers = new Map<number, { x: number; y: number }>()
@@ -177,6 +183,27 @@ export class SolarScene {
 
   setAim(value: boolean): void {
     this.aim = value
+  }
+
+  /** หน้าตาน่ารักบนดาว ภารกิจแปดดาวเปิด เกมยานสำรวจปิดไว้ */
+  setFaces(value: boolean): void {
+    this.faces = value
+  }
+
+  /** ดาวที่ตื่นแล้ว ดวงอื่นวาดเป็นหลับตามี z ลอย ส่ง undefined คือตื่นทุกดวง */
+  setAwake(ids: readonly BodyId[] | undefined): void {
+    this.awake = ids ? [...ids] : undefined
+  }
+
+  /** ให้ดาวดวงนี้เด้งดึ๋งแล้วหัวเราะ ใช้ตอนเด็กแตะดาว */
+  poke(id: BodyId): void {
+    this.poked = { id, at: performance.now() }
+  }
+
+  /** สียานกับรูปเพื่อนร่วมทางจากอู่ต่อยาน ส่ง undefined กับ null คือยานสีเดิมไม่มีใครนั่งด้วย */
+  setShipLook(look: ShipLook | undefined, companion: HTMLImageElement | null): void {
+    this.shipLook = look
+    this.companion = companion
   }
 
   setLabels(value: boolean): void {
@@ -384,6 +411,11 @@ export class SolarScene {
       now,
       reduceMotion: this.reduceMotion,
       pixelRatio: ratio,
+      faces: this.faces,
+      awake: this.awake,
+      poke: this.poked,
+      shipLook: this.shipLook,
+      companion: this.companion,
     })
   }
 

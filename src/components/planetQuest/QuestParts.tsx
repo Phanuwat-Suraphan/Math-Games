@@ -1,3 +1,4 @@
+import { createContext, useContext } from 'react'
 import type { ReactNode } from 'react'
 import type { Stars } from '../../planetQuest/games'
 
@@ -12,6 +13,21 @@ export interface StageGameProps {
   seed: string
   reduceMotion: boolean
   onFinish: (outcome: StageOutcome) => void
+}
+
+/**
+ * ช่องทางบอกเพื่อนดาวว่าเด็กเพิ่งตอบถูกหรือพลาด ดาวจะได้เชียร์หรือปลอบ
+ *
+ * ใช้ context แทน prop เพราะเกมส่วนใหญ่แจ้งผ่าน useCombo ที่ใช้ร่วมกันอยู่แล้ว
+ * เกมที่ไม่ได้อยู่ใต้ผู้ให้ค่า เช่น ห้องทดลองอุปราคาในโหมดสำรวจ ได้ฟังก์ชันเปล่าที่ไม่ทำอะไร
+ */
+export type Reaction = 'good' | 'oops'
+export type ReactionHandler = (reaction: Reaction, streak?: number) => void
+
+export const ReactionContext = createContext<ReactionHandler>(() => undefined)
+
+export function useReaction(): ReactionHandler {
+  return useContext(ReactionContext)
 }
 
 /** แถบบอกว่าเล่นถึงข้อไหนแล้ว */
