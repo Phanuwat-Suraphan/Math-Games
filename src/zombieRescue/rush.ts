@@ -20,6 +20,15 @@ export const RUSH_SECONDS = 60
 export type RushTable = Table | 'mix'
 export const RUSH_TABLES: RushTable[] = [...TABLES, 'mix']
 
+/** ✖ ท้าเวลาสูตรคูณ หรือ ➗ ท้าเวลาการหาร (ใช้คู่เดียวกัน: ตัวหารคือแม่ คำตอบคือจำนวนกลุ่ม) */
+export type RushOp = 'mul' | 'div'
+
+/** คีย์สถิติ: สูตรคูณใช้ชื่อแม่ตรง ๆ (เข้ากันกับสถิติที่เก็บไว้ก่อนมีการหาร) การหารขึ้นต้นด้วย div: */
+export const rushKey = (op: RushOp, table: RushTable): string => (op === 'div' ? `div:${table}` : String(table))
+
+/** คำตอบที่ถูกของข้อในโหมดนั้น */
+export const rushAnswer = (op: RushOp, fact: { each: number; groups: number }): number => (op === 'div' ? fact.groups : fact.each * fact.groups)
+
 export interface RushFact {
   each: Table
   groups: number
@@ -74,16 +83,19 @@ export type RushBest = Partial<Record<string, number>>
 export function parseRushBest(raw: unknown): RushBest {
   const out: RushBest = {}
   if (typeof raw !== 'object' || raw === null) return out
-  for (const t of RUSH_TABLES) {
-    const v = (raw as Record<string, unknown>)[String(t)]
-    if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[String(t)] = Math.min(999, Math.floor(v))
+  for (const op of ['mul', 'div'] as const) {
+    for (const t of RUSH_TABLES) {
+      const key = rushKey(op, t)
+      const v = (raw as Record<string, unknown>)[key]
+      if (typeof v === 'number' && Number.isFinite(v) && v > 0) out[key] = Math.min(999, Math.floor(v))
+    }
   }
   return out
 }
 
 /** บันทึกผลรอบใหม่ คืนสถิติใหม่และบอกว่าทำลายสถิติเดิมไหม */
-export function withRushResult(best: RushBest, table: RushTable, cured: number): { best: RushBest; record: boolean } {
-  const key = String(table)
+export function withRushResult(best: RushBest, table: RushTable, cured: number, op: RushOp = 'mul'): { best: RushBest; record: boolean } {
+  const key = rushKey(op, table)
   const old = best[key] ?? 0
   if (cured <= old) return { best, record: false }
   return { best: { ...best, [key]: cured }, record: cured > 0 }

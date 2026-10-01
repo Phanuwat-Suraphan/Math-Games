@@ -1001,7 +1001,7 @@ check('➗ แบ่งวัคซีน: หารลงตัวทุกข�
           assert(!new RegExp(`(^|\\D)${q.groups}(\\D|$)`).test(q.text), `โจทย์ปัญหาบอกคำตอบ: ${q.text}`)
         }
         const spoken = SP.questionSpeech(q)
-        assert(spoken.includes('หาร') || q.key === 'div-story', `อ่านข้อหารต้องมีคำว่าหาร: ${spoken}`)
+        assert(spoken.includes('หารด้วย') || q.key === 'div-story', `อ่านข้อหารต้องใช้คำว่าหารด้วย: ${spoken}`)
         assert(!/[×÷=□?]/.test(spoken) && !spoken.includes('ช่องว่าง'), `เสียงอ่านข้อหาร: ${spoken}`)
       }
     }
@@ -1034,6 +1034,58 @@ check('📄 รายงาน: ชื่อถูก escape ตัวเลข�
   for (const f of BOOK.allFacts(full)) { full = BOOK.noteAnswer(full, f, true).book; full = BOOK.noteAnswer(full, f, true).book }
   assert(RP.reportTips(full).some((t) => t.includes('แบ่งวัคซีน')), 'ครบแล้วแนะนำการหาร')
   assert(RP.reportHtml({ name: '   ', date: 'x', book: full, rushBest: {}, correct: -5, plays: 0, cures: 0 }).includes('<b>ผู้เล่น</b>'), 'ไม่มีชื่อใช้คำว่าผู้เล่น')
+})
+
+check('📝 ใบงานการหาร: 20 ข้อตามตอน เฉลยถูก วงล้อมไม่เกิน 30 ตัว และใช้คำว่าหารด้วย', () => {
+  const WS = load('zombieRescue/worksheet')
+  const SP = load('zombieRescue/speech')
+  equal(WS.DIV_SHEET_PARTS.reduce((s, p) => s + p.count, 0), 20, 'รวม 20 ข้อ')
+  for (const table of [2, 3, 4, 5, 10, 'mix']) {
+    for (let seed = 2000; seed < 2040; seed += 1) {
+      const sheet = WS.buildWorksheet(table, seed, 'div')
+      equal(sheet.op, 'div', 'ชนิดใบงาน')
+      equal(sheet.items.length, 20, 'จำนวนข้อ')
+      let n = 0
+      for (const part of WS.DIV_SHEET_PARTS) {
+        for (const it of sheet.items.slice(n, n + part.count)) equal(it.kind, part.kind, 'ชนิดข้อตรงกับตอน')
+        n += part.count
+      }
+      for (const it of sheet.items) {
+        equal(it.product, it.groups * it.each, 'หารลงตัว')
+        if (table !== 'mix') equal(it.each, table, 'ตัวหารคือแม่ที่เลือก')
+        if (it.kind === 'circle') assert(it.product <= Q.MAX_DRAWN && it.groups >= 2, 'วงล้อมไม่เกิน 30 ตัว อย่างน้อย 2 กลุ่ม')
+        if (it.kind === 'divStory' && it.groups !== it.each) {
+          assert(!new RegExp(`(^|\\D)${it.groups}(\\D|$)`).test(it.text), `โจทย์ปัญหาการหารบอกคำตอบ: ${it.text}`)
+        }
+        if (it.kind === 'divide') equal(WS.answerOf(it), String(it.groups), 'เฉลยผลหาร')
+        assert(WS.answerOf(it).includes(String(it.groups)), 'เฉลยมีผลหาร')
+      }
+    }
+  }
+  const html = WS.worksheetHtml(WS.buildWorksheet(4, 5150, 'div'))
+  assert(html.includes('ใบงานการหาร') && html.includes('หารด้วย 4'), 'หัวใบงานใช้คำว่าหารด้วย')
+  equal((html.match(/<li[ >]/g) || []).length, 40, 'โจทย์ 20 + เฉลย 20')
+  assert(!/NaN|undefined|null|\[object/.test(html), 'ไม่มีค่าเสีย')
+  equal(JSON.stringify(WS.buildWorksheet(3, 1234)), JSON.stringify(WS.buildWorksheet(3, 1234, 'mul')), 'ใบงานคูณเดิมไม่เปลี่ยน')
+  equal(SP.divFactSpeech(8, 4), '32 หารด้วย 4 เท่ากับเท่าไร', 'อ่านข้อหาร')
+  equal(SP.divRevealSpeech(8, 4), '32 หารด้วย 4 เท่ากับ 8', 'อ่านเฉลยข้อหาร')
+  equal(SP.mathSpeech('12 ÷ 3 = □'), '12 หารด้วย 3 เท่ากับ ช่องว่าง', 'แปลง ÷ เป็นหารด้วย')
+})
+
+check('⚡ ซอมบี้บุก! แบบหาร: คำตอบคือผลหาร สถิติแยกจากสูตรคูณ และอ่านสถิติเดิมได้', () => {
+  const RUSH = load('zombieRescue/rush')
+  equal(RUSH.rushAnswer('mul', { each: 4, groups: 8 }), 32, 'สูตรคูณตอบผลคูณ')
+  equal(RUSH.rushAnswer('div', { each: 4, groups: 8 }), 8, 'การหารตอบผลหาร')
+  equal(RUSH.rushKey('mul', 3), '3', 'คีย์สูตรคูณเหมือนเดิม')
+  equal(RUSH.rushKey('div', 3), 'div:3', 'คีย์การหาร')
+  let best = RUSH.parseRushBest({ 3: 9, 'div:3': 4, 'div:mix': 6, 'div:7': 9, 'div:4': -2 })
+  equal(JSON.stringify(best), JSON.stringify({ 3: 9, 'div:3': 4, 'div:mix': 6 }), 'อ่านทั้งสองแบบ ทิ้งค่าเสีย')
+  let r = RUSH.withRushResult(best, 3, 7, 'div')
+  equal(r.record, true, 'สถิติการหารใหม่')
+  equal(r.best['div:3'], 7, 'เก็บที่คีย์การหาร')
+  equal(r.best['3'], 9, 'สถิติสูตรคูณไม่เปลี่ยน')
+  r = RUSH.withRushResult(best, 3, 8)
+  equal(r.record, false, 'ค่าเริ่มต้นยังเป็นสูตรคูณ')
 })
 
 /* ── การต่อเข้ากับแอป ─────────────────────────────────── */

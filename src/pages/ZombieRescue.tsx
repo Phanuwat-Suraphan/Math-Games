@@ -54,7 +54,7 @@ import { TABLES, checkAnswer, practiceReward } from '../zombieRescue/questions'
 import type { QAnswer, Question, Stage } from '../zombieRescue/questions'
 import { clearZombieGame, loadRushBest, loadVaccineBook, loadZombieGame, saveRushBest, saveVaccineBook, saveZombieGame } from '../zombieRescue/storage'
 import { rushReward, withRushResult } from '../zombieRescue/rush'
-import type { RushBest, RushTable } from '../zombieRescue/rush'
+import type { RushBest, RushOp, RushTable } from '../zombieRescue/rush'
 import { curedCount, noteAnswer, weakFacts } from '../zombieRescue/vaccineBook'
 import type { VaccineBook } from '../zombieRescue/vaccineBook'
 import { villagerFor } from '../zombieRescue/villagers'
@@ -175,14 +175,15 @@ export function ZombieRescue({ player }: { player: Player }) {
 
   /* ⚡ ซอมบี้บุก!: สถิติดีสุดแยกแม่ เหรียญจ่ายตอนจบรอบ ข้อที่ถูกนับรวมกับ zombieCorrect เหมือนโหมดฝึก */
   const [rushBest, setRushBest] = useState<RushBest>(() => loadRushBest(player.name))
-  const finishRush = (table: RushTable, cured: number) => {
-    const { best, record } = withRushResult(rushBest, table, cured)
+  const finishRush = (table: RushTable, cured: number, _answered: number, op: RushOp) => {
+    const { best, record } = withRushResult(rushBest, table, cured, op)
     if (record) {
       setRushBest(best)
       saveRushBest(player.name, best)
     }
     const reward = applyBonusPercent(rushReward(cured), totalStats(player).coinBonusPercent)
-    patchPlayer({ coins: player.coins + Math.max(0, reward), records: recordZombiePractice(player, cured) })
+    // ข้อหารไม่นับรวมตัวนับ "ตอบโจทย์คูณถูก" (ได้แค่เหรียญ)
+    patchPlayer({ coins: player.coins + Math.max(0, reward), records: op === 'div' ? recordsOf(player) : recordZombiePractice(player, cured) })
     return { reward, record }
   }
 
@@ -488,7 +489,9 @@ export function ZombieRescue({ player }: { player: Player }) {
             <RushScreen
               best={rushBest}
               reduceMotion={!settings.animationsEnabled}
-              onAnswer={(fact, correct) => {
+              onAnswer={(fact, correct, op) => {
+                // ข้อหารไม่ใช่ตัวชี้วัดการคูณ และไม่ใช่ข้อในสมุดวัคซีน
+                if (op === 'div') return false
                 logIndicator(ZOMBIE_INDICATOR, correct)
                 return noteFact(fact, correct)
               }}
