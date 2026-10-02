@@ -1992,6 +1992,87 @@ check('เพดานการย่อขยายของรูปต้อ�
   )
 })
 
+check('ไม้บรรทัดต้องนำเส้นเฉพาะช่วงที่มีไม้อยู่จริง', () => {
+  const a = { x: 100, y: 100 }
+  const b = { x: 300, y: 100 }
+
+  /* อยู่ในช่วงไม้บรรทัด ต้องทาบลงบนขอบตามปกติ */
+  const middle = G.projectOnSegment({ x: 200, y: 160 }, a, b)
+  close(middle.x, 200, 0.0001, 'ทาบกลางไม้บรรทัดผิดตำแหน่ง')
+  close(middle.y, 100, 0.0001, 'ทาบแล้วไม่ได้อยู่บนขอบไม้บรรทัด')
+
+  /*
+   * เลยปลายไม้ไปแล้วต้องหยุดที่ปลาย ไม่ใช่วิ่งต่อไปบนเส้นตรงที่ยาวไม่สิ้นสุด
+   * ของจริงดินสอที่เลยปลายไม้ไปก็ไม่มีอะไรนำทางอีกแล้ว
+   */
+  const past = G.projectOnSegment({ x: 900, y: 140 }, a, b)
+  close(past.x, 300, 0.0001, 'เลยปลายขวาแล้วต้องหยุดที่ปลายไม้')
+  const before = G.projectOnSegment({ x: -400, y: 90 }, a, b)
+  close(before.x, 100, 0.0001, 'เลยปลายซ้ายแล้วต้องหยุดที่ปลายไม้')
+
+  /* ไม้ยาวศูนย์ต้องไม่ทำให้ได้ค่า NaN แล้วเส้นหายไปทั้งเส้น */
+  const none = G.projectOnSegment({ x: 50, y: 50 }, a, a)
+  assert(Number.isFinite(none.x) && Number.isFinite(none.y), 'ไม้ยาวศูนย์ทำให้ได้ค่าที่ใช้ไม่ได้')
+})
+
+check('ทาบครึ่งวงกลมกับมุม ต้องอ่านองศาได้จากสเกลเสมอ', () => {
+  /*
+   * จุดตายคือการทาบผิดข้าง ถ้าขอบล่างไปทาบแขนที่ผิด
+   * แขนอีกข้างจะไปโผล่ใต้ขอบล่าง ซึ่งไม่มีสเกลให้อ่านเลยสักขีด
+   * ต้องทาบให้อีกข้างอ่านได้ในช่วง 0 ถึง 180 เสมอไม่ว่ามุมจะวางท่าไหน
+   */
+  for (const start of [0, 37, 90, 150, 215, 300, 355]) {
+    for (const size of [15, 45, 90, 120, 175]) {
+      for (const flip of [1, -1]) {
+        const vertex = { x: 400, y: 400 }
+        const arm = G.pointAt(vertex, 150, start)
+        const other = G.pointAt(vertex, 150, start + flip * size)
+        const angle = { id: 'ang', kind: 'angle', color: '#000', width: 3, vertex, a: arm, b: other }
+
+        const placing = N.alignProtractorTo(angle)
+        assert(placing !== null, 'ทาบกับมุมไม่ได้')
+        close(G.distance(placing.at, vertex), 0, 0.0001, 'รูตรงกลางไม่ได้อยู่ที่จุดยอด')
+
+        /* อ่านค่าแบบเดียวกับที่หน้าจอคำนวณ คือองศาเทียบกับขอบล่าง */
+        const readings = [arm, other].map((end) =>
+          G.normalizeDeg(G.angleOf(vertex, end) - placing.rotation),
+        )
+        const onScale = readings.filter((deg) => deg <= 180.0001)
+        assert(onScale.length === 2, `มุม ${size}° ที่วางท่า ${start}° มีแขนหลุดออกนอกสเกล`)
+        close(Math.max(...onScale), size, 0.0001, 'อ่านองศาจากสเกลแล้วไม่ตรงกับมุมจริง')
+      }
+    }
+  }
+})
+
+check('ทาบอุปกรณ์กับเส้น ต้องเริ่มที่ปลายเส้นและยาวพอจะวัดได้', () => {
+  const a = { x: 100, y: 500 }
+  const b = { x: 100 + 6 * G.PX_PER_CM, y: 500 }
+  const line = { id: 'seg', kind: 'segment', color: '#000', width: 3, a, b }
+
+  const protractor = N.alignProtractorTo(line)
+  close(protractor.at.x, a.x, 0.0001, 'ครึ่งวงกลมไม่ได้วางที่ปลายเส้น')
+  close(protractor.rotation, 0, 0.0001, 'ขอบล่างไม่ได้ทาบไปตามเส้น')
+
+  const ruler = N.alignRulerTo(line)
+  close(ruler.at.x, a.x, 0.0001, 'ไม้บรรทัดไม่ได้เริ่มที่ปลายเส้น')
+  close(ruler.rotation, 0, 0.0001, 'ไม้บรรทัดไม่ได้ทาบไปตามเส้น')
+  assert(ruler.lengthCm >= 6, 'ไม้บรรทัดสั้นกว่าเส้นที่จะวัด ก็วัดไม่ได้')
+  assert(ruler.lengthCm <= N.RULER_MAX_CM, 'ไม้บรรทัดยาวเกินที่ของจริงมี')
+
+  /* เส้นที่ยาวกว่าไม้บรรทัดที่ยาวที่สุด ต้องได้ไม้ที่ยาวที่สุดเท่าที่มี ไม่ใช่ค่าพัง */
+  const huge = {
+    ...line,
+    b: { x: 100 + 90 * G.PX_PER_CM, y: 500 },
+  }
+  assert(N.alignRulerTo(huge).lengthCm === N.RULER_MAX_CM, 'เส้นยาวมากต้องได้ไม้ที่ยาวที่สุด')
+
+  /* รูปที่ไม่มีแนวให้ทาบ ต้องไม่ขึ้นปุ่มให้กดแล้วไม่เกิดอะไร */
+  const dot = { id: 'dot', kind: 'dot', color: '#000', width: 3, at: a, label: 'A' }
+  assert(N.alignProtractorTo(dot) === null, 'จุดไม่มีแนวให้ทาบครึ่งวงกลม')
+  assert(N.alignRulerTo(dot) === null, 'จุดไม่มีแนวให้ทาบไม้บรรทัด')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

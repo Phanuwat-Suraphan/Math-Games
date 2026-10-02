@@ -94,6 +94,8 @@ import {
 } from '../geometry/recipes'
 import { ShapeView } from '../geometry/ShapeView'
 import {
+  alignProtractorTo,
+  alignRulerTo,
   PROTRACTOR_DEFAULT,
   RULER_DEFAULT_CM,
   RULER_MAX_CM,
@@ -154,7 +156,7 @@ import {
   pointAt,
   pointLabel,
   polygonName,
-  projectOnLine,
+  projectOnSegment,
   regularPolygon,
   snapDeg,
   softSnapDeg,
@@ -224,6 +226,8 @@ type Drag =
   /** ลากจุดเดียวของรูปเพื่อแก้รูปทรง */
   | { kind: 'vertex'; id: string; vertexKey: string; marked: boolean }
   /** ลากทาบของที่รู้ความยาวในรูปแบบฝึก เพื่อตั้งมาตราส่วนของรูปนั้น */
+  /** ถูยางลบไปบนกระดาษ ลบทุกอย่างที่ผ่าน โดยนับเป็นการลบครั้งเดียว */
+  | { kind: 'erase'; marked: boolean }
   | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
@@ -269,6 +273,8 @@ export function GeometryStudio() {
   /* ช่องเลือกไฟล์ที่ซ่อนไว้ สำหรับแท็บเล็ตที่กด Ctrl+V ไม่ได้ */
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const pasteRef = useRef<(file: File) => void>(() => {})
+  /* ตัวจำว่าเลือกรูปไหนอยู่ ไว้ให้ปุ่มลัดบนคีย์บอร์ดอ่าน ซึ่งผูกไว้ครั้งเดียวตอนเปิดหน้า */
+  const selectedRef = useRef<string | null>(null)
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -391,6 +397,7 @@ export function GeometryStudio() {
   const recipe = findRecipe(recipeId)
   const mission = MISSIONS[missionIndex]
   const selected = board.shapes.find((shape) => shape.id === selectedId) ?? null
+  selectedRef.current = selected ? selected.id : null
 
   /* เก็บกวาดตัวจับเวลาตอนออกจากหน้า ไม่งั้น React จะเตือนว่าอัปเดตของที่ถูกถอดไปแล้ว */
   useEffect(() => {
@@ -556,7 +563,7 @@ export function GeometryStudio() {
   function penEnd(start: Point, raw: Point, guided: boolean): Point {
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
-    return guided ? projectOnLine(end, rulerStart, rulerEnd) : end
+    return guided ? projectOnSegment(end, rulerStart, rulerEnd) : end
   }
 
   /* ------------------------------------------------------------------ */
@@ -786,6 +793,22 @@ export function GeometryStudio() {
     )
   }
 
+  /**
+   * ลบสิ่งที่อยู่ใต้ยางลบ ณ จุดนี้ คืนค่าว่าจดประวัติไปแล้วหรือยัง
+   *
+   * ยางลบจริงใช้ "ถู" ไม่ใช่ "จิ้มทีละชิ้น" การถูหนึ่งครั้งจึงต้องย้อนกลับได้ครั้งเดียว
+   * ถ้าจดประวัติทุกชิ้นที่ลบ เด็กที่ถูยาว ๆ ทีเดียวจะต้องกดย้อนกลับสามสิบครั้งกว่าจะได้งานคืน
+   */
+  function rubOut(at: Point, marked: boolean): boolean {
+    const found = findShapeAt(board.shapes, at, hitRange)
+    if (!found) return marked
+    if (!marked) dispatch({ type: 'mark' })
+    dispatch({ type: 'live', shapes: board.shapes.filter((shape) => shape.id !== found.id) })
+    if (selectedId === found.id) setSelectedId(null)
+    playSfx('click')
+    return true
+  }
+
   function handlePointerDown(event: ReactPointerEvent<SVGSVGElement>) {
     const kind = pointerKind(event.pointerType)
     const now = Date.now()
@@ -819,14 +842,9 @@ export function GeometryStudio() {
       return
     }
 
-    /* พลิกปากกาใช้ด้านยางลบ ลบได้เลยโดยไม่ต้องเปลี่ยนเครื่องมือ */
+    /* พลิกปากกาใช้ด้านยางลบ ถูลบได้เลยโดยไม่ต้องเปลี่ยนเครื่องมือ */
     if (isEraserTip(kind, event.buttons)) {
-      const found = findShapeAt(board.shapes, raw, hitRange)
-      if (found) {
-        dispatch({ type: 'remove', id: found.id })
-        if (selectedId === found.id) setSelectedId(null)
-        playSfx('click')
-      }
+      setDrag({ kind: 'erase', marked: rubOut(raw, false) })
       return
     }
 
@@ -865,7 +883,9 @@ export function GeometryStudio() {
 
       case 'pen': {
         const guided = alongRuler(raw)
-        const start = guided ? projectOnLine(snapPoint(raw), rulerStart, rulerEnd) : snapPoint(raw)
+        const start = guided
+          ? projectOnSegment(snapPoint(raw), rulerStart, rulerEnd)
+          : snapPoint(raw)
         setDrag({ kind: 'pen', start, end: start, guided })
         return
       }
@@ -975,11 +995,8 @@ export function GeometryStudio() {
       }
 
       case 'eraser': {
-        const found = findShapeAt(board.shapes, raw, hitRange)
-        if (!found) return
-        dispatch({ type: 'remove', id: found.id })
-        if (selectedId === found.id) setSelectedId(null)
-        playSfx('click')
+        /* กดค้างแล้วถูไปเรื่อย ๆ ได้เหมือนยางลบจริง ไม่ใช่ต้องจิ้มทีละชิ้น */
+        setDrag({ kind: 'erase', marked: rubOut(raw, false) })
         return
       }
 
@@ -1145,6 +1162,10 @@ export function GeometryStudio() {
         setDrag({ ...drag, marked: true })
         return
       }
+
+      case 'erase':
+        setDrag({ kind: 'erase', marked: rubOut(raw, drag.marked) })
+        return
 
       case 'calibrate':
         setDrag({ ...drag, end: raw })
@@ -1514,6 +1535,33 @@ export function GeometryStudio() {
     image.src = dataUrl
   }
 
+  /**
+   * เอาอุปกรณ์ไปทาบกับรูปที่เลือกไว้
+   *
+   * ท่านี้ครูทำหน้าชั้นทุกครั้ง แต่ทำด้วยมือบนจอใช้เวลาเป็นสิบวินาทีต่อหนึ่งครั้ง
+   * ซึ่งนานเกินไปตอนสอน ปุ่มนี้จึงวางให้ตรงท่าที่ถูกต้องทันที
+   * ย้ายต่อเองได้ทุกเมื่อ เพราะอุปกรณ์ยังลากได้อิสระเหมือนเดิมทุกอย่าง
+   */
+  function snugProtractor() {
+    if (!selected) return
+    const placing = alignProtractorTo(selected)
+    if (!placing) return
+    setShowProtractor(true)
+    setProtractor({ ...protractor, center: placing.at, rotation: placing.rotation })
+    playSfx('pickup')
+    say('ทาบครึ่งวงกลมให้แล้ว อ่านองศาที่แขนอีกข้างได้เลย')
+  }
+
+  function snugRuler() {
+    if (!selected) return
+    const placing = alignRulerTo(selected)
+    if (!placing) return
+    setShowRuler(true)
+    setRuler({ origin: placing.at, rotation: placing.rotation, lengthCm: placing.lengthCm })
+    playSfx('pickup')
+    say('ทาบไม้บรรทัดให้แล้ว อ่านความยาวจากขีดศูนย์ได้เลย')
+  }
+
   /** เริ่มตั้งมาตราส่วนของรูปที่เลือกอยู่ */
   function startCalibrate(id: string) {
     setCalibrate({ id, line: null })
@@ -1796,8 +1844,23 @@ export function GeometryStudio() {
         setDraft([])
         setAnglePicks([])
         setPolygonAsk(null)
+        setCalibrate(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
         setDrag({ kind: 'none' })
+        return
+      }
+
+      /*
+       * ปุ่มลบของคีย์บอร์ดลบรูปที่เลือกอยู่ เหมือนโปรแกรมวาดรูปทุกตัว
+       * ต้องไม่ทำงานตอนกำลังพิมพ์ ไม่งั้นการลบตัวเลขในช่องตั้งค่าจะลบรูปทิ้งไปด้วย
+       */
+      if (!typing && (event.key === 'Delete' || event.key === 'Backspace')) {
+        const id = selectedRef.current
+        if (id === null) return
+        event.preventDefault()
+        dispatch({ type: 'remove', id })
+        setSelectedId(null)
+        playSfx('click')
         return
       }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
@@ -2833,7 +2896,8 @@ export function GeometryStudio() {
                 {cursor ? (
                   <PointerCursor
                     at={cursor.point}
-                    color={color}
+                    /* ยางลบมีสีของมันเอง เด็กจะได้รู้ว่าตอนนี้ถูแล้วของหาย ไม่ใช่กำลังจะวาด */
+                    color={tool === 'eraser' ? '#fb923c' : color}
                     onTarget={cursor.onTarget}
                     drawing={drag.kind !== 'none'}
                     scale={view.scale}
@@ -3096,6 +3160,18 @@ export function GeometryStudio() {
                     </div>
                   ))}
                 </div>
+              ) : null}
+
+              {/* เอาอุปกรณ์ไปทาบกับรูปนี้ ท่าเดียวกับที่ครูทำหน้าชั้น */}
+              {selected && alignProtractorTo(selected) ? (
+                <button type="button" onClick={snugProtractor} className="geo-chip mt-2 w-full">
+                  📐 ทาบครึ่งวงกลมกับรูปนี้
+                </button>
+              ) : null}
+              {selected && alignRulerTo(selected) ? (
+                <button type="button" onClick={snugRuler} className="geo-chip mt-2 w-full">
+                  📏 ทาบไม้บรรทัดกับรูปนี้
+                </button>
               ) : null}
 
               {selected && selected.kind !== 'photo' ? (

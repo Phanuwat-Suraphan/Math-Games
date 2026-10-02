@@ -247,6 +247,23 @@ export function projectOnLine(p: Point, a: Point, b: Point): Point {
   return { x: a.x + t * dx, y: a.y + t * dy }
 }
 
+/**
+ * ทาบจุดลงบนไม้บรรทัดจริง ๆ คือลงบนช่วงที่มีไม้อยู่เท่านั้น
+ *
+ * ของจริงดินสอวิ่งเลยปลายไม้บรรทัดไปก็ไม่มีอะไรนำทางอีกแล้ว
+ * ถ้าใช้เส้นตรงยาวไม่สิ้นสุด เด็กจะลากเลยปลายไม้ไปครึ่งกระดาษ
+ * แล้วยังได้เส้นที่ตรงเป๊ะ ซึ่งไม่ตรงกับสิ่งที่กำลังสอนว่าไม้บรรทัดทำอะไรได้
+ */
+export function projectOnSegment(p: Point, a: Point, b: Point): Point {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared === 0) return { x: a.x, y: a.y }
+  const raw = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSquared
+  const t = Math.min(1, Math.max(0, raw))
+  return { x: a.x + t * dx, y: a.y + t * dy }
+}
+
 /** ระยะจากจุดถึงส่วนของเส้นตรง (ไม่ใช่เส้นตรงยาวไม่สิ้นสุด) */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
