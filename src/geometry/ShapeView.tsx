@@ -178,6 +178,16 @@ function ShapeFace({ center, size, color }: { center: Point; size: number; color
   )
 }
 
+/**
+ * ลายเส้นประของรูปนี้ คืน undefined เมื่อเป็นเส้นทึบ
+ *
+ * ช่องไฟคิดจากความหนาเส้น ไม่ใช่ค่าคงที่
+ * เส้นหนาที่ใช้ลายของเส้นบางจะดูเป็นเส้นทึบ ซึ่งทำให้แยกเส้นร่างกับเส้นคำตอบไม่ออก
+ */
+function dashOf(shape: Shape): string | undefined {
+  return shape.dash ? `${shape.width * 3.2} ${shape.width * 2.2}` : undefined
+}
+
 export function ShapeView({
   shape,
   selected,
@@ -259,6 +269,7 @@ export function ShapeView({
             y2={shape.b.y}
             stroke={shape.color}
             strokeWidth={shape.width}
+            strokeDasharray={dashOf(shape)}
             strokeLinecap="round"
           />
           <EndPoint at={shape.a} color={shape.color} />
@@ -289,6 +300,7 @@ export function ShapeView({
             fill={shape.fill}
             stroke={shape.color}
             strokeWidth={shape.width}
+            strokeDasharray={dashOf(shape)}
           />
           <circle cx={shape.center.x} cy={shape.center.y} r={3.5} fill={shape.color} />
           {face ? <ShapeFace center={face.center} size={face.size} color={shape.color} /> : null}
@@ -338,6 +350,7 @@ export function ShapeView({
             fill="none"
             stroke={shape.color}
             strokeWidth={shape.width}
+            strokeDasharray={dashOf(shape)}
             strokeLinecap="round"
           />
           <circle cx={shape.center.x} cy={shape.center.y} r={3.5} fill={shape.color} opacity={0.6} />
@@ -376,6 +389,7 @@ export function ShapeView({
               fill={shape.fill}
               stroke={shape.color}
               strokeWidth={shape.width}
+              strokeDasharray={dashOf(shape)}
               strokeLinejoin="round"
             />
           ) : (
@@ -384,6 +398,7 @@ export function ShapeView({
               fill="none"
               stroke={shape.color}
               strokeWidth={shape.width}
+              strokeDasharray={dashOf(shape)}
               strokeLinejoin="round"
               strokeLinecap="round"
             />

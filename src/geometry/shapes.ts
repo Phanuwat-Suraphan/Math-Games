@@ -36,6 +36,14 @@ interface Drawn {
   id: string
   color: string
   width: number
+  /**
+   * วาดเป็นเส้นประหรือไม่
+   *
+   * ในการสร้างรูปด้วยวงเวียน เส้นร่างกับเส้นคำตอบต้องแยกกันให้ออก
+   * หนังสือเรียนใช้เส้นประสำหรับเส้นร่าง และเส้นทึบสำหรับคำตอบ
+   * ถ้าทุกเส้นหน้าตาเหมือนกันหมด งานที่เสร็จแล้วจะอ่านไม่ออกว่าอะไรคือคำตอบ
+   */
+  dash?: boolean
 }
 
 /** เส้นตรงหนึ่งเส้น ตั้งแต่จุด a ถึงจุด b */
@@ -1042,4 +1050,32 @@ export function grabHandle(shape: Shape, near: Point): Point {
   return spots.reduce((best, spot) =>
     distance(spot, near) < distance(best, near) ? spot : best,
   )
+}
+
+
+/** รูปที่เป็นเส้น จึงวาดเป็นเส้นประได้ สติกเกอร์กับรูปถ่ายไม่เข้าพวก */
+export function canDash(shape: Shape): boolean {
+  /* ป้ายวัดมุมไม่เข้าพวก แขนของมันเป็นเส้นประอยู่แล้วเพราะเป็นเส้นช่วยอ่านค่า ไม่ใช่เส้นที่วาด */
+  return (
+    shape.kind === 'segment' ||
+    shape.kind === 'circle' ||
+    shape.kind === 'arc' ||
+    shape.kind === 'polygon'
+  )
+}
+
+/** เปลี่ยนรูปนี้เป็นเส้นประหรือเส้นทึบ รูปที่ไม่ใช่เส้นคืนตัวเดิมไปเลย */
+export function withDash(shape: Shape, dash: boolean): Shape {
+  if (!canDash(shape)) return shape
+  return { ...shape, dash }
+}
+
+/**
+ * ทำสำเนารูป วางเยื้องจากของเดิมเล็กน้อย
+ *
+ * ต้องเยื้อง ไม่ใช่วางทับที่เดิมเป๊ะ ไม่งั้นเด็กจะกดปุ่มแล้วเห็นว่าไม่มีอะไรเกิดขึ้น
+ * แล้วกดซ้ำอีกห้าครั้ง จนได้รูปซ้อนกันหกชิ้นโดยไม่รู้ตัว
+ */
+export function duplicateShape(shape: Shape, id: string, dx: number, dy: number): Shape {
+  return { ...translateShape(shape, dx, dy), id }
 }

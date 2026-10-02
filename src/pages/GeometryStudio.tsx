@@ -137,6 +137,7 @@ import type { ToolId } from '../geometry/tools'
 import {
   HIT_TOLERANCE,
   applyField,
+  canDash,
   describeBoard,
   describeShape,
   editableFields,
@@ -150,6 +151,8 @@ import {
   shapeReach,
   shapeVertices,
   translateShape,
+  duplicateShape,
+  withDash,
 } from '../geometry/shapes'
 import type { Shape, ShapeField } from '../geometry/shapes'
 import {
@@ -252,6 +255,12 @@ export function GeometryStudio() {
   const [width, setWidth] = useState(PENCIL_WIDTHS[1].value)
   const [sides, setSides] = useState(6)
   const [fillColor, setFillColor] = useState(FILL_COLORS[0].value)
+  /*
+   * ดินสอวาดเส้นประหรือเส้นทึบ
+   * หนังสือเรียนใช้เส้นประกับเส้นร่าง และเส้นทึบกับเส้นคำตอบ
+   * ถ้าทุกเส้นหน้าตาเหมือนกันหมด งานที่เสร็จแล้วจะอ่านไม่ออกว่าอะไรคือคำตอบ
+   */
+  const [dashed, setDashed] = useState(false)
 
   /*
    * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
@@ -307,6 +316,12 @@ export function GeometryStudio() {
   const [showPerimeter, setShowPerimeter] = useState(false)
   const [showRuler, setShowRuler] = useState(false)
   const [showSetSquare, setShowSetSquare] = useState(false)
+  /*
+   * ความทึบของอุปกรณ์ที่วางทับกระดาษ
+   * ของจริงเป็นพลาสติกใส มองทะลุเห็นเส้นที่อยู่ใต้ไม้บรรทัดได้
+   * ยิ่งสำคัญตอนวัดบนรูปจากแบบฝึก เพราะสิ่งที่ต้องวัดอยู่ใต้อุปกรณ์พอดี
+   */
+  const [toolFade, setToolFade] = useState(0.8)
   const [showProtractor, setShowProtractor] = useState(false)
 
   const [ruler, setRuler] = useState({
@@ -464,7 +479,11 @@ export function GeometryStudio() {
    */
   function placeShapes(drafts: Shape[]) {
     if (drafts.length === 0) return
-    const ready = drafts.map((draft) => ({ ...draft, id: makeId() }))
+    /*
+     * ใส่ลายเส้นที่ดินสอเลือกอยู่ให้ทุกชิ้นที่วางพร้อมกัน จุดเดียวจบ ไม่ต้องไล่ใส่ทุกที่ที่สร้างรูป
+     * ชิ้นที่บอกลายเส้นมาเองแล้วไม่ถูกแก้ เช่น สำเนาของรูปเดิม ซึ่งต้องเหมือนต้นฉบับทุกอย่าง
+     */
+    const ready = drafts.map((draft) => withDash({ ...draft, id: makeId() }, draft.dash ?? dashed))
     setShowWelcome(false)
     for (const shape of ready) dispatch({ type: 'add', shape })
     playSfx('pickup')
@@ -1805,6 +1824,7 @@ export function GeometryStudio() {
 
     setColor(saved.prefs.color)
     setFillColor(saved.prefs.fillColor)
+    setDashed(saved.prefs.dashed)
     setWidth(saved.prefs.width)
     setThemeId(saved.prefs.themeId)
     setShowGrid(saved.prefs.showGrid)
@@ -1837,6 +1857,7 @@ export function GeometryStudio() {
           themeId,
           color,
           fillColor,
+          dashed,
           width,
           showGrid,
           snapOn,
@@ -1853,6 +1874,7 @@ export function GeometryStudio() {
     themeId,
     color,
     fillColor,
+    dashed,
     width,
     showGrid,
     snapOn,
@@ -2460,6 +2482,29 @@ export function GeometryStudio() {
             ))}
           </div>
 
+          <p className="mt-3 text-xs font-bold text-slate-500">ลายเส้น</p>
+          <div className="mt-1 flex gap-2">
+            {[
+              { on: false, label: '— เส้นทึบ' },
+              { on: true, label: '╌ เส้นประ' },
+            ].map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => {
+                  setDashed(item.on)
+                  playSfx('click')
+                }}
+                className={`geo-chip flex-1 ${dashed === item.on ? 'geo-chip-strong' : ''}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs font-semibold text-slate-500">
+            เส้นร่างที่ใช้ช่วยสร้างรูปใช้เส้นประ ส่วนเส้นคำตอบใช้เส้นทึบ เหมือนในหนังสือ
+          </p>
+
           <p className="mt-3 text-xs font-bold text-slate-500">ความหนาเส้น</p>
           <div className="mt-1 flex gap-2">
             {PENCIL_WIDTHS.map((item) => (
@@ -2553,6 +2598,36 @@ export function GeometryStudio() {
               onToggle={() => setShowPerimeter(!showPerimeter)}
             />
           </div>
+          {/*
+            แถบปรับความทึบของอุปกรณ์
+            อุปกรณ์ที่วางทับงานแล้วมองไม่เห็นของที่อยู่ข้างใต้ ทำให้วัดไม่ได้เลย
+            โดยเฉพาะตอนวัดบนรูปจากแบบฝึก ซึ่งสิ่งที่ต้องวัดอยู่ใต้อุปกรณ์พอดี
+          */}
+          {showProtractor || showRuler || showSetSquare ? (
+            <div className="mt-2 rounded-2xl bg-white/70 p-3">
+              <label
+                htmlFor="tool-fade"
+                className="flex items-center justify-between text-xs font-bold text-slate-600"
+              >
+                👻 ความทึบของอุปกรณ์
+                <span className="geo-badge">{Math.round(toolFade * 100)}%</span>
+              </label>
+              <input
+                id="tool-fade"
+                type="range"
+                min={25}
+                max={100}
+                step={5}
+                value={Math.round(toolFade * 100)}
+                onChange={(event) => setToolFade(Number(event.target.value) / 100)}
+                className="mt-2 w-full accent-violet-500"
+              />
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                เลื่อนไปทางซ้ายให้อุปกรณ์จางลง จะได้มองทะลุเห็นเส้นที่อยู่ข้างใต้
+              </p>
+            </div>
+          ) : null}
+
           {showSetSquare ? (
             <div className="mt-2 rounded-2xl bg-white/70 p-3">
               <p className="text-xs font-bold text-slate-600">🔺 แบบของไม้ฉาก</p>
@@ -2939,6 +3014,7 @@ export function GeometryStudio() {
                     origin={ruler.origin}
                     rotation={ruler.rotation}
                     lengthCm={ruler.lengthCm}
+                    opacity={toolFade}
                     onGrab={handleRulerGrab}
                   />
                 ) : null}
@@ -2949,6 +3025,7 @@ export function GeometryStudio() {
                     at={setSquare.at}
                     rotation={setSquare.rotation}
                     leg={setSquare.leg}
+                    opacity={toolFade}
                     onGrab={handleSetSquareGrab}
                   />
                 ) : null}
@@ -2959,6 +3036,7 @@ export function GeometryStudio() {
                     rotation={protractor.rotation}
                     radius={protractor.radius}
                     highlight={protractorHighlight}
+                    opacity={toolFade}
                     onGrab={handleProtractorGrab}
                   />
                 ) : null}
@@ -3486,6 +3564,32 @@ export function GeometryStudio() {
                   ))}
                 </div>
               ) : null}
+
+              {/* สลับเส้นร่างกับเส้นคำตอบของรูปที่วาดไปแล้ว */}
+              {selected && canDash(selected) ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    editSelected(withDash(selected, !selected.dash))
+                    playSfx('click')
+                  }}
+                  className="geo-chip mt-2 w-full"
+                >
+                  {selected.dash ? '— เปลี่ยนเป็นเส้นทึบ' : '╌ เปลี่ยนเป็นเส้นประ'}
+                </button>
+              ) : null}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!selected) return
+                  addShape(duplicateShape(selected, makeId(), 24, 24))
+                  say('ทำสำเนาแล้ว ลากไปวางที่ใหม่ได้เลย')
+                }}
+                className="geo-chip mt-2 w-full"
+              >
+                ⧉ ทำสำเนา
+              </button>
 
               {/* เอาอุปกรณ์ไปทาบกับรูปนี้ ท่าเดียวกับที่ครูทำหน้าชั้น */}
               {selected && alignProtractorTo(selected) ? (
