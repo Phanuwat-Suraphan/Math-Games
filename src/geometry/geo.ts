@@ -264,6 +264,22 @@ export function projectOnSegment(p: Point, a: Point, b: Point): Point {
   return { x: a.x + t * dx, y: a.y + t * dy }
 }
 
+/**
+ * จุดตัดของเส้นตรงสองเส้น คิดแบบเส้นยาวไม่สิ้นสุด
+ *
+ * คืน null เมื่อสองเส้นขนานกัน ซึ่งไม่ใช่ข้อผิดพลาด แต่คือคำตอบจริง
+ * เส้นขนานไม่มีจุดตัด และมุมระหว่างมันก็ไม่มีจุดยอดให้วัด
+ */
+export function lineIntersection(a1: Point, a2: Point, b1: Point, b2: Point): Point | null {
+  const d1 = { x: a2.x - a1.x, y: a2.y - a1.y }
+  const d2 = { x: b2.x - b1.x, y: b2.y - b1.y }
+  const denominator = d1.x * d2.y - d1.y * d2.x
+  /* เกือบศูนย์ก็ถือว่าขนาน เส้นที่เกือบขนานให้จุดตัดไกลเป็นหมื่นพิกเซลซึ่งใช้ไม่ได้อยู่ดี */
+  if (Math.abs(denominator) < 1e-9) return null
+  const t = ((b1.x - a1.x) * d2.y - (b1.y - a1.y) * d2.x) / denominator
+  return { x: a1.x + t * d1.x, y: a1.y + t * d1.y }
+}
+
 /** ระยะจากจุดถึงส่วนของเส้นตรง (ไม่ใช่เส้นตรงยาวไม่สิ้นสุด) */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
