@@ -16,8 +16,9 @@
  * ยาวขึ้นคือมีขีดมากขึ้น ไม่ใช่ขีดห่างขึ้น
  */
 
-import { PX_PER_CM } from './geo'
+import { PX_PER_CM, angleOf, distance, normalizeDeg } from './geo'
 import type { Point } from './geo'
+import type { Shape } from './shapes'
 
 /** รัศมีของครึ่งวงกลม ตั้งแต่ 3 ถึง 8 เซนติเมตร */
 export const PROTRACTOR_MIN = 120
@@ -71,4 +72,53 @@ export function rulerLengthFromPointer(
  */
 export function scaleUnit(radius: number, base = PROTRACTOR_DEFAULT): number {
   return Math.min(1.5, Math.max(0.72, radius / base))
+}
+
+
+/** ที่วางของอุปกรณ์หนึ่งชิ้น */
+export interface Placement {
+  at: Point
+  rotation: number
+}
+
+/**
+ * เอาครึ่งวงกลมไปทาบกับรูปที่เลือกไว้
+ *
+ * นี่คือท่าที่ครูทำหน้าชั้นทุกครั้ง วางรูตรงกลางที่จุดยอด แล้วหมุนให้ขอบล่างทาบแขนข้างหนึ่ง
+ * ทำด้วยมือบนจอได้ แต่ใช้เวลาเป็นสิบวินาทีต่อหนึ่งครั้ง ซึ่งนานเกินไปตอนสอนหน้าชั้น
+ *
+ * เลือกแขนที่ทำให้อีกข้างอ่านได้ในช่วง 0 ถึง 180 เสมอ
+ * ถ้าทาบผิดข้าง แขนอีกข้างจะไปโผล่ใต้ขอบล่างซึ่งไม่มีสเกลให้อ่านเลย
+ */
+export function alignProtractorTo(shape: Shape): Placement | null {
+  if (shape.kind === 'angle') {
+    const toA = angleOf(shape.vertex, shape.a)
+    const toB = angleOf(shape.vertex, shape.b)
+    const aFirst = normalizeDeg(toB - toA) <= 180
+    return { at: { ...shape.vertex }, rotation: normalizeDeg(aFirst ? toA : toB) }
+  }
+  if (shape.kind === 'segment') {
+    return { at: { ...shape.a }, rotation: normalizeDeg(angleOf(shape.a, shape.b)) }
+  }
+  return null
+}
+
+/**
+ * เอาไม้บรรทัดไปทาบกับรูปที่เลือกไว้
+ *
+ * คืนความยาวที่ควรใช้มาด้วย ไม้บรรทัดที่สั้นกว่าเส้นที่จะวัดคือไม้ที่วัดไม่ได้
+ * และไม้ที่ยาวกว่าเส้นมาก ๆ ก็บังงานส่วนอื่นเปล่า ๆ
+ */
+export function alignRulerTo(shape: Shape): (Placement & { lengthCm: number }) | null {
+  const span = (a: Point, b: Point) => ({
+    at: { ...a },
+    rotation: normalizeDeg(angleOf(a, b)),
+    lengthCm: clampRulerLength(Math.ceil(distance(a, b) / PX_PER_CM) + 2),
+  })
+  if (shape.kind === 'segment') return span(shape.a, shape.b)
+  if (shape.kind === 'angle') return span(shape.vertex, shape.a)
+  if (shape.kind === 'polygon' && shape.points.length >= 2) {
+    return span(shape.points[0], shape.points[1])
+  }
+  return null
 }
