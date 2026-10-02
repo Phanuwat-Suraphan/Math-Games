@@ -2073,6 +2073,65 @@ check('ทาบอุปกรณ์กับเส้น ต้องเริ
   assert(N.alignRulerTo(dot) === null, 'จุดไม่มีแนวให้ทาบไม้บรรทัด')
 })
 
+check('กางวงเวียนให้เท่ารูปที่เลือก ต้องได้ระยะเท่ากันเป๊ะ', () => {
+  /*
+   * ขั้นตอนแรกของการสร้างรูปเกือบทุกแบบคือ "กางวงเวียนเท่ากับ AB"
+   * ถ้ารัศมีพลาดไปสองสามมิลลิเมตร ส่วนโค้งที่ควรตัดกันพอดีจะไม่ตัดกัน
+   * ทั้งที่เด็กทำทุกขั้นตอนถูกหมด แล้วจะไม่มีทางรู้เลยว่าพลาดตรงไหน
+   */
+  const a = { x: 100, y: 100 }
+  const b = { x: 100 + 4 * G.PX_PER_CM, y: 100 }
+  const line = { id: 'seg', kind: 'segment', color: '#000', width: 3, a, b }
+  close(N.compassSpanOf(line), 4 * G.PX_PER_CM, 0.0001, 'กางไม่เท่ากับความยาวเส้น')
+
+  const circle = { id: 'c', kind: 'circle', color: '#000', width: 3, center: a, radius: 95, fill: 'none' }
+  close(N.compassSpanOf(circle), 95, 0.0001, 'กางไม่เท่ากับรัศมีวงกลม')
+
+  const poly = {
+    id: 'p',
+    kind: 'polygon',
+    color: '#000',
+    width: 3,
+    closed: true,
+    fill: 'none',
+    points: G.regularPolygon({ x: 300, y: 300 }, 120, 6, 0),
+  }
+  close(
+    N.compassSpanOf(poly),
+    G.distance(poly.points[0], poly.points[1]),
+    0.0001,
+    'กางไม่เท่ากับด้านของรูปหลายเหลี่ยม',
+  )
+
+  /* รูปที่ไม่มีความยาวให้ลอก ต้องไม่ขึ้นปุ่มให้กดแล้วไม่เกิดอะไร */
+  const dot = { id: 'd', kind: 'dot', color: '#000', width: 3, at: a, label: 'A' }
+  assert(N.compassSpanOf(dot) === null, 'จุดไม่มีความยาวให้กางวงเวียนตาม')
+})
+
+check('ระยะกางวงเวียนต้องอยู่ในช่วงที่วงเวียนจริงกางได้', () => {
+  close(N.clampCompassRadius(3 * G.PX_PER_CM), 3 * G.PX_PER_CM, 0.0001, 'ค่าปกติไม่ควรถูกแก้')
+  close(N.clampCompassRadius(99 * G.PX_PER_CM), N.COMPASS_MAX, 0.0001, 'กางเกินของจริงต้องถูกจำกัด')
+  close(N.clampCompassRadius(1), N.COMPASS_MIN, 0.0001, 'หุบจนเกือบศูนย์ต้องถูกจำกัด')
+  close(N.clampCompassRadius(Number.NaN), N.COMPASS_MIN, 0.0001, 'ค่าพังต้องไม่ทำให้วงเวียนหาย')
+
+  /* ลอกความยาวที่ยาวเกินวงเวียนจริง ต้องได้ค่าสูงสุดที่กางได้ ไม่ใช่ค่าที่ใช้ไม่ได้ */
+  const far = { x: 0, y: 0 }
+  const line = {
+    id: 'seg',
+    kind: 'segment',
+    color: '#000',
+    width: 3,
+    a: far,
+    b: { x: 40 * G.PX_PER_CM, y: 0 },
+  }
+  close(
+    N.clampCompassRadius(N.compassSpanOf(line)),
+    N.COMPASS_MAX,
+    0.0001,
+    'เส้นที่ยาวกว่าวงเวียนต้องได้ระยะกางสูงสุด',
+  )
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

@@ -96,6 +96,8 @@ import { ShapeView } from '../geometry/ShapeView'
 import {
   alignProtractorTo,
   alignRulerTo,
+  clampCompassRadius,
+  compassSpanOf,
   PROTRACTOR_DEFAULT,
   RULER_DEFAULT_CM,
   RULER_MAX_CM,
@@ -1108,10 +1110,13 @@ export function GeometryStudio() {
         return
 
       case 'compass-spread':
-        /* กางหรือหุบขา ระยะเปลี่ยน ทิศของปลายดินสอเดินตามนิ้วไปด้วย แต่ยังไม่วาดอะไร */
+        /*
+         * กางหรือหุบขา ระยะเปลี่ยน ทิศของปลายดินสอเดินตามนิ้วไปด้วย แต่ยังไม่วาดอะไร
+         * กางได้มากที่สุดเท่าที่วงเวียนในกล่องเรขาคณิตจริงกางได้ ไม่ใช่ลากจนเต็มกระดาษ
+         */
         setCompass({
           ...compass,
-          radius: snappedRadius(compass.center, raw),
+          radius: clampCompassRadius(snappedRadius(compass.center, raw)),
           angle: angleOf(compass.center, raw),
         })
         return
@@ -1560,6 +1565,24 @@ export function GeometryStudio() {
     setRuler({ origin: placing.at, rotation: placing.rotation, lengthCm: placing.lengthCm })
     playSfx('pickup')
     say('ทาบไม้บรรทัดให้แล้ว อ่านความยาวจากขีดศูนย์ได้เลย')
+  }
+
+  /**
+   * กางวงเวียนให้เท่ากับความยาวของรูปที่เลือกไว้
+   *
+   * ของจริงทำด้วยการเอาเข็มจิ้มปลายข้างหนึ่งแล้วเลื่อนดินสอไปทาบปลายอีกข้าง
+   * ซึ่งเป๊ะโดยไม่ต้องอ่านตัวเลขเลยสักครั้ง บนจอถ้าต้องเลื่อนแถบกะเอาเอง
+   * รัศมีจะพลาดไปสองสามมิลลิเมตรทุกครั้ง แล้วส่วนโค้งที่ควรตัดกันพอดีก็จะไม่ตัดกัน
+   * ทั้งที่เด็กทำทุกขั้นตอนถูกหมด
+   */
+  function matchCompass() {
+    if (!selected) return
+    const span = compassSpanOf(selected)
+    if (span === null) return
+    setCompass({ ...compass, radius: clampCompassRadius(span) })
+    setTool('compass')
+    playSfx('pickup')
+    say(`กางวงเวียน ${formatCm(clampCompassRadius(span))} เท่ากับรูปนี้แล้ว`)
   }
 
   /** เริ่มตั้งมาตราส่วนของรูปที่เลือกอยู่ */
@@ -2246,6 +2269,30 @@ export function GeometryStudio() {
                 }
                 className="mt-2 w-full accent-violet-500"
               />
+              {/*
+                ช่องพิมพ์ตัวเลขคู่กับแถบเลื่อน
+                แถบเลื่อนขยับทีละครึ่งเซนติเมตร แต่โจทย์ในหนังสือสั่ง 3.7 ซม. ก็มี
+                ถ้ามีแต่แถบเลื่อน ครูจะสั่งขนาดแบบนั้นไม่ได้เลย
+              */}
+              <div className="geo-field mt-2">
+                <span className="flex-1">พิมพ์ระยะกาง</span>
+                <input
+                  type="number"
+                  value={Math.round(toCm(compass.radius) * 10) / 10}
+                  min={0.5}
+                  max={8}
+                  step={0.1}
+                  onChange={(event) =>
+                    setCompass({
+                      ...compass,
+                      radius: clampCompassRadius(Number(event.target.value) * PX_PER_CM),
+                    })
+                  }
+                  aria-label="ระยะกางวงเวียนเป็นเซนติเมตร"
+                />
+                <span className="w-8 text-left">ซม.</span>
+              </div>
+
               <button
                 type="button"
                 onClick={drawFullCircle}
@@ -3171,6 +3218,11 @@ export function GeometryStudio() {
               {selected && alignRulerTo(selected) ? (
                 <button type="button" onClick={snugRuler} className="geo-chip mt-2 w-full">
                   📏 ทาบไม้บรรทัดกับรูปนี้
+                </button>
+              ) : null}
+              {selected && compassSpanOf(selected) !== null ? (
+                <button type="button" onClick={matchCompass} className="geo-chip mt-2 w-full">
+                  🧭 กางวงเวียนเท่ารูปนี้
                 </button>
               ) : null}
 

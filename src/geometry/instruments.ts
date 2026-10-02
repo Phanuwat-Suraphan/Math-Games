@@ -75,6 +75,39 @@ export function scaleUnit(radius: number, base = PROTRACTOR_DEFAULT): number {
 }
 
 
+/** ระยะกางวงเวียน ตั้งแต่ 0.5 ถึง 8 เซนติเมตร เท่าที่วงเวียนในกล่องเรขาคณิตกางได้จริง */
+export const COMPASS_MIN = 0.5 * PX_PER_CM
+export const COMPASS_MAX = 8 * PX_PER_CM
+
+export function clampCompassRadius(radius: number): number {
+  if (!Number.isFinite(radius)) return COMPASS_MIN
+  return Math.min(COMPASS_MAX, Math.max(COMPASS_MIN, radius))
+}
+
+/**
+ * ความยาวของรูปที่จะเอาไปกางวงเวียนให้เท่ากัน
+ *
+ * ขั้นตอนแรกของการสร้างรูปเกือบทุกแบบคือ "กางวงเวียนเท่ากับ AB"
+ * ของจริงทำด้วยการเอาเข็มจิ้มที่ A แล้วเลื่อนดินสอไปทาบ B ซึ่งเป๊ะโดยไม่ต้องอ่านตัวเลขเลย
+ * บนจอถ้าต้องเลื่อนแถบกะเอาเอง รัศมีจะพลาดไปสองสามมิลลิเมตรทุกครั้ง
+ * แล้วส่วนโค้งที่ควรตัดกันพอดีก็จะไม่ตัดกัน ทั้งที่ขั้นตอนทุกอย่างถูกหมด
+ */
+export function compassSpanOf(shape: Shape): number | null {
+  switch (shape.kind) {
+    case 'segment':
+      return distance(shape.a, shape.b)
+    case 'circle':
+    case 'arc':
+      return shape.radius
+    case 'polygon':
+      return shape.points.length >= 2 ? distance(shape.points[0], shape.points[1]) : null
+    case 'angle':
+      return distance(shape.vertex, shape.a)
+    default:
+      return null
+  }
+}
+
 /** ที่วางของอุปกรณ์หนึ่งชิ้น */
 export interface Placement {
   at: Point
