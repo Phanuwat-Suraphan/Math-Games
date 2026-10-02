@@ -2097,8 +2097,11 @@ export function GeometryStudio() {
 
   const protractorHighlight = (() => {
     if (!showProtractor || !pointer) return null
-    const away = distance(pointer, protractor.center)
-    if (away < protractor.radius - 70 || away > protractor.radius + 34) return null
+    /*
+     * อ่านค่าได้ทุกที่ที่เมาส์อยู่ ไม่ใช่เฉพาะตอนจ่อใกล้ขอบสเกล
+     * ของจริงเล็งผ่านขอบไปไกลแค่ไหนก็ยังอ่านองศาเดิมได้ เพราะมุมไม่ขึ้นกับระยะ
+     * เงื่อนไขเดิมที่บังคับให้จ่อใกล้ขอบ ทำให้ค่าหายไปตอนเลื่อนเมาส์ออกมานิดเดียว
+     */
     const local = normalizeDeg(angleOf(protractor.center, pointer) - protractor.rotation)
     return local <= 180 ? local : null
   })()
@@ -3100,6 +3103,7 @@ export function GeometryStudio() {
                     rotation={protractor.rotation}
                     radius={protractor.radius}
                     highlight={protractorHighlight}
+                    reach={pointer ? distance(protractor.center, pointer) : 0}
                     opacity={toolFade}
                     onGrab={handleProtractorGrab}
                   />
