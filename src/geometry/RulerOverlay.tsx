@@ -20,6 +20,8 @@ interface RulerOverlayProps {
   lengthCm: number
   /** ความทึบของทั้งอัน ไม้บรรทัดของจริงเป็นพลาสติกใส มองเห็นงานที่อยู่ใต้ไม้ได้ */
   opacity: number
+  /** ค่าที่อ่านได้ตรงที่ปลายนิ้วอยู่ หน่วยเซนติเมตร ไม่ได้ชี้อยู่ให้ส่ง null */
+  reading: number | null
   onGrab: (part: RulerPart, event: ReactPointerEvent<SVGElement>) => void
 }
 
@@ -86,7 +88,14 @@ const RulerScale = memo(function RulerScale({
   )
 })
 
-export function RulerOverlay({ origin, rotation, lengthCm, opacity, onGrab }: RulerOverlayProps) {
+export function RulerOverlay({
+  origin,
+  rotation,
+  lengthCm,
+  opacity,
+  reading,
+  onGrab,
+}: RulerOverlayProps) {
   const length = lengthCm * PX_PER_CM
   const height = 76
 
@@ -111,6 +120,35 @@ export function RulerOverlay({ origin, rotation, lengthCm, opacity, onGrab }: Ru
       <line x1={-10} y1={0} x2={length + 10} y2={0} stroke="#b45309" strokeWidth={3} pointerEvents="none" />
 
       <RulerScale lengthCm={lengthCm} rotation={rotation} />
+
+      {/* ขีดชี้กับป้ายบอกค่า ตรงที่ปลายนิ้วทาบอยู่บนไม้ */}
+      {reading !== null ? (
+        <g pointerEvents="none">
+          <line
+            x1={reading * PX_PER_CM}
+            y1={-10}
+            x2={reading * PX_PER_CM}
+            y2={30}
+            stroke="#b45309"
+            strokeWidth={3}
+          />
+          <g transform={`translate(${reading * PX_PER_CM} ${-26})`}>
+            <g transform={`rotate(${rotation})`}>
+              <rect x={-34} y={-14} width={68} height={26} rx={13} fill="#b45309" />
+              <text
+                textAnchor="middle"
+                y={5}
+                fontSize={13}
+                fontWeight={700}
+                fill="#ffffff"
+                fontFamily="Kanit, sans-serif"
+              >
+                {reading.toFixed(1)} ซม.
+              </text>
+            </g>
+          </g>
+        </g>
+      ) : null}
 
       <text
         x={length / 2}
