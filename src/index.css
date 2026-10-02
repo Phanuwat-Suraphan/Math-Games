@@ -2468,6 +2468,114 @@ html[data-animations='off'] *::after {
 }
 
 /*
+ * โหมดเต็มจอ
+ *
+ * ครูฉายขึ้นโปรเจกเตอร์ให้ทั้งห้องดู เด็กแถวหลังต้องเห็นเส้นที่ครูลาก
+ * กระดาษที่กินพื้นที่แค่ครึ่งจอทำให้แถวหลังมองไม่เห็นอะไรเลย
+ * โหมดนี้จึงเก็บแผงสองข้างกับหัวเว็บ แล้วให้กระดาษกินพื้นที่ทั้งหน้าจอ
+ */
+.geo-hide-on-stage {
+  display: block;
+}
+
+.geo-stage .geo-hide-on-stage {
+  display: none !important;
+}
+
+.geo-stage-grid {
+  display: block !important;
+  max-width: none !important;
+  padding: 8px !important;
+}
+
+.geo-stage .geo-paper-frame {
+  padding: 6px;
+  border-radius: 18px;
+}
+
+/*
+ * ความสูงคิดจากความสูงจอจริง ไม่ใช่จากสัดส่วนของกระดาษ
+ * กระดาษจะได้เต็มจอทั้งแนวตั้งและแนวนอน ส่วนที่เหลือเป็นขอบเท่า ๆ กัน
+ * เพราะ viewBox ยังรักษาสัดส่วนเดิมไว้ให้เอง รูปจึงไม่ยืดและไม่บิด
+ */
+/*
+ * เว้นแถบล่างไว้ให้แถบเครื่องมือลอยโดยเฉพาะ
+ * ถ้าให้กระดาษสูงเต็มจอ แถบปุ่มจะไปนั่งทับกระดาษตรงกลางล่างพอดี
+ * ซึ่งเป็นที่ที่ครูวางรูปบ่อยที่สุดเวลาสอนหน้าชั้น
+ */
+.geo-stage .geo-canvas {
+  height: calc(100vh - 86px);
+  max-height: calc(100vh - 86px);
+  /* ปล่อยความกว้างให้เดินตามสัดส่วนของกระดาษ แผ่นกระดาษจึงเต็มจอพอดีโดยไม่ยืด */
+  width: auto;
+}
+
+.geo-stage .geo-paper-frame {
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* แถบเครื่องมือลอยในโหมดเต็มจอ */
+.geo-stagebar {
+  /*
+   * จัดกลางด้วย left/right 0 แล้วให้ margin auto จัดการ ไม่ใช่ left 50% แล้วเลื่อนกลับ
+   * วิธีหลังทำให้กล่องกว้างได้แค่ครึ่งจอ ปุ่มจึงตกบรรทัดทั้งที่จอยังเหลือที่อีกเพียบ
+   */
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 14px;
+  width: fit-content;
+  margin: 0 auto;
+  z-index: 35;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px;
+  border-radius: 9999px;
+  border: 2px solid #ffffff;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 20px 40px -22px rgba(30, 41, 59, 0.9);
+}
+
+.geo-stagekey {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  border: 2px solid #ede9fe;
+  background: #ffffff;
+  font-size: 1.2rem;
+  line-height: 1;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.geo-stagekey:hover {
+  transform: translateY(-2px);
+}
+
+.geo-stagekey:disabled {
+  opacity: 0.4;
+}
+
+.geo-stagekey-on {
+  border-color: #7c3aed;
+  box-shadow: 0 8px 14px -10px rgba(124, 58, 237, 0.9);
+}
+
+/* ช่องว่างคั่นกลุ่มปุ่ม ให้ตาแยกออกว่ากลุ่มไหนทำอะไร */
+.geo-stagegap {
+  display: block;
+  width: 2px;
+  height: 26px;
+  border-radius: 2px;
+  background: #ede9fe;
+}
+
+/*
  * ใบงานที่พิมพ์ลงกระดาษ
  *
  * บนจอมันคือแผ่นกระดาษสีขาวลอยอยู่เหนือหน้าเว็บ ครูจึงตรวจดูก่อนพิมพ์ได้
