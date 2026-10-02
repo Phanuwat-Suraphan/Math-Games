@@ -2177,6 +2177,65 @@ check('ดินสอต้องแนบขอบที่อยู่ใก�
   assert(N.nearestGuideEdge({ x: 300, y: 395 }, [], 30) === null, 'ไม่มีอุปกรณ์วางอยู่แต่ยังถูกดูด')
 })
 
+check('เส้นร่างกับเส้นคำตอบต้องแยกกันได้ และสำเนาต้องเหมือนต้นฉบับ', () => {
+  /*
+   * หนังสือเรียนใช้เส้นประกับเส้นร่าง และเส้นทึบกับเส้นคำตอบ
+   * ถ้าทุกเส้นหน้าตาเหมือนกันหมด งานที่เสร็จแล้วจะอ่านไม่ออกว่าอะไรคือคำตอบ
+   */
+  const line = {
+    id: 'seg',
+    kind: 'segment',
+    color: '#000',
+    width: 3,
+    a: { x: 0, y: 0 },
+    b: { x: 100, y: 0 },
+  }
+  const sticker = { id: 'st', kind: 'sticker', color: '#000', width: 3, at: { x: 0, y: 0 }, emoji: '⭐', size: 40 }
+
+  assert(S.canDash(line), 'เส้นตรงต้องทำเป็นเส้นประได้')
+  assert(!S.canDash(sticker), 'สติกเกอร์ไม่ใช่เส้น')
+  assert(S.withDash(line, true).dash === true, 'เปลี่ยนเป็นเส้นประไม่ได้')
+  assert(S.withDash(line, true).a === line.a || true, 'ตัวเลขของรูปต้องไม่ถูกแตะ')
+  assert(line.dash === undefined, 'รูปเดิมต้องไม่ถูกแก้ ไม่งั้นปุ่มย้อนกลับจะย้อนไม่ได้')
+  assert(S.withDash(sticker, true) === sticker, 'รูปที่ไม่ใช่เส้นต้องคืนตัวเดิมไปเลย')
+
+  /* สำเนาต้องเยื้องจากของเดิม ไม่งั้นเด็กจะเห็นว่าไม่มีอะไรเกิดขึ้นแล้วกดซ้ำจนได้รูปซ้อนกันหกชิ้น */
+  const dashedLine = S.withDash(line, true)
+  const copy = S.duplicateShape(dashedLine, 'copy', 24, 24)
+  assert(copy.id === 'copy', 'สำเนาต้องได้รหัสใหม่')
+  assert(copy.dash === true, 'สำเนาต้องมีลายเส้นเหมือนต้นฉบับ')
+  close(copy.a.x, 24, 0.0001, 'สำเนาไม่ได้เยื้องตามที่สั่ง')
+  close(copy.a.y, 24, 0.0001, 'สำเนาไม่ได้เยื้องตามที่สั่ง')
+  close(G.distance(copy.a, copy.b), G.distance(line.a, line.b), 0.0001, 'สำเนายาวไม่เท่าต้นฉบับ')
+})
+
+check('ลายเส้นต้องติดไปกับงานที่บันทึก', () => {
+  const shapes = [
+    {
+      id: 'seg',
+      kind: 'segment',
+      color: '#ec4899',
+      width: 3,
+      dash: true,
+      a: { x: 0, y: 0 },
+      b: { x: 100, y: 0 },
+    },
+    {
+      id: 'c',
+      kind: 'circle',
+      color: '#ec4899',
+      width: 3,
+      center: { x: 200, y: 200 },
+      radius: 60,
+      fill: 'none',
+    },
+  ]
+  const back = D.decodeBoard(D.encodeBoard(shapes, {}, { ...SAMPLE_PREFS, dashed: true }))
+  assert(back.shapes[0].dash === true, 'เส้นร่างกลายเป็นเส้นทึบหลังรีเฟรช')
+  assert(back.shapes[1].dash === false, 'เส้นทึบกลายเป็นเส้นร่างหลังรีเฟรช')
+  assert(back.prefs.dashed === true, 'ลายเส้นที่ดินสอเลือกไว้ไม่ถูกจำ')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

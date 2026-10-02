@@ -18,6 +18,8 @@ interface RulerOverlayProps {
   origin: Point
   rotation: number
   lengthCm: number
+  /** ความทึบของทั้งอัน ไม้บรรทัดของจริงเป็นพลาสติกใส มองเห็นงานที่อยู่ใต้ไม้ได้ */
+  opacity: number
   onGrab: (part: RulerPart, event: ReactPointerEvent<SVGElement>) => void
 }
 
@@ -84,19 +86,23 @@ const RulerScale = memo(function RulerScale({
   )
 })
 
-export function RulerOverlay({ origin, rotation, lengthCm, onGrab }: RulerOverlayProps) {
+export function RulerOverlay({ origin, rotation, lengthCm, opacity, onGrab }: RulerOverlayProps) {
   const length = lengthCm * PX_PER_CM
   const height = 76
 
   return (
-    <g transform={`translate(${origin.x} ${origin.y}) rotate(${-rotation})`} className="geo-ruler">
+    <g
+      transform={`translate(${origin.x} ${origin.y}) rotate(${-rotation})`}
+      className="geo-ruler"
+      opacity={opacity}
+    >
       <rect
         x={-10}
         y={0}
         width={length + 20}
         height={height}
         rx={14}
-        fill="rgba(253, 230, 138, 0.82)"
+        fill="rgba(253, 230, 138, 0.55)"
         stroke="#d97706"
         strokeWidth={2.5}
         onPointerDown={(event) => onGrab('move', event)}

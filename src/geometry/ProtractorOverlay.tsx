@@ -23,6 +23,8 @@ interface ProtractorOverlayProps {
   radius: number
   /** องศาบนสเกลที่ปลายนิ้วชี้อยู่ (0 ถึง 180) ไม่ได้ชี้อยู่ให้ส่ง null */
   highlight: number | null
+  /** ความทึบของทั้งอัน 1 คือทึบเต็มที่ ของจริงเป็นพลาสติกใสจึงไม่ควรทึบเท่ากระดาษ */
+  opacity: number
   onGrab: (part: ProtractorPart, event: ReactPointerEvent<SVGElement>) => void
 }
 
@@ -122,6 +124,7 @@ export function ProtractorOverlay({
   rotation,
   radius,
   highlight,
+  opacity,
   onGrab,
 }: ProtractorOverlayProps) {
   const unit = scaleUnit(radius)
@@ -138,11 +141,12 @@ export function ProtractorOverlay({
     <g
       transform={`translate(${center.x} ${center.y}) rotate(${-rotation})`}
       className="geo-protractor"
+      opacity={opacity}
     >
       {/* ตัวครึ่งวงกลมโปร่งแสง จิ้มตรงกลางแล้วลากเพื่อย้าย */}
       <path
         d={`M ${outer.x} ${outer.y} A ${radius} ${radius} 0 0 1 ${outerEnd.x} ${outerEnd.y} Z`}
-        fill="rgba(244, 114, 182, 0.16)"
+        fill="rgba(244, 114, 182, 0.1)"
         stroke="#f472b6"
         strokeWidth={2.5}
         onPointerDown={(event) => onGrab('move', event)}
@@ -154,7 +158,7 @@ export function ProtractorOverlay({
           `M ${outer.x} ${outer.y} A ${radius} ${radius} 0 0 1 ${outerEnd.x} ${outerEnd.y} ` +
           `L ${innerStart.x} ${innerStart.y} A ${bandInner} ${bandInner} 0 0 0 ${innerEnd.x} ${innerEnd.y} Z`
         }
-        fill="rgba(255, 255, 255, 0.5)"
+        fill="rgba(255, 255, 255, 0.18)"
         stroke="none"
         onPointerDown={(event) => onGrab('scale', event)}
       />

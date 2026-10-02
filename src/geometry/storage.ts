@@ -32,6 +32,8 @@ export interface SavedPrefs {
   color: string
   /** สีที่เลือกไว้ในถังสี */
   fillColor: string
+  /** ดินสอกำลังวาดเส้นประอยู่หรือไม่ */
+  dashed: boolean
   width: number
   showGrid: boolean
   snapOn: boolean
@@ -51,6 +53,7 @@ export const DEFAULT_PREFS: SavedPrefs = {
   themeId: PAPER_THEMES[0].id,
   color: PENCIL_COLORS[0].value,
   fillColor: FILL_COLORS[0].value,
+  dashed: false,
   width: PENCIL_WIDTHS[1].value,
   showGrid: true,
   snapOn: true,
@@ -98,7 +101,7 @@ export function sanitizeShape(value: unknown): Shape | null {
   const color = text(value.color, '#0f172a')
   const width = num(value.width) ?? 3
   if (id === '') return null
-  const base = { id, color, width }
+  const base = { id, color, width, dash: value.dash === true }
 
   switch (value.kind) {
     case 'segment': {
@@ -216,6 +219,7 @@ function sanitizePrefs(value: unknown): SavedPrefs {
     showLengths: bool(value.showLengths, DEFAULT_PREFS.showLengths),
     showAngles: bool(value.showAngles, DEFAULT_PREFS.showAngles),
     showFaces: bool(value.showFaces, DEFAULT_PREFS.showFaces),
+    dashed: bool(value.dashed, DEFAULT_PREFS.dashed),
   }
 }
 

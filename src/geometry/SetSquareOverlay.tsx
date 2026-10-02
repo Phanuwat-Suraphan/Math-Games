@@ -21,10 +21,19 @@ interface SetSquareOverlayProps {
   at: Point
   rotation: number
   leg: number
+  /** ความทึบของทั้งอัน ไม้ฉากของจริงเป็นพลาสติกใสเหมือนกัน */
+  opacity: number
   onGrab: (part: SetSquarePart, event: ReactPointerEvent<SVGElement>) => void
 }
 
-export function SetSquareOverlay({ kind, at, rotation, leg, onGrab }: SetSquareOverlayProps) {
+export function SetSquareOverlay({
+  kind,
+  at,
+  rotation,
+  leg,
+  opacity,
+  onGrab,
+}: SetSquareOverlayProps) {
   const [corner, baseEnd, riseEnd] = setSquareCorners(kind, at, rotation, leg)
   const points = [corner, baseEnd, riseEnd].map((p) => `${p.x},${p.y}`).join(' ')
 
@@ -55,10 +64,10 @@ export function SetSquareOverlay({ kind, at, rotation, leg, onGrab }: SetSquareO
   const angles = kind === '45' ? { base: 45, rise: 45 } : { base: 30, rise: 60 }
 
   return (
-    <g className="geo-setsquare">
+    <g className="geo-setsquare" opacity={opacity}>
       <polygon
         points={points}
-        fill="rgba(45, 212, 191, 0.2)"
+        fill="rgba(45, 212, 191, 0.14)"
         stroke="#0d9488"
         strokeWidth={2.5}
         onPointerDown={(event) => onGrab('move', event)}
