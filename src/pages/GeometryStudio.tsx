@@ -115,6 +115,7 @@ import {
   clampRulerLength,
   protractorRadiusFromPointer,
   rulerLengthFromPointer,
+  rulerReading,
 } from '../geometry/instruments'
 import type { LabelOffsets } from '../geometry/labels'
 import {
@@ -622,6 +623,18 @@ export function GeometryStudio() {
    * ป้ายวัดมุมไม่ใช่รูปที่วาด แต่เป็นเครื่องมือที่ทาบลงไปบนของที่มีอยู่แล้ว
    * แม่เหล็กจึงต้องไม่ยุ่งกับมัน ไม่งั้นการเลื่อนให้ทาบเส้นในรูปแบบฝึกจะทำไม่ได้เลย
    */
+  /**
+   * จุดวางของอุปกรณ์ ดูดเข้าจุดสำคัญเมื่อเปิดแม่เหล็ก
+   *
+   * ระยะดูดแคบกว่าของปลายดินสอมาก เพราะอุปกรณ์ต้องวางได้อิสระเป็นหลัก
+   * แต่ท่าที่ทำบ่อยที่สุดคือเอารูตรงกลางครึ่งวงกลมไปทาบจุดยอด
+   * ซึ่งถ้าต้องเล็งเองทุกครั้งจะพลาดสองสามพิกเซลเสมอ แล้วองศาที่อ่านได้ก็เพี้ยนตาม
+   */
+  function instrumentAnchor(p: Point): Point {
+    if (!snapOn) return p
+    return nearestSnapPoint(board.shapes, p, 14 / view.scale) ?? p
+  }
+
   function isMeasuring(id: string): boolean {
     return board.shapes.some((shape) => shape.id === id && shape.kind === 'angle')
   }
@@ -1285,7 +1298,7 @@ export function GeometryStudio() {
         } else {
           setProtractor({
             ...protractor,
-            center: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y },
+            center: instrumentAnchor({ x: raw.x + drag.grab.x, y: raw.y + drag.grab.y }),
           })
         }
         return
@@ -1302,7 +1315,7 @@ export function GeometryStudio() {
         } else {
           setSetSquare({
             ...setSquare,
-            at: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y },
+            at: instrumentAnchor({ x: raw.x + drag.grab.x, y: raw.y + drag.grab.y }),
           })
         }
         return
@@ -1316,7 +1329,10 @@ export function GeometryStudio() {
             rotation: softSnapDeg(angleOf(ruler.origin, raw), 5, snapOn ? 2 : 0),
           })
         } else {
-          setRuler({ ...ruler, origin: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y } })
+          setRuler({
+            ...ruler,
+            origin: instrumentAnchor({ x: raw.x + drag.grab.x, y: raw.y + drag.grab.y }),
+          })
         }
         return
 
@@ -2104,6 +2120,12 @@ export function GeometryStudio() {
      */
     const local = normalizeDeg(angleOf(protractor.center, pointer) - protractor.rotation)
     return local <= 180 ? local : null
+  })()
+
+  /* ค่าที่อ่านได้จากไม้บรรทัดตรงที่ปลายนิ้วอยู่ แสดงเหมือนที่ครึ่งวงกลมบอกองศา */
+  const rulerMark = (() => {
+    if (!showRuler || !pointer) return null
+    return rulerReading(ruler.origin, ruler.rotation, ruler.lengthCm, pointer)?.cm ?? null
   })()
 
   const liveReadout = (() => {
@@ -3082,6 +3104,7 @@ export function GeometryStudio() {
                     rotation={ruler.rotation}
                     lengthCm={ruler.lengthCm}
                     opacity={toolFade}
+                    reading={rulerMark}
                     onGrab={handleRulerGrab}
                   />
                 ) : null}

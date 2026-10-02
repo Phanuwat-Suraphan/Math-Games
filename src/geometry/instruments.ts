@@ -16,7 +16,15 @@
  * ยาวขึ้นคือมีขีดมากขึ้น ไม่ใช่ขีดห่างขึ้น
  */
 
-import { PX_PER_CM, angleOf, distance, distanceToSegment, normalizeDeg, pointAt } from './geo'
+import {
+  PX_PER_CM,
+  angleOf,
+  distance,
+  distanceToSegment,
+  normalizeDeg,
+  pointAt,
+  projectOnSegment,
+} from './geo'
 import type { Point } from './geo'
 import type { Shape } from './shapes'
 
@@ -189,6 +197,30 @@ export function nearestGuideEdge(
     }
   }
   return best
+}
+
+/**
+ * ค่าที่อ่านได้จากไม้บรรทัด ณ จุดที่ปลายนิ้วอยู่
+ *
+ * ของจริงเด็กอ่านค่าโดยดูว่าปลายดินสอตรงกับขีดไหน ไม่ใช่คำนวณจากจุดเริ่มถึงจุดจบ
+ * บนจอไม่มีสายตาที่ไล่ตามขีดได้เหมือนของจริง ป้ายบอกค่าจึงมาแทนหน้าที่นั้น
+ *
+ * คืน null เมื่อปลายนิ้วเลยปลายไม้ไปแล้ว เพราะของจริงตรงนั้นไม่มีขีดให้อ่าน
+ */
+export function rulerReading(
+  origin: Point,
+  rotation: number,
+  lengthCm: number,
+  p: Point,
+): { cm: number; at: Point } | null {
+  const end = pointAt(origin, lengthCm * PX_PER_CM, rotation)
+  const along = projectOnSegment(p, origin, end)
+  const cm = distance(origin, along) / PX_PER_CM
+  /* เลยปลายไม้ไปแล้ว การทาบจะไปค้างที่ปลายพอดี ซึ่งไม่ใช่ค่าที่อ่านได้จริง */
+  const atEnd = cm >= lengthCm - 0.001 && distance(p, end) > 2
+  const atStart = cm <= 0.001 && distance(p, origin) > 2
+  if (atEnd || atStart) return null
+  return { cm: Math.round(cm * 10) / 10, at: along }
 }
 
 /** ที่วางของอุปกรณ์หนึ่งชิ้น */
