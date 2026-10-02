@@ -20,6 +20,7 @@ import {
   angleOf,
   interiorAngles,
   isOnArc,
+  lineIntersection,
   polygonArea,
   nearestVertexDistance,
   pointAt,
@@ -1078,4 +1079,31 @@ export function withDash(shape: Shape, dash: boolean): Shape {
  */
 export function duplicateShape(shape: Shape, id: string, dx: number, dy: number): Shape {
   return { ...translateShape(shape, dx, dy), id }
+}
+
+
+/**
+ * มุมระหว่างเส้นตรงสองเส้นที่วาดไว้แล้ว
+ *
+ * วิธีวัดมุมที่เร็วที่สุดในห้องเรียนคือชี้ที่เส้นสองเส้นแล้วถามว่า "สองเส้นนี้ทำมุมกันเท่าไร"
+ * ไม่ใช่การจิ้มสามจุดให้ตรงเป๊ะ ซึ่งพลาดง่ายมากบนจอสัมผัส
+ *
+ * จุดยอดคือจุดตัดของเส้นทั้งสอง แขนชี้ไปทางปลายที่ไกลจากจุดตัด
+ * แขนจึงทาบไปบนเส้นที่วาดไว้จริง ไม่ใช่ชี้ออกไปคนละทาง
+ */
+export function angleFromLines(
+  first: SegmentShape,
+  second: SegmentShape,
+): { vertex: Point; a: Point; b: Point } | null {
+  const vertex = lineIntersection(first.a, first.b, second.a, second.b)
+  if (!vertex) return null
+
+  const farEnd = (line: SegmentShape): Point =>
+    distance(vertex, line.a) >= distance(vertex, line.b) ? line.a : line.b
+
+  const a = farEnd(first)
+  const b = farEnd(second)
+  /* จุดตัดทับปลายเส้นพอดีจนแขนยาวศูนย์ ก็ไม่มีมุมให้วัด */
+  if (distance(vertex, a) < 1 || distance(vertex, b) < 1) return null
+  return { vertex, a, b }
 }

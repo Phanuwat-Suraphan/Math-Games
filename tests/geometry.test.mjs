@@ -2236,6 +2236,34 @@ check('ลายเส้นต้องติดไปกับงานที�
   assert(back.prefs.dashed === true, 'ลายเส้นที่ดินสอเลือกไว้ไม่ถูกจำ')
 })
 
+check('จิ้มสองเส้นแล้วต้องได้มุมระหว่างเส้นที่ถูกต้อง', () => {
+  const line = (id, a, b) => ({ id, kind: 'segment', color: '#000', width: 3, a, b })
+
+  /* สองเส้นตั้งฉากกัน ตัดกันที่ปลายร่วม */
+  const flat = line('flat', { x: 100, y: 300 }, { x: 400, y: 300 })
+  const upright = line('up', { x: 100, y: 300 }, { x: 100, y: 60 })
+  const made = S.angleFromLines(flat, upright)
+  assert(made !== null, 'สองเส้นที่ตัดกันต้องวัดมุมได้')
+  close(made.vertex.x, 100, 0.0001, 'จุดยอดไม่ได้อยู่ที่จุดตัด')
+  close(made.vertex.y, 300, 0.0001, 'จุดยอดไม่ได้อยู่ที่จุดตัด')
+  close(G.angleBetween(made.a, made.vertex, made.b), 90, 0.0001, 'มุมที่วัดได้ไม่ใช่มุมฉาก')
+
+  /* แขนต้องชี้ไปทางปลายที่ไกลจากจุดตัด ไม่งั้นแขนจะไม่ทาบไปบนเส้นที่วาดไว้จริง */
+  close(G.distance(made.vertex, made.a), 300, 0.0001, 'แขนไม่ได้ทาบไปตามเส้นแรก')
+  close(G.distance(made.vertex, made.b), 240, 0.0001, 'แขนไม่ได้ทาบไปตามเส้นที่สอง')
+
+  /* เส้นที่ยังไม่ชนกันบนกระดาษ ก็ยังตอบได้ว่าแนวของมันทำมุมกันเท่าไร */
+  const slanted = line('slant', { x: 500, y: 500 }, { x: 700, y: 300 })
+  const crossing = S.angleFromLines(flat, slanted)
+  assert(crossing !== null, 'เส้นที่ตัดกันนอกช่วงที่วาด ยังต้องวัดมุมได้')
+  close(G.angleBetween(crossing.a, crossing.vertex, crossing.b), 45, 0.0001, 'มุมของแนวเส้นผิด')
+
+  /* เส้นขนานไม่มีจุดยอด ต้องตอบว่าไม่มีมุม ไม่ใช่โยนจุดตัดที่ไกลเป็นหมื่นพิกเซลออกมา */
+  const twin = line('twin', { x: 100, y: 420 }, { x: 400, y: 420 })
+  assert(S.angleFromLines(flat, twin) === null, 'เส้นขนานต้องไม่มีมุมให้วัด')
+  assert(G.lineIntersection(flat.a, flat.b, twin.a, twin.b) === null, 'เส้นขนานต้องไม่มีจุดตัด')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

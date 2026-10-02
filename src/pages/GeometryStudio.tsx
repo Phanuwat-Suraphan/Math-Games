@@ -136,6 +136,7 @@ import {
 import type { ToolId } from '../geometry/tools'
 import {
   HIT_TOLERANCE,
+  angleFromLines,
   applyField,
   canDash,
   describeBoard,
@@ -154,10 +155,11 @@ import {
   duplicateShape,
   withDash,
 } from '../geometry/shapes'
-import type { Shape, ShapeField } from '../geometry/shapes'
+import type { SegmentShape, Shape, ShapeField } from '../geometry/shapes'
 import {
   PX_PER_CM,
   accumulateSweep,
+  angleBetween,
   angleOf,
   arcPath,
   distance,
@@ -345,6 +347,8 @@ export function GeometryStudio() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Point[]>([])
   const [anglePicks, setAnglePicks] = useState<Point[]>([])
+  /* เส้นแรกที่จิ้มไว้ในการวัดมุมแบบ "เส้นสองเส้นทำมุมกันเท่าไร" */
+  const [angleLine, setAngleLine] = useState<SegmentShape | null>(null)
   const [compass, setCompass] = useState<CompassState>({
     center: { x: 300, y: 340 },
     radius: 3 * PX_PER_CM,
@@ -579,6 +583,13 @@ export function GeometryStudio() {
   function guideEdgeFor(p: Point): { a: Point; b: Point } | null {
     const edges: { a: Point; b: Point }[] = []
     if (showRuler) edges.push({ a: rulerStart, b: rulerEnd })
+    if (showProtractor) {
+      /* ขอบล่างของครึ่งวงกลมเป็นไม้บรรทัดสั้น ๆ ในตัว ของจริงก็ใช้ลากเส้นตรงได้เหมือนกัน */
+      edges.push({
+        a: pointAt(protractor.center, protractor.radius, protractor.rotation + 180),
+        b: pointAt(protractor.center, protractor.radius, protractor.rotation),
+      })
+    }
     if (showSetSquare) {
       edges.push(...setSquareEdges(setSquare.kind, setSquare.at, setSquare.rotation, setSquare.leg))
     }
@@ -980,6 +991,34 @@ export function GeometryStudio() {
          * เพราะสิ่งที่วัดบ่อยที่สุดคือมุมในรูปจากแบบฝึกที่วางไว้ ซึ่งไม่มีจุดให้ดูดสักจุด
          * ถ้ายังดูดอยู่ ปลายแขนจะกระโดดไปเกาะเส้นที่เด็กวาดไว้ก่อนหน้า แล้วองศาที่ได้ก็ผิด
          */
+        /*
+         * จิ้มโดนเส้นที่วาดไว้ ถือว่ากำลังถามว่า "สองเส้นนี้ทำมุมกันเท่าไร"
+         * ซึ่งเป็นวิธีวัดที่เร็วที่สุดในห้องเรียน และแม่นกว่าการจิ้มสามจุดให้ตรงเป๊ะบนจอสัมผัส
+         * จิ้มที่ว่างเมื่อไร ก็กลับไปเป็นการจิ้มสามจุดแบบเดิมทันที
+         */
+        const onLine = findShapeAt(board.shapes, raw, hitRange)
+        if (anglePicks.length === 0 && onLine && onLine.kind === 'segment') {
+          if (!angleLine) {
+            setAngleLine(onLine)
+            setSelectedId(onLine.id)
+            say('จิ้มอีกเส้นที่ทำมุมกับเส้นนี้ได้เลย')
+            playSfx('click')
+            return
+          }
+          if (angleLine.id !== onLine.id) {
+            const made = angleFromLines(angleLine, onLine)
+            setAngleLine(null)
+            setSelectedId(null)
+            if (!made) {
+              say('สองเส้นนี้ขนานกัน จึงไม่มีจุดยอดและไม่มีมุมให้วัด')
+              return
+            }
+            addShape({ kind: 'angle', id: makeId(), color, width, ...made })
+            say(`สองเส้นนี้ทำมุมกัน ${formatDeg(angleBetween(made.a, made.vertex, made.b))}`)
+            return
+          }
+        }
+
         const point = raw
         const picks = [...anglePicks, point]
         if (picks.length < 3) {
@@ -1501,6 +1540,7 @@ export function GeometryStudio() {
     setTool(next)
     setDraft([])
     setAnglePicks([])
+    setAngleLine(null)
     setPolygonAsk(null)
     /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
     playSfx('click')
@@ -1985,9 +2025,30 @@ export function GeometryStudio() {
         }
       }
 
+      /* ปุ่มตัวอักษรสำหรับอุปกรณ์ ครูที่ใช้คอมพิวเตอร์หยิบเก็บได้โดยไม่ต้องละมือไปหาเมาส์ */
+      if (!typing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        const letter = event.key.toLowerCase()
+        if (letter === 'r') {
+          event.preventDefault()
+          setShowRuler((on) => !on)
+          return
+        }
+        if (letter === 'p') {
+          event.preventDefault()
+          setShowProtractor((on) => !on)
+          return
+        }
+        if (letter === 's') {
+          event.preventDefault()
+          setShowSetSquare((on) => !on)
+          return
+        }
+      }
+
       if (event.key === 'Escape') {
         setDraft([])
         setAnglePicks([])
+        setAngleLine(null)
         setPolygonAsk(null)
         setCalibrate(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
@@ -2036,8 +2097,11 @@ export function GeometryStudio() {
 
   const protractorHighlight = (() => {
     if (!showProtractor || !pointer) return null
-    const away = distance(pointer, protractor.center)
-    if (away < protractor.radius - 70 || away > protractor.radius + 34) return null
+    /*
+     * อ่านค่าได้ทุกที่ที่เมาส์อยู่ ไม่ใช่เฉพาะตอนจ่อใกล้ขอบสเกล
+     * ของจริงเล็งผ่านขอบไปไกลแค่ไหนก็ยังอ่านองศาเดิมได้ เพราะมุมไม่ขึ้นกับระยะ
+     * เงื่อนไขเดิมที่บังคับให้จ่อใกล้ขอบ ทำให้ค่าหายไปตอนเลื่อนเมาส์ออกมานิดเดียว
+     */
     const local = normalizeDeg(angleOf(protractor.center, pointer) - protractor.rotation)
     return local <= 180 ? local : null
   })()
@@ -2067,6 +2131,9 @@ export function GeometryStudio() {
     }
     if (draft.length > 0) {
       return `กำลังวาดรูปหลายเหลี่ยม มี ${draft.length} จุดแล้ว · จิ้มจุดแรกเพื่อปิดรูป`
+    }
+    if (angleLine) {
+      return 'เลือกเส้นแรกแล้ว จิ้มอีกเส้นเพื่อดูว่าสองเส้นทำมุมกันเท่าไร'
     }
     if (anglePicks.length > 0) {
       return `เลือกจุดที่ ${anglePicks.length} จาก 3 แล้ว`
@@ -3036,6 +3103,7 @@ export function GeometryStudio() {
                     rotation={protractor.rotation}
                     radius={protractor.radius}
                     highlight={protractorHighlight}
+                    reach={pointer ? distance(protractor.center, pointer) : 0}
                     opacity={toolFade}
                     onGrab={handleProtractorGrab}
                   />

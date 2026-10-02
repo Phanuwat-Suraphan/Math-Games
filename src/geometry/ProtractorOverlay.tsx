@@ -23,6 +23,8 @@ interface ProtractorOverlayProps {
   radius: number
   /** องศาบนสเกลที่ปลายนิ้วชี้อยู่ (0 ถึง 180) ไม่ได้ชี้อยู่ให้ส่ง null */
   highlight: number | null
+  /** เส้นเล็งยาวถึงตรงไหน ใช้ลากจากรูตรงกลางไปหาปลายเมาส์ที่อยู่ไกลออกไป */
+  reach: number
   /** ความทึบของทั้งอัน 1 คือทึบเต็มที่ ของจริงเป็นพลาสติกใสจึงไม่ควรทึบเท่ากระดาษ */
   opacity: number
   onGrab: (part: ProtractorPart, event: ReactPointerEvent<SVGElement>) => void
@@ -83,8 +85,14 @@ const ProtractorScale = memo(function ProtractorScale({
       {ticks
         .filter((tick) => tick.major)
         .map((tick) => {
-          const outerLabel = pointAt(origin, radius - 32 * unit, tick.deg)
-          const innerLabel = pointAt(origin, radius - 56 * unit, tick.deg)
+          /*
+           * เลขที่ปลายสองข้างต้องยกขึ้นเหนือขอบล่างเล็กน้อย
+           * ถ้าวางตรงองศาจริง มันจะนอนทับเส้นขอบล่างและทับเลขของอีกแถวพอดี
+           * จนอ่านไม่ออกทั้งคู่ ทั้งที่คู่ 0 กับ 180 คือคู่ที่ต้องอ่านให้เป็นมากที่สุด
+           */
+          const lift = tick.deg === 0 ? 5 : tick.deg === 180 ? -5 : 0
+          const outerLabel = pointAt(origin, radius - 32 * unit, tick.deg + lift)
+          const innerLabel = pointAt(origin, radius - 56 * unit, tick.deg + lift)
           return (
             <g key={`label-${tick.deg}`}>
               <text
@@ -124,6 +132,7 @@ export function ProtractorOverlay({
   rotation,
   radius,
   highlight,
+  reach,
   opacity,
   onGrab,
 }: ProtractorOverlayProps) {
@@ -146,7 +155,7 @@ export function ProtractorOverlay({
       {/* ตัวครึ่งวงกลมโปร่งแสง จิ้มตรงกลางแล้วลากเพื่อย้าย */}
       <path
         d={`M ${outer.x} ${outer.y} A ${radius} ${radius} 0 0 1 ${outerEnd.x} ${outerEnd.y} Z`}
-        fill="rgba(244, 114, 182, 0.1)"
+        fill="rgba(244, 114, 182, 0.07)"
         stroke="#f472b6"
         strokeWidth={2.5}
         onPointerDown={(event) => onGrab('move', event)}
@@ -158,7 +167,12 @@ export function ProtractorOverlay({
           `M ${outer.x} ${outer.y} A ${radius} ${radius} 0 0 1 ${outerEnd.x} ${outerEnd.y} ` +
           `L ${innerStart.x} ${innerStart.y} A ${bandInner} ${bandInner} 0 0 0 ${innerEnd.x} ${innerEnd.y} Z`
         }
-        fill="rgba(255, 255, 255, 0.18)"
+        /*
+         * โปร่งใสสนิท ไม่ใช่สีขาวจาง ๆ
+         * แถบนี้มีไว้เป็นเป้าให้จิ้มยิงเส้นตามองศา ไม่ได้มีไว้ให้มองเห็น
+         * สีขาวตรงนี้คือสิ่งที่กลบเส้นในหนังสือที่ต้องวัดพอดี เพราะมันอยู่ตรงที่อ่านค่า
+         */
+        fill="transparent"
         stroke="none"
         onPointerDown={(event) => onGrab('scale', event)}
       />
@@ -168,11 +182,12 @@ export function ProtractorOverlay({
       {/* เส้นที่ปลายนิ้วชี้อยู่ ทำให้เห็นชัดว่ากำลังจะได้มุมกี่องศา */}
       {highlight !== null ? (
         <g pointerEvents="none">
+          {/* เส้นเล็งยาวตามเมาส์ไปด้วย เด็กจึงเห็นว่ากำลังเล็งไปที่อะไรอยู่ ไม่ใช่แค่ขอบสเกล */}
           <line
             x1={0}
             y1={0}
-            x2={edge(highlight, radius).x}
-            y2={edge(highlight, radius).y}
+            x2={edge(highlight, Math.max(radius, reach)).x}
+            y2={edge(highlight, Math.max(radius, reach)).y}
             stroke="#db2777"
             strokeWidth={2.5}
             strokeDasharray="7 5"
@@ -222,9 +237,13 @@ export function ProtractorOverlay({
         </text>
       </g>
 
-      {/* ปุ่มหมุน อยู่นอกตัวครึ่งวงกลมเพื่อไม่ให้บังสเกล */}
+      {/*
+        ปุ่มหมุน อยู่ใต้ขอบล่างทางขวา
+        เดิมวางไว้ปลายขวาของขอบล่างพอดี ซึ่งทับเลข 0 กับ 180 ที่ต้องอ่านทุกครั้งที่วัด
+        ใต้ขอบล่างคือที่ว่างจริง ไม่มีสเกลและไม่มีกระดาษส่วนที่กำลังวัดอยู่
+      */}
       <g
-        transform={`translate(${radius + 30} 0)`}
+        transform={`translate(${radius * 0.62} 40)`}
         onPointerDown={(event) => onGrab('rotate', event)}
         className="cursor-grab"
       >
