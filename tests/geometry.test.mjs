@@ -2132,6 +2132,51 @@ check('ระยะกางวงเวียนต้องอยู่ใน�
   )
 })
 
+check('ไม้ฉากต้องได้มุมตามแบบเป๊ะทุกขนาดและทุกท่าที่หมุน', () => {
+  /*
+   * ไม้ฉากคือเครื่องมือที่เด็กใช้ลอกมุม 30 45 60 และ 90 ลงกระดาษ
+   * ถ้ามุมของไม้ฉากเองเพี้ยนไปแม้แต่องศาเดียว ทุกเส้นที่ลอกจากมันจะเพี้ยนตามหมด
+   * และไม่มีอะไรบนจอบอกเลยว่าผิด เพราะรูปยังดูเหมือนไม้ฉากทุกประการ
+   */
+  for (const kind of ['45', '30']) {
+    const want = kind === '45' ? [90, 45, 45] : [90, 30, 60]
+    for (const rotation of [0, 37, 90, 180, 263, 359]) {
+      for (const leg of [N.SETSQUARE_MIN, N.SETSQUARE_DEFAULT, N.SETSQUARE_MAX]) {
+        const [corner, baseEnd, riseEnd] = N.setSquareCorners(kind, { x: 500, y: 400 }, rotation, leg)
+        close(G.angleBetween(baseEnd, corner, riseEnd), want[0], 0.0001, `มุมฉากของไม้ฉาก ${kind} เพี้ยน`)
+        close(G.angleBetween(corner, baseEnd, riseEnd), want[1], 0.0001, `มุมที่ปลายฐานของ ${kind} เพี้ยน`)
+        close(G.angleBetween(corner, riseEnd, baseEnd), want[2], 0.0001, `มุมที่ปลายขาตั้งของ ${kind} เพี้ยน`)
+        close(G.distance(corner, baseEnd), leg, 0.0001, 'ความยาวฐานไม่ตรงกับที่สั่ง')
+      }
+    }
+  }
+
+  /* ขนาดต้องอยู่ในช่วงของไม้ฉากจริง และค่าพังต้องไม่ทำให้ไม้ฉากหายไป */
+  close(N.clampSetSquare(999 * G.PX_PER_CM), N.SETSQUARE_MAX, 0.0001, 'ไม้ฉากใหญ่เกินของจริง')
+  close(N.clampSetSquare(1), N.SETSQUARE_MIN, 0.0001, 'ไม้ฉากเล็กจนใช้ไม่ได้')
+  close(N.clampSetSquare(Number.NaN), N.SETSQUARE_DEFAULT, 0.0001, 'ค่าพังต้องกลับไปใช้ขนาดตั้งต้น')
+})
+
+check('ดินสอต้องแนบขอบที่อยู่ใกล้ที่สุด ไม่ใช่ขอบที่โปรแกรมเลือกไว้ให้', () => {
+  /*
+   * ท่าที่ครูใช้บ่อยที่สุดคือเลื่อนไม้ฉากไปตามไม้บรรทัดแล้วลากตามขาตั้ง
+   * ซึ่งต้องแนบขาตั้ง ไม่ใช่ขอบไม้บรรทัดที่อยู่ติดกันนั่นเอง
+   */
+  const edges = N.setSquareEdges('45', { x: 200, y: 400 }, 0, 160)
+  const base = edges[0]
+  const rise = edges[1]
+
+  const nearBase = N.nearestGuideEdge({ x: 300, y: 395 }, edges, 30)
+  assert(nearBase !== null && nearBase.b.x === base.b.x && nearBase.b.y === base.b.y, 'ไม่ได้แนบขอบฐาน')
+
+  const nearRise = N.nearestGuideEdge({ x: 205, y: 300 }, edges, 30)
+  assert(nearRise !== null && nearRise.b.y === rise.b.y, 'ไม่ได้แนบขอบขาตั้ง')
+
+  /* ห่างจากทุกขอบ แปลว่าวาดอิสระ ไม่ควรถูกดูดเข้าขอบใดเลย */
+  assert(N.nearestGuideEdge({ x: 700, y: 120 }, edges, 30) === null, 'อยู่ไกลไม้ฉากแต่ยังถูกดูด')
+  assert(N.nearestGuideEdge({ x: 300, y: 395 }, [], 30) === null, 'ไม่มีอุปกรณ์วางอยู่แต่ยังถูกดูด')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
