@@ -272,6 +272,13 @@ export function GeometryStudio() {
   } | null>(null)
   const [realCm, setRealCm] = useState('4')
 
+  /*
+   * โหมดเต็มจอ ซ่อนแผงสองข้างแล้วเหลือแต่กระดาษ
+   * ครูฉายขึ้นโปรเจกเตอร์ให้ทั้งห้องดู เด็กแถวหลังต้องเห็นเส้นที่ครูลาก
+   * กระดาษที่กินพื้นที่แค่ครึ่งจอทำให้แถวหลังมองไม่เห็นอะไรเลย
+   */
+  const [stage, setStage] = useState(false)
+
   /* ช่องเลือกไฟล์ที่ซ่อนไว้ สำหรับแท็บเล็ตที่กด Ctrl+V ไม่ได้ */
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const pasteRef = useRef<(file: File) => void>(() => {})
@@ -1843,6 +1850,35 @@ export function GeometryStudio() {
     return () => svg.removeEventListener('wheel', onWheel)
   }, [])
 
+  /**
+   * เข้าออกโหมดเต็มจอ
+   *
+   * ขอเต็มจอจริงของเบราว์เซอร์ด้วย แถบที่อยู่เว็บกับแถบงานจะได้หายไป
+   * แต่ไม่ผูกโหมดของหน้านี้ไว้กับความสำเร็จของคำขอนั้น
+   * เพราะบนไอแพดและในโหมดฝังหน้าเว็บ คำขอนี้ถูกปฏิเสธเงียบ ๆ
+   * ถ้าผูกไว้ ครูจะกดปุ่มแล้วไม่มีอะไรเกิดขึ้นเลยสักอย่าง
+   */
+  function toggleStage() {
+    const next = !stage
+    setStage(next)
+    playSfx('click')
+    try {
+      if (next) void document.documentElement.requestFullscreen?.()
+      else if (document.fullscreenElement) void document.exitFullscreen?.()
+    } catch {
+      /* เบราว์เซอร์ไม่ให้เต็มจอจริงก็ไม่เป็นไร โหมดของหน้านี้ยังทำงานตามปกติ */
+    }
+  }
+
+  /* กด Esc ออกจากเต็มจอของเบราว์เซอร์ หน้าเว็บต้องรู้ตามไปด้วย ไม่งั้นแผงข้างจะหายค้างไว้ */
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement) setStage(false)
+    }
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+
   /* ปุ่มลัดสำหรับครูที่ใช้คีย์บอร์ด เด็กใช้ปุ่มบนจอได้เหมือนกัน */
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -1967,8 +2003,8 @@ export function GeometryStudio() {
       : null
 
   return (
-    <div className="geo-page min-h-screen pb-10">
-      <header className="sticky top-0 z-30 border-b border-white/50 bg-white/80 backdrop-blur">
+    <div className={`geo-page min-h-screen pb-10 ${stage ? 'geo-stage' : ''}`}>
+      <header className="geo-hide-on-stage sticky top-0 z-30 border-b border-white/50 bg-white/80 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-3">
           <button
             type="button"
@@ -2012,13 +2048,20 @@ export function GeometryStudio() {
             <button type="button" onClick={clearBoard} className="geo-chip">
               🧹 ล้างกระดาษ
             </button>
+            <button type="button" onClick={toggleStage} className="geo-chip geo-chip-strong">
+              ⛶ เต็มจอ
+            </button>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1400px] gap-4 px-3 pt-4 lg:grid-cols-[230px_minmax(0,1fr)_310px]">
+      <div
+        className={`mx-auto grid max-w-[1600px] gap-4 px-3 pt-4 lg:grid-cols-[230px_minmax(0,1fr)_310px] ${
+          stage ? 'geo-stage-grid' : ''
+        }`}
+      >
         {/* กล่องดินสอ */}
-        <aside className="geo-panel order-2 lg:order-1">
+        <aside className="geo-panel geo-hide-on-stage order-2 lg:order-1">
           <h2 className="geo-heading">🧰 กล่องเครื่องมือ</h2>
           {/*
             เรียงเป็นตารางสามช่อง ไม่ใช่รายการแถวยาว
@@ -2953,6 +2996,121 @@ export function GeometryStudio() {
               </g>
             </svg>
 
+            {/*
+              แถบเครื่องมือลอยสำหรับโหมดเต็มจอ
+              ซ่อนแผงข้างแล้วยังต้องเปลี่ยนเครื่องมือได้ ไม่งั้นเต็มจอจะกลายเป็นโหมดดูอย่างเดียว
+              ติดคลาสห้ามส่งออก ปุ่มพวกนี้จึงไม่ติดไปในภาพที่บันทึก
+            */}
+            {stage ? (
+              <div className="geo-stagebar geo-no-export">
+                {TOOLS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => chooseTool(item.id)}
+                    title={item.label}
+                    aria-label={item.label}
+                    style={tool === item.id ? { backgroundColor: item.tint } : undefined}
+                    className={`geo-stagekey ${tool === item.id ? 'geo-stagekey-on' : ''}`}
+                  >
+                    {item.emoji}
+                  </button>
+                ))}
+
+                <span className="geo-stagegap" aria-hidden="true" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'undo' })
+                    playSfx('click')
+                  }}
+                  disabled={!canUndo(board)}
+                  title="ย้อนกลับ"
+                  aria-label="ย้อนกลับ"
+                  className="geo-stagekey"
+                >
+                  ↩️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'redo' })
+                    playSfx('click')
+                  }}
+                  disabled={!canRedo(board)}
+                  title="ทำซ้ำ"
+                  aria-label="ทำซ้ำ"
+                  className="geo-stagekey"
+                >
+                  ↪️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRuler(!showRuler)
+                    playSfx('click')
+                  }}
+                  title="ไม้บรรทัด"
+                  aria-label="ไม้บรรทัด"
+                  className={`geo-stagekey ${showRuler ? 'geo-stagekey-on' : ''}`}
+                >
+                  📏
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowProtractor(!showProtractor)
+                    playSfx('click')
+                  }}
+                  title="ครึ่งวงกลม"
+                  aria-label="ครึ่งวงกลม"
+                  className={`geo-stagekey ${showProtractor ? 'geo-stagekey-on' : ''}`}
+                >
+                  📐
+                </button>
+
+                <span className="geo-stagegap" aria-hidden="true" />
+
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1 / 1.25)}
+                  title="ย่อ"
+                  aria-label="ย่อกระดาษ"
+                  className="geo-stagekey"
+                >
+                  −
+                </button>
+                <button
+                  type="button"
+                  onClick={() => zoomBy(1.25)}
+                  title="ขยาย"
+                  aria-label="ขยายกระดาษ"
+                  className="geo-stagekey"
+                >
+                  +
+                </button>
+                <button
+                  type="button"
+                  onClick={resetView}
+                  title="พอดีจอ"
+                  aria-label="กลับมาเห็นทั้งแผ่น"
+                  className="geo-stagekey"
+                >
+                  ⤢
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleStage}
+                  className="geo-chip geo-chip-strong"
+                  title="ออกจากโหมดเต็มจอ"
+                >
+                  ⤡ ออกจากเต็มจอ
+                </button>
+              </div>
+            ) : null}
+
             {showWelcome && board.shapes.length === 0 ? (
               /*
                 การ์ดนี้ไม่รับการคลิกเลย ยกเว้นปุ่มปิด
@@ -3116,7 +3274,7 @@ export function GeometryStudio() {
             ) : null}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="geo-hide-on-stage mt-3 flex flex-wrap items-center gap-2">
             <div className="geo-zoom">
               <button
                 type="button"
@@ -3161,7 +3319,7 @@ export function GeometryStudio() {
         </main>
 
         {/* แผงข้อมูลและภารกิจ */}
-        <aside className="geo-panel order-3">
+        <aside className="geo-panel geo-hide-on-stage order-3">
           <Mascot message={praise ?? toolInfo.hint} cheering={cheering} />
 
           <h2 className="geo-heading mt-4">🔍 สิ่งที่วาดอยู่</h2>
