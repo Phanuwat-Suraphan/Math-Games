@@ -16,7 +16,7 @@
  * ยาวขึ้นคือมีขีดมากขึ้น ไม่ใช่ขีดห่างขึ้น
  */
 
-import { PX_PER_CM, angleOf, distance, normalizeDeg } from './geo'
+import { PX_PER_CM, angleOf, distance, distanceToSegment, normalizeDeg, pointAt } from './geo'
 import type { Point } from './geo'
 import type { Shape } from './shapes'
 
@@ -106,6 +106,89 @@ export function compassSpanOf(shape: Shape): number | null {
     default:
       return null
   }
+}
+
+/**
+ * ไม้ฉาก
+ *
+ * ในกล่องเรขาคณิตจริงมีสี่ชิ้น วงเวียน ไม้บรรทัด ครึ่งวงกลม และไม้ฉาก
+ * ไม้ฉากคือชิ้นที่ใช้ลากเส้นตั้งฉากและเส้นขนาน ซึ่งเป็นสองอย่างที่หลักสูตรสอน
+ * และเป็นสองอย่างที่ลากด้วยมือเปล่าแล้วไม่มีวันตรงจริง
+ *
+ * มีสองแบบเหมือนของจริง 45-45-90 กับ 30-60-90
+ * ไม่ใช่เพื่อความหลากหลาย แต่เพราะมุม 30 45 60 คือมุมที่โจทย์สั่งให้วาดบ่อยที่สุด
+ */
+export type SetSquareKind = '45' | '30'
+
+export const SETSQUARE_MIN = 4 * PX_PER_CM
+export const SETSQUARE_MAX = 14 * PX_PER_CM
+export const SETSQUARE_DEFAULT = 8 * PX_PER_CM
+
+export function clampSetSquare(leg: number): number {
+  if (!Number.isFinite(leg)) return SETSQUARE_DEFAULT
+  return Math.min(SETSQUARE_MAX, Math.max(SETSQUARE_MIN, leg))
+}
+
+/** ความยาวขาที่ตั้งฉากกับฐาน เทียบกับความยาวฐาน */
+export function setSquareRise(kind: SetSquareKind): number {
+  /* 30-60-90 ขาตั้งสั้นกว่าฐานตามอัตราส่วน tan 30 องศา มุมที่ปลายฐานจึงเป็น 30 องศาพอดี */
+  return kind === '45' ? 1 : Math.tan(Math.PI / 6)
+}
+
+/**
+ * มุมฉากอยู่ที่จุดแรกเสมอ ไล่ไปปลายฐาน แล้วไปปลายขาตั้ง
+ * ลำดับนี้สำคัญ เพราะหน้าจอวาดเครื่องหมายมุมฉากที่จุดแรก
+ */
+export function setSquareCorners(
+  kind: SetSquareKind,
+  at: Point,
+  rotation: number,
+  leg: number,
+): [Point, Point, Point] {
+  const base = clampSetSquare(leg)
+  return [
+    { ...at },
+    pointAt(at, base, rotation),
+    pointAt(at, base * setSquareRise(kind), rotation + 90),
+  ]
+}
+
+/** ขอบทั้งสามด้านของไม้ฉาก ลากดินสอตามขอบไหนก็ได้เหมือนของจริง */
+export function setSquareEdges(
+  kind: SetSquareKind,
+  at: Point,
+  rotation: number,
+  leg: number,
+): { a: Point; b: Point }[] {
+  const [corner, baseEnd, riseEnd] = setSquareCorners(kind, at, rotation, leg)
+  return [
+    { a: corner, b: baseEnd },
+    { a: corner, b: riseEnd },
+    { a: baseEnd, b: riseEnd },
+  ]
+}
+
+/**
+ * ขอบที่ดินสออยู่ใกล้ที่สุด ใช้ตัดสินว่าจะลากแนบขอบไหน
+ *
+ * ของจริงดินสอแนบขอบไหนก็ได้ที่มันพิงอยู่ ไม่ใช่ขอบที่โปรแกรมเลือกไว้ให้
+ * คืน null เมื่อดินสออยู่ห่างจากทุกขอบ แปลว่าวาดอิสระตามปกติ
+ */
+export function nearestGuideEdge(
+  p: Point,
+  edges: { a: Point; b: Point }[],
+  range: number,
+): { a: Point; b: Point } | null {
+  let best: { a: Point; b: Point } | null = null
+  let bestAway = range
+  for (const edge of edges) {
+    const away = distanceToSegment(p, edge.a, edge.b)
+    if (away <= bestAway) {
+      best = edge
+      bestAway = away
+    }
+  }
+  return best
 }
 
 /** ที่วางของอุปกรณ์หนึ่งชิ้น */

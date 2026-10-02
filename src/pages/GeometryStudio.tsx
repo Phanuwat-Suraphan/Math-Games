@@ -25,6 +25,9 @@ import { ProtractorOverlay } from '../geometry/ProtractorOverlay'
 import type { ProtractorPart } from '../geometry/ProtractorOverlay'
 import { RulerOverlay } from '../geometry/RulerOverlay'
 import type { RulerPart } from '../geometry/RulerOverlay'
+import { SetSquareOverlay } from '../geometry/SetSquareOverlay'
+import type { SetSquarePart } from '../geometry/SetSquareOverlay'
+import type { SetSquareKind } from '../geometry/instruments'
 import { PointerCursor } from '../geometry/PointerCursor'
 import { ShapesLayer } from '../geometry/ShapesLayer'
 import {
@@ -94,10 +97,14 @@ import {
 } from '../geometry/recipes'
 import { ShapeView } from '../geometry/ShapeView'
 import {
+  SETSQUARE_DEFAULT,
   alignProtractorTo,
   alignRulerTo,
   clampCompassRadius,
+  clampSetSquare,
   compassSpanOf,
+  nearestGuideEdge,
+  setSquareEdges,
   PROTRACTOR_DEFAULT,
   RULER_DEFAULT_CM,
   RULER_MAX_CM,
@@ -151,7 +158,6 @@ import {
   angleOf,
   arcPath,
   distance,
-  distanceToSegment,
   formatCm,
   formatDeg,
   normalizeDeg,
@@ -195,7 +201,8 @@ interface CompassState {
 
 type Drag =
   | { kind: 'none' }
-  | { kind: 'pen'; start: Point; end: Point; guided: boolean }
+  /** guide คือขอบของอุปกรณ์ที่ดินสอแนบอยู่ เก็บทั้งขอบไว้เลยเพราะไม้ฉากมีตั้งสามขอบ */
+  | { kind: 'pen'; start: Point; end: Point; guide: { a: Point; b: Point } | null }
   | { kind: 'regular'; center: Point; edge: Point }
   /** ลากเข็มเพื่อย้ายวงเวียน โดย grab คือระยะเยื้องจากปลายนิ้วถึงเข็ม */
   /** ลากกระดาษไปมาตอนซูมเข้า เก็บจุดเริ่มเป็นพิกัดบนจอ เพราะพิกัดกระดาษขยับตามไปด้วย */
@@ -233,6 +240,7 @@ type Drag =
   | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
+  | { kind: 'setsquare'; part: SetSquarePart; grab: Point }
 
 export function GeometryStudio() {
   const navigate = useNavigate()
@@ -298,6 +306,7 @@ export function GeometryStudio() {
   const [showArea, setShowArea] = useState(false)
   const [showPerimeter, setShowPerimeter] = useState(false)
   const [showRuler, setShowRuler] = useState(false)
+  const [showSetSquare, setShowSetSquare] = useState(false)
   const [showProtractor, setShowProtractor] = useState(false)
 
   const [ruler, setRuler] = useState({
@@ -305,6 +314,13 @@ export function GeometryStudio() {
     rotation: 0,
     lengthCm: RULER_DEFAULT_CM,
   })
+  const [setSquare, setSetSquare] = useState<{
+    kind: SetSquareKind
+    at: Point
+    rotation: number
+    leg: number
+  }>({ kind: '45', at: { x: 640, y: 540 }, rotation: 0, leg: SETSQUARE_DEFAULT })
+
   const [protractor, setProtractor] = useState({
     center: { x: 520, y: 430 },
     rotation: 0,
@@ -534,8 +550,20 @@ export function GeometryStudio() {
   const rulerStart = ruler.origin
   const rulerEnd = pointAt(ruler.origin, ruler.lengthCm * PX_PER_CM, ruler.rotation)
 
-  function alongRuler(p: Point): boolean {
-    return showRuler && distanceToSegment(p, rulerStart, rulerEnd) <= RULER_GUIDE_RANGE
+  /**
+   * ขอบของอุปกรณ์ที่ดินสออยู่ใกล้ที่สุด
+   *
+   * ของจริงดินสอแนบขอบไหนก็ได้ที่มันพิงอยู่ ทั้งขอบไม้บรรทัดและขอบทั้งสามของไม้ฉาก
+   * ไม่ใช่ขอบเดียวที่โปรแกรมเลือกไว้ให้ ท่าที่ครูใช้บ่อยที่สุดคือ
+   * เลื่อนไม้ฉากไปตามไม้บรรทัดแล้วลากตามขาตั้ง ซึ่งต้องแนบขาตั้ง ไม่ใช่ขอบไม้บรรทัด
+   */
+  function guideEdgeFor(p: Point): { a: Point; b: Point } | null {
+    const edges: { a: Point; b: Point }[] = []
+    if (showRuler) edges.push({ a: rulerStart, b: rulerEnd })
+    if (showSetSquare) {
+      edges.push(...setSquareEdges(setSquare.kind, setSquare.at, setSquare.rotation, setSquare.leg))
+    }
+    return nearestGuideEdge(p, edges, RULER_GUIDE_RANGE)
   }
 
   /**
@@ -569,10 +597,10 @@ export function GeometryStudio() {
   }
 
   /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
-  function penEnd(start: Point, raw: Point, guided: boolean): Point {
+  function penEnd(start: Point, raw: Point, guide: { a: Point; b: Point } | null): Point {
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
-    return guided ? projectOnSegment(end, rulerStart, rulerEnd) : end
+    return guide ? projectOnSegment(end, guide.a, guide.b) : end
   }
 
   /* ------------------------------------------------------------------ */
@@ -891,11 +919,11 @@ export function GeometryStudio() {
       }
 
       case 'pen': {
-        const guided = alongRuler(raw)
-        const start = guided
-          ? projectOnSegment(snapPoint(raw), rulerStart, rulerEnd)
+        const guide = guideEdgeFor(raw)
+        const start = guide
+          ? projectOnSegment(snapPoint(raw), guide.a, guide.b)
           : snapPoint(raw)
-        setDrag({ kind: 'pen', start, end: start, guided })
+        setDrag({ kind: 'pen', start, end: start, guide })
         return
       }
 
@@ -1045,7 +1073,7 @@ export function GeometryStudio() {
 
     switch (drag.kind) {
       case 'pen':
-        setDrag({ ...drag, end: penEnd(drag.start, raw, drag.guided) })
+        setDrag({ ...drag, end: penEnd(drag.start, raw, drag.guide) })
         return
 
       case 'regular':
@@ -1204,6 +1232,23 @@ export function GeometryStudio() {
         }
         return
 
+      case 'setsquare':
+        if (drag.part === 'resize') {
+          /* ลากปุ่มที่ปลายขาตั้งเพื่อย่อขยาย มุมของไม้ฉากไม่เปลี่ยนตามขนาด เหมือนของจริง */
+          setSetSquare({ ...setSquare, leg: clampSetSquare(distance(setSquare.at, raw)) })
+        } else if (drag.part === 'rotate') {
+          setSetSquare({
+            ...setSquare,
+            rotation: softSnapDeg(angleOf(setSquare.at, raw), 5, snapOn ? 2 : 0),
+          })
+        } else {
+          setSetSquare({
+            ...setSquare,
+            at: { x: raw.x + drag.grab.x, y: raw.y + drag.grab.y },
+          })
+        }
+        return
+
       case 'ruler':
         if (drag.part === 'resize') {
           setRuler({ ...ruler, lengthCm: rulerLengthFromPointer(ruler.origin, ruler.rotation, raw) })
@@ -1249,7 +1294,7 @@ export function GeometryStudio() {
       }
 
       case 'pen': {
-        const end = penEnd(drag.start, raw, drag.guided)
+        const end = penEnd(drag.start, raw, drag.guide)
         if (distance(drag.start, end) >= 6) {
           addShape({ kind: 'segment', id: makeId(), color, width, a: drag.start, b: end })
         }
@@ -1389,6 +1434,25 @@ export function GeometryStudio() {
       kind: 'ruler',
       part,
       grab: part === 'move' ? { x: ruler.origin.x - raw.x, y: ruler.origin.y - raw.y } : { x: 0, y: 0 },
+    })
+  }
+
+  function handleSetSquareGrab(part: SetSquarePart, event: ReactPointerEvent<SVGElement>) {
+    event.stopPropagation()
+    const kind = pointerKind(event.pointerType)
+    const now = Date.now()
+    if (shouldIgnorePointer(gateRef.current, event.pointerId, kind, now)) return
+    gateRef.current = beginPointer(gateRef.current, event.pointerId, kind, now)
+
+    const raw = toPaper(event)
+    svgRef.current?.setPointerCapture(event.pointerId)
+    setDrag({
+      kind: 'setsquare',
+      part,
+      grab:
+        part === 'move'
+          ? { x: setSquare.at.x - raw.x, y: setSquare.at.y - raw.y }
+          : { x: 0, y: 0 },
     })
   }
 
@@ -1960,7 +2024,7 @@ export function GeometryStudio() {
     if (drag.kind === 'pen') {
       return `ยาว ${formatCm(distance(drag.start, drag.end))} · ทำมุม ${formatDeg(
         angleOf(drag.start, drag.end),
-      )}${drag.guided ? ' · แนบไม้บรรทัด' : ''}`
+      )}${drag.guide ? ' · แนบขอบอุปกรณ์' : ''}`
     }
     if (drag.kind === 'regular') {
       const radius = snappedRadius(drag.center, drag.edge)
@@ -2460,6 +2524,12 @@ export function GeometryStudio() {
               on={showRuler}
               onToggle={() => setShowRuler(!showRuler)}
             />
+            <ToggleChip
+              label="ไม้ฉาก"
+              emoji="🔺"
+              on={showSetSquare}
+              onToggle={() => setShowSetSquare(!showSetSquare)}
+            />
             <ToggleChip label="เส้นตาราง" emoji="🔲" on={showGrid} onToggle={() => setShowGrid(!showGrid)} />
             <ToggleChip label="แม่เหล็ก" emoji="🧲" on={snapOn} onToggle={() => setSnapOn(!snapOn)} />
             <ToggleChip
@@ -2483,6 +2553,34 @@ export function GeometryStudio() {
               onToggle={() => setShowPerimeter(!showPerimeter)}
             />
           </div>
+          {showSetSquare ? (
+            <div className="mt-2 rounded-2xl bg-white/70 p-3">
+              <p className="text-xs font-bold text-slate-600">🔺 แบบของไม้ฉาก</p>
+              <div className="mt-1 flex gap-2">
+                {([
+                  { id: '45' as SetSquareKind, label: '45° 45° 90°' },
+                  { id: '30' as SetSquareKind, label: '30° 60° 90°' },
+                ]).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setSetSquare({ ...setSquare, kind: item.id })
+                      playSfx('click')
+                    }}
+                    className={`geo-chip flex-1 ${setSquare.kind === item.id ? 'geo-chip-strong' : ''}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                ลากดินสอแนบขอบไหนก็ได้ทั้งสามขอบ ท่าที่ใช้บ่อยคือเลื่อนไม้ฉากไปตามไม้บรรทัด
+                แล้วลากตามขาตั้ง จะได้เส้นตั้งฉากและเส้นขนานที่ตรงจริง
+              </p>
+            </div>
+          ) : null}
+
           {showProtractor ? (
             <div className="mt-2 rounded-2xl bg-white/70 p-3">
               <label
@@ -2845,6 +2943,16 @@ export function GeometryStudio() {
                   />
                 ) : null}
 
+                {showSetSquare ? (
+                  <SetSquareOverlay
+                    kind={setSquare.kind}
+                    at={setSquare.at}
+                    rotation={setSquare.rotation}
+                    leg={setSquare.leg}
+                    onGrab={handleSetSquareGrab}
+                  />
+                ) : null}
+
                 {showProtractor ? (
                   <ProtractorOverlay
                     center={protractor.center}
@@ -3068,6 +3176,18 @@ export function GeometryStudio() {
                   className={`geo-stagekey ${showProtractor ? 'geo-stagekey-on' : ''}`}
                 >
                   📐
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSetSquare(!showSetSquare)
+                    playSfx('click')
+                  }}
+                  title="ไม้ฉาก"
+                  aria-label="ไม้ฉาก"
+                  className={`geo-stagekey ${showSetSquare ? 'geo-stagekey-on' : ''}`}
+                >
+                  🔺
                 </button>
 
                 <span className="geo-stagegap" aria-hidden="true" />
