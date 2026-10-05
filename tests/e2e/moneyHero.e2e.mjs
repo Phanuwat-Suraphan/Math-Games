@@ -51,7 +51,9 @@ let failed = false
 let shot = 0
 
 async function openPage(viewport, name) {
-  const context = await browser.newContext({ viewport, deviceScaleFactor: 1 })
+  // ปิดภาพเคลื่อนไหวแบบเดียวกับที่ผู้ใช้ตั้งได้ในเครื่อง ไม่งั้นปุ่มที่เต้นตุบ ๆ
+  // จะไม่มีวัน "นิ่ง" พอให้ Playwright กด (ฮีโร่บนแผนที่ยังเดินได้เพราะขยับด้วยโค้ด ไม่ใช่ CSS)
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, reducedMotion: 'reduce' })
   const page = await context.newPage()
   page.setDefaultTimeout(15_000)
   page.on('pageerror', (error) => errors.push(`[${name}] pageerror: ${error.message}`))
