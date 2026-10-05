@@ -24,7 +24,7 @@ export function TopBar({ compact = false }: { compact?: boolean }) {
         <span className="mh-stat" title="เหรียญ" data-testid="mh-coins">
           🪙 {player.coins}
         </span>
-        <span className="mh-stat" title="ดาว">
+        <span className="mh-stat mh-stat-star" title="ดาว">
           ⭐ {totalStars(player)}
         </span>
         {!compact && (
@@ -37,7 +37,7 @@ export function TopBar({ compact = false }: { compact?: boolean }) {
         <Link to="/map" className="mh-icon-btn" aria-label="แผนที่" data-testid="mh-nav-map">
           <MapIcon size={22} />
         </Link>
-        <Link to="/badges" className="mh-icon-btn" aria-label="รางวัล">
+        <Link to="/badges" className="mh-icon-btn mh-hide-sm" aria-label="รางวัล">
           <Trophy size={22} />
         </Link>
         <Link to="/profile" className="mh-icon-btn mh-hide-sm" aria-label="โปรไฟล์">

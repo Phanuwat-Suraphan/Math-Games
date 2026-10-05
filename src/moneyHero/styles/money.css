@@ -1560,3 +1560,60 @@ button:disabled {
 .mh-switch:checked::after {
   transform: translateX(28px);
 }
+
+/* มือถือ: แถบบนต้องอยู่บรรทัดเดียว และฉากแผนที่ไม่สูงเกินไป */
+@media (max-width: 640px) {
+  .mh-topbar {
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 8px 4px;
+  }
+  .mh-topbar-player {
+    padding: 3px;
+  }
+  .mh-topbar-name,
+  .mh-lv,
+  .mh-stat-exp {
+    display: none;
+  }
+  .mh-stats {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+  .mh-stat {
+    padding: 5px 9px;
+  }
+  .mh-topbar-nav {
+    gap: 4px;
+  }
+  .mh-topbar .mh-icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+  }
+  .mh-map-progress-text {
+    font-size: 0.9em;
+  }
+  .mh-map-chips {
+    gap: 4px;
+  }
+  .mh-mini-chip {
+    font-size: 0.68em;
+    padding: 2px 6px;
+  }
+  .mh-world-view {
+    height: clamp(300px, 48vh, 420px);
+  }
+  .mh-controls {
+    gap: 8px;
+  }
+  .mh-pad {
+    min-height: 64px;
+  }
+  .mh-level-panel {
+    flex-wrap: wrap;
+  }
+  .mh-level-panel .mh-btn {
+    width: 100%;
+  }
+}
