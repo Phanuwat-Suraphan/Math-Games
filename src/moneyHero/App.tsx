@@ -4,6 +4,9 @@ import { SplashPage } from './pages/SplashPage'
 import { StartPage } from './pages/StartPage'
 import { CreatePlayerPage } from './pages/CreatePlayerPage'
 import { ComingSoonPage } from './pages/ComingSoonPage'
+import { MapPage } from './pages/MapPage'
+import { PlayersPage } from './pages/PlayersPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -38,12 +41,15 @@ export default function App() {
               path="/map"
               element={
                 <NeedPlayer>
-                  <ComingSoonPage title="แผนที่เมืองเงินทอง" npc="hero" />
+                  <MapPage />
                 </NeedPlayer>
               }
             />
-            <Route path="/players" element={<ComingSoonPage title="เปลี่ยนผู้เล่น" npc="rabbit" />} />
-            <Route path="/settings" element={<ComingSoonPage title="ตั้งค่า" npc="owl" />} />
+            <Route path="/players" element={<PlayersPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/badges" element={<ComingSoonPage title="🏆 รางวัล" npc="hero" back="/map" />} />
+            <Route path="/profile" element={<ComingSoonPage title="👤 โปรไฟล์" npc="rabbit" back="/map" />} />
+            <Route path="/stats" element={<ComingSoonPage title="📊 สถิติ" npc="fox" back="/map" />} />
             <Route path="/teacher" element={<ComingSoonPage title="โหมดคุณครู" npc="owl" />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>

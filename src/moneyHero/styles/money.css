@@ -988,3 +988,575 @@ button:disabled {
 .mh-toast-icon {
   font-size: 1.5em;
 }
+
+/* ------------------------------------------------------------------ */
+/* แผนที่ 2 มิติ                                                       */
+/* ------------------------------------------------------------------ */
+
+.mh-map-page {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 12px 30px;
+}
+
+.mh-lv {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: #fff;
+  background: var(--mh-purple);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+.mh-map-progress {
+  padding: 12px 16px;
+  margin: 4px 0 10px;
+}
+
+.mh-map-progress-text {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 14px;
+  margin-bottom: 8px;
+}
+
+.mh-map-progress-text strong {
+  font-family: var(--mh-display);
+  font-size: 1.1em;
+}
+
+.mh-map-progress-text span {
+  color: var(--mh-ink-soft);
+  font-weight: 500;
+}
+
+.mh-map-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.mh-mini-chip {
+  font-size: 0.78em;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(43, 35, 80, 0.08);
+  color: var(--mh-ink-soft);
+}
+
+.mh-mini-chip.is-open {
+  background: #fff3c4;
+  color: #8a5a00;
+}
+
+.mh-mini-chip.is-done {
+  background: #d7f7e8;
+  color: var(--mh-mint-deep);
+}
+
+.mh-world-view {
+  position: relative;
+  height: clamp(340px, 58vh, 520px);
+  border-radius: 26px;
+  overflow: hidden;
+  border: 4px solid #fff;
+  box-shadow: var(--mh-shadow);
+  background: linear-gradient(180deg, #8fd8ff 0%, #c7e9ff 55%, #ffe8f4 100%);
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.mh-layer {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 100%;
+  width: 6000px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.mh-hill {
+  position: absolute;
+  bottom: 60px;
+  width: 420px;
+  height: 190px;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(180deg, #b6e7a8, #8fd18a);
+  opacity: 0.75;
+}
+
+.mh-hill:nth-child(2n) {
+  height: 140px;
+  background: linear-gradient(180deg, #c9f0b4, #9fdc96);
+}
+
+.mh-tree {
+  position: absolute;
+  bottom: 88px;
+  font-size: 56px;
+  opacity: 0.9;
+}
+
+.mh-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  will-change: transform;
+}
+
+.mh-road {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  background: linear-gradient(180deg, #7ee08f 0, #7ee08f 14px, #e9c98f 14px, #d9b06a 100%);
+  border-top: 4px solid #b6f5b4;
+}
+
+.mh-road::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52px;
+  height: 6px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.75) 0 40px, transparent 40px 80px);
+}
+
+.mh-building {
+  position: absolute;
+  bottom: 92px;
+  width: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  transition: transform 0.2s;
+}
+
+.mh-building.is-near {
+  transform: translateY(-6px);
+}
+
+.mh-building-sign {
+  background: #fff;
+  border-radius: 14px;
+  padding: 6px 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  max-width: 210px;
+  line-height: 1.25;
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.12);
+  border: 3px solid var(--mh-gold);
+}
+
+.mh-building-sign b {
+  color: var(--mh-purple);
+}
+
+.mh-building-art {
+  font-size: 112px;
+  line-height: 1;
+  filter: drop-shadow(0 10px 8px rgba(43, 35, 80, 0.25));
+}
+
+.mh-building.is-locked .mh-building-art {
+  filter: grayscale(1) opacity(0.55);
+}
+
+.mh-building.is-locked .mh-building-sign {
+  border-color: #c9c4dd;
+  color: var(--mh-ink-soft);
+}
+
+.mh-building.is-near .mh-building-sign {
+  animation: mh-pulse 1.2s ease-in-out infinite;
+}
+
+.mh-building-status {
+  font-size: 0.8em;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.mh-building-done {
+  position: absolute;
+  top: 50px;
+  right: 18px;
+  font-size: 30px;
+}
+
+.mh-npc {
+  position: absolute;
+  bottom: 92px;
+  width: 72px;
+}
+
+.mh-npc-hint {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 26px;
+  animation: mh-bob 1s ease-in-out infinite;
+}
+
+.mh-map-coin {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c4 0%, #ffd23f 40%, #e09a00 100%);
+  box-shadow: inset 0 0 0 3px rgba(224, 154, 0, 0.6), 0 4px 8px -2px rgba(140, 90, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #8a5a00;
+  animation: mh-float 2.4s ease-in-out infinite;
+}
+
+.mh-coin-pop {
+  position: absolute;
+  font-family: var(--mh-display);
+  font-weight: 700;
+  color: #8a5a00;
+  background: #fff3c4;
+  border-radius: 999px;
+  padding: 2px 10px;
+  animation: mh-rise 0.9s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes mh-rise {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+}
+
+.mh-walker {
+  position: absolute;
+  left: 0;
+  bottom: 88px;
+  width: 90px;
+  will-change: transform;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.mh-walker-inner {
+  transform-origin: bottom center;
+}
+
+.mh-walker.is-left .mh-walker-inner {
+  transform: scaleX(-1);
+}
+
+.mh-walker.is-walking .mh-walker-inner > .mh-char {
+  animation: mh-walk 0.36s ease-in-out infinite;
+}
+
+@keyframes mh-walk {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(3deg);
+  }
+}
+
+.mh-walker-shadow {
+  display: block;
+  width: 60px;
+  height: 12px;
+  margin: -6px auto 0;
+  border-radius: 50%;
+  background: rgba(43, 35, 80, 0.2);
+}
+
+.mh-talk,
+.mh-level-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  animation: mh-pop 0.3s ease-out both;
+}
+
+.mh-talk p {
+  margin: 2px 0 0;
+}
+
+.mh-level-panel-icon {
+  font-size: 46px;
+}
+
+.mh-level-panel-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mh-level-panel-info strong {
+  font-family: var(--mh-display);
+}
+
+.mh-level-panel-info span {
+  color: var(--mh-ink-soft);
+  font-size: 0.9em;
+}
+
+.mh-level-panel-game {
+  font-weight: 600;
+}
+
+.mh-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1.3fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mh-pad {
+  min-height: 70px;
+  border-radius: 20px;
+  border: 3px solid #fff;
+  background: var(--mh-card-strong);
+  box-shadow: 0 6px 0 rgba(43, 35, 80, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mh-display);
+  font-weight: 600;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mh-pad span {
+  font-size: 0.7em;
+}
+
+.mh-pad:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 rgba(43, 35, 80, 0.18);
+}
+
+.mh-pad-action {
+  background: #f1eefc;
+  font-size: 1.05em;
+}
+
+.mh-pad-action.is-ready {
+  background: linear-gradient(180deg, #ffe27a, #ffbb1c);
+  color: #5a3a00;
+  animation: mh-pulse 1.2s ease-in-out infinite;
+}
+
+.mh-map-help {
+  font-size: 0.8em;
+}
+
+.mh-level-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mh-level-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 12px;
+  border-radius: 18px;
+  background: var(--mh-card-strong);
+  border: 2px solid #fff;
+  box-shadow: 0 5px 0 rgba(43, 35, 80, 0.12);
+}
+
+.mh-level-card.is-locked {
+  opacity: 0.6;
+}
+
+.mh-level-card-icon {
+  font-size: 38px;
+}
+
+.mh-level-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+@media (max-width: 640px) {
+  .mh-hide-sm {
+    display: none;
+  }
+  .mh-topbar-name {
+    max-width: 80px;
+  }
+  .mh-building-art {
+    font-size: 92px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* เลือกผู้เล่น ตั้งค่า                                               */
+/* ------------------------------------------------------------------ */
+
+.mh-player-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mh-player-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  flex-wrap: wrap;
+}
+
+.mh-player-row.is-on {
+  border-color: var(--mh-gold);
+}
+
+.mh-player-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 0;
+  min-width: 0;
+}
+
+.mh-player-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mh-player-info b {
+  font-family: var(--mh-display);
+  font-size: 1.15em;
+}
+
+.mh-player-info span {
+  color: var(--mh-ink-soft);
+  font-size: 0.85em;
+}
+
+.mh-player-go {
+  margin-left: auto;
+  font-size: 1.4em;
+  color: var(--mh-purple);
+}
+
+.mh-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.mh-chip-danger {
+  background: #ffe3e8;
+  border-color: #ffb3c0;
+  color: #b3123a;
+}
+
+.mh-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.mh-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 4px;
+  border-bottom: 1px dashed var(--mh-line);
+  cursor: pointer;
+}
+
+.mh-switch-row:last-child {
+  border-bottom: none;
+}
+
+.mh-switch-icon {
+  font-size: 1.6em;
+}
+
+.mh-switch-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.mh-switch-text span {
+  color: var(--mh-ink-soft);
+  font-size: 0.85em;
+}
+
+.mh-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 64px;
+  height: 36px;
+  border-radius: 999px;
+  background: #d6d1ea;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex: 0 0 auto;
+}
+
+.mh-switch::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.mh-switch:checked {
+  background: var(--mh-mint);
+}
+
+.mh-switch:checked::after {
+  transform: translateX(28px);
+}
