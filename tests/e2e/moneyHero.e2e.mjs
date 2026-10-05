@@ -151,6 +151,43 @@ async function answer(page, q, { wrong = false } = {}) {
       await t('mh-submit').click()
       return
     }
+    case 'shop': {
+      const picked = q.products.slice(0, q.pick)
+      for (const p of picked) await t(`mh-product-${p.id}`).click()
+      const total = picked.reduce((sum, p) => sum + p.price, 0) + (wrong ? 100 : 0)
+      await t('mh-total-baht').fill(String(Math.floor(total / 100)))
+      await t('mh-total-satang').fill(String(total % 100))
+      if (q.budget !== undefined) {
+        const change = q.budget - total
+        await t('mh-change-baht').fill(String(Math.floor(change / 100)))
+        await t('mh-change-satang').fill(String(change % 100))
+      }
+      await t('mh-submit').click()
+      return
+    }
+    case 'word': {
+      const words = { '+': 'บวก', '-': 'ลบ', '×': 'คูณ', '÷': 'หาร' }
+      for (const stepName of q.steps) {
+        if (stepName === 'given') await t(`mh-given-${q.given.answer}`).click()
+        if (stepName === 'asked') await t(`mh-asked-${q.asked.answer}`).click()
+        if (stepName === 'op') await t(`mh-op-${words[q.op]}`).click()
+      }
+      const v = wrong ? q.answer + 100 : q.answer
+      await t('mh-baht').fill(String(Math.floor(v / 100)))
+      await t('mh-satang').fill(String(v % 100))
+      await t('mh-submit').click()
+      return
+    }
+    case 'ledger': {
+      for (let i = 0; i < q.sheet.rows.length; i += 1) {
+        const r = q.sheet.rows[i]
+        const text = r.amount % 100 === 0 ? String(r.amount / 100) : dotText(r.amount).replace(/,/g, '')
+        const income = (r.type === 'in') !== (wrong && i === 0)
+        await t(income ? `mh-in-${i}` : `mh-out-${i}`).fill(text)
+      }
+      await t('mh-submit').click()
+      return
+    }
     default:
       throw new Error(`บอตยังไม่รู้จักโจทย์แบบ ${q.kind}`)
   }
@@ -159,8 +196,15 @@ async function answer(page, q, { wrong = false } = {}) {
 /** เล่นจนกว่าจะเจอหน้าจบขั้น หรือหน้าผลลัพธ์ */
 async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
   let mistakes = makeMistake
-  for (let guard = 0; guard < 60; guard += 1) {
+  for (let guard = 0; guard < 90; guard += 1) {
     if (await page.getByTestId(doneTestId).isVisible().catch(() => false)) return
+    // ด่านสุดท้าย: เดินเข้าแต่ละสถานีของวัน
+    const enter = page.getByTestId('mh-journey-enter')
+    if (await enter.isVisible().catch(() => false)) {
+      await enter.click()
+      await page.getByTestId('mh-question').waitFor()
+      continue
+    }
     const q = await currentQuestion(page)
     if (!q) {
       await page.waitForTimeout(150)
@@ -171,10 +215,10 @@ async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
       // ตอบผิดสองครั้ง: ต้องเห็น "ลองคิดอีกครั้ง" แล้วเห็นวิธีคิดทีละขั้น
       mistakes = false
       await answer(page, q, { wrong: true })
-      await page.getByText('ลองคิดอีกครั้ง').waitFor()
+      await page.getByText('ลองคิดอีกครั้ง', { exact: true }).waitFor()
       await page.getByTestId('mh-try-again').click()
       await answer(page, q, { wrong: true })
-      await page.getByText('มาดูวิธีคิดทีละขั้นกัน').waitFor()
+      await page.getByText('มาดูวิธีคิดทีละขั้นกัน', { exact: true }).waitFor()
       await page.getByText('เดี๋ยวจะมีข้อแบบเดียวกันให้ฝึกอีกครั้ง').waitFor()
     } else {
       await answer(page, q)
@@ -186,7 +230,7 @@ async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
     await page.getByTestId('mh-next').click()
     await page.waitForFunction((id) => window.__MH_DEBUG?.question?.id !== id, before, { timeout: 5000 }).catch(() => undefined)
   }
-  throw new Error(`เล่นเกิน 60 ข้อแล้วยังไม่จบ (${doneTestId})`)
+  throw new Error(`เล่นเกิน 90 ข้อแล้วยังไม่จบ (${doneTestId})`)
 }
 
 async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {

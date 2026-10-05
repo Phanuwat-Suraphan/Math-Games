@@ -10,6 +10,7 @@ import { buildStep } from '../generators'
 import { TopBar } from '../components/TopBar'
 import { LearnSlides } from '../components/LearnSlides'
 import { StepRunner, type RunSummary } from '../components/StepRunner'
+import { JourneyMission } from '../components/JourneyMission'
 import { CharacterArt } from '../components/Art'
 import { Stars } from '../components/Stars'
 import { CoinRain, Confetti } from '../components/Effects'
@@ -117,7 +118,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   const [round, setRound] = useState(0)
 
   const questions = useMemo(
-    () => (step === 'learn' ? [] : buildStep(level.id, step)),
+    () => (step === 'learn' || (level.id === 12 && step === 'mission') ? [] : buildStep(level.id, step)),
     // round เปลี่ยนเมื่อเล่นบอสใหม่ จะได้โจทย์ชุดใหม่
     [level.id, step, round],
   )
@@ -274,6 +275,16 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
       <h2 className="mh-step-title mh-step-title-out">
         {step === 'practice' ? '✏️' : step === 'mission' ? '🎯' : '👑'} STEP {stepNo} · {STEP_NAME[step]}
       </h2>
+      {level.id === 12 && step === 'mission' ? (
+        <JourneyMission
+          learn={level.learn}
+          onDone={(s) => {
+            playSound('complete')
+            markStep(3, s)
+            setDone(s)
+          }}
+        />
+      ) : (
       <StepRunner
         key={round}
         questions={questions}
@@ -290,6 +301,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
           setDone(s)
         }}
       />
+      )}
     </div>
   )
 }
@@ -321,6 +333,14 @@ function ResultView({ level }: { level: LevelDef }) {
           <span className="mh-reward">🪙 +{result.coins}</span>
           <span className="mh-reward">🌟 MONEY STAR × {stars}</span>
           <span className="mh-reward">🎯 ถูกครั้งแรก {Math.round(result.accuracy * 100)}%</span>
+        </div>
+      )}
+      {level.id === 12 && (
+        <div className="mh-master" data-testid="mh-master">
+          <div className="mh-master-badge">🏆</div>
+          <b>MONEY MASTER ป.3</b>
+          <p>คุณผ่านเนื้อหาเรื่องเงินครบทุกหัวข้อแล้ว!</p>
+          <p className="mh-soft">ธนบัตรและเหรียญ · บอกจำนวนเงิน · เขียนแบบจุด · เปรียบเทียบ · แลกเงิน · บวก ลบ คูณ หาร · โจทย์ปัญหา · รายรับรายจ่าย</p>
         </div>
       )}
       {next && (

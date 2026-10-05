@@ -159,7 +159,7 @@ export function checkAnswer(q: Question, r: Response): CheckResult {
       if (r.kind !== 'choice') break
       return r.id === q.answer
         ? { correct: true }
-        : { correct: false, feedback: 'ยังไม่ใช่ ลองคิดอีกครั้งนะ', wrongKeys: [r.id] }
+        : { correct: false, feedback: 'ยังไม่ใช่ข้อนี้นะ', wrongKeys: [r.id] }
     }
     case 'amount': {
       if (r.kind !== 'amount') break

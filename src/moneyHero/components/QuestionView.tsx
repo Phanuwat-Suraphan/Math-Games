@@ -8,6 +8,9 @@ import { AmountInput, NumberInput } from './inputs/AmountInput'
 import { PayInput } from './inputs/PayInput'
 import { MatchInput } from './inputs/MatchInput'
 import { SortInput } from './inputs/SortInput'
+import { ShopInput } from './inputs/ShopInput'
+import { WordInput } from './inputs/WordInput'
+import { LedgerInput } from './inputs/LedgerInput'
 
 /**
  * แสดงโจทย์หนึ่งข้อ: ตัวละครบอกคำสั่งสั้น ๆ + เรื่องราว + ภาพ + ช่องตอบแบบที่เหมาะกับโจทย์
@@ -37,8 +40,12 @@ export function QuestionInput({
       return <MatchInput q={q} disabled={disabled} wrongKeys={wrongKeys} onSubmit={onSubmit} />
     case 'sort':
       return <SortInput q={q} disabled={disabled} wrongKeys={wrongKeys} onSubmit={onSubmit} />
-    default:
-      return <p className="mh-help-line">🛠️ โจทย์แบบนี้จะเปิดในส่วนถัดไป</p>
+    case 'shop':
+      return <ShopInput q={q} disabled={disabled} wrongKeys={wrongKeys} onSubmit={onSubmit} />
+    case 'word':
+      return <WordInput q={q} disabled={disabled} onSubmit={onSubmit} />
+    case 'ledger':
+      return <LedgerInput q={q} disabled={disabled} wrongKeys={wrongKeys} onSubmit={onSubmit} />
   }
 }
 
