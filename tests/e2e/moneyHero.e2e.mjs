@@ -284,35 +284,43 @@ for (const [name, viewport] of [
     await page.waitForURL(/#\/map/)
   })
 
-  await step(`[${name}] แผนที่ 2 มิติ: เดิน กระโดด เก็บเหรียญ และถึงอาคารด่าน 0`, async () => {
+  await step(`[${name}] แผนที่ 2 มิติแบบมองจากด้านบน: แตะอาคารเดินตามถนน เก็บเหรียญ และเดินเองได้`, async () => {
     await page.getByTestId('mh-world').waitFor()
     await page.getByText('คุณเรียนรู้แล้ว 0 / 12 ด่าน').waitFor()
     await snap(page, `${name}-map`)
     await noSideScroll(page, 'แผนที่')
-    const heroX = () =>
-      page.getByTestId('mh-hero').evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m41)
-    const before = await heroX()
-    if (name === 'desktop') {
-      await page.keyboard.down('ArrowRight')
-      await page.waitForTimeout(1300)
-      await page.keyboard.up('ArrowRight')
-      await page.keyboard.press('Space')
-    } else {
-      const pad = page.getByRole('button', { name: 'เดินขวา' })
-      const box = await pad.boundingBox()
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-      await page.mouse.down()
-      await page.waitForTimeout(1300)
-      await page.mouse.up()
-      await page.getByRole('button', { name: 'กระโดด' }).click()
-    }
-    const after = await heroX()
-    if (!(after > before + 200)) throw new Error(`ฮีโร่ไม่เดิน (จาก ${before} ไป ${after})`)
+    const heroPos = () =>
+      page.getByTestId('mh-hero').evaluate((el) => {
+        const m = new DOMMatrix(getComputedStyle(el).transform)
+        return { x: m.m41, y: m.m42 }
+      })
+    const before = await heroPos()
+    // แตะอาคารด่าน 1: ฮีโร่ต้องเดินตามถนนข้ามสะพานไปเอง
+    await page.getByTestId('mh-building-1').evaluate((el) => el.click())
+    await page.getByText('ด่าน 1: ธนาคารแห่งเมืองเงินทอง').waitFor({ timeout: 12000 })
+    const atBank = await heroPos()
+    if (!(Math.hypot(atBank.x - before.x, atBank.y - before.y) > 300)) throw new Error(`ฮีโร่ไม่เดินไปที่อาคาร (${JSON.stringify(before)} → ${JSON.stringify(atBank)})`)
     const coins = await page.getByTestId('mh-coins').innerText()
     if (!/🪙\s*[1-9]/.test(coins)) throw new Error(`เดินผ่านเหรียญแล้วแต่ไม่ได้เหรียญ (${coins})`)
-    // แตะอาคารด่าน 0 ฮีโร่ต้องเดินไปเอง แล้วแผงด่านขึ้น
+    await snap(page, `${name}-map-bank`)
+    // เดินเองบนถนน (ไปทางซ้าย)
+    if (name === 'desktop') {
+      await page.keyboard.down('ArrowLeft')
+      await page.waitForTimeout(700)
+      await page.keyboard.up('ArrowLeft')
+    } else {
+      const joy = await page.getByTestId('mh-joystick').boundingBox()
+      await page.mouse.move(joy.x + joy.width / 2, joy.y + joy.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(joy.x + joy.width / 2 - 40, joy.y + joy.height / 2, { steps: 4 })
+      await page.waitForTimeout(700)
+      await page.mouse.up()
+    }
+    const walked = await heroPos()
+    if (!(walked.x < atBank.x - 80)) throw new Error(`เดินเองไม่ได้ (${atBank.x} → ${walked.x})`)
+    // แตะค่ายด่าน 0 แล้วแผงเข้าด่านต้องขึ้น
     await page.getByTestId('mh-building-0').evaluate((el) => el.click())
-    await page.getByTestId('mh-level-panel').waitFor({ timeout: 8000 })
+    await page.getByTestId('mh-level-panel').waitFor({ timeout: 12000 })
     await page.getByText('ด่าน 0: เริ่มต้น MONEY HERO').waitFor()
     await snap(page, `${name}-map-near`)
     // รายการด่านสำหรับคนที่ไม่อยากเดิน

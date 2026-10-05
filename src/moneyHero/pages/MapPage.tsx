@@ -1,67 +1,63 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, ChevronUp, List } from 'lucide-react'
+import { List } from 'lucide-react'
 import type { NpcId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { LEVELS, TOTAL_LESSONS, type LevelDef } from '../data/levels'
 import { CHARACTERS } from '../data/characters'
+import {
+  TOWN_COINS,
+  TOWN_NPCS,
+  TREES,
+  WORLD,
+  dist,
+  doorOf,
+  routeTo,
+  walkable,
+  type Pt,
+  type TownCoin,
+} from '../data/town'
 import { isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId } from '../engine/progress'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
+import { HouseArt, TownTerrain, TreeSprite } from '../components/TownArt'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
 
 /**
- * แผนที่ "เมืองเงินทอง" แบบเกม 2 มิติ
+ * แผนที่ "เมืองเงินทอง" แบบเกม 2 มิติมองจากด้านบน
  *
- * ฮีโร่เดินซ้าย–ขวา กระโดดเก็บเหรียญ คุยกับเพื่อน ๆ และเดินเข้าอาคารเพื่อเข้าด่าน
- * ควบคุมได้ทั้งคีย์บอร์ด (← → / A D, Space กระโดด, Enter เข้า) ปุ่มบนจอ และแตะอาคารเพื่อเดินไปเอง
+ * เดินได้ทุกทิศ: ลูกศร / WASD บนคีย์บอร์ด หรือจอยสติกบนจอสัมผัส
+ * แตะอาคารแล้วฮีโร่เดินตามถนนไปเอง · เก็บเหรียญริมถนน · คุยกับเพื่อน ๆ · เข้าประตูเพื่อเล่นด่าน
  *
  * ตำแหน่งฮีโร่อัปเดตทุกเฟรมผ่าน ref โดยตรง ไม่ผ่าน state ของ React จึงลื่นแม้บนแท็บเล็ต
  */
 
-const FIRST_X = 340
-const GAP = 380
-const WORLD_W = FIRST_X + GAP * (LEVELS.length - 1) + 420
-const SPEED = 300
-const JUMP_V = 760
-const GRAVITY = 2000
-const NEAR = 120
+const SPEED = 240
+const NEAR_DOOR = 70
+const NEAR_NPC = 70
 
 /** ด่านที่เล่นได้แล้วในเวอร์ชันนี้ ด่านที่เหลือเปิดในส่วนถัดไป */
 export const PLAYABLE_MAX = 6
 
-function buildingX(id: number): number {
-  return FIRST_X + id * GAP
+const TIPS: Record<'rabbit' | 'fox' | 'bear' | 'owl', string[]> = {
+  rabbit: ['100 สตางค์ = 1 บาท นะ!', 'นับเงินจากค่ามากไปน้อย จะนับง่ายขึ้น', 'เก็บเหรียญริมถนนได้ด้วยนะ!'],
+  fox: ['เทียบบาทก่อน ถ้าบาทเท่ากันค่อยดูสตางค์', 'อ่านโจทย์ให้ดี ถามอะไร บอกอะไร'],
+  bear: ['ซื้อของแล้วอย่าลืมคิดเงินทอนนะ', 'สตางค์เกิน 100 ต้องทดเป็น 1 บาท'],
+  owl: ['คงเหลือ = เดิม + รายรับ − รายจ่าย', 'จดบัญชีทุกวัน จะรู้ว่าเงินไปไหน'],
 }
-
-interface MapCoin {
-  id: string
-  x: number
-  /** ความสูงจากพื้น (px) */
-  h: number
-}
-
-const COINS: MapCoin[] = LEVELS.slice(0, -1).flatMap((l) =>
-  [0, 1, 2].map((k) => ({ id: `c${l.id}-${k}`, x: buildingX(l.id) + 125 + k * 62, h: k === 1 ? 150 : 46 })),
-)
-
-interface MapNpc {
-  id: NpcId
-  x: number
-  tips: string[]
-}
-
-const NPCS: MapNpc[] = [
-  { id: 'rabbit', x: buildingX(1) + 175, tips: ['100 สตางค์ = 1 บาท นะ!', 'นับเงินจากค่ามากไปน้อย จะนับง่ายขึ้น', 'กระโดดเก็บเหรียญบนฟ้าได้ด้วยนะ!'] },
-  { id: 'fox', x: buildingX(4) + 175, tips: ['เทียบบาทก่อน ถ้าบาทเท่ากันค่อยดูสตางค์', 'อ่านโจทย์ให้ดี ถามอะไร บอกอะไร'] },
-  { id: 'bear', x: buildingX(7) + 175, tips: ['ซื้อของแล้วอย่าลืมคิดเงินทอนนะ', 'สตางค์เกิน 100 ต้องทดเป็น 1 บาท'] },
-  { id: 'owl', x: buildingX(11) + 175, tips: ['คงเหลือ = เดิม + รายรับ − รายจ่าย', 'จดบัญชีทุกวัน จะรู้ว่าเงินไปไหน'] },
-]
 
 function stepLabel(stepDone: number): string {
   return ['ยังไม่เริ่ม', 'เรียนแล้ว', 'ฝึกแล้ว', 'ภารกิจเสร็จ', 'ผ่านแล้ว'][Math.min(4, stepDone)]
+}
+
+function startPoint(mapX?: number, mapY?: number, next = 0): Pt {
+  if (mapX !== undefined && mapY !== undefined && walkable({ x: mapX, y: mapY })) return { x: mapX, y: mapY }
+  const d = doorOf(next)
+  // ยืนบนถนนข้างประตูด่านที่ควรเล่นต่อ
+  const p = { x: d.x + 90, y: d.y }
+  return walkable(p) ? p : d
 }
 
 export function MapPage() {
@@ -70,49 +66,50 @@ export function MapPage() {
   const viewRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
-  const farRef = useRef<HTMLDivElement>(null)
-  const midRef = useRef<HTMLDivElement>(null)
+  const knobRef = useRef<HTMLDivElement>(null)
 
-  const startX = useMemo(() => {
-    if (!player) return FIRST_X
-    return player.mapX ?? buildingX(nextLevelId(player)) - 150
+  const start = useMemo(
+    () => startPoint(player?.mapX, player?.mapY, player ? nextLevelId(player) : 0),
     // ตำแหน่งเริ่มคิดครั้งเดียวตอนเปิดหน้า
-  }, [])
+    [],
+  )
 
-  const sim = useRef({ x: startX, y: 0, vy: 0, dir: 1, left: false, right: false, target: null as number | null })
+  const sim = useRef({
+    x: start.x,
+    y: start.y,
+    dir: 1,
+    keys: { up: false, down: false, left: false, right: false },
+    joy: { x: 0, y: 0 },
+    route: null as Pt[] | null,
+    walking: false,
+  })
   const collectedRef = useRef(new Set(player?.mapCoins ?? []))
   const [collected, setCollected] = useState(() => new Set(player?.mapCoins ?? []))
   const [nearLevel, setNearLevel] = useState<number | null>(null)
   const [nearNpc, setNearNpc] = useState<NpcId | null>(null)
   const [talk, setTalk] = useState<{ npc: NpcId; text: string } | null>(null)
   const [showList, setShowList] = useState(false)
-  const [pop, setPop] = useState<{ x: number; h: number; key: number } | null>(null)
+  const [pop, setPop] = useState<{ x: number; y: number; key: number } | null>(null)
   const tipIndex = useRef<Record<string, number>>({})
   const nearRef = useRef<{ level: number | null; npc: NpcId | null }>({ level: null, npc: null })
 
   const savePosition = useCallback(() => {
     const x = Math.round(sim.current.x)
-    updatePlayer((p) => (p.mapX === x ? p : { ...p, mapX: x }))
+    const y = Math.round(sim.current.y)
+    updatePlayer((p) => (p.mapX === x && p.mapY === y ? p : { ...p, mapX: x, mapY: y }))
   }, [updatePlayer])
 
   const collect = useCallback(
-    (coin: MapCoin) => {
+    (coin: TownCoin) => {
       if (collectedRef.current.has(coin.id)) return
       collectedRef.current.add(coin.id)
       setCollected(new Set(collectedRef.current))
-      setPop({ x: coin.x, h: coin.h, key: Date.now() })
+      setPop({ x: coin.x, y: coin.y, key: Date.now() })
       playSound('coin')
       updatePlayer((p) => (p.mapCoins.includes(coin.id) ? p : { ...p, coins: p.coins + 1, mapCoins: [...p.mapCoins, coin.id] }))
     },
     [updatePlayer],
   )
-
-  const jump = useCallback(() => {
-    const s = sim.current
-    if (s.y > 0.5) return
-    s.vy = JUMP_V
-    playSound('jump')
-  }, [])
 
   const enter = useCallback(
     (level: LevelDef) => {
@@ -135,13 +132,20 @@ export function MapPage() {
     [player, navigate, savePosition],
   )
 
+  /** แตะอาคาร: เดินตามถนนไปหน้าประตู */
+  const walkTo = useCallback((level: number) => {
+    const s = sim.current
+    s.route = routeTo({ x: s.x, y: s.y }, level)
+    playSound('click')
+  }, [])
+
   const action = useCallback(() => {
     const { level, npc } = nearRef.current
-    if (npc) {
-      const def = NPCS.find((n) => n.id === npc)!
+    if (npc && npc !== 'hero') {
+      const tips = TIPS[npc as keyof typeof TIPS]
       const i = tipIndex.current[npc] ?? 0
       tipIndex.current[npc] = i + 1
-      const text = def.tips[i % def.tips.length]
+      const text = tips[i % tips.length]
       setTalk({ npc, text })
       speak(text)
       playSound('click')
@@ -159,51 +163,67 @@ export function MapPage() {
       last = now
       const s = sim.current
 
-      let vx = 0
-      if (s.left) vx -= SPEED
-      if (s.right) vx += SPEED
-      if (vx !== 0) s.target = null
-      if (s.target !== null) {
-        const d = s.target - s.x
-        if (Math.abs(d) < 6) s.target = null
-        else vx = Math.sign(d) * SPEED
-      }
-      if (vx !== 0) s.dir = vx > 0 ? 1 : -1
-      s.x = Math.max(80, Math.min(WORLD_W - 80, s.x + vx * dt))
+      let vx = (s.keys.right ? 1 : 0) - (s.keys.left ? 1 : 0) + s.joy.x
+      let vy = (s.keys.down ? 1 : 0) - (s.keys.up ? 1 : 0) + s.joy.y
+      const manual = Math.hypot(vx, vy) > 0.15
+      if (manual) s.route = null
 
-      if (s.y > 0 || s.vy > 0) {
-        s.vy -= GRAVITY * dt
-        s.y = Math.max(0, s.y + s.vy * dt)
-        if (s.y === 0) s.vy = 0
+      if (!manual && s.route && s.route.length > 0) {
+        // เดินตามถนนอัตโนมัติ (ไม่ต้องตรวจชน เพราะถนนโล่งเสมอ)
+        const target = s.route[0]
+        const d = dist(s, target)
+        const step = SPEED * 1.15 * dt
+        vx = target.x - s.x
+        vy = target.y - s.y
+        if (d <= step) {
+          s.x = target.x
+          s.y = target.y
+          s.route.shift()
+          if (s.route.length === 0) s.route = null
+        } else {
+          s.x += ((target.x - s.x) / d) * step
+          s.y += ((target.y - s.y) / d) * step
+        }
+        s.walking = true
+      } else if (manual) {
+        const len = Math.max(1, Math.hypot(vx, vy))
+        const nx = s.x + (vx / len) * SPEED * dt
+        const ny = s.y + (vy / len) * SPEED * dt
+        // เลื่อนแยกแกน จะได้ไถลไปตามขอบต้นไม้/อาคาร ไม่ติดหนึบ
+        if (walkable({ x: nx, y: s.y })) s.x = nx
+        if (walkable({ x: s.x, y: ny })) s.y = ny
+        s.walking = true
+      } else {
+        s.walking = false
       }
+      if (Math.abs(vx) > 0.1) s.dir = vx > 0 ? 1 : -1
 
-      const viewW = viewRef.current?.clientWidth ?? 800
-      const cam = Math.max(0, Math.min(WORLD_W - viewW, s.x - viewW / 2))
-      if (worldRef.current) worldRef.current.style.transform = `translate3d(${-cam}px,0,0)`
-      if (farRef.current) farRef.current.style.transform = `translate3d(${-cam * 0.25}px,0,0)`
-      if (midRef.current) midRef.current.style.transform = `translate3d(${-cam * 0.55}px,0,0)`
+      const view = viewRef.current
+      const vw = view?.clientWidth ?? 800
+      const vh = view?.clientHeight ?? 500
+      const camX = Math.max(0, Math.min(WORLD.w - vw, s.x - vw / 2))
+      const camY = Math.max(0, Math.min(WORLD.h - vh, s.y - vh / 2))
+      if (worldRef.current) worldRef.current.style.transform = `translate3d(${-camX}px,${-camY}px,0)`
       if (heroRef.current) {
-        heroRef.current.style.transform = `translate3d(${s.x - 45}px,${-s.y}px,0)`
-        heroRef.current.classList.toggle('is-walking', vx !== 0 && s.y === 0)
-        heroRef.current.classList.toggle('is-left', s.dir < 0)
+        const h = heroRef.current
+        h.style.transform = `translate3d(${s.x - 34}px,${s.y - 84}px,0)`
+        h.style.zIndex = String(Math.round(s.y) + 1)
+        h.classList.toggle('is-walking', s.walking)
+        h.classList.toggle('is-left', s.dir < 0)
       }
 
-      // เก็บเหรียญ
-      for (const c of COINS) {
-        if (collectedRef.current.has(c.id)) continue
-        if (Math.abs(s.x - c.x) < 34 && Math.abs(s.y + 60 - c.h) < 62) collect(c)
+      for (const c of TOWN_COINS) {
+        if (!collectedRef.current.has(c.id) && dist(s, c) < 30) collect(c)
       }
 
-      // อยู่ใกล้อาคารหรือเพื่อนคนไหน
       let level: number | null = null
-      for (const l of LEVELS) if (Math.abs(s.x - buildingX(l.id)) < NEAR) level = l.id
+      for (const l of LEVELS) if (dist(s, doorOf(l.id)) < NEAR_DOOR) level = l.id
       let npc: NpcId | null = null
-      for (const n of NPCS) if (Math.abs(s.x - n.x) < 60) npc = n.id
+      for (const n of TOWN_NPCS) if (dist(s, n) < NEAR_NPC) npc = n.id
       if (level !== nearRef.current.level || npc !== nearRef.current.npc) {
         nearRef.current = { level, npc }
         setNearLevel(level)
         setNearNpc(npc)
-        if (npc === null) setTalk(null)
       }
 
       raf = requestAnimationFrame(tick)
@@ -214,23 +234,28 @@ export function MapPage() {
 
   /* ---------------- คีย์บอร์ด ---------------- */
   useEffect(() => {
-    const isTyping = () => document.activeElement instanceof HTMLInputElement
+    type Dir = 'up' | 'down' | 'left' | 'right'
+    const keyOf = (k: string): Dir | null => {
+      if (k === 'ArrowLeft' || k === 'a' || k === 'A') return 'left'
+      if (k === 'ArrowRight' || k === 'd' || k === 'D') return 'right'
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') return 'up'
+      if (k === 'ArrowDown' || k === 's' || k === 'S') return 'down'
+      return null
+    }
     const down = (e: KeyboardEvent) => {
-      if (isTyping()) return
-      const s = sim.current
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') s.left = true
-      else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') s.right = true
-      else if (e.key === ' ' || e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      if (document.activeElement instanceof HTMLInputElement) return
+      const k = keyOf(e.key)
+      if (k) {
+        sim.current.keys[k] = true
         e.preventDefault()
-        jump()
-      } else if (e.key === 'Enter' || e.key === 'e' || e.key === 'E') action()
-      else return
-      if (e.key.startsWith('Arrow') || e.key === ' ') e.preventDefault()
+      } else if (e.key === 'Enter' || e.key === 'e' || e.key === 'E' || e.key === ' ') {
+        e.preventDefault()
+        action()
+      }
     }
     const up = (e: KeyboardEvent) => {
-      const s = sim.current
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') s.left = false
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') s.right = false
+      const k = keyOf(e.key)
+      if (k) sim.current.keys[k] = false
     }
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -238,7 +263,7 @@ export function MapPage() {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
     }
-  }, [jump, action])
+  }, [action])
 
   // คำพูดหายไปเองหลังอ่านจบ แผงเข้าด่านจึงกลับมา
   useEffect(() => {
@@ -250,29 +275,29 @@ export function MapPage() {
   // บันทึกตำแหน่งตอนออกจากแผนที่
   useEffect(() => () => savePosition(), [savePosition])
 
+  /* ---------------- จอยสติก ---------------- */
+  const joyOrigin = useRef<{ x: number; y: number } | null>(null)
+  const joyMove = (e: RPointerEvent<HTMLDivElement>) => {
+    const o = joyOrigin.current
+    if (!o) return
+    const dx = e.clientX - o.x
+    const dy = e.clientY - o.y
+    const len = Math.hypot(dx, dy)
+    const max = 44
+    const k = len > max ? max / len : 1
+    sim.current.joy = { x: (dx * k) / max, y: (dy * k) / max }
+    if (knobRef.current) knobRef.current.style.transform = `translate(${dx * k}px, ${dy * k}px)`
+  }
+  const joyEnd = () => {
+    joyOrigin.current = null
+    sim.current.joy = { x: 0, y: 0 }
+    if (knobRef.current) knobRef.current.style.transform = 'translate(0, 0)'
+  }
+
   if (!player) return null
   const passed = lessonsPassed(player)
   const left = TOTAL_LESSONS - passed
   const near = nearLevel !== null ? LEVELS[nearLevel] : null
-
-  const hold = (dir: 'left' | 'right') => ({
-    onPointerDown: (e: RPointerEvent<HTMLButtonElement>) => {
-      e.preventDefault()
-      try {
-        // จับนิ้วไว้กับปุ่ม แม้นิ้วเลื่อนออกนิดหน่อยฮีโร่ก็ยังเดินต่อ
-        e.currentTarget.setPointerCapture(e.pointerId)
-      } catch {
-        // ไม่รองรับก็ไม่เป็นไร
-      }
-      sim.current[dir] = true
-    },
-    onPointerUp: () => {
-      sim.current[dir] = false
-    },
-    onPointerCancel: () => {
-      sim.current[dir] = false
-    },
-  })
 
   return (
     <div className="mh-map-page">
@@ -295,135 +320,140 @@ export function MapPage() {
         </div>
       </section>
 
-      <div className="mh-world-view" ref={viewRef} data-testid="mh-world">
-        <div className="mh-layer mh-layer-far" ref={farRef} aria-hidden="true">
-          {Array.from({ length: 14 }, (_, i) => (
-            <span key={i} className="mh-hill" style={{ left: i * 260 }} />
-          ))}
-        </div>
-        <div className="mh-layer mh-layer-mid" ref={midRef} aria-hidden="true">
-          {Array.from({ length: 22 }, (_, i) => (
-            <span key={i} className="mh-tree" style={{ left: i * 230 + 60 }}>
-              {i % 3 === 0 ? '🌳' : i % 3 === 1 ? '🌲' : '🌴'}
-            </span>
-          ))}
-        </div>
+      <div className="mh-town-view" ref={viewRef} data-testid="mh-world">
+        <div className="mh-town" ref={worldRef} style={{ width: WORLD.w, height: WORLD.h }}>
+          <TownTerrain />
 
-        <div className="mh-world" ref={worldRef} style={{ width: WORLD_W }}>
-          <div className="mh-road" />
+          {TREES.map((t, i) => (
+            <TreeSprite key={i} tree={t} />
+          ))}
+
           {LEVELS.map((l) => {
             const unlocked = isLevelUnlocked(player, l.id)
             const rec = levelRecord(player, l.id)
             const done = rec.stepDone >= 4
             const soon = l.id > PLAYABLE_MAX
+            const d = doorOf(l.id)
+            const kind = l.id === 0 ? 'tent' : l.id === 12 ? 'castle' : 'house'
+            const w = kind === 'castle' ? 190 : 160
             return (
               <button
                 key={l.id}
                 type="button"
-                className={`mh-building ${l.theme} ${unlocked ? 'is-open' : 'is-locked'} ${nearLevel === l.id ? 'is-near' : ''}`}
-                style={{ left: buildingX(l.id) - 110 }}
+                className={`mh-house ${unlocked ? 'is-open' : 'is-locked'} ${nearLevel === l.id ? 'is-near' : ''}`}
+                style={{ left: d.x - w / 2, top: d.y - (kind === 'castle' ? 222 : 188), width: w, zIndex: Math.round(d.y) - 30 }}
                 data-testid={`mh-building-${l.id}`}
-                onClick={() => {
-                  sim.current.target = buildingX(l.id)
-                  playSound('click')
-                }}
+                onClick={() => walkTo(l.id)}
                 aria-label={`ด่าน ${l.id} ${l.name}`}
               >
-                <span className="mh-building-sign">
-                  <b>ด่าน {l.id}</b> {l.name}
+                <span className="mh-house-sign">
+                  <b>{l.id}</b> {l.name}
                 </span>
-                <span className="mh-building-art">{l.building}</span>
-                <span className="mh-building-status">
-                  {!unlocked ? '🔒 ล็อก' : done ? <Stars n={rec.bestStars} /> : soon ? '🛠️ เร็ว ๆ นี้' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
+                <HouseArt theme={l.theme} icon={l.icon} locked={!unlocked} kind={kind} />
+                <span className="mh-house-status">
+                  {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
                 </span>
-                {done && <span className="mh-building-done">✅</span>}
               </button>
             )
           })}
 
-          {NPCS.map((n) => (
-            <div key={n.id} className={`mh-npc ${nearNpc === n.id ? 'is-near' : ''}`} style={{ left: n.x - 36 }}>
+          {TOWN_NPCS.map((n) => (
+            <div key={n.id} className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`} style={{ left: n.x - 30, top: n.y - 76, zIndex: n.y }}>
               {nearNpc === n.id && <span className="mh-npc-hint">💬</span>}
-              <CharacterArt id={n.id} size={72} />
+              <CharacterArt id={n.id} size={60} />
             </div>
           ))}
 
-          {COINS.map((c) =>
+          {TOWN_COINS.map((c) =>
             collected.has(c.id) ? null : (
-              <span key={c.id} className="mh-map-coin" style={{ left: c.x - 17, bottom: 96 + c.h - 17 }} aria-hidden="true">
+              <span key={c.id} className="mh-map-coin mh-town-coin" style={{ left: c.x - 15, top: c.y - 34, zIndex: c.y - 1 }} aria-hidden="true">
                 ฿
               </span>
             ),
           )}
           {pop && (
-            <span key={pop.key} className="mh-coin-pop" style={{ left: pop.x - 20, bottom: 96 + pop.h + 10 }}>
+            <span key={pop.key} className="mh-coin-pop" style={{ left: pop.x - 24, top: pop.y - 80, zIndex: 5000 }}>
               +1 🪙
             </span>
           )}
 
-          <div className="mh-walker" ref={heroRef} data-testid="mh-hero">
-            <div className="mh-walker-inner">
-              <AvatarArt avatar={player.avatar} size={90} />
-            </div>
+          <div className="mh-walker mh-town-walker" ref={heroRef} data-testid="mh-hero">
             <span className="mh-walker-shadow" />
+            <div className="mh-walker-inner">
+              <AvatarArt avatar={player.avatar} size={68} />
+            </div>
           </div>
         </div>
+
         <div className="mh-world-overlay">
-        {talk && (
-          <div className="mh-card mh-talk" aria-live="polite">
-            <CharacterArt id={talk.npc} size={56} />
-            <div>
-              <strong>{CHARACTERS[talk.npc].name}</strong>
-              <p>{talk.text}</p>
+          {talk && (
+            <div className="mh-card mh-talk" aria-live="polite">
+              <CharacterArt id={talk.npc} size={52} />
+              <div>
+                <strong>{CHARACTERS[talk.npc].name}</strong>
+                <p>{talk.text}</p>
+              </div>
             </div>
-          </div>
-        )}
-
-        {near && !talk && (
-          <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
-            <div className="mh-level-panel-icon">{near.icon}</div>
-            <div className="mh-level-panel-info">
-              <strong>
-                ด่าน {near.id}: {near.name}
-              </strong>
-              <span>{near.topic}</span>
-              <span className="mh-level-panel-game">🎮 {near.game}</span>
+          )}
+          {near && !talk && (
+            <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
+              <div className="mh-level-panel-icon">{near.icon}</div>
+              <div className="mh-level-panel-info">
+                <strong>
+                  ด่าน {near.id}: {near.name}
+                </strong>
+                <span>{near.topic}</span>
+                <span className="mh-level-panel-game">🎮 {near.game}</span>
+              </div>
+              <button
+                type="button"
+                className="mh-btn mh-btn-gold"
+                onClick={() => enter(near)}
+                data-testid="mh-enter"
+                disabled={!isLevelUnlocked(player, near.id)}
+              >
+                {isLevelUnlocked(player, near.id) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
+              </button>
             </div>
-            <button
-              type="button"
-              className="mh-btn mh-btn-gold"
-              onClick={() => enter(near)}
-              data-testid="mh-enter"
-              disabled={!isLevelUnlocked(player, near.id)}
-            >
-              {isLevelUnlocked(player, near.id) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
-            </button>
-          </div>
-        )}
+          )}
         </div>
-      </div>
 
-      <div className="mh-controls">
-        <button type="button" className="mh-pad" aria-label="เดินซ้าย" {...hold('left')}>
-          <ChevronLeft size={34} />
-        </button>
-        <button type="button" className="mh-pad" aria-label="เดินขวา" {...hold('right')}>
-          <ChevronRight size={34} />
-        </button>
-        <button type="button" className="mh-pad mh-pad-jump" aria-label="กระโดด" onClick={jump}>
-          <ChevronUp size={34} />
-          <span>กระโดด</span>
-        </button>
+        <div
+          className="mh-joystick"
+          aria-label="จอยสติก ลากเพื่อเดิน"
+          data-testid="mh-joystick"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            const r = e.currentTarget.getBoundingClientRect()
+            joyOrigin.current = { x: r.left + r.width / 2, y: r.top + r.height / 2 }
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId)
+            } catch {
+              // ไม่รองรับก็ไม่เป็นไร
+            }
+            joyMove(e)
+          }}
+          onPointerMove={joyMove}
+          onPointerUp={joyEnd}
+          onPointerCancel={joyEnd}
+        >
+          <div className="mh-joystick-knob" ref={knobRef} />
+        </div>
         <button
           type="button"
-          className={`mh-pad mh-pad-action ${nearLevel !== null || nearNpc ? 'is-ready' : ''}`}
-          aria-label="ทำ"
+          className={`mh-action-btn ${nearLevel !== null || nearNpc ? 'is-ready' : ''}`}
           onClick={action}
+          aria-label="ทำ"
+          data-testid="mh-action"
         >
-          {nearNpc ? '💬 คุย' : nearLevel !== null ? '🚪 เข้า' : '✋'}
+          {nearNpc ? '💬' : nearLevel !== null ? '🚪' : '✋'}
+          <span>{nearNpc ? 'คุย' : nearLevel !== null ? 'เข้า' : 'ทำ'}</span>
         </button>
       </div>
-      <p className="mh-help-line mh-map-help">⌨️ ลูกศร ← → เดิน · Space กระโดด · Enter เข้า · หรือแตะอาคารเพื่อเดินไปเอง</p>
+
+      <p className="mh-help-line mh-map-help">
+        ⌨️ ลูกศร / WASD เดิน · Enter เข้าอาคาร · 📱 ลากจอยสติกเพื่อเดิน · 👆 แตะอาคารให้ฮีโร่เดินไปเอง
+      </p>
 
       <div className="mh-row-buttons">
         <button type="button" className="mh-btn mh-btn-soft" onClick={() => setShowList((v) => !v)} data-testid="mh-level-list-toggle">

@@ -30,6 +30,7 @@ const solveMod = load('engine/solve.js')
 const ledger = load('generators/ledger.js')
 const journey = load('generators/journey.js')
 const scoring = load('engine/scoring.js')
+const town = load('data/town.js')
 
 let passed = 0
 const failures = []
@@ -420,6 +421,56 @@ test('คะแนนต่อข้อ: ถูกครั้งแรกได
   assert(first.exp > hinted.exp && hinted.exp > 0, 'ไม่ใช้ตัวช่วยได้มากกว่า แต่ใช้ตัวช่วยก็ยังได้คะแนน')
   eq(wrong.exp, 0, 'ตอบผิดไม่ได้คะแนน แต่ไม่หักคะแนน')
   assert(wrong.coins >= 0, 'ไม่หักเหรียญ')
+})
+
+/* ------------------------------------------------------------------ */
+/* ผังเมือง (แผนที่ 2 มิติ)                                            */
+/* ------------------------------------------------------------------ */
+
+test('เมือง: ถนนเดินได้ตลอดเส้น ไม่มีต้นไม้หรืออาคารขวาง', () => {
+  for (let i = 0; i < town.ROAD.length - 1; i += 1) {
+    const a = town.ROAD[i]
+    const b = town.ROAD[i + 1]
+    const n = Math.ceil(town.dist(a, b) / 6)
+    for (let k = 0; k <= n; k += 1) {
+      const p = { x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n }
+      assert(town.walkable(p), `ถนนช่วงที่ ${i} ถูกขวางที่ (${Math.round(p.x)}, ${Math.round(p.y)})`)
+    }
+  }
+})
+
+test('เมือง: ประตูครบ 13 ด่าน เหรียญทุกเหรียญเก็บได้', () => {
+  for (let l = 0; l <= 12; l += 1) assert(town.walkable(town.doorOf(l)), `ประตูด่าน ${l} ถูกขวาง`)
+  assert(town.TOWN_COINS.length >= 20, 'เหรียญบนแผนที่น้อยเกินไป')
+  for (const c of town.TOWN_COINS) assert(town.walkable(c), `เหรียญ ${c.id} อยู่ในที่ที่เดินไปไม่ได้`)
+  eq(new Set(town.TOWN_COINS.map((c) => c.id)).size, town.TOWN_COINS.length, 'id เหรียญซ้ำ')
+})
+
+test('เมือง: แตะอาคารจากที่ไหนก็เดินตามถนนไปถึงประตูได้', () => {
+  const starts = [town.doorOf(0), town.doorOf(6), town.doorOf(12), { x: 800, y: 1520 }, { x: 1100, y: 1040 }]
+  for (const from of starts) {
+    for (let l = 0; l <= 12; l += 1) {
+      const route = town.routeTo(from, l)
+      const end = route[route.length - 1]
+      eq(`${end.x},${end.y}`, `${town.doorOf(l).x},${town.doorOf(l).y}`, `เส้นทางไปด่าน ${l} ไม่จบที่ประตู`)
+    }
+  }
+})
+
+test('เมือง: ต้นไม้ไม่ทับอาคาร ไม่ทับแม่น้ำ และเพื่อน ๆ ยืนบนพื้นที่เดินได้', () => {
+  assert(town.TREES.length > 40, 'ต้นไม้น้อยเกินไป')
+  for (const t of town.TREES) {
+    assert(!(t.y > town.RIVER.top - t.r && t.y < town.RIVER.bottom + t.r), `ต้นไม้อยู่ในแม่น้ำ (${t.x}, ${t.y})`)
+    for (let l = 0; l <= 12; l += 1) {
+      const b = town.buildingRect(l)
+      const inside = t.x > b.x - t.r && t.x < b.x + b.w + t.r && t.y > b.y - t.r && t.y < b.y + b.h + town.BUILDING.gap + t.r
+      assert(!inside, `ต้นไม้ทับอาคารด่าน ${l}`)
+    }
+  }
+  for (const n of town.TOWN_NPCS) {
+    const beside = { x: n.x, y: n.y - 40 }
+    assert(town.walkable(beside) || town.walkable({ x: n.x + 40, y: n.y }), `เดินไปหา${n.id}ไม่ได้`)
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
