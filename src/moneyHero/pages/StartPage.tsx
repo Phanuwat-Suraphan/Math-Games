@@ -15,7 +15,8 @@ import { playSound } from '../utils/sound'
 export function StartPage() {
   const { player, save, settings, updateSettings } = useGame()
   const navigate = useNavigate()
-  const hasOthers = Object.values(save.players).some((p) => p.id !== player?.id)
+  // มีผู้เล่นในเครื่องแล้ว ให้เปลี่ยนหรือลบผู้เล่นได้เสมอ
+  const hasOthers = Object.keys(save.players).length > 0
 
   const start = () => {
     playSound('click')

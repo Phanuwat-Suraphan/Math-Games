@@ -7,6 +7,7 @@ import { ComingSoonPage } from './pages/ComingSoonPage'
 import { MapPage } from './pages/MapPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { LevelPage } from './pages/LevelPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -42,6 +43,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <MapPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/level/:id/:step"
+              element={
+                <NeedPlayer>
+                  <LevelPage />
                 </NeedPlayer>
               }
             />

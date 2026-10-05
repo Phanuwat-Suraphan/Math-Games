@@ -90,6 +90,127 @@ async function step(label, fn) {
   }
 }
 
+
+/* ---------------- บอตตอบโจทย์ (อ่านเฉลยจากโจทย์ที่เกมสุ่มมา) ---------------- */
+
+function dotText(v) {
+  return `${Math.floor(v / 100).toLocaleString('en-US')}.${String(v % 100).padStart(2, '0')}`
+}
+
+async function currentQuestion(page) {
+  return page.evaluate(() => window.__MH_DEBUG?.question ?? null)
+}
+
+async function answer(page, q, { wrong = false } = {}) {
+  const t = (id) => page.getByTestId(id)
+  switch (q.kind) {
+    case 'choice': {
+      const id = wrong ? q.options.find((o) => o.id !== q.answer).id : q.answer
+      await t(`mh-opt-${id}`).click()
+      return
+    }
+    case 'amount': {
+      const v = wrong ? q.answer + 100 : q.answer
+      if (q.input === 'dot') await t('mh-dot').fill(dotText(v))
+      else {
+        await t('mh-baht').fill(String(Math.floor(v / 100)))
+        if (q.input === 'bs') await t('mh-satang').fill(String(v % 100))
+      }
+      await t('mh-submit').click()
+      return
+    }
+    case 'number':
+      await t('mh-number').fill(String(wrong ? q.answer + 1 : q.answer))
+      await t('mh-submit').click()
+      return
+    case 'pay': {
+      const combos = q.sample.slice(0, q.mode === 'make' ? q.ways : 1)
+      for (const combo of combos) {
+        for (const id of wrong ? [...combo, 'b1'].filter((x) => q.tray.includes(x)) : combo) await t(`mh-tray-${id}`).click()
+        if (wrong && !combo.length) await t(`mh-tray-${q.tray[0]}`).click()
+        await t(q.mode === 'make' ? 'mh-save-way' : 'mh-submit').click()
+        if (wrong) return
+      }
+      return
+    }
+    case 'match': {
+      const ids = q.pairs.map((p) => p.id)
+      for (let i = 0; i < ids.length; i += 1) {
+        await t(`mh-left-${ids[i]}`).click()
+        await t(`mh-right-${wrong ? ids[(i + 1) % ids.length] : ids[i]}`).click()
+      }
+      await t('mh-submit').click()
+      return
+    }
+    case 'sort': {
+      const order = q.items
+        .slice()
+        .sort((a, b) => (q.order === 'asc' ? a.value - b.value : b.value - a.value))
+        .map((it) => it.id)
+      for (const id of wrong ? order.slice().reverse() : order) await t(`mh-sort-item-${id}`).click()
+      await t('mh-submit').click()
+      return
+    }
+    default:
+      throw new Error(`บอตยังไม่รู้จักโจทย์แบบ ${q.kind}`)
+  }
+}
+
+/** เล่นจนกว่าจะเจอหน้าจบขั้น หรือหน้าผลลัพธ์ */
+async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
+  let mistakes = makeMistake
+  for (let guard = 0; guard < 60; guard += 1) {
+    if (await page.getByTestId(doneTestId).isVisible().catch(() => false)) return
+    const q = await currentQuestion(page)
+    if (!q) {
+      await page.waitForTimeout(150)
+      continue
+    }
+    const before = q.id
+    if (mistakes && q.kind !== 'pay') {
+      // ตอบผิดสองครั้ง: ต้องเห็น "ลองคิดอีกครั้ง" แล้วเห็นวิธีคิดทีละขั้น
+      mistakes = false
+      await answer(page, q, { wrong: true })
+      await page.getByText('ลองคิดอีกครั้ง').waitFor()
+      await page.getByTestId('mh-try-again').click()
+      await answer(page, q, { wrong: true })
+      await page.getByText('มาดูวิธีคิดทีละขั้นกัน').waitFor()
+      await page.getByText('เดี๋ยวจะมีข้อแบบเดียวกันให้ฝึกอีกครั้ง').waitFor()
+    } else {
+      await answer(page, q)
+      const fb = page.getByTestId('mh-feedback')
+      await fb.waitFor()
+      const text = await fb.innerText()
+      if (!/✔/.test(text)) throw new Error(`ตอบตามเฉลยแล้วไม่ถูก (${q.gen}): ${text.slice(0, 160)}`)
+    }
+    await page.getByTestId('mh-next').click()
+    await page.waitForFunction((id) => window.__MH_DEBUG?.question?.id !== id, before, { timeout: 5000 }).catch(() => undefined)
+  }
+  throw new Error(`เล่นเกิน 60 ข้อแล้วยังไม่จบ (${doneTestId})`)
+}
+
+async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
+  await page.waitForURL(new RegExp(`#/level/${id}/learn`))
+  for (let i = 0; i < 10; i += 1) {
+    if (await page.getByTestId('mh-learn-done').isVisible().catch(() => false)) break
+    await page.getByTestId('mh-learn-next').click()
+  }
+  await snap(page, `${label}level${id}-learn`)
+  await page.getByTestId('mh-learn-done').click()
+  await page.waitForURL(new RegExp(`#/level/${id}/practice`))
+  await page.getByTestId('mh-question').waitFor()
+  await snap(page, `${label}level${id}-practice`)
+  await playUntil(page, 'mh-step-done', { makeMistake })
+  await page.getByTestId('mh-next-step').click()
+  await page.waitForURL(new RegExp(`#/level/${id}/mission`))
+  await playUntil(page, 'mh-step-done')
+  await page.getByTestId('mh-next-step').click()
+  await page.waitForURL(new RegExp(`#/level/${id}/boss`))
+  await playUntil(page, 'mh-result')
+  await page.getByText('MISSION COMPLETE!').waitFor()
+  await snap(page, `${label}level${id}-result`)
+}
+
 for (const [name, viewport] of [
   ['desktop', { width: 1280, height: 860 }],
   ['mobile', { width: 390, height: 844 }],
@@ -150,12 +271,17 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-level-panel').waitFor({ timeout: 8000 })
     await page.getByText('ด่าน 0: เริ่มต้น MONEY HERO').waitFor()
     await snap(page, `${name}-map-near`)
-    await page.getByTestId('mh-enter').click()
-    await page.getByText('กำลังสร้าง').first().waitFor()
     // รายการด่านสำหรับคนที่ไม่อยากเดิน
     await page.getByTestId('mh-level-list-toggle').click()
     await page.getByTestId('mh-level-card-12').waitFor()
     await noSideScroll(page, 'แผนที่ + รายการด่าน')
+    // ด่านที่ยังล็อกต้องเข้าไม่ได้
+    await page.getByTestId('mh-level-card-3').click()
+    await page.getByText('ผ่านด่าน 2 ก่อน').waitFor()
+    await page.getByTestId('mh-enter').click()
+    await page.waitForURL(/#\/level\/0\/learn/)
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-world').waitFor()
   })
 
   await step(`[${name}] รีเฟรชแล้วผู้เล่นยังอยู่`, async () => {
@@ -172,6 +298,39 @@ for (const [name, viewport] of [
     await snap(page, `${name}-continue`)
     await noSideScroll(page, 'หน้าเริ่มเกม (ผู้เล่นเดิม)')
   })
+
+  await step(`[${name}] เล่นด่าน 0 ครบ 4 ขั้น (ตอบผิดก่อนหนึ่งข้อ) ใช้ตัวช่วย และได้ดาว`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-level-list-toggle').click()
+    await page.getByTestId('mh-level-card-0').click()
+    await page.waitForURL(/#\/level\/0\/learn/)
+    // ข้ามขั้นไม่ได้: เปิด BOSS ตรง ๆ ต้องถูกพากลับ LEARN
+    await page.goto(`${BASE}#/level/0/boss`)
+    await page.waitForURL(/#\/level\/0\/learn/)
+    await page.getByTestId('mh-learn-next').waitFor()
+    await playLevel(page, 0, { makeMistake: true, label: `${name}-` })
+    await noSideScroll(page, 'หน้าผลลัพธ์')
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const p = Object.values(saved.players)[0]
+    if (p.levels[0].stepDone !== 4) throw new Error('ผ่านด่าน 0 แล้วแต่ไม่ได้บันทึก')
+    if (!(p.levels[0].bestStars >= 1)) throw new Error('ผ่านด่านแล้วไม่ได้ดาว')
+    if (!(p.exp > 0)) throw new Error('ไม่ได้ EXP')
+    if (p.mistakes.length < 1) throw new Error('ข้อที่ตอบผิดไม่ถูกบันทึก')
+  })
+
+  if (name === 'desktop') {
+    await step(`[${name}] เล่นต่อด่าน 1–6 จนจบทุกด่าน`, async () => {
+      for (let id = 1; id <= 6; id += 1) {
+        await page.getByTestId('mh-next-level').click()
+        await playLevel(page, id)
+      }
+      await page.getByTestId('mh-back-map').click()
+      await page.getByText('คุณเรียนรู้แล้ว 6 / 12 ด่าน').waitFor()
+      await page.reload()
+      await page.getByText('คุณเรียนรู้แล้ว 6 / 12 ด่าน').waitFor()
+      await snap(page, `${name}-map-after-6`)
+    })
+  }
 
   await step(`[${name}] ปุ่มบนหน้าเริ่มเกมไม่มีทางตัน`, async () => {
     for (const label of ['โหมดคุณครู', 'เปลี่ยนผู้เล่น']) {

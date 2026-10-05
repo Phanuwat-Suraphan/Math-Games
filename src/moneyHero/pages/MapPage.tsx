@@ -29,8 +29,8 @@ const JUMP_V = 760
 const GRAVITY = 2000
 const NEAR = 120
 
-/** ด่านที่เล่นได้แล้วในเวอร์ชันนี้ (-1 = ยังไม่มี) ด่านที่เหลือเปิดในส่วนถัดไป */
-export const PLAYABLE_MAX = -1
+/** ด่านที่เล่นได้แล้วในเวอร์ชันนี้ ด่านที่เหลือเปิดในส่วนถัดไป */
+export const PLAYABLE_MAX = 6
 
 function buildingX(id: number): number {
   return FIRST_X + id * GAP
@@ -240,6 +240,13 @@ export function MapPage() {
     }
   }, [jump, action])
 
+  // คำพูดหายไปเองหลังอ่านจบ แผงเข้าด่านจึงกลับมา
+  useEffect(() => {
+    if (!talk) return
+    const t = window.setTimeout(() => setTalk(null), 3500)
+    return () => window.clearTimeout(t)
+  }, [talk])
+
   // บันทึกตำแหน่งตอนออกจากแผนที่
   useEffect(() => () => savePosition(), [savePosition])
 
@@ -249,14 +256,17 @@ export function MapPage() {
   const near = nearLevel !== null ? LEVELS[nearLevel] : null
 
   const hold = (dir: 'left' | 'right') => ({
-    onPointerDown: (e: RPointerEvent) => {
+    onPointerDown: (e: RPointerEvent<HTMLButtonElement>) => {
       e.preventDefault()
+      try {
+        // จับนิ้วไว้กับปุ่ม แม้นิ้วเลื่อนออกนิดหน่อยฮีโร่ก็ยังเดินต่อ
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        // ไม่รองรับก็ไม่เป็นไร
+      }
       sim.current[dir] = true
     },
     onPointerUp: () => {
-      sim.current[dir] = false
-    },
-    onPointerLeave: () => {
       sim.current[dir] = false
     },
     onPointerCancel: () => {
@@ -358,39 +368,40 @@ export function MapPage() {
             <span className="mh-walker-shadow" />
           </div>
         </div>
+        <div className="mh-world-overlay">
+        {talk && (
+          <div className="mh-card mh-talk" aria-live="polite">
+            <CharacterArt id={talk.npc} size={56} />
+            <div>
+              <strong>{CHARACTERS[talk.npc].name}</strong>
+              <p>{talk.text}</p>
+            </div>
+          </div>
+        )}
+
+        {near && !talk && (
+          <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
+            <div className="mh-level-panel-icon">{near.icon}</div>
+            <div className="mh-level-panel-info">
+              <strong>
+                ด่าน {near.id}: {near.name}
+              </strong>
+              <span>{near.topic}</span>
+              <span className="mh-level-panel-game">🎮 {near.game}</span>
+            </div>
+            <button
+              type="button"
+              className="mh-btn mh-btn-gold"
+              onClick={() => enter(near)}
+              data-testid="mh-enter"
+              disabled={!isLevelUnlocked(player, near.id)}
+            >
+              {isLevelUnlocked(player, near.id) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
+            </button>
+          </div>
+        )}
+        </div>
       </div>
-
-      {talk && (
-        <div className="mh-card mh-talk" aria-live="polite">
-          <CharacterArt id={talk.npc} size={56} />
-          <div>
-            <strong>{CHARACTERS[talk.npc].name}</strong>
-            <p>{talk.text}</p>
-          </div>
-        </div>
-      )}
-
-      {near && !talk && (
-        <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
-          <div className="mh-level-panel-icon">{near.icon}</div>
-          <div className="mh-level-panel-info">
-            <strong>
-              ด่าน {near.id}: {near.name}
-            </strong>
-            <span>{near.topic}</span>
-            <span className="mh-level-panel-game">🎮 {near.game}</span>
-          </div>
-          <button
-            type="button"
-            className="mh-btn mh-btn-gold"
-            onClick={() => enter(near)}
-            data-testid="mh-enter"
-            disabled={!isLevelUnlocked(player, near.id)}
-          >
-            {isLevelUnlocked(player, near.id) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
-          </button>
-        </div>
-      )}
 
       <div className="mh-controls">
         <button type="button" className="mh-pad" aria-label="เดินซ้าย" {...hold('left')}>
