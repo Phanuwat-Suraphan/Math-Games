@@ -61,6 +61,11 @@
     "src/services/perkService.ts",
     "src/services/recordService.ts",
     "src/services/storyService.ts",
-    "src/battle/**/*.ts"
+    "src/battle/**/*.ts",
+    // MONEY HERO: ตรรกะเงิน ตัวสร้างโจทย์ และระบบคะแนน (ไม่รวมไฟล์ React)
+    "src/moneyHero/engine/**/*.ts",
+    "src/moneyHero/utils/**/*.ts",
+    "src/moneyHero/data/**/*.ts",
+    "src/moneyHero/generators/**/*.ts"
   ]
 }

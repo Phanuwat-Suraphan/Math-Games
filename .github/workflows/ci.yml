@@ -105,6 +105,9 @@ jobs:
       - name: ทดสอบ ZOMBIE RESCUE (เกมการคูณ ป.2 โจทย์สุ่มหลายหมื่นข้อและจำลองหลายร้อยเกม)
         run: node tests/zombieRescue.test.mjs /tmp/logic
 
+      - name: ทดสอบ MONEY HERO (เรื่องเงิน ป.3 โจทย์สุ่มหลายหมื่นข้อ ตรวจคณิตศาสตร์ทุกด่าน)
+        run: node tests/moneyHero.test.mjs /tmp/logic
+
       - name: ทดสอบเครื่องแต่งเพลง
         run: node tests/music.test.mjs /tmp/logic
 
@@ -145,6 +148,10 @@ jobs:
 
       - name: บอตเล่นภารกิจแปดดาวครบทุกโหมด และยานสำรวจระบบสุริยะหนึ่งทริป
         run: node tests/e2e/space.e2e.mjs dist /tmp/logic
+
+      - name: บอตเล่น MONEY HERO (เรื่องเงิน ป.3) บนจอคอมพิวเตอร์และมือถือ
+        if: always()
+        run: node tests/e2e/moneyHero.e2e.mjs dist
 
       # ภาพหน้าจอทุกขั้น ดาวน์โหลดได้จากหน้าสรุปของการรันนี้
       - name: เก็บภาพหน้าจอ
