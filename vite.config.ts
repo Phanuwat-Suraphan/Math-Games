@@ -16,6 +16,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   base: '/',
   plugins: [react()],
+  build: {
+    // สองหน้าเว็บในโปรเจกต์เดียว: เกมผจญภัยเดิม (index.html) และ MONEY HERO (money-hero.html)
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        moneyHero: 'money-hero.html',
+      },
+    },
+  },
   server: {
     host: true,
     port: 5173,
