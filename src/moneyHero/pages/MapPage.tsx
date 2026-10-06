@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { List } from 'lucide-react'
 import type { NpcId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { LEVELS, TOTAL_LESSONS, type LevelDef } from '../data/levels'
 import { CHARACTERS } from '../data/characters'
 import {
+  BRIDGE,
+  RIVER,
   TOWN_COINS,
   TOWN_NPCS,
   TREES,
@@ -17,11 +19,12 @@ import {
   type Pt,
   type TownCoin,
 } from '../data/town'
-import { isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId } from '../engine/progress'
+import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
-import { HouseArt, TownTerrain, TreeSprite } from '../components/TownArt'
+import { TownTerrain, TreeSprite } from '../components/TownArt'
+import { BuildingArt } from '../components/BuildingArt'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
 
@@ -47,6 +50,15 @@ const TIPS: Record<'rabbit' | 'fox' | 'bear' | 'owl', string[]> = {
   bear: ['ซื้อของแล้วอย่าลืมคิดเงินทอนนะ', 'สตางค์เกิน 100 ต้องทดเป็น 1 บาท'],
   owl: ['คงเหลือ = เดิม + รายรับ − รายจ่าย', 'จดบัญชีทุกวัน จะรู้ว่าเงินไปไหน'],
 }
+
+/** ผีเสื้อบินวนในเมือง */
+const BUTTERFLIES = [
+  { x: 520, y: 1080, c: '#ff9fc4' },
+  { x: 1180, y: 1420, c: '#ffd23f' },
+  { x: 900, y: 760, c: '#9fd8ff' },
+  { x: 1640, y: 470, c: '#ffb066' },
+  { x: 1960, y: 1050, c: '#c9a6ff' },
+]
 
 function stepLabel(stepDone: number): string {
   return ['ยังไม่เริ่ม', 'เรียนแล้ว', 'ฝึกแล้ว', 'ภารกิจเสร็จ', 'ผ่านแล้ว'][Math.min(4, stepDone)]
@@ -210,7 +222,7 @@ export function MapPage() {
       }
       if (heroRef.current) {
         const h = heroRef.current
-        h.style.transform = `translate3d(${s.x - 34}px,${s.y - 84}px,0)`
+        h.style.transform = `translate3d(${s.x - 37}px,${s.y - 90}px,0)`
         h.style.zIndex = String(Math.round(s.y) + 1)
         h.classList.toggle('is-walking', s.walking)
         h.classList.toggle('is-left', s.dir < 0)
@@ -327,6 +339,17 @@ export function MapPage() {
       <div className="mh-town-view" ref={viewRef} data-testid="mh-world">
         <div className="mh-town" ref={worldRef} style={{ width: WORLD.w, height: WORLD.h }}>
           <TownTerrain />
+          {/* ประกายน้ำไหล (เว้นช่วงสะพาน) */}
+          <div className="mh-river-shine" style={{ left: 0, top: RIVER.top + 8, width: BRIDGE.x, height: RIVER.bottom - RIVER.top - 16 }} aria-hidden="true">
+            <i />
+          </div>
+          <div
+            className="mh-river-shine"
+            style={{ left: BRIDGE.x + BRIDGE.w, top: RIVER.top + 8, width: WORLD.w - BRIDGE.x - BRIDGE.w, height: RIVER.bottom - RIVER.top - 16 }}
+            aria-hidden="true"
+          >
+            <i />
+          </div>
 
           {TREES.map((t, i) => (
             <TreeSprite key={i} tree={t} />
@@ -338,14 +361,14 @@ export function MapPage() {
             const done = rec.stepDone >= 4
             const soon = l.id > PLAYABLE_MAX
             const d = doorOf(l.id)
-            const kind = l.id === 0 ? 'tent' : l.id === 12 ? 'castle' : 'house'
-            const w = kind === 'castle' ? 190 : 160
+            const castle = l.id === 12
+            const w = castle ? 190 : 160
             return (
               <button
                 key={l.id}
                 type="button"
                 className={`mh-house ${unlocked ? 'is-open' : 'is-locked'} ${nearLevel === l.id ? 'is-near' : ''}`}
-                style={{ left: d.x - w / 2, top: d.y - (kind === 'castle' ? 222 : 188), width: w, zIndex: Math.round(d.y) - 30 }}
+                style={{ left: d.x - w / 2, top: d.y - (castle ? 222 : 188), width: w, zIndex: Math.round(d.y) - 30 }}
                 data-testid={`mh-building-${l.id}`}
                 onClick={() => walkTo(l.id)}
                 aria-label={`ด่าน ${l.id} ${l.name}`}
@@ -353,7 +376,7 @@ export function MapPage() {
                 <span className="mh-house-sign">
                   <b>{l.id}</b> {l.name}
                 </span>
-                <HouseArt theme={l.theme} icon={l.icon} locked={!unlocked} kind={kind} />
+                <BuildingArt level={l.id} locked={!unlocked} />
                 <span className="mh-house-status">
                   {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
                 </span>
@@ -362,19 +385,38 @@ export function MapPage() {
           })}
 
           {TOWN_NPCS.map((n) => (
-            <div key={n.id} className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`} style={{ left: n.x - 30, top: n.y - 76, zIndex: n.y }}>
+            <div key={n.id} className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`} style={{ left: n.x - 32, top: n.y - 80, zIndex: n.y }}>
               {nearNpc === n.id && <span className="mh-npc-hint">💬</span>}
-              <CharacterArt id={n.id} size={60} />
+              <CharacterArt id={n.id} size={64} />
             </div>
           ))}
 
           {TOWN_COINS.map((c) =>
             collected.has(c.id) ? null : (
-              <span key={c.id} className="mh-map-coin mh-town-coin" style={{ left: c.x - 15, top: c.y - 34, zIndex: c.y - 1 }} aria-hidden="true">
-                ฿
+              <span key={c.id} className="mh-town-coin" style={{ left: c.x - 15, top: c.y - 38, zIndex: c.y - 1 }} aria-hidden="true">
+                <span className="mh-coin-spin">฿</span>
               </span>
             ),
           )}
+          {BUTTERFLIES.map((b, i) => (
+            <span key={i} className="mh-butterfly" style={{ left: b.x, top: b.y, animationDelay: `${i * -2.3}s` }} aria-hidden="true">
+              <svg viewBox="-12 -10 24 20" width="22" height="18">
+                <g className="mh-wing">
+                  <ellipse cx="-6" cy="-3" rx="6" ry="5" fill={b.c} />
+                  <ellipse cx="-5" cy="4" rx="4" ry="3.4" fill={b.c} opacity="0.85" />
+                </g>
+                <g className="mh-wing mh-wing-r">
+                  <ellipse cx="6" cy="-3" rx="6" ry="5" fill={b.c} />
+                  <ellipse cx="5" cy="4" rx="4" ry="3.4" fill={b.c} opacity="0.85" />
+                </g>
+                <rect x="-1" y="-6" width="2" height="12" rx="1" fill="#3b2a20" />
+              </svg>
+            </span>
+          ))}
+          {/* เงาเมฆลอยผ่านเมือง */}
+          <div className="mh-cloud-shadow" style={{ top: 120 }} aria-hidden="true" />
+          <div className="mh-cloud-shadow mh-cloud-2" style={{ top: 760 }} aria-hidden="true" />
+          <div className="mh-cloud-shadow mh-cloud-3" style={{ top: 1180 }} aria-hidden="true" />
           {pop && (
             <span key={pop.key} className="mh-coin-pop" style={{ left: pop.x - 24, top: pop.y - 80, zIndex: 5000 }}>
               +1 🪙
@@ -384,7 +426,7 @@ export function MapPage() {
           <div className="mh-walker mh-town-walker" ref={heroRef} data-testid="mh-hero">
             <span className="mh-walker-shadow" />
             <div className="mh-walker-inner">
-              <AvatarArt avatar={player.avatar} size={68} />
+              <AvatarArt avatar={player.avatar} size={74} />
             </div>
           </div>
         </div>
@@ -401,7 +443,9 @@ export function MapPage() {
           )}
           {near && !talk && (
             <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
-              <div className="mh-level-panel-icon">{near.icon}</div>
+              <div className="mh-level-panel-icon">
+                <BuildingArt level={near.id} locked={!isLevelUnlocked(player, near.id)} className="mh-thumb-bld" />
+              </div>
               <div className="mh-level-panel-info">
                 <strong>
                   ด่าน {near.id}: {near.name}
@@ -459,6 +503,47 @@ export function MapPage() {
         ⌨️ ลูกศร / WASD เดิน · Enter เข้าอาคาร · 📱 ลากจอยสติกเพื่อเดิน · 👆 แตะอาคารให้ฮีโร่เดินไปเอง
       </p>
 
+      {!player.preTest && (
+        <Link to="/test/pre" className="mh-card mh-test-banner" data-testid="mh-pretest-banner">
+          <span className="mh-test-banner-icon" aria-hidden="true">
+            🧭
+          </span>
+          <span>
+            <b>วัดพลังก่อนออกผจญภัย!</b>
+            <span>แบบทดสอบก่อนเรียน 18 ข้อ · ได้ตรา “นักสำรวจพลัง”</span>
+          </span>
+          <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
+        </Link>
+      )}
+      {canTakePostTest(player) && !player.postTest && (
+        <Link to="/test/post" className="mh-card mh-test-banner is-post" data-testid="mh-posttest-banner">
+          <span className="mh-test-banner-icon" aria-hidden="true">
+            🎓
+          </span>
+          <span>
+            <b>แบบทดสอบหลังเรียนเปิดแล้ว!</b>
+            <span>20 ข้อ · ดูว่าเก่งขึ้นจากก่อนเรียนเท่าไร</span>
+          </span>
+          <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
+        </Link>
+      )}
+
+      <nav className="mh-map-menu" aria-label="เมนูฮีโร่">
+        <Link to="/badges" className="mh-menu-tile">
+          <span aria-hidden="true">🏆</span>ตรา
+        </Link>
+        <Link to="/profile" className="mh-menu-tile">
+          <span aria-hidden="true">👤</span>โปรไฟล์
+        </Link>
+        <Link to="/stats" className="mh-menu-tile">
+          <span aria-hidden="true">📊</span>สถิติ
+        </Link>
+        <Link to="/review" className="mh-menu-tile" data-testid="mh-menu-review">
+          <span aria-hidden="true">🔁</span>ฝึกข้อที่ผิด
+          {pendingMistakes(player).length > 0 && <em className="mh-menu-badge">{pendingMistakes(player).length}</em>}
+        </Link>
+      </nav>
+
       <div className="mh-row-buttons">
         <button type="button" className="mh-btn mh-btn-soft" onClick={() => setShowList((v) => !v)} data-testid="mh-level-list-toggle">
           <List size={22} /> {showList ? 'ซ่อนรายการด่าน' : 'ดูรายการด่าน'}
@@ -478,7 +563,9 @@ export function MapPage() {
                 onClick={() => enter(l)}
                 data-testid={`mh-level-card-${l.id}`}
               >
-                <span className="mh-level-card-icon">{unlocked ? l.icon : '🔒'}</span>
+                <span className="mh-level-card-icon">
+                  <BuildingArt level={l.id} locked={!unlocked} className="mh-thumb-bld" />
+                </span>
                 <span className="mh-level-card-body">
                   <b>
                     ด่าน {l.id} {rec.stepDone >= 4 ? '✅' : ''}

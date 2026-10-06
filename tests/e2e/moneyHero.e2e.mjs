@@ -235,6 +235,26 @@ async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
   throw new Error(`เล่นเกิน 90 ข้อแล้วยังไม่จบ (${doneTestId})`)
 }
 
+/** ทำแบบทดสอบ (ไม่มีการบอกถูกผิด ตอบแล้วไปข้อต่อไปทันที) ตอบผิด wrongFirst ข้อแรก */
+async function playTest(page, wrongFirst = 0) {
+  for (let i = 0; i < 40; i += 1) {
+    if (await page.getByTestId('mh-test-result').isVisible().catch(() => false)) return
+    const q = await currentQuestion(page)
+    if (!q) {
+      await page.waitForTimeout(150)
+      continue
+    }
+    await answer(page, q, { wrong: i < wrongFirst && q.kind !== 'pay' })
+    await page.waitForFunction((id) => window.__MH_DEBUG?.question?.id !== id, q.id, { timeout: 5000 }).catch(() => undefined)
+  }
+  throw new Error('ทำแบบทดสอบเกิน 40 ข้อแล้วยังไม่จบ')
+}
+
+async function savedPlayer(page) {
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+  return Object.values(saved.players)[0]
+}
+
 async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   await page.waitForURL(new RegExp(`#/level/${id}/learn`))
   for (let i = 0; i < 10; i += 1) {
@@ -311,6 +331,7 @@ for (const [name, viewport] of [
       await page.waitForTimeout(700)
       await page.keyboard.up('ArrowLeft')
     } else {
+      await page.getByTestId('mh-joystick').scrollIntoViewIfNeeded()
       const joy = await page.getByTestId('mh-joystick').boundingBox()
       await page.mouse.move(joy.x + joy.width / 2, joy.y + joy.height / 2)
       await page.mouse.down()
@@ -353,6 +374,30 @@ for (const [name, viewport] of [
     await noSideScroll(page, 'หน้าเริ่มเกม (ผู้เล่นเดิม)')
   })
 
+  await step(`[${name}] แบบทดสอบก่อนเรียน: ป้ายบนแผนที่ → ทำครบ 18 ข้อ → เห็นคะแนนรายทักษะ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-pretest-banner').click()
+    await page.waitForURL(/#\/test\/pre/)
+    await page.getByTestId('mh-test-intro').waitFor()
+    await snap(page, `${name}-pretest-intro`)
+    await noSideScroll(page, 'หน้าแบบทดสอบ')
+    await page.getByTestId('mh-test-start').click()
+    await page.getByTestId('mh-question').waitFor()
+    // ระหว่างทำต้องไม่มีปุ่มตัวช่วย
+    if (await page.getByTestId('mh-hint-btn').isVisible().catch(() => false)) throw new Error('แบบทดสอบมีปุ่มตัวช่วย')
+    await playTest(page, 6)
+    await page.getByTestId('mh-skill-bars').waitFor()
+    await snap(page, `${name}-pretest-result`)
+    await noSideScroll(page, 'ผลแบบทดสอบ')
+    const p = await savedPlayer(page)
+    if (!p.preTest || p.preTest.total !== 18) throw new Error(`ผลก่อนเรียนไม่ถูกบันทึก: ${JSON.stringify(p.preTest)?.slice(0, 120)}`)
+    if (!(p.preTest.score <= 12)) throw new Error(`ตอบผิด 6 ข้อแต่ได้ ${p.preTest.score}`)
+    if (!p.badges.includes('pretest')) throw new Error('ไม่ได้ตรานักสำรวจพลัง')
+    await page.getByTestId('mh-test-to-map').click()
+    await page.getByTestId('mh-world').waitFor()
+    if (await page.getByTestId('mh-pretest-banner').isVisible().catch(() => false)) throw new Error('ทำแล้วป้ายยังอยู่')
+  })
+
   await step(`[${name}] เล่นด่าน 0 ครบ 4 ขั้น (ตอบผิดก่อนหนึ่งข้อ) ใช้ตัวช่วย และได้ดาว`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-level-list-toggle').click()
@@ -372,10 +417,27 @@ for (const [name, viewport] of [
     if (p.mistakes.length < 1) throw new Error('ข้อที่ตอบผิดไม่ถูกบันทึก')
   })
 
+  await step(`[${name}] ฝึกข้อที่เคยผิด: เมนูบนแผนที่ → สถิติ → ฝึกจนถูก แล้วข้อนั้นหายจากรายการ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-review').waitFor()
+    await page.goto(`${BASE}#/stats`)
+    await page.getByTestId('mh-skill-bars').waitFor()
+    await snap(page, `${name}-stats`)
+    await noSideScroll(page, 'หน้าสถิติ')
+    await page.getByTestId('mh-review-go').click()
+    await page.waitForURL(/#\/review/)
+    await page.getByTestId('mh-question').waitFor()
+    await playUntil(page, 'mh-review-done')
+    await snap(page, `${name}-review-done`)
+    const p = await savedPlayer(page)
+    if (!p.mistakes.every((m) => m.fixed)) throw new Error('ฝึกถูกแล้วแต่ยังไม่ถูกนับว่าแก้ได้')
+  })
+
   if (name === 'desktop') {
     await step(`[${name}] เล่นต่อด่าน 1–${LAST_LEVEL} จนจบทุกด่าน`, async () => {
       for (let id = 1; id <= LAST_LEVEL; id += 1) {
-        await page.getByTestId('mh-next-level').click()
+        if (id === 1) await page.goto(`${BASE}#/level/1/learn`)
+        else await page.getByTestId('mh-next-level').click()
         await playLevel(page, id)
       }
       if (LAST_LEVEL === 12) {
@@ -390,7 +452,39 @@ for (const [name, viewport] of [
       await page.getByText(passedText).waitFor()
       await snap(page, `${name}-map-after-all`)
     })
+
+    await step(`[${name}] แบบทดสอบหลังเรียน: เปิดหลังผ่านด่าน 12 และเห็นกราฟก่อน → หลังเรียน`, async () => {
+      await page.getByTestId('mh-posttest-banner').click()
+      await page.getByTestId('mh-test-start').click()
+      await playTest(page, 0)
+      await page.getByTestId('mh-before-after').waitFor()
+      await snap(page, `${name}-posttest-result`)
+      const p = await savedPlayer(page)
+      if (!p.postTest || p.postTest.total !== 20 || p.postTest.score !== 20) throw new Error(`ผลหลังเรียนผิด: ${JSON.stringify(p.postTest)?.slice(0, 120)}`)
+      for (const b of ['posttest', 'improver']) if (!p.badges.includes(b)) throw new Error(`ไม่ได้ตรา ${b}`)
+    })
   }
+
+  await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
+    await page.goto(`${BASE}#/badges`)
+    await page.getByTestId('mh-badge-pretest').waitFor()
+    if (!(await page.getByTestId('mh-badge-pretest').getAttribute('class')).includes('is-earned')) throw new Error('ตราที่ได้แล้วไม่แสดงว่าได้')
+    await snap(page, `${name}-badges`)
+    await noSideScroll(page, 'หน้าตรา')
+    await page.goto(`${BASE}#/profile`)
+    await page.getByTestId('mh-profile').waitFor()
+    await snap(page, `${name}-profile`)
+    await noSideScroll(page, 'หน้าโปรไฟล์')
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-table').waitFor()
+    await page.getByRole('button', { name: 'ทดสอบ' }).click()
+    await page.getByTestId('mh-student-detail').waitFor()
+    await snap(page, `${name}-teacher`)
+    await noSideScroll(page, 'แผงคุณครู')
+    const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv').click()])
+    const csv = fs.readFileSync(await download.path(), 'utf8')
+    if (csv.charCodeAt(0) !== 0xfeff || !csv.includes('ทดสอบ') || !csv.includes('Pre-test')) throw new Error(`ไฟล์ CSV ไม่ถูกต้อง: ${csv.slice(0, 80)}`)
+  })
 
   await step(`[${name}] ปุ่มบนหน้าเริ่มเกมไม่มีทางตัน`, async () => {
     for (const label of ['โหมดคุณครู', 'เปลี่ยนผู้เล่น']) {

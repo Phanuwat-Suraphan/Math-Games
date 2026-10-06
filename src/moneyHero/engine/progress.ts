@@ -260,7 +260,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   }
   if (p.preTest) want.push('pretest')
   if (p.postTest) want.push('posttest')
-  if (p.preTest && p.postTest && p.postTest.score > p.preTest.score) want.push('improver')
+  if (p.preTest && p.postTest && p.postTest.score / Math.max(1, p.postTest.total) > p.preTest.score / Math.max(1, p.preTest.total)) want.push('improver')
   if (p.bestStreak >= 5) want.push('streak5')
   if (p.bestStreak >= 10) want.push('streak10')
   if (totalStars(p) >= 15) want.push('stars-15')
@@ -282,4 +282,71 @@ export function overallAccuracy(p: Player): number {
     { attempts: 0, correct: 0 },
   )
   return accuracy(totals)
+}
+
+/* ------------------------------------------------------------------ */
+/* แบบทดสอบก่อน/หลังเรียน                                               */
+/* ------------------------------------------------------------------ */
+
+export type TestKind = 'pre' | 'post'
+
+/** แบบทดสอบหลังเรียนเปิดเมื่อผ่านด่านสุดท้าย (FINAL MONEY MASTER) */
+export const POST_TEST_AFTER = 12
+
+export function canTakePostTest(p: Player): boolean {
+  return isLevelPassed(p, POST_TEST_AFTER)
+}
+
+/** รางวัลทำแบบทดสอบ (ได้ครั้งแรกครั้งเดียว ทำซ้ำไม่ได้เพิ่ม จะได้ไม่ทำเพื่อปั๊มแต้ม) */
+export const TEST_REWARD: Record<TestKind, { exp: number; coins: number }> = {
+  pre: { exp: 30, coins: 10 },
+  post: { exp: 60, coins: 20 },
+}
+
+/** สรุปผลแบบทดสอบจากผลการทำโจทย์ */
+export function testResultFrom(
+  run: { firstTry: number; originals: number; ms: number; bySkill: Record<string, { correct: number; total: number }> },
+  now = Date.now(),
+): TestResult {
+  const skills = emptyTestSkills()
+  for (const s of SKILLS) {
+    const b = run.bySkill[s]
+    if (b) skills[s] = { correct: b.correct, total: b.total }
+  }
+  return { score: run.firstTry, total: run.originals, timeMs: run.ms, at: now, skills }
+}
+
+/** บันทึกผลแบบทดสอบ พร้อมรางวัลครั้งแรก */
+export function recordTest(p: Player, kind: TestKind, result: TestResult): Player {
+  const first = kind === 'pre' ? !p.preTest : !p.postTest
+  const reward = first ? TEST_REWARD[kind] : { exp: 0, coins: 0 }
+  return {
+    ...p,
+    exp: p.exp + reward.exp,
+    coins: p.coins + reward.coins,
+    ...(kind === 'pre' ? { preTest: result } : { postTest: result }),
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* ฝึกข้อที่เคยผิด                                                      */
+/* ------------------------------------------------------------------ */
+
+/** ข้อที่เคยผิดและยังไม่ได้ฝึกจนถูก (แบบโจทย์ละ 1 ข้อ ล่าสุดก่อน) */
+export function pendingMistakes(p: Player, max = 8): Mistake[] {
+  const seen = new Set<string>()
+  const out: Mistake[] = []
+  for (let i = p.mistakes.length - 1; i >= 0 && out.length < max; i -= 1) {
+    const m = p.mistakes[i]
+    if (m.fixed || seen.has(m.gen)) continue
+    seen.add(m.gen)
+    out.push(m)
+  }
+  return out
+}
+
+/** ตอบโจทย์แบบนี้ถูกแล้ว ทำเครื่องหมายว่าแก้ได้ทุกข้อที่เป็นแบบเดียวกัน */
+export function markMistakeFixed(p: Player, gen: string): Player {
+  if (!p.mistakes.some((m) => m.gen === gen && !m.fixed)) return p
+  return { ...p, mistakes: p.mistakes.map((m) => (m.gen === gen && !m.fixed ? { ...m, fixed: true } : m)) }
 }
