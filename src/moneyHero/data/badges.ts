@@ -36,6 +36,7 @@ export const SPECIAL_BADGES: BadgeDef[] = [
   { id: 'coins-300', icon: '💰', name: 'เศรษฐีน้อย', how: 'สะสม 300 เหรียญ' },
   { id: 'explorer', icon: '🪙', name: 'นักเก็บเหรียญ', how: 'เก็บเหรียญบนแผนที่ 15 เหรียญ' },
   { id: 'comeback', icon: '💪', name: 'ไม่ยอมแพ้', how: 'ฝึกข้อที่เคยผิดจนถูก 5 ข้อ' },
+  { id: 'ar-hunter', icon: '📷', name: 'นักล่าเหรียญ AR', how: 'เก็บเงินพอดีครบ 5 รอบในเกมล่าเหรียญ' },
 ]
 
 export const ALL_BADGES: BadgeDef[] = [...LEVEL_BADGES, ...SPECIAL_BADGES]
