@@ -39,7 +39,7 @@ const NEAR_DOOR = 70
 const NEAR_NPC = 70
 
 /** ด่านที่เล่นได้แล้วในเวอร์ชันนี้ ด่านที่เหลือเปิดในส่วนถัดไป */
-export const PLAYABLE_MAX = 6
+export const PLAYABLE_MAX = 12
 
 const TIPS: Record<'rabbit' | 'fox' | 'bear' | 'owl', string[]> = {
   rabbit: ['100 สตางค์ = 1 บาท นะ!', 'นับเงินจากค่ามากไปน้อย จะนับง่ายขึ้น', 'เก็บเหรียญริมถนนได้ด้วยนะ!'],
@@ -199,11 +199,15 @@ export function MapPage() {
       if (Math.abs(vx) > 0.1) s.dir = vx > 0 ? 1 : -1
 
       const view = viewRef.current
-      const vw = view?.clientWidth ?? 800
-      const vh = view?.clientHeight ?? 500
+      // จอเล็กซูมออก จะได้เห็นเมืองกว้างขึ้น ไม่ใช่เห็นทีละบ้าน
+      const zoom = (view?.clientWidth ?? 800) < 600 ? 0.68 : 1
+      const vw = (view?.clientWidth ?? 800) / zoom
+      const vh = (view?.clientHeight ?? 500) / zoom
       const camX = Math.max(0, Math.min(WORLD.w - vw, s.x - vw / 2))
       const camY = Math.max(0, Math.min(WORLD.h - vh, s.y - vh / 2))
-      if (worldRef.current) worldRef.current.style.transform = `translate3d(${-camX}px,${-camY}px,0)`
+      if (worldRef.current) {
+        worldRef.current.style.transform = `translate3d(${-camX * zoom}px,${-camY * zoom}px,0) scale(${zoom})`
+      }
       if (heroRef.current) {
         const h = heroRef.current
         h.style.transform = `translate3d(${s.x - 34}px,${s.y - 84}px,0)`

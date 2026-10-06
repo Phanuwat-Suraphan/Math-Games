@@ -3884,3 +3884,7 @@ button:disabled {
     height: 78px;
   }
 }
+
+.mh-town {
+  transform-origin: 0 0;
+}

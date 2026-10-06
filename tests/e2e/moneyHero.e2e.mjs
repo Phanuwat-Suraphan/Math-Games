@@ -45,7 +45,7 @@ const server = http.createServer((request, response) => {
 await new Promise((resolve) => server.listen(4174, resolve))
 const BASE = 'http://localhost:4174/money-hero.html'
 // ด่านสุดท้ายที่เปิดให้เล่นในเวอร์ชันนี้ (ตรงกับ PLAYABLE_MAX ใน MapPage.tsx)
-const LAST_LEVEL = 6
+const LAST_LEVEL = 12
 
 const browser = await chromium.launch()
 const errors = []
