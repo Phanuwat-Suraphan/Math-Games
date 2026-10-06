@@ -33,9 +33,17 @@ export function CreatePlayerPage() {
       </div>
 
       <div className="mh-card mh-create">
-        <div className="mh-npc-line">
-          <CharacterArt id="rabbit" size={64} />
-          <div className="mh-bubble">สวัสดีจ้ะ! บอกชื่อเล่นแล้วเลือกตัวละครได้เลย</div>
+        <div className="mh-create-hero">
+          <div className="mh-pedestal mh-create-pedestal">
+            <AvatarArt key={avatar} avatar={avatar} size={128} mood="happy" className="mh-create-preview" />
+          </div>
+          <div className="mh-create-hero-text">
+            <div className="mh-npc-line">
+              <CharacterArt id="rabbit" size={56} />
+              <div className="mh-bubble">สวัสดีจ้ะ! บอกชื่อเล่นแล้วเลือกตัวละครได้เลย</div>
+            </div>
+            <div className="mh-create-name">{name.trim() || 'ฮีโร่คนใหม่'}</div>
+          </div>
         </div>
 
         <label className="mh-label" htmlFor="mh-name">

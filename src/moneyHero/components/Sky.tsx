@@ -1,6 +1,7 @@
 import type { DenomId } from '../engine/types'
 import { BuildingArt } from './BuildingArt'
 import { CoinSvg } from './MoneyArt'
+import { Balloon } from './Bunting'
 
 /**
  * ฉากหลังของทั้งเกม: ท้องฟ้า ดวงอาทิตย์ เมฆ เหรียญลอย
@@ -21,6 +22,13 @@ const COINS: { left: string; top: string; delay: string; id: DenomId }[] = [
   { left: '48%', top: '5%', delay: '1.8s', id: 's50' },
 ]
 
+const BALLOONS = [
+  { left: '9%', color: '#ff6f91', dur: '26s', delay: '-4s' },
+  { left: '27%', color: '#ffd23f', dur: '31s', delay: '-19s' },
+  { left: '71%', color: '#4fc3f7', dur: '28s', delay: '-11s' },
+  { left: '91%', color: '#c38bff', dur: '34s', delay: '-25s' },
+]
+
 /** อาคารบนเนินหญ้า (ตำแหน่งอยู่ใน CSS: จอกว้างกับมือถือจัดต่างกัน ไม่ให้แผงปุ่มบังปราสาท) */
 const SKYLINE = [5, 1, 7, 4, 12]
 
@@ -31,13 +39,12 @@ const TREES = [
   { left: 62, bottom: 9, s: 1.1 },
 ]
 
-function Hills() {
+export function Hills() {
   return (
     <svg className="mh-hills" viewBox="0 0 1600 300" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 150 C 200 60, 420 70, 640 130 S 1100 40, 1300 110 S 1520 90, 1600 120 L1600 300 L0 300 Z" fill="#9fdc8a" opacity="0.75" />
       <path d="M0 190 C 260 120, 520 150, 800 165 S 1300 110, 1600 170 L1600 300 L0 300 Z" fill="#7cc35a" />
       <path d="M0 230 C 300 200, 600 215, 800 210 S 1300 200, 1600 225 L1600 300 L0 300 Z" fill="#5fae47" />
-      <path d="M0 192 C 260 122, 520 152, 800 167" fill="none" stroke="#c7f2b0" strokeWidth="5" opacity="0.7" />
     </svg>
   )
 }
@@ -67,6 +74,11 @@ export function Sky({ city = true }: { city?: boolean }) {
           className="mh-cloud"
           style={{ top: c.top, width: c.w, height: c.h, animationDelay: c.delay, animationDuration: c.dur }}
         />
+      ))}
+      {BALLOONS.map((b, i) => (
+        <div key={`b${i}`} className="mh-balloon" style={{ left: b.left, animationDuration: b.dur, animationDelay: b.delay }}>
+          <Balloon color={b.color} />
+        </div>
       ))}
       {COINS.map((c, i) => (
         <div key={i} className="mh-float-coin" style={{ left: c.left, top: c.top, animationDelay: c.delay }}>

@@ -38,6 +38,8 @@ import { speak } from '../utils/speech'
  */
 
 const SPEED = 240
+/** จำนวนก้อนฝุ่นที่หมุนเวียนใช้ตอนเดิน */
+const PUFFS = 6
 const NEAR_DOOR = 70
 const NEAR_NPC = 70
 
@@ -78,6 +80,7 @@ export function MapPage() {
   const viewRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
+  const puffRefs = useRef<(HTMLSpanElement | null)[]>([])
   const knobRef = useRef<HTMLDivElement>(null)
 
   const start = useMemo(
@@ -170,6 +173,10 @@ export function MapPage() {
   useEffect(() => {
     let raf = 0
     let last = performance.now()
+    let puffClock = 0
+    let puffNext = 0
+    const calm = () =>
+      document.documentElement.classList.contains('mh-reduce-motion') || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
@@ -226,6 +233,25 @@ export function MapPage() {
         h.style.zIndex = String(Math.round(s.y) + 1)
         h.classList.toggle('is-walking', s.walking)
         h.classList.toggle('is-left', s.dir < 0)
+      }
+
+      // ฝุ่นฟุ้งเล็ก ๆ ที่เท้าตอนเดิน
+      puffClock += dt
+      if (s.walking && puffClock > 0.2 && !calm()) {
+        puffClock = 0
+        const puff = puffRefs.current[puffNext]
+        puffNext = (puffNext + 1) % PUFFS
+        if (puff?.animate) {
+          const x = s.x - 8 - s.dir * 14
+          const y = s.y - 8
+          puff.animate(
+            [
+              { transform: `translate(${x}px, ${y}px) scale(0.4)`, opacity: 0.8 },
+              { transform: `translate(${x - s.dir * 10}px, ${y - 12}px) scale(1.5)`, opacity: 0 },
+            ],
+            { duration: 520, easing: 'ease-out' },
+          )
+        }
       }
 
       for (const c of TOWN_COINS) {
@@ -378,16 +404,20 @@ export function MapPage() {
                 </span>
                 <BuildingArt level={l.id} locked={!unlocked} />
                 <span className="mh-house-status">
-                  {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
+                  {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} size={14} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
                 </span>
               </button>
             )
           })}
 
           {TOWN_NPCS.map((n) => (
-            <div key={n.id} className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`} style={{ left: n.x - 32, top: n.y - 80, zIndex: n.y }}>
+            <div
+              key={n.id}
+              className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`}
+              style={{ left: n.x - 32, top: n.y - 80, zIndex: n.y, animationDelay: `${(n.x % 7) * -0.6}s` }}
+            >
               {nearNpc === n.id && <span className="mh-npc-hint">💬</span>}
-              <CharacterArt id={n.id} size={64} />
+              <CharacterArt id={n.id} size={64} mood={nearNpc === n.id ? 'happy' : 'normal'} />
             </div>
           ))}
 
@@ -423,6 +453,16 @@ export function MapPage() {
             </span>
           )}
 
+          {Array.from({ length: PUFFS }, (_, i) => (
+            <span
+              key={`p${i}`}
+              className="mh-puff"
+              ref={(el) => {
+                puffRefs.current[i] = el
+              }}
+              aria-hidden="true"
+            />
+          ))}
           <div className="mh-walker mh-town-walker" ref={heroRef} data-testid="mh-hero">
             <span className="mh-walker-shadow" />
             <div className="mh-walker-inner">
