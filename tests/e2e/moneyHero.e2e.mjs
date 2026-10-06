@@ -44,6 +44,8 @@ const server = http.createServer((request, response) => {
 })
 await new Promise((resolve) => server.listen(4174, resolve))
 const BASE = 'http://localhost:4174/money-hero.html'
+// ด่านสุดท้ายที่เปิดให้เล่นในเวอร์ชันนี้ (ตรงกับ PLAYABLE_MAX ใน MapPage.tsx)
+const LAST_LEVEL = 6
 
 const browser = await chromium.launch()
 const errors = []
@@ -371,16 +373,22 @@ for (const [name, viewport] of [
   })
 
   if (name === 'desktop') {
-    await step(`[${name}] เล่นต่อด่าน 1–6 จนจบทุกด่าน`, async () => {
-      for (let id = 1; id <= 6; id += 1) {
+    await step(`[${name}] เล่นต่อด่าน 1–${LAST_LEVEL} จนจบทุกด่าน`, async () => {
+      for (let id = 1; id <= LAST_LEVEL; id += 1) {
         await page.getByTestId('mh-next-level').click()
         await playLevel(page, id)
       }
+      if (LAST_LEVEL === 12) {
+        await page.getByTestId('mh-master').waitFor()
+        await page.getByText('คุณผ่านเนื้อหาเรื่องเงินครบทุกหัวข้อแล้ว').waitFor()
+        await snap(page, `${name}-money-master`)
+      }
       await page.getByTestId('mh-back-map').click()
-      await page.getByText('คุณเรียนรู้แล้ว 6 / 12 ด่าน').waitFor()
+      const passedText = `คุณเรียนรู้แล้ว ${LAST_LEVEL} / 12 ด่าน`
+      await page.getByText(passedText).waitFor()
       await page.reload()
-      await page.getByText('คุณเรียนรู้แล้ว 6 / 12 ด่าน').waitFor()
-      await snap(page, `${name}-map-after-6`)
+      await page.getByText(passedText).waitFor()
+      await snap(page, `${name}-map-after-all`)
     })
   }
 
