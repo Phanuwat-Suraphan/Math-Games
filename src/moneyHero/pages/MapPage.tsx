@@ -578,6 +578,9 @@ export function MapPage() {
         <Link to="/stats" className="mh-menu-tile">
           <span aria-hidden="true">📊</span>สถิติ
         </Link>
+        <Link to="/ar" className="mh-menu-tile mh-menu-ar" data-testid="mh-menu-ar">
+          <span aria-hidden="true">📷</span>ล่าเหรียญ AR
+        </Link>
         <Link to="/review" className="mh-menu-tile" data-testid="mh-menu-review">
           <span aria-hidden="true">🔁</span>ฝึกข้อที่ผิด
           {pendingMistakes(player).length > 0 && <em className="mh-menu-badge">{pendingMistakes(player).length}</em>}

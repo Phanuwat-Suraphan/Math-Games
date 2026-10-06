@@ -465,6 +465,38 @@ for (const [name, viewport] of [
     })
   }
 
+  await step(`[${name}] ล่าเหรียญ AR (เล่นแบบไม่ใช้กล้อง): เก็บเงินพอดีครบ 5 รอบ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-ar').click()
+    await page.getByTestId('mh-ar-intro').waitFor()
+    await snap(page, `${name}-ar-intro`)
+    await noSideScroll(page, 'หน้าล่าเหรียญ')
+    await page.getByTestId('mh-ar-play').click()
+    for (let r = 0; r < 5; r += 1) {
+      await page.getByTestId('mh-ar-target').waitFor()
+      const info = await page.evaluate(() => window.__MH_AR)
+      if (!info || info.round !== r) throw new Error(`ข้อมูลรอบไม่ตรง: ${JSON.stringify(info)}`)
+      if (r === 0) {
+        // ตรวจก่อนเก็บครบ ต้องบอกว่ายังขาด
+        await page.getByTestId(`mh-ar-coin-${info.solution[0]}`).evaluate((el) => el.click())
+        await page.getByTestId('mh-ar-check').click()
+        await page.getByTestId('mh-ar-wrong').waitFor()
+        for (const k of info.solution.slice(1)) await page.getByTestId(`mh-ar-coin-${k}`).evaluate((el) => el.click())
+      } else {
+        for (const k of info.solution) await page.getByTestId(`mh-ar-coin-${k}`).evaluate((el) => el.click())
+      }
+      if (r === 2) await snap(page, `${name}-ar-play`)
+      await page.getByTestId('mh-ar-check').click()
+      await page.getByTestId('mh-ar-right').waitFor()
+      await page.getByTestId('mh-ar-next').click()
+    }
+    await page.getByTestId('mh-ar-done').waitFor()
+    await snap(page, `${name}-ar-done`)
+    await noSideScroll(page, 'ผลล่าเหรียญ')
+    const p = await savedPlayer(page)
+    if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
+  })
+
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
     await page.goto(`${BASE}#/badges`)
     await page.getByTestId('mh-badge-pretest').waitFor()

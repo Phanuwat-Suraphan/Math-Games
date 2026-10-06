@@ -33,6 +33,7 @@ const scoring = load('engine/scoring.js')
 const town = load('data/town.js')
 const progress = load('engine/progress.js')
 const report = load('engine/report.js')
+const hunt = load('engine/coinHunt.js')
 
 let passed = 0
 const failures = []
@@ -566,6 +567,26 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   assert(lines[1].startsWith('"เอ, ""ก"""'), `ชื่อที่มีจุลภาคและอัญประกาศต้องถูกครอบ: ${lines[1].slice(0, 20)}`)
   const cols = lines[0].split(',').length
   for (const l of lines.slice(2)) eq(l.split(',').length, cols, 'จำนวนคอลัมน์ต้องเท่ากันทุกแถว')
+})
+
+test('ล่าเหรียญ AR: ทุกรอบมีทางเก็บได้พอดี และตัวตรวจบอกขาด/เกินถูกต้อง', () => {
+  for (let i = 0; i < 3000; i += 1) {
+    const round = i % hunt.HUNT_ROUNDS
+    const r = hunt.makeRound(round)
+    const lv = hunt.HUNT_LEVELS[round]
+    assert(r.target > 0, 'เป้าหมายต้องมากกว่า 0')
+    assert(r.spawns.every((id) => lv.allowed.includes(id)), `รอบ ${round} มีเงินชนิดที่ไม่อนุญาต`)
+    assert(new Set(r.solution).size === r.solution.length, 'ตำแหน่งคำตอบซ้ำ')
+    assert(r.spawns.length > r.solution.length, 'ต้องมีตัวหลอกด้วย')
+    const picked = r.solution.map((k) => r.spawns[k])
+    const ok = hunt.checkHunt(r.target, picked)
+    assert(ok.ok && ok.diff === 0, `ชุดคำตอบไม่พอดี (รอบ ${round})`)
+  }
+  const less = hunt.checkHunt(1000, ['b5'])
+  assert(!less.ok && less.diff === -500 && less.message.includes('ขาดอีก 5 บาท'), less.message)
+  const more = hunt.checkHunt(150, ['b1', 's50', 's25'])
+  assert(!more.ok && more.diff === 25 && more.message.includes('เกินมา 25 สตางค์'), more.message)
+  assert(!hunt.checkHunt(100, []).ok, 'ยังไม่เก็บอะไรต้องไม่ผ่าน')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

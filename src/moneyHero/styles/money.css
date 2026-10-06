@@ -4622,7 +4622,7 @@ button:disabled {
 
 .mh-map-menu {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 10px;
   margin: 12px 0;
 }
@@ -5827,4 +5827,230 @@ button:disabled {
 /* ตอสต์ได้ตราใหม่ เด้งเข้ามา */
 .mh-toast {
   animation: mh-pop-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+/* ================================================================== */
+/* มินิเกม AR ล่าเหรียญ                                                 */
+/* ================================================================== */
+
+.mh-menu-ar {
+  background: linear-gradient(180deg, #fff1fa, #ffd6ef);
+  border-color: #ffc2e4;
+}
+
+.mh-ar {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 14px;
+  background: linear-gradient(180deg, #8fd8ff 0%, #c7b8ff 60%, #ffd9f1 100%);
+}
+
+.mh-ar.is-camera {
+  background: #000;
+}
+
+.mh-ar-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.mh-ar-scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.mh-ar-bunting {
+  top: 0;
+}
+
+.mh-ar-hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 30vh;
+}
+
+.mh-ar-hills .mh-hills {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mh-ar > :not(.mh-ar-video):not(.mh-ar-scene) {
+  position: relative;
+  z-index: 1;
+}
+
+.mh-ar-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 26px;
+  flex-wrap: wrap;
+}
+
+.mh-ar-title {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 1.4em;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(43, 35, 80, 0.35);
+}
+
+.mh-ar-round {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 600;
+  font-size: 0.85em;
+}
+
+.mh-ar-intro {
+  max-width: 560px;
+  margin: 24px auto 0;
+}
+
+.mh-ar-note {
+  color: #9a4b00;
+  font-weight: 600;
+}
+
+/* เงินลอยไปมาในสนาม */
+.mh-ar-arena {
+  position: relative;
+  flex: 1;
+  min-height: 300px;
+  margin: 8px 0;
+}
+
+.mh-ar-float {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: none;
+  background: none;
+  padding: 6px;
+  cursor: pointer;
+  animation: mh-ar-drift var(--dur, 4s) ease-in-out var(--delay, 0s) infinite alternate;
+  filter: drop-shadow(0 8px 8px rgba(43, 35, 80, 0.35));
+  touch-action: manipulation;
+}
+
+.mh-ar-float::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 200, 0.55), transparent 70%);
+  animation: mh-twinkle 1.4s ease-in-out infinite alternate;
+  z-index: -1;
+}
+
+.mh-ar-float:active {
+  scale: 0.85;
+}
+
+@keyframes mh-ar-drift {
+  0% {
+    transform: translate(-50%, -50%) rotate(-6deg);
+  }
+  50% {
+    transform: translate(calc(-50% + 14px), calc(-50% - 18px)) rotate(4deg);
+  }
+  100% {
+    transform: translate(calc(-50% - 10px), calc(-50% + 10px)) rotate(-2deg);
+  }
+}
+
+/* แผงด้านล่าง */
+.mh-ar-hud {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.mh-ar-goal {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mh-ar-goal > b {
+  font-family: var(--mh-display);
+  font-size: 1.5em;
+  color: var(--mh-purple);
+}
+
+.mh-ar-now {
+  margin-left: auto;
+  background: #fff6c9;
+  border-radius: 999px;
+  padding: 2px 12px;
+}
+
+.mh-ar-wallet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 6px 8px;
+  border-radius: 16px;
+  background: rgba(43, 35, 80, 0.05);
+  border: 2px dashed #d9d2ff;
+}
+
+.mh-ar-chip {
+  border: none;
+  background: none;
+  padding: 2px;
+  animation: mh-pop-in 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.mh-ar-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: 16px;
+  font-weight: 600;
+  animation: mh-pop-in 0.35s ease-out both;
+}
+
+.mh-ar-result.is-ok {
+  background: #eafff5;
+  color: #0d7a4f;
+}
+
+.mh-ar-result.is-off {
+  background: #fff4e6;
+  color: #9a4b00;
+}
+
+.mh-ar .mh-row-buttons {
+  margin: 0;
+}
+
+@media (max-width: 560px) {
+  .mh-ar-arena {
+    min-height: 260px;
+  }
+  .mh-ar-float .mh-note {
+    width: 80px !important;
+    height: 40px !important;
+  }
 }
