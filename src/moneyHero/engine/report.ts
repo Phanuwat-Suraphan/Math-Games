@@ -38,6 +38,13 @@ export function skillPercent(p: Player, s: Skill): number | null {
   return st.attempts === 0 ? null : percent(accuracy(st))
 }
 
+/** วันเวลาแบบ 2026-10-06 14:05 (ไม่ขึ้นกับภาษาของเครื่อง Excel จึงเรียงลำดับได้) */
+export function dateText(ms: number): string {
+  const d = new Date(ms)
+  const two = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}:${two(d.getMinutes())}`
+}
+
 function csvCell(value: string | number | null): string {
   const text = value === null ? '' : String(value)
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
@@ -81,7 +88,50 @@ export function buildCsv(players: Player[]): string {
     ...SKILLS.map((s) => skillPercent(p, s)),
     weakSkills(p).map((s) => SKILL_NAMES[s]).join(' / '),
     p.mistakes.length,
-    new Date(p.lastPlayed).toLocaleString('th-TH'),
+    dateText(p.lastPlayed),
   ])
   return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
+}
+
+function average(xs: number[]): number | null {
+  return xs.length === 0 ? null : Math.round(xs.reduce((a, b) => a + b, 0) / xs.length)
+}
+
+export interface ClassSummary {
+  players: number
+  /** เปอร์เซ็นต์ตอบถูกเฉลี่ย (เฉพาะคนที่เคยทำโจทย์) */
+  accuracy: number | null
+  pre: number | null
+  post: number | null
+  /** พัฒนาการเฉลี่ย (เฉพาะคนที่ทำครบทั้งสองแบบทดสอบ) */
+  improvement: number | null
+  /** ค่าเฉลี่ยรายทักษะของทั้งห้อง */
+  skills: Record<Skill, number | null>
+  /** จำนวนนักเรียนที่ทักษะนั้นยังอ่อน */
+  weakCount: Record<Skill, number>
+}
+
+/** สรุปภาพรวมทั้งห้องสำหรับแผงคุณครู */
+export function classSummary(players: Player[]): ClassSummary {
+  const skills = {} as Record<Skill, number | null>
+  const weakCount = {} as Record<Skill, number>
+  for (const s of SKILLS) {
+    skills[s] = average(players.map((p) => skillPercent(p, s)).filter((v): v is number => v !== null))
+    weakCount[s] = players.filter((p) => weakSkills(p).includes(s)).length
+  }
+  return {
+    players: players.length,
+    accuracy: average(players.filter((p) => p.answered > 0).map((p) => percent(overallAccuracy(p)))),
+    pre: average(players.map((p) => testPercent(p.preTest)).filter((v): v is number => v !== null)),
+    post: average(players.map((p) => testPercent(p.postTest)).filter((v): v is number => v !== null)),
+    improvement: average(players.map((p) => improvement(p)).filter((v): v is number => v !== null)),
+    skills,
+    weakCount,
+  }
+}
+
+/** เปอร์เซ็นต์ถูกของทักษะหนึ่งในแบบทดสอบ */
+export function testSkillPercent(t: TestResult | undefined, s: Skill): number | null {
+  const v = t?.skills[s]
+  return v && v.total > 0 ? percent(v.correct / v.total) : null
 }

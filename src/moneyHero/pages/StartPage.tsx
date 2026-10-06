@@ -61,7 +61,7 @@ export function StartPage() {
         <div className="mh-card mh-start-actions">
           {player && (
             <div className="mh-continue">
-              <AvatarArt avatar={player.avatar} size={52} />
+              <AvatarArt avatar={player.avatar} size={52} portrait />
               <div>
                 <div className="mh-continue-name">{player.name}</div>
                 <div className="mh-continue-meta">

@@ -12,6 +12,7 @@ import { LearnSlides } from '../components/LearnSlides'
 import { StepRunner, type RunSummary } from '../components/StepRunner'
 import { JourneyMission } from '../components/JourneyMission'
 import { CharacterArt } from '../components/Art'
+import { BuildingArt } from '../components/BuildingArt'
 import { Stars } from '../components/Stars'
 import { CoinRain, Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
@@ -92,15 +93,19 @@ export function LevelPage() {
     <div className={`mh-level ${level.theme}`}>
       <TopBar compact />
       <div className="mh-page mh-level-page">
-        <div className="mh-level-head">
+        <div className="mh-level-head mh-level-scene">
           <Link to="/map" className="mh-icon-btn" aria-label="กลับแผนที่">
             <ArrowLeft size={24} />
           </Link>
-          <div>
+          <div className="mh-level-scene-text">
             <div className="mh-level-kicker">
               ด่าน {level.id} · {level.game}
             </div>
             <h1 className="mh-title mh-level-title">{level.name}</h1>
+          </div>
+          <div className="mh-level-scene-art" aria-hidden="true">
+            <BuildingArt level={level.id} className="mh-level-scene-bld" />
+            <CharacterArt id={level.npc} size={64} className="mh-level-scene-npc" />
           </div>
         </div>
         <StepTrack level={level} rec={rec} current={step} />

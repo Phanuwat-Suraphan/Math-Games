@@ -2,35 +2,44 @@ import type { DenomId, NpcId } from '../engine/types'
 import { denom } from '../data/denominations'
 import { AVATARS, CHARACTERS, avatarById } from '../data/characters'
 import { useImage } from '../hooks/useImage'
+import { CharacterSvg, isDrawn, type CharacterKind } from './CharacterSvg'
 
 /**
  * ภาพตัวละครและเงิน
- * ใช้รูปจริงจาก public/money-hero/ ถ้ามี ไม่งั้นวาดเองด้วย SVG / อีโมจิ
+ * ใช้รูปจริงจาก public/money-hero/ ถ้ามี ไม่งั้นใช้ภาพวาด SVG (components/CharacterSvg.tsx)
  */
 
-export function CharacterArt({ id, size = 96, className = '' }: { id: NpcId; size?: number; className?: string }) {
-  const c = CHARACTERS[id]
-  const src = useImage(c.image)
+/** วงกลมรูปหน้า (ใช้ในแถบบน กล่องคำพูด รายชื่อผู้เล่น) */
+function Portrait({ kind, size, tint, src, className, label }: { kind: CharacterKind | null; size: number; tint: string; src: string | null; className: string; label: string }) {
   return (
-    <div className={`mh-char ${className}`} style={{ width: size, height: size * 1.25 }} aria-label={c.name} role="img">
-      {src ? (
-        <img src={src} alt="" className="mh-char-img" draggable={false} />
-      ) : (
-        <div className="mh-char-fallback" style={{ background: c.tint, fontSize: size * 0.55 }}>
-          {c.emoji}
-        </div>
-      )}
+    <div className={`mh-portrait ${className}`} style={{ width: size, height: size, background: tint }} aria-label={label} role="img">
+      {src ? <img src={src} alt="" className="mh-portrait-img" draggable={false} /> : kind ? <CharacterSvg kind={kind} portrait /> : null}
     </div>
   )
 }
 
-export function AvatarArt({ avatar, size = 80, className = '' }: { avatar: string; size?: number; className?: string }) {
+export function CharacterArt({ id, size = 96, className = '', portrait = false }: { id: NpcId; size?: number; className?: string; portrait?: boolean }) {
+  const c = CHARACTERS[id]
+  const src = useImage(c.image)
+  if (portrait) return <Portrait kind={id} size={size} tint={c.tint} src={src} className={className} label={c.name} />
+  return (
+    <div className={`mh-char ${className}`} style={{ width: size, height: size * 1.25 }} aria-label={c.name} role="img">
+      {src ? <img src={src} alt="" className="mh-char-img" draggable={false} /> : <CharacterSvg kind={id} />}
+    </div>
+  )
+}
+
+export function AvatarArt({ avatar, size = 80, className = '', portrait = false }: { avatar: string; size?: number; className?: string; portrait?: boolean }) {
   const a = avatarById(avatar)
   const src = useImage(a.image)
+  const kind = isDrawn(a.id) ? a.id : null
+  if (portrait) return <Portrait kind={kind} size={size} tint="linear-gradient(180deg,#fff3c4,#ffd36b)" src={src} className={className} label={a.name} />
   return (
     <div className={`mh-char ${className}`} style={{ width: size, height: size * 1.25 }} aria-label={a.name} role="img">
       {src ? (
         <img src={src} alt="" className="mh-char-img" draggable={false} />
+      ) : kind ? (
+        <CharacterSvg kind={kind} />
       ) : (
         <div className="mh-char-fallback mh-avatar-fallback" style={{ fontSize: size * 0.58 }}>
           {a.emoji}

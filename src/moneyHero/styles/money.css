@@ -594,6 +594,147 @@ button:disabled {
   line-height: 1;
 }
 
+/* ตัวละครวาดด้วย SVG: หายใจ กะพริบตา และเดินได้ */
+.mh-cs {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+  filter: drop-shadow(0 4px 5px rgba(43, 35, 80, 0.18));
+}
+
+.mh-cs .mh-cs-body {
+  animation: mh-cs-breathe 2.8s ease-in-out infinite;
+}
+
+.mh-cs .mh-cs-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mh-cs-blink 4.6s infinite;
+}
+
+.mh-cs .mh-cs-leg,
+.mh-cs .mh-cs-arm {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+}
+
+.mh-cs .mh-cs-tail {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: mh-cs-wag 1.8s ease-in-out infinite;
+}
+
+.mh-cs .mh-cs-cape {
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+  animation: mh-cs-cape 2.2s ease-in-out infinite;
+}
+
+.is-walking .mh-cs .mh-cs-leg-l,
+.is-walking .mh-cs .mh-cs-arm-r {
+  animation: mh-cs-swing 0.42s ease-in-out infinite alternate;
+}
+
+.is-walking .mh-cs .mh-cs-leg-r,
+.is-walking .mh-cs .mh-cs-arm-l {
+  animation: mh-cs-swing 0.42s ease-in-out infinite alternate-reverse;
+}
+
+.is-walking .mh-cs .mh-cs-body {
+  animation: mh-cs-step 0.21s ease-in-out infinite alternate;
+}
+
+@keyframes mh-cs-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-1.4px);
+  }
+}
+
+@keyframes mh-cs-blink {
+  0%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+  97% {
+    transform: scaleY(0.12);
+  }
+}
+
+@keyframes mh-cs-swing {
+  from {
+    transform: rotate(-16deg);
+  }
+  to {
+    transform: rotate(16deg);
+  }
+}
+
+@keyframes mh-cs-step {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes mh-cs-wag {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-7deg);
+  }
+}
+
+@keyframes mh-cs-cape {
+  0%,
+  100% {
+    transform: skewX(0deg);
+  }
+  50% {
+    transform: skewX(-4deg);
+  }
+}
+
+.mh-portrait {
+  position: relative;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px -4px rgba(43, 35, 80, 0.45), inset 0 -6px 0 rgba(0, 0, 0, 0.06);
+}
+
+.mh-portrait .mh-cs {
+  filter: none;
+}
+
+.mh-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+}
+
+.mh-reduce-motion .mh-cs *,
+.mh-reduce-motion .mh-cs {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mh-cs * {
+    animation: none !important;
+  }
+}
+
 .mh-avatar-fallback {
   background: linear-gradient(180deg, #ffe9a8, #ffc75a);
 }
@@ -678,9 +819,10 @@ button:disabled {
   min-width: 0;
 }
 
-.mh-topbar-player .mh-char {
+.mh-topbar-player .mh-portrait {
   width: 40px !important;
   height: 40px !important;
+  border-width: 2px;
 }
 
 .mh-topbar-name {
@@ -762,7 +904,7 @@ button:disabled {
 
 /* ตัวละครหน้าแรก ย่อตามความกว้างจอ ไม่ล้นบนมือถือ */
 .mh-start-cast .mh-char.mh-cast-sm {
-  width: min(13.5vw, 78px) !important;
+  width: min(15vw, 100px) !important;
   height: auto !important;
   aspect-ratio: 4 / 5;
 }
@@ -938,20 +1080,6 @@ button:disabled {
   color: var(--mh-ink-soft);
   margin: 10px 0 0;
   font-size: 0.92em;
-}
-
-.mh-soon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  text-align: center;
-  padding: 28px 18px;
-}
-
-.mh-soon-text {
-  font-size: 1.1em;
-  margin: 0;
 }
 
 .mh-splash-hero {
@@ -1275,10 +1403,10 @@ button:disabled {
 @keyframes mh-walk {
   0%,
   100% {
-    transform: translateY(0) rotate(-3deg);
+    transform: translateY(0) rotate(-1.5deg);
   }
   50% {
-    transform: translateY(-7px) rotate(3deg);
+    transform: translateY(-3px) rotate(1.5deg);
   }
 }
 
@@ -1306,7 +1434,8 @@ button:disabled {
 }
 
 .mh-level-panel-icon {
-  font-size: 46px;
+  width: 64px;
+  flex: 0 0 auto;
 }
 
 .mh-level-panel-info {
@@ -1402,7 +1531,8 @@ button:disabled {
 }
 
 .mh-level-card-icon {
-  font-size: 38px;
+  width: 58px;
+  flex: 0 0 auto;
 }
 
 .mh-level-card-body {
@@ -1630,6 +1760,76 @@ button:disabled {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* หัวด่านแบบฉาก: ท้องฟ้า พื้นหญ้า อาคารของด่าน และเพื่อนผู้นำทาง */
+.mh-level-scene {
+  position: relative;
+  align-items: flex-end;
+  min-height: 132px;
+  padding: 12px 14px 18px;
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  box-shadow: 0 10px 24px -14px rgba(43, 35, 80, 0.55);
+}
+
+.mh-level-scene::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  right: -10px;
+  bottom: -26px;
+  height: 46px;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(180deg, #8fd16a, #6db34e);
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, 0.35);
+}
+
+.mh-level-scene > .mh-icon-btn {
+  align-self: flex-start;
+  z-index: 1;
+}
+
+.mh-level-scene-text {
+  flex: 1;
+  min-width: 0;
+  z-index: 1;
+  padding-bottom: 14px;
+}
+
+.mh-level-scene-art {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  flex: 0 0 auto;
+  margin-bottom: -6px;
+}
+
+.mh-level-scene-bld {
+  width: 132px;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 6px 4px rgba(30, 60, 20, 0.25));
+}
+
+.mh-level-scene-npc {
+  margin-left: -18px;
+}
+
+@media (max-width: 560px) {
+  .mh-level-scene {
+    min-height: 0;
+    padding: 10px 10px 16px;
+  }
+  .mh-level-scene-bld {
+    width: 84px;
+  }
+  .mh-level-scene-npc {
+    display: none !important;
+  }
 }
 
 .mh-level-kicker {
@@ -3238,7 +3438,7 @@ button:disabled {
     gap: 8px;
   }
   .mh-world-overlay .mh-level-panel-icon {
-    font-size: 34px;
+    width: 48px;
   }
   .mh-world-overlay .mh-level-panel .mh-btn {
     min-height: 48px;
@@ -3786,19 +3986,285 @@ button:disabled {
 
 .mh-town-npc {
   position: absolute;
-  width: 60px;
+  width: 64px;
 }
 
+.mh-thumb-bld {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 3px 2px rgba(30, 60, 20, 0.25));
+}
+
+/* เหรียญบนแผนที่: หมุนวาว ๆ มีเงาบนพื้น */
 .mh-town-coin {
+  position: absolute;
+  width: 30px;
+  height: 38px;
+  pointer-events: none;
+}
+
+.mh-town-coin::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  bottom: 0;
+  width: 18px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(30, 60, 20, 0.25);
+}
+
+.mh-coin-spin {
+  position: absolute;
+  left: 0;
+  top: 0;
   width: 30px;
   height: 30px;
-  font-size: 0.85em;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff8d0 0%, #ffd23f 42%, #e09a00 100%);
+  box-shadow: inset 0 0 0 3px rgba(200, 130, 0, 0.65), 0 3px 6px -2px rgba(140, 90, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  color: #8a5a00;
+  animation: mh-coin-spin 1.8s ease-in-out infinite;
+}
+
+@keyframes mh-coin-spin {
+  0%,
+  100% {
+    transform: translateY(0) scaleX(1);
+  }
+  25% {
+    transform: translateY(-3px) scaleX(0.18);
+  }
+  50% {
+    transform: translateY(-5px) scaleX(1);
+  }
+  75% {
+    transform: translateY(-3px) scaleX(0.18);
+  }
+}
+
+/* ประกายบนผิวน้ำ เลื่อนไปทางขวาช้า ๆ (ขยับด้วย transform จึงไม่หนักเครื่อง) */
+.mh-river-shine {
+  position: absolute;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mh-river-shine i {
+  position: absolute;
+  left: -160px;
+  top: 0;
+  right: -160px;
+  bottom: 0;
+  background-image: radial-gradient(ellipse 22px 3px at 30% 30%, rgba(255, 255, 255, 0.7), transparent 70%),
+    radial-gradient(ellipse 16px 2.5px at 75% 75%, rgba(255, 255, 255, 0.55), transparent 70%);
+  background-size: 160px 42px;
+  animation: mh-river-flow 7s linear infinite;
+  will-change: transform;
+}
+
+@keyframes mh-river-flow {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(160px);
+  }
+}
+
+/* เงาเมฆลอยผ่าน ทำให้เมืองดูมีแสงแดดจริง */
+.mh-cloud-shadow {
+  position: absolute;
+  left: 0;
+  width: 720px;
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(20, 50, 30, 0.16) 0%, rgba(20, 50, 30, 0.08) 45%, transparent 70%);
+  pointer-events: none;
+  z-index: 4500;
+  animation: mh-cloud-drift 70s linear infinite;
+  will-change: transform;
+}
+
+.mh-cloud-2 {
+  animation-duration: 95s;
+  animation-delay: -40s;
+}
+
+.mh-cloud-3 {
+  animation-duration: 82s;
+  animation-delay: -66s;
+}
+
+@keyframes mh-cloud-drift {
+  from {
+    transform: translateX(-760px);
+  }
+  to {
+    transform: translateX(2300px);
+  }
+}
+
+.mh-butterfly {
+  position: absolute;
+  pointer-events: none;
+  z-index: 3500;
+  animation: mh-flutter-path 9s ease-in-out infinite;
+}
+
+.mh-butterfly svg {
+  display: block;
+  overflow: visible;
+}
+
+.mh-wing {
+  transform-box: fill-box;
+  transform-origin: 100% 50%;
+  animation: mh-flap 0.28s ease-in-out infinite alternate;
+}
+
+.mh-wing-r {
+  transform-origin: 0% 50%;
+}
+
+@keyframes mh-flap {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0.25);
+  }
+}
+
+@keyframes mh-flutter-path {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(60px, -30px);
+  }
+  50% {
+    transform: translate(110px, 10px);
+  }
+  75% {
+    transform: translate(40px, 30px);
+  }
+}
+
+/* ชิ้นที่ขยับได้ในอาคาร */
+.mh-smoke-puff {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mh-smoke 2.7s ease-out infinite;
+  opacity: 0;
+}
+
+@keyframes mh-smoke {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate(10px, -30px) scale(1.8);
+    opacity: 0;
+  }
+}
+
+.mh-fire {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: mh-fire 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes mh-fire {
+  from {
+    transform: scale(1, 1);
+  }
+  to {
+    transform: scale(0.88, 1.12);
+  }
+}
+
+.mh-flag {
+  transform-box: fill-box;
+  transform-origin: 0% 50%;
+  animation: mh-flag 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes mh-flag {
+  from {
+    transform: scaleX(1) skewY(0deg);
+  }
+  to {
+    transform: scaleX(0.82) skewY(6deg);
+  }
+}
+
+.mh-gear {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mh-spin 6s linear infinite;
+}
+
+.mh-radar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: mh-radar 3s ease-in-out infinite alternate;
+}
+
+@keyframes mh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes mh-radar {
+  from {
+    transform: rotate(-18deg);
+  }
+  to {
+    transform: rotate(18deg);
+  }
+}
+
+.mh-house.is-locked .mh-smoke-puff,
+.mh-house.is-locked .mh-flag,
+.mh-house.is-locked .mh-gear {
+  animation: none;
+}
+
+.mh-town-walker:has(.mh-cs) .mh-walker-shadow {
+  display: none;
+}
+
+.mh-reduce-motion .mh-coin-spin,
+.mh-reduce-motion .mh-river-shine i,
+.mh-reduce-motion .mh-cloud-shadow,
+.mh-reduce-motion .mh-butterfly,
+.mh-reduce-motion .mh-wing,
+.mh-reduce-motion .mh-smoke-puff,
+.mh-reduce-motion .mh-fire,
+.mh-reduce-motion .mh-flag,
+.mh-reduce-motion .mh-gear,
+.mh-reduce-motion .mh-radar {
+  animation: none !important;
 }
 
 .mh-town-walker {
   bottom: auto;
   top: 0;
-  width: 68px;
+  width: 74px;
 }
 
 .mh-town-walker .mh-walker-shadow {
@@ -3887,4 +4353,767 @@ button:disabled {
 
 .mh-town {
   transform-origin: 0 0;
+}
+
+/* ================================================================== */
+/* ส่วนที่ 3: แบบทดสอบ ตรา โปรไฟล์ สถิติ ฝึกข้อที่ผิด แผงคุณครู         */
+/* ================================================================== */
+
+.mh-section-title {
+  font-family: var(--mh-display);
+  font-size: 1.2em;
+  color: #fff;
+  text-shadow: 0 2px 0 rgba(43, 35, 80, 0.3);
+  margin: 22px 0 10px;
+}
+
+.mh-card-title {
+  font-family: var(--mh-display);
+  font-size: 1.08em;
+  margin: 0 0 8px;
+}
+
+.mh-btn-sm {
+  min-height: 42px;
+  padding: 6px 14px;
+  font-size: 0.9em;
+  border-radius: 14px;
+}
+
+.mh-icon-btn-sm {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  font-size: 16px;
+  box-shadow: 0 3px 0 rgba(43, 35, 80, 0.12);
+}
+
+.mh-link {
+  color: #4b3dc4;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+/* ---------- แผนที่: ป้ายแบบทดสอบ และเมนู ---------- */
+.mh-test-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  padding: 10px 14px;
+  text-decoration: none;
+  color: var(--mh-ink);
+  border-color: #ffe08a;
+  background: linear-gradient(90deg, rgba(255, 246, 214, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.mh-test-banner.is-post {
+  border-color: #c9b6ff;
+  background: linear-gradient(90deg, rgba(238, 230, 255, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.mh-test-banner > span:nth-child(2) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mh-test-banner > span:nth-child(2) > span {
+  font-size: 0.85em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-test-banner-icon {
+  font-size: 34px;
+}
+
+.mh-map-menu {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.mh-menu-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: 18px;
+  background: var(--mh-card-strong);
+  border: 2px solid #fff;
+  box-shadow: 0 5px 0 rgba(43, 35, 80, 0.12);
+  color: var(--mh-ink);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.85em;
+  text-align: center;
+}
+
+.mh-menu-tile > span {
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.mh-menu-badge {
+  position: absolute;
+  top: -6px;
+  right: -4px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--mh-red);
+  color: #fff;
+  font-style: normal;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+}
+
+/* ---------- ช่องสถิติ ---------- */
+.mh-stat-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.mh-stat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 12px 8px;
+  border-radius: 18px;
+  background: var(--mh-card-strong);
+  border: 2px solid #fff;
+  box-shadow: 0 5px 0 rgba(43, 35, 80, 0.1);
+  text-align: center;
+}
+
+.mh-stat-tile-icon {
+  font-size: 24px;
+}
+
+.mh-stat-tile-value {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 1.35em;
+  line-height: 1.2;
+}
+
+.mh-stat-tile-label {
+  font-size: 0.82em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-stat-tile-sub {
+  font-size: 0.72em;
+  color: var(--mh-ink-soft);
+}
+
+/* ---------- แผนภูมิแท่ง ---------- */
+.mh-chart {
+  margin: 0;
+}
+
+.mh-chart-caption {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.mh-bars,
+.mh-pairs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mh-bar-row,
+.mh-pair-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 36%) 1fr 104px;
+  align-items: center;
+  gap: 10px;
+}
+
+.mh-pair-row {
+  grid-template-columns: minmax(118px, 36%) 1fr 116px;
+}
+
+.mh-bar-label {
+  font-size: 0.86em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mh-meter-track {
+  position: relative;
+  display: block;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(43, 35, 80, 0.08);
+  overflow: hidden;
+}
+
+.mh-meter-track.is-thin {
+  height: 9px;
+}
+
+.mh-meter-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 0 4px 4px 0;
+  background: #2a78d6;
+}
+
+.mh-fill-pre {
+  background: #2a78d6;
+}
+
+.mh-fill-post {
+  background: #eb6834;
+}
+
+.mh-bar-value {
+  font-weight: 700;
+  font-size: 0.86em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-start;
+}
+
+.mh-weak-tag {
+  font-size: 0.78em;
+  font-weight: 600;
+  color: #9a4b00;
+  background: #fff1d6;
+  border-radius: 999px;
+  padding: 1px 7px;
+  white-space: nowrap;
+}
+
+.mh-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85em;
+  margin-bottom: 10px;
+}
+
+.mh-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mh-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.mh-swatch-pre {
+  background: #2a78d6;
+}
+
+.mh-swatch-post {
+  background: #eb6834;
+}
+
+.mh-pair-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mh-pair-row.is-total {
+  padding-bottom: 8px;
+  border-bottom: 2px dashed var(--mh-line);
+  font-weight: 700;
+}
+
+.mh-pair-value {
+  white-space: nowrap;
+}
+
+.mh-diff {
+  font-size: 0.82em;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.mh-diff.is-up,
+.mh-up {
+  color: #0d7a4f;
+}
+
+.mh-diff.is-down,
+.mh-down {
+  color: #b3261e;
+}
+
+/* ---------- แบบทดสอบ ---------- */
+.mh-test-lead {
+  font-size: 1.1em;
+  max-width: 520px;
+  margin: 4px 0;
+}
+
+.mh-test-rules {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+
+.mh-test-result {
+  position: relative;
+  overflow: hidden;
+}
+
+.mh-test-score {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mh-test-score-num {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 2.6em;
+  line-height: 1;
+}
+
+.mh-test-score-num small {
+  font-size: 0.45em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-test-score-pct {
+  display: inline-block;
+  margin-top: 4px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(90deg, #ff9a3c, #ff6f91);
+  border-radius: 999px;
+  padding: 2px 12px;
+}
+
+.mh-test-result .mh-chart {
+  margin: 8px 0 14px;
+}
+
+/* ---------- ตรา ---------- */
+.mh-badge-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mh-badge-summary > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mh-badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.mh-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 14px 10px;
+  border-radius: 20px;
+  background: var(--mh-card-strong);
+  border: 2px solid #fff;
+  box-shadow: 0 6px 0 rgba(43, 35, 80, 0.1);
+}
+
+.mh-badge-medal {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 35% 30%, #fff8d0, #ffd23f 55%, #e09a00);
+  box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.55), 0 6px 12px -4px rgba(160, 100, 0, 0.6);
+}
+
+.mh-badge-icon {
+  font-size: 36px;
+}
+
+.mh-badge.is-locked .mh-badge-medal {
+  background: radial-gradient(circle at 35% 30%, #ffffff, #dedbe9 60%, #b9b4cc);
+  box-shadow: inset 0 0 0 5px rgba(255, 255, 255, 0.55);
+}
+
+.mh-badge.is-locked .mh-badge-icon {
+  font-size: 26px;
+  opacity: 0.7;
+}
+
+.mh-badge.is-locked .mh-badge-name {
+  color: var(--mh-ink-soft);
+}
+
+.mh-badge-name {
+  font-size: 0.92em;
+}
+
+.mh-badge-how {
+  font-size: 0.78em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-badge.is-earned .mh-badge-how {
+  color: #0d7a4f;
+  font-weight: 600;
+}
+
+/* ---------- โปรไฟล์ ---------- */
+.mh-profile {
+  display: grid;
+  grid-template-columns: minmax(260px, 340px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.mh-profile-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.mh-pedestal {
+  position: relative;
+  isolation: isolate;
+  padding: 10px 30px 18px;
+}
+
+.mh-pedestal::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 0;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, #ffe9a8, #ffc75a 60%, #e89b00);
+  box-shadow: 0 6px 0 #c98400;
+  z-index: -1;
+}
+
+.mh-profile-name {
+  font-family: var(--mh-display);
+  font-size: 1.5em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mh-rename {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.mh-rename .mh-text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.mh-lv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  font-size: 0.85em;
+}
+
+.mh-exp-bar {
+  flex: 1;
+  height: 14px;
+}
+
+.mh-avatar-pick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mh-avatar-chip {
+  border: 3px solid transparent;
+  background: none;
+  border-radius: 50%;
+  padding: 2px;
+}
+
+.mh-avatar-chip.is-on {
+  border-color: var(--mh-purple);
+}
+
+.mh-profile-side .mh-stat-tiles {
+  margin-top: 0;
+}
+
+.mh-test-card {
+  margin-bottom: 12px;
+}
+
+.mh-test-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mh-test-pair > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: rgba(43, 35, 80, 0.05);
+}
+
+/* ---------- สถิติ ---------- */
+.mh-stats-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.mh-stats-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mh-review-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mh-review-card p {
+  margin: 0 0 8px;
+}
+
+.mh-advice,
+.mh-weak-list,
+.mh-mistake-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mh-level-stars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+.mh-level-star {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border-radius: 18px;
+  background: var(--mh-card);
+  border: 2px solid #fff;
+  font-size: 0.85em;
+}
+
+.mh-level-star .mh-thumb-bld {
+  width: 70px;
+}
+
+.mh-level-star.is-done {
+  background: var(--mh-card-strong);
+  border-color: #ffe08a;
+}
+
+/* ---------- แผงคุณครู ---------- */
+.mh-teacher .mh-page-head {
+  flex-wrap: wrap;
+}
+
+.mh-teacher-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.mh-teacher .mh-section-title {
+  color: var(--mh-ink);
+  text-shadow: none;
+}
+
+.mh-table-wrap {
+  overflow-x: auto;
+  padding: 10px;
+}
+
+.mh-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.mh-table th {
+  text-align: left;
+  font-weight: 700;
+  color: var(--mh-ink-soft);
+  padding: 8px;
+  border-bottom: 2px solid var(--mh-line);
+}
+
+.mh-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--mh-line);
+}
+
+.mh-table tr.is-open td {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.mh-table-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: none;
+  padding: 2px;
+  font-weight: 700;
+  text-decoration: underline dotted;
+}
+
+.mh-table-name .mh-portrait {
+  border-width: 2px;
+}
+
+.mh-table-weak {
+  font-size: 1.1em;
+}
+
+.mh-table-note {
+  margin: 8px 4px 0;
+  font-size: 0.8em;
+}
+
+.mh-student {
+  margin-top: 16px;
+}
+
+.mh-student-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mh-student .mh-chart + .mh-card-title,
+.mh-student h4.mh-card-title {
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .mh-profile,
+  .mh-stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .mh-map-menu {
+    gap: 6px;
+  }
+  .mh-menu-tile {
+    font-size: 0.74em;
+    padding: 8px 2px;
+  }
+  .mh-menu-tile > span {
+    font-size: 24px;
+  }
+  .mh-bar-row {
+    grid-template-columns: minmax(92px, 34%) 1fr 78px;
+    gap: 6px;
+  }
+  .mh-bar-label {
+    white-space: normal;
+    line-height: 1.2;
+    font-size: 0.8em;
+  }
+  .mh-weak-text {
+    display: none;
+  }
+  .mh-pair-row {
+    grid-template-columns: minmax(92px, 34%) 1fr 104px;
+    gap: 6px;
+  }
+  .mh-test-banner .mh-btn {
+    display: none;
+  }
+  .mh-test-score-num {
+    font-size: 2em;
+  }
+  .mh-teacher-actions {
+    margin-left: 0;
+    width: 100%;
+  }
+  .mh-teacher-actions .mh-btn {
+    flex: 1;
+  }
+}
+
+@media print {
+  body.mh-body {
+    background: #fff !important;
+  }
+  .mh-sky,
+  .mh-teacher-actions,
+  .mh-teacher .mh-icon-btn,
+  .mh-toasts {
+    display: none !important;
+  }
+  .mh-card {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
 }

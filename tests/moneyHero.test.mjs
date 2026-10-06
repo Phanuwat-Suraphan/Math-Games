@@ -31,6 +31,8 @@ const ledger = load('generators/ledger.js')
 const journey = load('generators/journey.js')
 const scoring = load('engine/scoring.js')
 const town = load('data/town.js')
+const progress = load('engine/progress.js')
+const report = load('engine/report.js')
 
 let passed = 0
 const failures = []
@@ -471,6 +473,99 @@ test('เมือง: ต้นไม้ไม่ทับอาคาร ไ�
     const beside = { x: n.x, y: n.y - 40 }
     assert(town.walkable(beside) || town.walkable({ x: n.x + 40, y: n.y }), `เดินไปหา${n.id}ไม่ได้`)
   }
+})
+
+/* ------------------------------------------------------------------ */
+/* แบบทดสอบ ฝึกข้อที่ผิด และรายงานคุณครู                                 */
+/* ------------------------------------------------------------------ */
+
+function fakeRun(bySkill) {
+  let firstTry = 0
+  let originals = 0
+  for (const v of Object.values(bySkill)) {
+    firstTry += v.correct
+    originals += v.total
+  }
+  return { firstTry, originals, ms: 90000, bySkill }
+}
+
+test('แบบทดสอบ: สรุปคะแนนรายทักษะ และรางวัลได้ครั้งแรกครั้งเดียว', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  const pre = progress.testResultFrom(fakeRun({ count: { correct: 1, total: 2 }, compare: { correct: 2, total: 4 } }), 5)
+  eq(pre.score, 3, 'คะแนนรวม')
+  eq(pre.total, 6, 'จำนวนข้อ')
+  eq(pre.skills.count.total, 2, 'ทักษะ count')
+  eq(pre.skills.ledger.total, 0, 'ทักษะที่ไม่มีในชุดต้องเป็น 0')
+  p = progress.recordTest(p, 'pre', pre)
+  eq(p.exp, progress.TEST_REWARD.pre.exp, 'EXP ครั้งแรก')
+  p = progress.recordTest(p, 'pre', pre)
+  eq(p.exp, progress.TEST_REWARD.pre.exp, 'ทำซ้ำต้องไม่ได้ EXP เพิ่ม')
+  eq(report.testPercent(p.preTest), 50, 'เปอร์เซ็นต์ก่อนเรียน')
+  assert(progress.newBadges(p).includes('pretest'), 'ต้องได้ตรานักสำรวจพลัง')
+  assert(!progress.canTakePostTest(p), 'ยังไม่ผ่านด่าน 12 ต้องยังทำหลังเรียนไม่ได้')
+  p = { ...p, levels: { 12: { ...progress.emptyLevel(), stepDone: 4 } } }
+  assert(progress.canTakePostTest(p), 'ผ่านด่าน 12 แล้วต้องทำหลังเรียนได้')
+  // หลังเรียน 20 ข้อ ถูก 13 ข้อ (65%) มากกว่าก่อนเรียน (50%) แม้จำนวนข้อไม่เท่ากัน
+  const post = progress.testResultFrom(fakeRun({ count: { correct: 7, total: 10 }, compare: { correct: 6, total: 10 } }))
+  p = progress.recordTest(p, 'post', post)
+  eq(report.improvement(p), 15, 'พัฒนาการ')
+  const badges = progress.newBadges(p)
+  assert(badges.includes('posttest') && badges.includes('improver'), `ตราหลังเรียนไม่ครบ: ${badges}`)
+  eq(report.testSkillPercent(p.postTest, 'count'), 70, 'เปอร์เซ็นต์รายทักษะ')
+  eq(report.testSkillPercent(p.postTest, 'ledger'), null, 'ทักษะที่ไม่ได้สอบต้องเป็น null')
+})
+
+test('ตราเก่งขึ้นทุกวัน: เทียบเป็นเปอร์เซ็นต์ ไม่ใช่จำนวนข้อ', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  // ก่อนเรียน 15/18 (83%) หลังเรียน 16/20 (80%) จำนวนข้อมากกว่าแต่เปอร์เซ็นต์น้อยกว่า
+  p = progress.recordTest(p, 'pre', { score: 15, total: 18, timeMs: 1, at: 1, skills: progress.emptyTestSkills() })
+  p = progress.recordTest(p, 'post', { score: 16, total: 20, timeMs: 1, at: 2, skills: progress.emptyTestSkills() })
+  assert(!progress.newBadges(p).includes('improver'), 'คะแนนลดลงแต่ได้ตราเก่งขึ้น')
+})
+
+test('ฝึกข้อที่ผิด: แบบโจทย์ละ 1 ข้อ ล่าสุดก่อน และแก้แล้วไม่กลับมาอีก', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  const q1 = gens.regenerate('compare', 2)
+  const q2 = gens.regenerate('add', 1)
+  for (const q of [q1, q1, q2]) p = progress.recordAnswer(p, q, 4, false, 1000, 0)
+  const pending = progress.pendingMistakes(p)
+  eq(pending.length, 2, 'จำนวนแบบโจทย์ที่ต้องฝึก')
+  eq(pending[0].gen, 'add', 'ข้อล่าสุดต้องมาก่อน')
+  p = progress.markMistakeFixed(p, 'compare')
+  eq(progress.pendingMistakes(p).length, 1, 'แก้แล้วต้องหายจากรายการ')
+  assert(p.mistakes.filter((m) => m.gen === 'compare').every((m) => m.fixed), 'ต้องทำเครื่องหมายทุกข้อของแบบนั้น')
+  eq(progress.markMistakeFixed(p, 'compare'), p, 'ไม่มีอะไรเปลี่ยนต้องคืนตัวเดิม')
+  // แบบทดสอบ (levelId -1) ไม่นับเป็นข้อที่ต้องฝึก
+  p = progress.recordAnswer(p, gens.regenerate('divide', 1), -1, false, 1000, 0)
+  eq(progress.pendingMistakes(p).length, 1, 'ข้อผิดในแบบทดสอบต้องไม่ถูกบันทึก')
+  for (const m of progress.pendingMistakes(p)) validateQuestion(gens.regenerate(m.gen, m.difficulty), `ฝึกซ้ำ ${m.gen}`)
+})
+
+test('แผงคุณครู: ค่าเฉลี่ยทั้งห้องไม่นับคนที่ยังไม่มีข้อมูล และ CSV ถูกต้อง', () => {
+  const a = progress.newPlayer('เอ, "ก"', 'hero', 1)
+  a.skills.count = { attempts: 4, correct: 2, timeMs: 1 }
+  a.answered = 4
+  a.preTest = { score: 9, total: 18, timeMs: 60000, at: 1, skills: progress.emptyTestSkills() }
+  a.postTest = { score: 18, total: 20, timeMs: 60000, at: 2, skills: progress.emptyTestSkills() }
+  const b = progress.newPlayer('บี', 'wizard', 2)
+  b.skills.count = { attempts: 4, correct: 4, timeMs: 1 }
+  b.answered = 4
+  const c = progress.newPlayer('ซี', 'adventurer', 3)
+  const sum = report.classSummary([a, b, c])
+  eq(sum.players, 3, 'จำนวนนักเรียน')
+  eq(sum.skills.count, 75, 'ค่าเฉลี่ยทักษะ (50% กับ 100%)')
+  eq(sum.skills.ledger, null, 'ทักษะที่ไม่มีใครทำต้องเป็น null')
+  eq(sum.accuracy, 75, 'ตอบถูกเฉลี่ยไม่นับคนที่ยังไม่ทำ')
+  eq(sum.pre, 50, 'ก่อนเรียนเฉลี่ย')
+  eq(sum.improvement, 40, 'พัฒนาการเฉลี่ย')
+  eq(sum.weakCount.count, 1, 'จำนวนคนที่ทักษะอ่อน')
+  const csv = report.buildCsv([a, b, c])
+  assert(csv.charCodeAt(0) === 0xfeff, 'CSV ต้องขึ้นต้นด้วย BOM ให้ Excel อ่านภาษาไทยได้')
+  const lines = csv.slice(1).split('\r\n')
+  eq(lines.length, 4, 'จำนวนบรรทัด CSV')
+  assert(lines[1].startsWith('"เอ, ""ก"""'), `ชื่อที่มีจุลภาคและอัญประกาศต้องถูกครอบ: ${lines[1].slice(0, 20)}`)
+  const cols = lines[0].split(',').length
+  for (const l of lines.slice(2)) eq(l.split(',').length, cols, 'จำนวนคอลัมน์ต้องเท่ากันทุกแถว')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

@@ -110,6 +110,19 @@ export const SKILL_ICONS: Record<Skill, string> = {
   ledger: '📒',
 }
 
+/** ด่านที่สอนแต่ละทักษะ (ใช้แนะนำว่าควรกลับไปทบทวนด่านไหน) */
+export const SKILL_LEVELS: Record<Skill, number[]> = {
+  notes: [1],
+  count: [2],
+  dot: [3],
+  compare: [4],
+  exchange: [5, 6],
+  addsub: [7],
+  muldiv: [8],
+  word: [9, 10],
+  ledger: [11],
+}
+
 export const SKILLS: Skill[] = [
   'notes',
   'count',

@@ -3,11 +3,16 @@ import { GameProvider, useGame } from './hooks/useMoneyGame'
 import { SplashPage } from './pages/SplashPage'
 import { StartPage } from './pages/StartPage'
 import { CreatePlayerPage } from './pages/CreatePlayerPage'
-import { ComingSoonPage } from './pages/ComingSoonPage'
 import { MapPage } from './pages/MapPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LevelPage } from './pages/LevelPage'
+import { TestPage } from './pages/TestPage'
+import { BadgesPage } from './pages/BadgesPage'
+import { ProfilePage } from './pages/ProfilePage'
+import { StatsPage } from './pages/StatsPage'
+import { ReviewPage } from './pages/ReviewPage'
+import { TeacherPage } from './pages/TeacherPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -56,10 +61,47 @@ export default function App() {
             />
             <Route path="/players" element={<PlayersPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/badges" element={<ComingSoonPage title="🏆 รางวัล" npc="hero" back="/map" />} />
-            <Route path="/profile" element={<ComingSoonPage title="👤 โปรไฟล์" npc="rabbit" back="/map" />} />
-            <Route path="/stats" element={<ComingSoonPage title="📊 สถิติ" npc="fox" back="/map" />} />
-            <Route path="/teacher" element={<ComingSoonPage title="โหมดคุณครู" npc="owl" />} />
+            <Route
+              path="/test/:kind"
+              element={
+                <NeedPlayer>
+                  <TestPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/badges"
+              element={
+                <NeedPlayer>
+                  <BadgesPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <NeedPlayer>
+                  <ProfilePage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/stats"
+              element={
+                <NeedPlayer>
+                  <StatsPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/review"
+              element={
+                <NeedPlayer>
+                  <ReviewPage />
+                </NeedPlayer>
+              }
+            />
+            <Route path="/teacher" element={<TeacherPage />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>
           <Toasts />
