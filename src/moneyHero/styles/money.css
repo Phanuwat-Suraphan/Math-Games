@@ -272,50 +272,134 @@ button:disabled {
 
 .mh-float-coin {
   position: absolute;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff6c4 0%, #ffd23f 40%, #e09a00 100%);
-  box-shadow: inset 0 0 0 3px rgba(224, 154, 0, 0.6), 0 6px 12px -4px rgba(140, 90, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mh-display);
-  font-weight: 700;
-  color: #8a5a00;
-  font-size: 15px;
+  width: 48px;
+  height: 48px;
   animation: mh-float 6s ease-in-out infinite;
 }
 
+.mh-float-coin .mh-money-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ดวงอาทิตย์มีรัศมีหมุนช้า ๆ */
+.mh-sun {
+  position: absolute;
+  right: 6%;
+  top: 4%;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 38%, #fffbe0 0%, #ffe680 45%, #ffc934 100%);
+  box-shadow: 0 0 40px 14px rgba(255, 228, 120, 0.55);
+}
+
+.mh-sun i {
+  position: absolute;
+  inset: -46px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 244, 190, 0.45) 0deg 8deg, transparent 8deg 30deg);
+  -webkit-mask: radial-gradient(circle, transparent 46%, #000 48%, transparent 72%);
+  mask: radial-gradient(circle, transparent 46%, #000 48%, transparent 72%);
+  animation: mh-spin 40s linear infinite;
+}
+
+/* เนินหญ้าและอาคารของเมือง (หน้าเริ่มเกม) */
 .mh-city {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 26vh;
-  min-height: 150px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-around;
-  font-size: clamp(42px, 8vw, 86px);
-  line-height: 1;
-  filter: drop-shadow(0 8px 10px rgba(43, 35, 80, 0.2));
+  height: 30vh;
+  min-height: 170px;
 }
 
-.mh-city::after {
-  content: '';
+.mh-hills {
   position: absolute;
   left: 0;
-  right: 0;
   bottom: 0;
-  height: 34px;
-  background: linear-gradient(180deg, #7ee08f, #46b86a);
-  border-top: 4px solid #a7f0ad;
-  z-index: -1;
+  width: 100%;
+  height: 100%;
 }
 
-.mh-city span {
-  transform: translateY(-26px);
+.mh-city-bld,
+.mh-city-tree {
+  position: absolute;
+  display: block;
+}
+
+.mh-city-b5 {
+  left: -2%;
+  width: 14%;
+  bottom: 13%;
+}
+
+.mh-city-b1 {
+  left: 12%;
+  width: 13%;
+  bottom: 9%;
+}
+
+.mh-city-b7 {
+  left: 24%;
+  width: 12%;
+  bottom: 12%;
+}
+
+.mh-city-b4 {
+  left: 67%;
+  width: 12%;
+  bottom: 13%;
+}
+
+.mh-city-b12 {
+  left: 80%;
+  width: 17%;
+  bottom: 10%;
+}
+
+.mh-city-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 8px 6px rgba(30, 60, 20, 0.25));
+}
+
+.mh-city-tree svg {
+  display: block;
+}
+
+@media (max-width: 640px) {
+  .mh-sun {
+    width: 64px;
+    height: 64px;
+    right: 4%;
+  }
+  .mh-city {
+    height: 24vh;
+  }
+  .mh-city-b5,
+  .mh-city-b4 {
+    display: none;
+  }
+  .mh-city-b1 {
+    left: -4%;
+    width: 31%;
+  }
+  .mh-city-b12 {
+    left: 33%;
+    width: 36%;
+    bottom: 8%;
+  }
+  .mh-city-b7 {
+    left: 72%;
+    width: 30%;
+  }
+  .mh-float-coin {
+    width: 30px;
+    height: 30px;
+  }
 }
 
 @keyframes mh-drift {
@@ -701,6 +785,55 @@ button:disabled {
   }
   50% {
     transform: skewX(-4deg);
+  }
+}
+
+/* อารมณ์: ดีใจกระโดด ชูแขน ประกายระยิบ · คิดมีฟองลอย */
+.mh-cs.is-happy .mh-owl-eyes {
+  display: none;
+}
+
+.mh-cs.is-happy .mh-cs-body {
+  animation: mh-cs-hop 0.7s ease-in-out infinite alternate;
+}
+
+.mh-cs.is-happy .mh-cs-arm-l {
+  transform: rotate(130deg);
+}
+
+.mh-cs.is-happy .mh-cs-arm-r {
+  transform: rotate(-130deg);
+}
+
+.mh-cs-sparkles {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mh-twinkle 1.1s ease-in-out infinite alternate;
+}
+
+.mh-cs-think {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: mh-cs-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes mh-cs-hop {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes mh-twinkle {
+  from {
+    opacity: 0.45;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.08);
   }
 }
 
@@ -2215,6 +2348,18 @@ button:disabled {
   box-shadow: var(--mh-shadow);
   animation: mh-pop 0.35s ease-out both;
   overflow: hidden;
+}
+
+.mh-feedback-char {
+  position: absolute !important;
+  right: 12px;
+  top: 6px;
+  pointer-events: none;
+}
+
+.mh-feedback-head,
+.mh-feedback > .mh-feedback-text {
+  padding-right: 78px;
 }
 
 .mh-feedback-right {
@@ -5116,4 +5261,26 @@ button:disabled {
     border: 1px solid #ccc !important;
     break-inside: avoid;
   }
+}
+
+/* ฉากฉลองหน้าผลลัพธ์ */
+.mh-result-cast {
+  isolation: isolate;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+  position: relative;
+}
+
+.mh-result-cast::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: -6px;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, #ffe9a8, #ffc75a 60%, transparent 72%);
+  z-index: -1;
 }

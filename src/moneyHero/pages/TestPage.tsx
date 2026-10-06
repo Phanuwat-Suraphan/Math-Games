@@ -172,7 +172,7 @@ function TestResultView({
     <div className="mh-card mh-test-result" data-testid="mh-test-result">
       {pct >= 50 && <Confetti />}
       <div className="mh-test-score">
-        <CharacterArt id={pct >= 70 ? 'hero' : 'owl'} size={96} />
+        <CharacterArt id={pct >= 70 ? 'hero' : 'owl'} size={96} mood={pct >= 50 ? 'happy' : 'normal'} />
         <div>
           <div className="mh-test-score-num">
             {result.score} <small>/ {result.total}</small>

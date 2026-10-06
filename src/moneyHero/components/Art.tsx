@@ -2,7 +2,8 @@ import type { DenomId, NpcId } from '../engine/types'
 import { denom } from '../data/denominations'
 import { AVATARS, CHARACTERS, avatarById } from '../data/characters'
 import { useImage } from '../hooks/useImage'
-import { CharacterSvg, isDrawn, type CharacterKind } from './CharacterSvg'
+import { CharacterSvg, isDrawn, type CharacterKind, type Mood } from './CharacterSvg'
+import { CoinSvg, NoteSvg } from './MoneyArt'
 
 /**
  * ภาพตัวละครและเงิน
@@ -18,18 +19,42 @@ function Portrait({ kind, size, tint, src, className, label }: { kind: Character
   )
 }
 
-export function CharacterArt({ id, size = 96, className = '', portrait = false }: { id: NpcId; size?: number; className?: string; portrait?: boolean }) {
+export function CharacterArt({
+  id,
+  size = 96,
+  className = '',
+  portrait = false,
+  mood = 'normal',
+}: {
+  id: NpcId
+  size?: number
+  className?: string
+  portrait?: boolean
+  mood?: Mood
+}) {
   const c = CHARACTERS[id]
   const src = useImage(c.image)
   if (portrait) return <Portrait kind={id} size={size} tint={c.tint} src={src} className={className} label={c.name} />
   return (
     <div className={`mh-char ${className}`} style={{ width: size, height: size * 1.25 }} aria-label={c.name} role="img">
-      {src ? <img src={src} alt="" className="mh-char-img" draggable={false} /> : <CharacterSvg kind={id} />}
+      {src ? <img src={src} alt="" className="mh-char-img" draggable={false} /> : <CharacterSvg kind={id} mood={mood} />}
     </div>
   )
 }
 
-export function AvatarArt({ avatar, size = 80, className = '', portrait = false }: { avatar: string; size?: number; className?: string; portrait?: boolean }) {
+export function AvatarArt({
+  avatar,
+  size = 80,
+  className = '',
+  portrait = false,
+  mood = 'normal',
+}: {
+  avatar: string
+  size?: number
+  className?: string
+  portrait?: boolean
+  mood?: Mood
+}) {
   const a = avatarById(avatar)
   const src = useImage(a.image)
   const kind = isDrawn(a.id) ? a.id : null
@@ -39,7 +64,7 @@ export function AvatarArt({ avatar, size = 80, className = '', portrait = false 
       {src ? (
         <img src={src} alt="" className="mh-char-img" draggable={false} />
       ) : kind ? (
-        <CharacterSvg kind={kind} />
+        <CharacterSvg kind={kind} mood={mood} />
       ) : (
         <div className="mh-char-fallback mh-avatar-fallback" style={{ fontSize: size * 0.58 }}>
           {a.emoji}
@@ -54,57 +79,6 @@ export { AVATARS }
 /* ------------------------------------------------------------------ */
 /* เงิน                                                                */
 /* ------------------------------------------------------------------ */
-
-function CoinSvg({ id }: { id: DenomId }) {
-  const d = denom(id)
-  const gid = `g-${id}`
-  const bimetal = id === 'b10'
-  return (
-    <svg viewBox="0 0 100 100" className="mh-money-svg" aria-hidden="true">
-      <defs>
-        <radialGradient id={gid} cx="35%" cy="30%" r="75%">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.85" />
-          <stop offset="35%" stopColor={d.color} />
-          <stop offset="100%" stopColor={d.edge} />
-        </radialGradient>
-      </defs>
-      <circle cx="50" cy="52" r="46" fill="rgba(0,0,0,0.18)" />
-      <circle cx="50" cy="50" r="46" fill={bimetal ? d.edge : d.edge} />
-      <circle cx="50" cy="50" r={bimetal ? 34 : 41} fill={`url(#${gid})`} />
-      <circle cx="50" cy="50" r={bimetal ? 30 : 36} fill="none" stroke={d.ink} strokeOpacity="0.25" strokeWidth="1.5" />
-      <text x="50" y={d.unit === 'สตางค์' ? 52 : 56} textAnchor="middle" fontSize={d.face.length > 1 ? 30 : 38} fontWeight="700" fill={d.ink} fontFamily="Mitr, Kanit, sans-serif">
-        {d.face}
-      </text>
-      <text x="50" y={d.unit === 'สตางค์' ? 70 : 74} textAnchor="middle" fontSize={d.unit === 'สตางค์' ? 11 : 12} fill={d.ink} fontFamily="Kanit, sans-serif">
-        {d.unit}
-      </text>
-    </svg>
-  )
-}
-
-function NoteSvg({ id }: { id: DenomId }) {
-  const d = denom(id)
-  return (
-    <svg viewBox="0 0 200 100" className="mh-money-svg" aria-hidden="true">
-      <rect x="2" y="4" width="196" height="94" rx="10" fill="rgba(0,0,0,0.15)" />
-      <rect x="0" y="0" width="196" height="94" rx="10" fill={d.color} />
-      <rect x="7" y="7" width="182" height="80" rx="7" fill="none" stroke={d.edge} strokeWidth="3" />
-      <circle cx="52" cy="47" r="26" fill="#ffffff" fillOpacity="0.35" stroke={d.edge} strokeWidth="2" />
-      <text x="52" y="55" textAnchor="middle" fontSize="24" fill={d.ink}>
-        🐘
-      </text>
-      <text x="138" y="56" textAnchor="middle" fontSize={d.face.length > 3 ? 32 : 38} fontWeight="700" fill={d.ink} fontFamily="Mitr, Kanit, sans-serif">
-        {d.face}
-      </text>
-      <text x="138" y="78" textAnchor="middle" fontSize="13" fill={d.ink} fontFamily="Kanit, sans-serif">
-        บาท
-      </text>
-      <text x="20" y="24" fontSize="12" fontWeight="700" fill={d.ink} fontFamily="Mitr, sans-serif">
-        {d.face}
-      </text>
-    </svg>
-  )
-}
 
 /** ขนาดฐาน: เหรียญ 10 บาท = base px ธนบัตร = base × 2 กว้าง */
 export function MoneyPiece({ id, base = 64, className = '', showLabel = false }: { id: DenomId; base?: number; className?: string; showLabel?: boolean }) {

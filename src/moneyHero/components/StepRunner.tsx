@@ -14,6 +14,7 @@ import { speak, stopSpeaking } from '../utils/speech'
 import { HintPanel, QuestionView } from './QuestionView'
 import { LearnSlides } from './LearnSlides'
 import { Burst } from './Effects'
+import { AvatarArt, CharacterArt } from './Art'
 
 /**
  * ตัวเดินโจทย์ของขั้น PRACTICE / MISSION / BOSS / แบบทดสอบ / ฝึกข้อที่เคยผิด
@@ -269,6 +270,7 @@ export function StepRunner({
       {phase === 'right' && (
         <div className="mh-feedback mh-feedback-right" data-testid="mh-feedback" role="status" ref={feedbackRef}>
           <Burst />
+          {player && <AvatarArt avatar={player.avatar} size={68} mood="happy" className="mh-feedback-char" />}
           <div className="mh-feedback-head">
             <span className="mh-feedback-icon" aria-hidden="true">
               ✔
@@ -297,6 +299,7 @@ export function StepRunner({
 
       {phase === 'wrong' && (
         <div className="mh-feedback mh-feedback-wrong" data-testid="mh-feedback" role="status" ref={feedbackRef}>
+          <CharacterArt id={q.npc ?? 'fox'} size={64} mood="think" className="mh-feedback-char" />
           <div className="mh-feedback-head">
             <span className="mh-feedback-icon is-wrong" aria-hidden="true">
               ↺
@@ -334,6 +337,7 @@ export function StepRunner({
 
       {phase === 'reveal' && (
         <div className="mh-feedback mh-feedback-reveal" data-testid="mh-feedback" role="status" ref={feedbackRef}>
+          <CharacterArt id="owl" size={64} className="mh-feedback-char" />
           <div className="mh-feedback-head">
             <span className="mh-feedback-icon is-info" aria-hidden="true">
               💡
