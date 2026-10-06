@@ -378,7 +378,7 @@ export function MapPage() {
                 </span>
                 <BuildingArt level={l.id} locked={!unlocked} />
                 <span className="mh-house-status">
-                  {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
+                  {!unlocked ? '🔒' : done ? <Stars n={rec.bestStars} size={14} /> : soon ? '🛠️' : rec.stepDone > 0 ? `▶ ${stepLabel(rec.stepDone)}` : '✨ ใหม่!'}
                 </span>
               </button>
             )

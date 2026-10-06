@@ -14,6 +14,7 @@ import { JourneyMission } from '../components/JourneyMission'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { BuildingArt } from '../components/BuildingArt'
 import { Stars } from '../components/Stars'
+import { Hills } from '../components/Sky'
 import { CoinRain, Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { PLAYABLE_MAX } from './MapPage'
@@ -91,6 +92,9 @@ export function LevelPage() {
 
   return (
     <div className={`mh-level ${level.theme}`}>
+      <div className="mh-level-ground" aria-hidden="true">
+        <Hills />
+      </div>
       <TopBar compact />
       <div className="mh-page mh-level-page">
         <div className="mh-level-head mh-level-scene">
@@ -332,7 +336,7 @@ function ResultView({ level }: { level: LevelDef }) {
         {level.npc !== 'hero' && <CharacterArt id={level.npc} size={96} mood="happy" />}
       </div>
       <div className="mh-result-stars" aria-label={`ได้ ${stars} ดาว`}>
-        <Stars n={stars} />
+        <Stars n={stars} size={64} reveal />
       </div>
       <p className="mh-result-grade">{stars === 3 ? '⭐⭐⭐ ยอดเยี่ยม!' : stars === 2 ? '⭐⭐ ดีมาก!' : '⭐ ผ่านแล้ว!'}</p>
       {result && (

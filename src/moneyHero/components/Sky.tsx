@@ -31,13 +31,12 @@ const TREES = [
   { left: 62, bottom: 9, s: 1.1 },
 ]
 
-function Hills() {
+export function Hills() {
   return (
     <svg className="mh-hills" viewBox="0 0 1600 300" preserveAspectRatio="none" aria-hidden="true">
       <path d="M0 150 C 200 60, 420 70, 640 130 S 1100 40, 1300 110 S 1520 90, 1600 120 L1600 300 L0 300 Z" fill="#9fdc8a" opacity="0.75" />
       <path d="M0 190 C 260 120, 520 150, 800 165 S 1300 110, 1600 170 L1600 300 L0 300 Z" fill="#7cc35a" />
       <path d="M0 230 C 300 200, 600 215, 800 210 S 1300 200, 1600 225 L1600 300 L0 300 Z" fill="#5fae47" />
-      <path d="M0 192 C 260 122, 520 152, 800 167" fill="none" stroke="#c7f2b0" strokeWidth="5" opacity="0.7" />
     </svg>
   )
 }

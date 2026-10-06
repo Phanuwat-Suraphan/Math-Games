@@ -1015,13 +1015,58 @@ button:disabled {
 
 .mh-stars {
   display: inline-flex;
+  align-items: flex-end;
   gap: 2px;
-  font-size: 1.1em;
   letter-spacing: 0;
+  vertical-align: middle;
+}
+
+.mh-star-svg {
+  display: block;
+  filter: drop-shadow(0 2px 1px rgba(160, 100, 0, 0.25));
 }
 
 .mh-star-off {
-  filter: grayscale(1) opacity(0.35);
+  filter: none;
+  opacity: 0.7;
+}
+
+/* ดาวหน้าผลลัพธ์: เด้งขึ้นทีละดวง ดวงกลางใหญ่กว่า */
+.mh-stars.is-reveal {
+  gap: 6px;
+}
+
+.mh-stars.is-reveal .mh-star-svg {
+  animation: mh-star-pop 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.mh-stars.is-reveal .mh-star-svg:nth-child(1) {
+  animation-delay: 0.35s;
+  transform: rotate(-12deg);
+}
+
+.mh-stars.is-reveal .mh-star-svg:nth-child(2) {
+  animation-delay: 0.75s;
+}
+
+.mh-stars.is-reveal .mh-star-svg:nth-child(2) {
+  transform: translateY(-10px) scale(1.2);
+}
+
+.mh-stars.is-reveal .mh-star-svg:nth-child(3) {
+  animation-delay: 1.15s;
+  transform: rotate(12deg);
+}
+
+@keyframes mh-star-pop {
+  from {
+    opacity: 0;
+    scale: 0.2;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
 }
 
 /* ชั้นเนื้อหาต้องอยู่เหนือท้องฟ้าเสมอ (เมฆห้ามทับตัวหนังสือ) */
@@ -3444,8 +3489,7 @@ button:disabled {
 }
 
 .mh-result-stars {
-  font-size: 2.6em;
-  animation: mh-pop 0.7s 0.2s ease-out both;
+  margin-top: 6px;
 }
 
 .mh-result-grade {
@@ -5283,4 +5327,109 @@ button:disabled {
   border-radius: 50%;
   background: radial-gradient(ellipse at center, #ffe9a8, #ffc75a 60%, transparent 72%);
   z-index: -1;
+}
+
+/* รัศมีหมุนหลังการ์ดผลลัพธ์ */
+.mh-result::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 150px;
+  width: 760px;
+  height: 760px;
+  margin: -380px 0 0 -380px;
+  background: repeating-conic-gradient(from 0deg, rgba(255, 214, 90, 0.22) 0deg 10deg, transparent 10deg 24deg);
+  border-radius: 50%;
+  -webkit-mask: radial-gradient(circle, #000 20%, transparent 62%);
+  mask: radial-gradient(circle, #000 20%, transparent 62%);
+  animation: mh-spin 30s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.mh-result > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* พื้นหญ้าด้านล่างของหน้าด่าน */
+.mh-level {
+  position: relative;
+}
+
+.mh-level-ground {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18vh;
+  min-height: 110px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.9;
+}
+
+.mh-level-ground .mh-hills {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mh-level > :not(.mh-level-ground):not(.mh-topbar) {
+  position: relative;
+  z-index: 1;
+}
+
+/* หน้าสร้างตัวละคร: ตัวที่เลือกยืนบนแท่นใหญ่ ๆ */
+.mh-create-hero {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.mh-create-pedestal {
+  padding: 4px 20px 16px;
+  flex: 0 0 auto;
+}
+
+.mh-create-preview {
+  animation: mh-pop 0.45s ease-out both;
+}
+
+.mh-create-hero-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mh-create-name {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 1.5em;
+  color: var(--mh-purple);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .mh-create-hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  .mh-result::before {
+    width: 520px;
+    height: 520px;
+    margin: -260px 0 0 -260px;
+  }
+}
+
+.mh-reduce-motion .mh-result::before,
+.mh-reduce-motion .mh-stars.is-reveal .mh-star-svg {
+  animation: none !important;
 }
