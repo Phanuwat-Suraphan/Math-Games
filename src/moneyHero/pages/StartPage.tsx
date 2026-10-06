@@ -3,6 +3,7 @@ import { GraduationCap, Settings, UserPlus, Users, Volume2, VolumeX } from 'luci
 import { useGame } from '../hooks/useMoneyGame'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { Sky } from '../components/Sky'
+import { LogoLetters } from '../components/LogoLetters'
 import { lessonsPassed, totalStars } from '../engine/progress'
 import { TOTAL_LESSONS } from '../data/levels'
 import { playSound } from '../utils/sound'
@@ -45,8 +46,8 @@ export function StartPage() {
       </div>
 
       <div className="mh-start-stage">
-        <h1 className="mh-logo">
-          <span className="mh-logo-main">MONEY HERO</span>
+        <h1 className="mh-logo" aria-label="MONEY HERO ปฏิบัติการเมืองเงินทอง">
+          <LogoLetters text="MONEY HERO" />
           <span className="mh-logo-ribbon">ปฏิบัติการเมืองเงินทอง</span>
         </h1>
 

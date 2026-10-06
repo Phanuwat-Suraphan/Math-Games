@@ -15,6 +15,7 @@ import { AvatarArt, CharacterArt } from '../components/Art'
 import { BuildingArt } from '../components/BuildingArt'
 import { Stars } from '../components/Stars'
 import { Hills } from '../components/Sky'
+import { Bunting } from '../components/Bunting'
 import { CoinRain, Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { PLAYABLE_MAX } from './MapPage'
@@ -98,6 +99,7 @@ export function LevelPage() {
       <TopBar compact />
       <div className="mh-page mh-level-page">
         <div className="mh-level-head mh-level-scene">
+          <Bunting className="mh-scene-bunting" />
           <Link to="/map" className="mh-icon-btn" aria-label="กลับแผนที่">
             <ArrowLeft size={24} />
           </Link>
@@ -330,6 +332,7 @@ function ResultView({ level }: { level: LevelDef }) {
     <div className="mh-card mh-result" data-testid="mh-result">
       <Confetti />
       <CoinRain n={result?.coins ?? 6} />
+      <Bunting className="mh-result-bunting" count={12} />
       <div className="mh-result-banner">MISSION COMPLETE!</div>
       <div className="mh-result-cast">
         <AvatarArt avatar={player.avatar} size={120} mood="happy" />

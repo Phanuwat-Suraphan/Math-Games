@@ -288,7 +288,7 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-splash').waitFor()
     await snap(page, `${name}-splash`)
     await page.getByTestId('mh-start').waitFor({ timeout: 6000 })
-    await page.getByText('MONEY HERO').first().waitFor()
+    await page.getByRole('heading', { name: /MONEY HERO/ }).waitFor()
     await snap(page, `${name}-start`)
     await noSideScroll(page, 'หน้าเริ่มเกม')
   })

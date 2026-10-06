@@ -21,14 +21,15 @@ export function TopBar({ compact = false }: { compact?: boolean }) {
         <span className="mh-lv">Lv.{lv.level}</span>
       </Link>
       <div className="mh-stats">
-        <span className="mh-stat" title="เหรียญ" data-testid="mh-coins">
+        {/* key เปลี่ยนเมื่อค่าเปลี่ยน ชิปจะเด้งดุ๊กดิกให้เห็นว่าได้เพิ่ม */}
+        <span key={`c${player.coins}`} className="mh-stat mh-stat-coin" title="เหรียญ" data-testid="mh-coins">
           🪙 {player.coins}
         </span>
-        <span className="mh-stat mh-stat-star" title="ดาว">
+        <span key={`s${totalStars(player)}`} className="mh-stat mh-stat-star" title="ดาว">
           ⭐ {totalStars(player)}
         </span>
         {!compact && (
-          <span className="mh-stat mh-stat-exp" title="EXP">
+          <span key={`e${player.exp}`} className="mh-stat mh-stat-exp" title="EXP">
             ✨ {player.exp}
           </span>
         )}

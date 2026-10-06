@@ -1,6 +1,7 @@
 import type { DenomId } from '../engine/types'
 import { BuildingArt } from './BuildingArt'
 import { CoinSvg } from './MoneyArt'
+import { Balloon } from './Bunting'
 
 /**
  * ฉากหลังของทั้งเกม: ท้องฟ้า ดวงอาทิตย์ เมฆ เหรียญลอย
@@ -19,6 +20,13 @@ const COINS: { left: string; top: string; delay: string; id: DenomId }[] = [
   { left: '14%', top: '56%', delay: '2.1s', id: 'b2' },
   { left: '82%', top: '52%', delay: '0.7s', id: 'b1' },
   { left: '48%', top: '5%', delay: '1.8s', id: 's50' },
+]
+
+const BALLOONS = [
+  { left: '9%', color: '#ff6f91', dur: '26s', delay: '-4s' },
+  { left: '27%', color: '#ffd23f', dur: '31s', delay: '-19s' },
+  { left: '71%', color: '#4fc3f7', dur: '28s', delay: '-11s' },
+  { left: '91%', color: '#c38bff', dur: '34s', delay: '-25s' },
 ]
 
 /** อาคารบนเนินหญ้า (ตำแหน่งอยู่ใน CSS: จอกว้างกับมือถือจัดต่างกัน ไม่ให้แผงปุ่มบังปราสาท) */
@@ -66,6 +74,11 @@ export function Sky({ city = true }: { city?: boolean }) {
           className="mh-cloud"
           style={{ top: c.top, width: c.w, height: c.h, animationDelay: c.delay, animationDuration: c.dur }}
         />
+      ))}
+      {BALLOONS.map((b, i) => (
+        <div key={`b${i}`} className="mh-balloon" style={{ left: b.left, animationDuration: b.dur, animationDelay: b.delay }}>
+          <Balloon color={b.color} />
+        </div>
       ))}
       {COINS.map((c, i) => (
         <div key={i} className="mh-float-coin" style={{ left: c.left, top: c.top, animationDelay: c.delay }}>
