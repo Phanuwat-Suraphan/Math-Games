@@ -59,7 +59,7 @@ export function ReviewPage() {
         ) : done ? (
           <div className="mh-card mh-center" data-testid="mh-review-done">
             <Confetti />
-            <CharacterArt id="fox" size={100} />
+            <CharacterArt id="fox" size={100} mood="happy" />
             <h2 className="mh-step-title">ฝึกครบแล้ว! 💪</h2>
             <p>
               แก้โจทย์ที่เคยพลาดได้ {fixed} จาก {done.originals} แบบ · ได้ +{done.exp} EXP · +{done.coins} 🪙

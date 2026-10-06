@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react'
+import { createContext, useContext, useId, type ReactNode } from 'react'
 
 /**
  * ตัวละครวาดด้วย SVG สไตล์การ์ตูนตัวกลม (chibi) มีแสงเงาแบบสามมิติ
@@ -15,6 +15,10 @@ export const DRAWN_CHARACTERS: CharacterKind[] = ['hero', 'rabbit', 'fox', 'bear
 
 const INK = '#2b2350'
 
+/** อารมณ์ของตัวละคร: ปกติ · ดีใจ (ตายิ้ม ^^ มีประกาย) · คิด (มีฟองความคิด) */
+export type Mood = 'normal' | 'happy' | 'think'
+const MoodContext = createContext<Mood>('normal')
+
 /** id ของ gradient ต้องไม่ซ้ำกันในหน้า จึงต่อท้ายด้วย useId */
 function useIds() {
   const base = useId().replace(/[^a-zA-Z0-9]/g, '')
@@ -25,7 +29,20 @@ function Shadow() {
   return <ellipse className="mh-cs-shadow" cx="50" cy="121" rx="24" ry="4.5" fill="#2b2350" opacity="0.18" />
 }
 
+/** ตายิ้มปิด (^ ^) ตอนดีใจ */
+function HappyEyes({ xs, y, rx, color = INK }: { xs: number[]; y: number; rx: number; color?: string }) {
+  return (
+    <g>
+      {xs.map((x) => (
+        <path key={x} d={`M${x - rx * 1.1} ${y + 1.2} Q${x} ${y - rx * 1.5} ${x + rx * 1.1} ${y + 1.2}`} fill="none" stroke={color} strokeWidth="2.4" strokeLinecap="round" />
+      ))}
+    </g>
+  )
+}
+
 function Eyes({ y = 46, gap = 9, rx = 4.2, ry = 5.4, color = INK }: { y?: number; gap?: number; rx?: number; ry?: number; color?: string }) {
+  const mood = useContext(MoodContext)
+  if (mood === 'happy') return <HappyEyes xs={[50 - gap, 50 + gap]} y={y} rx={rx} color={color} />
   return (
     <g className="mh-cs-eyes">
       {[50 - gap, 50 + gap].map((x) => (
@@ -484,6 +501,11 @@ function BearArt({ gid }: { gid: (n: string) => string }) {
   )
 }
 
+function OwlEyes() {
+  const mood = useContext(MoodContext)
+  return mood === 'happy' ? <HappyEyes xs={[39, 61]} y={51} rx={6} /> : null
+}
+
 function OwlArt({ gid }: { gid: (n: string) => string }) {
   const body = gid('body')
   return (
@@ -531,7 +553,8 @@ function OwlArt({ gid }: { gid: (n: string) => string }) {
         {/* หน้า */}
         <circle cx="39" cy="50" r="13" fill="#f2f7ff" />
         <circle cx="61" cy="50" r="13" fill="#f2f7ff" />
-        <g className="mh-cs-eyes">
+        <OwlEyes />
+        <g className="mh-cs-eyes mh-owl-eyes">
           {[39, 61].map((x) => (
             <g key={x}>
               <circle cx={x} cy="50" r="7.4" fill={INK} />
@@ -568,14 +591,51 @@ export function isDrawn(id: string): id is CharacterKind {
 }
 
 /** ภาพตัวละครแบบ SVG เต็มตัว (กรอบ 100 × 125) */
-export function CharacterSvg({ kind, portrait = false }: { kind: CharacterKind; portrait?: boolean }) {
+/** ประกายรอบหัวตอนดีใจ */
+function Sparkles() {
+  const star = 'l1.5 3.6 3.6 1.5 -3.6 1.5 -1.5 3.6 -1.5 -3.6 -3.6 -1.5 3.6 -1.5 Z'
+  return (
+    <g className="mh-cs-sparkles">
+      <path d={`M10 22 ${star}`} fill="#ffd23f" />
+      <path d={`M86 14 ${star}`} fill="#ffd23f" />
+      <path d={`M90 46 ${star}`} fill="#ff9fc4" transform="translate(90 46) scale(0.7) translate(-90 -46)" />
+      <path d={`M8 52 ${star}`} fill="#9fd8ff" transform="translate(8 52) scale(0.7) translate(-8 -52)" />
+    </g>
+  )
+}
+
+/** ฟองความคิดตอนกำลังคิด */
+function ThinkBubble() {
+  return (
+    <g className="mh-cs-think">
+      <circle cx="80" cy="30" r="2.4" fill="#fff" stroke="#c9c2e6" strokeWidth="1" />
+      <circle cx="86" cy="22" r="3.6" fill="#fff" stroke="#c9c2e6" strokeWidth="1" />
+      <ellipse cx="95" cy="9" rx="11" ry="9" fill="#fff" stroke="#c9c2e6" strokeWidth="1.2" />
+      <text x="95" y="13.5" textAnchor="middle" fontSize="12" fontWeight="700" fill="#8b5cf6" fontFamily="Kanit, sans-serif">
+        ?
+      </text>
+    </g>
+  )
+}
+
+/** ภาพตัวละครแบบ SVG เต็มตัว (กรอบ 100 × 125) */
+export function CharacterSvg({ kind, portrait = false, mood = 'normal' }: { kind: CharacterKind; portrait?: boolean; mood?: Mood }) {
   const gid = useIds()
   const Art = ART[kind]
   // แบบรูปหน้า: ตัดเฉพาะหัวไหล่ขึ้นไป
   const box = portrait ? (kind === 'owl' ? '12 12 76 76' : '13 6 74 74') : '0 0 100 125'
   return (
-    <svg viewBox={box} className={`mh-cs mh-cs-${kind} ${portrait ? 'is-portrait' : ''}`} aria-hidden="true" overflow={portrait ? 'hidden' : 'visible'}>
-      <Art gid={gid} />
+    <svg
+      viewBox={box}
+      className={`mh-cs mh-cs-${kind} ${portrait ? 'is-portrait' : ''} is-${mood}`}
+      aria-hidden="true"
+      overflow={portrait ? 'hidden' : 'visible'}
+    >
+      <MoodContext.Provider value={mood}>
+        <Art gid={gid} />
+      </MoodContext.Provider>
+      {mood === 'happy' && !portrait && <Sparkles />}
+      {mood === 'think' && !portrait && <ThinkBubble />}
     </svg>
   )
 }

@@ -11,7 +11,7 @@ import { TopBar } from '../components/TopBar'
 import { LearnSlides } from '../components/LearnSlides'
 import { StepRunner, type RunSummary } from '../components/StepRunner'
 import { JourneyMission } from '../components/JourneyMission'
-import { CharacterArt } from '../components/Art'
+import { AvatarArt, CharacterArt } from '../components/Art'
 import { BuildingArt } from '../components/BuildingArt'
 import { Stars } from '../components/Stars'
 import { CoinRain, Confetti } from '../components/Effects'
@@ -223,7 +223,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   if (bossFail) {
     return (
       <div className="mh-card mh-step-card mh-center">
-        <CharacterArt id="fox" size={110} />
+        <CharacterArt id="fox" size={110} mood="think" />
         <h2 className="mh-step-title">เกือบแล้ว! 💪</h2>
         <p>
           ตอบถูก {bossFail.within2} จาก {bossFail.originals} ข้อ ต้องถูกอย่างน้อย {Math.ceil(bossFail.originals * BOSS_PASS)} ข้อ
@@ -327,7 +327,10 @@ function ResultView({ level }: { level: LevelDef }) {
       <Confetti />
       <CoinRain n={result?.coins ?? 6} />
       <div className="mh-result-banner">MISSION COMPLETE!</div>
-      <CharacterArt id={level.npc} size={120} />
+      <div className="mh-result-cast">
+        <AvatarArt avatar={player.avatar} size={120} mood="happy" />
+        {level.npc !== 'hero' && <CharacterArt id={level.npc} size={96} mood="happy" />}
+      </div>
       <div className="mh-result-stars" aria-label={`ได้ ${stars} ดาว`}>
         <Stars n={stars} />
       </div>
