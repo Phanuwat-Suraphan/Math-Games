@@ -71,6 +71,7 @@ export interface Player {
   answered: number
   mapCoins: string[]
   mapX?: number
+  mapY?: number
 }
 
 export interface Settings {
