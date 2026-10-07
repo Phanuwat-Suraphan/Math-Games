@@ -19,6 +19,95 @@ const INK = '#2b2350'
 export type Mood = 'normal' | 'happy' | 'think'
 const MoodContext = createContext<Mood>('normal')
 
+/** ของแต่งตัวจากร้านของฮีโร่ (ใส่ได้เฉพาะตัวละครเด็ก) */
+export interface WearArt {
+  hat?: string
+  face?: string
+}
+const WearContext = createContext<WearArt>({})
+
+/** หมวก/ของบนหัว วางบนหัวเด็ก (กึ่งกลาง x 50 ยอดหัว y ≈ 17) */
+function HatArt({ id }: { id: string }) {
+  switch (id) {
+    case 'hat-cap':
+      return (
+        <g>
+          <path d="M26 31 Q27 9 50 9 Q73 9 74 31 Z" fill="#e2574c" />
+          <path d="M34 14 Q42 10 50 10" stroke="#fff" strokeWidth="2.4" fill="none" opacity="0.45" strokeLinecap="round" />
+          <path d="M50 27 Q76 25 90 32 Q74 37 50 33 Z" fill="#b53a31" />
+          <circle cx="50" cy="9.5" r="2.6" fill="#b53a31" />
+          <text x="50" y="25" textAnchor="middle" fontSize="10" fontWeight="700" fill="#fff" fontFamily="Kanit, sans-serif">
+            ฿
+          </text>
+        </g>
+      )
+    case 'hat-crown':
+      return (
+        <g>
+          <path d="M30 26 L29 8 L38.5 16 L45 3 L50 13 L55 3 L61.5 16 L71 8 L70 26 Z" fill="#ffd23f" stroke="#c98400" strokeWidth="1.8" strokeLinejoin="round" />
+          <rect x="30" y="21" width="40" height="5" rx="1.5" fill="#f0b400" />
+          <circle cx="50" cy="18" r="2.8" fill="#e2574c" />
+          <circle cx="39" cy="20" r="2" fill="#4fc3f7" />
+          <circle cx="61" cy="20" r="2" fill="#7ed957" />
+          <path d="M34 12 L36 18" stroke="#fff" strokeWidth="1.6" opacity="0.6" strokeLinecap="round" />
+        </g>
+      )
+    case 'hat-party':
+      return (
+        <g>
+          <path d="M38 24 L52 -8 L64 22 Z" fill="#8b5cf6" />
+          <path d="M42.5 15 L58.5 9 M40.5 20 L61 13 M46 6 L55.5 2" stroke="#ffd23f" strokeWidth="3" />
+          <circle cx="52" cy="-9" r="4.5" fill="#ff6f91" />
+        </g>
+      )
+    case 'hat-grad':
+      return (
+        <g>
+          <rect x="34" y="14" width="32" height="10" rx="3" fill="#2b2350" />
+          <path d="M20 14 L50 3 L80 14 L50 25 Z" fill="#3b3070" stroke="#2b2350" strokeWidth="1.2" strokeLinejoin="round" />
+          <circle cx="50" cy="14" r="2" fill="#ffd23f" />
+          <path d="M50 14 Q66 16 72 26" stroke="#ffd23f" strokeWidth="1.8" fill="none" />
+          <path d="M70 26 L74 26 L73 34 L71 34 Z" fill="#ffd23f" />
+        </g>
+      )
+    case 'hat-flower':
+      return (
+        <g transform="translate(69 22)">
+          {[0, 72, 144, 216, 288].map((a) => (
+            <circle key={a} cx={Math.cos((a * Math.PI) / 180) * 5} cy={Math.sin((a * Math.PI) / 180) * 5} r="4.4" fill="#ff8fb8" stroke="#e8508a" strokeWidth="0.8" />
+          ))}
+          <circle r="3.4" fill="#ffd23f" />
+        </g>
+      )
+    default:
+      return null
+  }
+}
+
+/** แว่นตา วางบนตาเด็ก (ตาอยู่ที่ x 40.5 / 59.5, y 46) */
+function FaceArt({ id }: { id: string }) {
+  if (id === 'face-sun') {
+    return (
+      <g>
+        <rect x="31" y="40" width="17" height="11" rx="5" fill="#2b2350" />
+        <rect x="52" y="40" width="17" height="11" rx="5" fill="#2b2350" />
+        <path d="M48 44 Q50 42 52 44 M31 43 L25 41 M69 43 L75 41" stroke="#2b2350" strokeWidth="2" fill="none" />
+        <path d="M34 43 L39 42 M55 43 L60 42" stroke="#9fd8ff" strokeWidth="1.8" strokeLinecap="round" />
+      </g>
+    )
+  }
+  if (id === 'face-round') {
+    return (
+      <g fill="rgba(255,255,255,0.2)" stroke="#8b5cf6" strokeWidth="2.2">
+        <circle cx="40.5" cy="46" r="7.6" />
+        <circle cx="59.5" cy="46" r="7.6" />
+        <path d="M48 45 Q50 43 52 45" fill="none" />
+      </g>
+    )
+  }
+  return null
+}
+
 /** id ของ gradient ต้องไม่ซ้ำกันในหน้า จึงต่อท้ายด้วย useId */
 function useIds() {
   const base = useId().replace(/[^a-zA-Z0-9]/g, '')
@@ -110,6 +199,17 @@ interface KidLook {
   skirt?: boolean
 }
 
+/** ของที่สวม: ถ้าซื้อหมวกจะใส่แทนหมวกเดิมของตัวละคร */
+function KidWear({ fallbackHat }: { fallbackHat?: ReactNode }) {
+  const wear = useContext(WearContext)
+  return (
+    <>
+      {wear.face && <FaceArt id={wear.face} />}
+      {wear.hat ? <HatArt id={wear.hat} /> : fallbackHat}
+    </>
+  )
+}
+
 function Kid({ look, gid }: { look: KidLook; gid: (n: string) => string }) {
   const skin = gid('skin')
   const shirt = gid('shirt')
@@ -168,7 +268,7 @@ function Kid({ look, gid }: { look: KidLook; gid: (n: string) => string }) {
         <Cheeks y={54} gap={16} />
         <Smile y={54} w={5} />
         {look.hairTop}
-        {look.hat}
+        <KidWear fallbackHat={look.hat} />
       </g>
     </>
   )
@@ -590,7 +690,6 @@ export function isDrawn(id: string): id is CharacterKind {
   return (DRAWN_CHARACTERS as string[]).includes(id)
 }
 
-/** ภาพตัวละครแบบ SVG เต็มตัว (กรอบ 100 × 125) */
 /** ประกายรอบหัวตอนดีใจ */
 function Sparkles() {
   const star = 'l1.5 3.6 3.6 1.5 -3.6 1.5 -1.5 3.6 -1.5 -3.6 -3.6 -1.5 3.6 -1.5 Z'
@@ -618,8 +717,20 @@ function ThinkBubble() {
   )
 }
 
+const NO_WEAR: WearArt = {}
+
 /** ภาพตัวละครแบบ SVG เต็มตัว (กรอบ 100 × 125) */
-export function CharacterSvg({ kind, portrait = false, mood = 'normal' }: { kind: CharacterKind; portrait?: boolean; mood?: Mood }) {
+export function CharacterSvg({
+  kind,
+  portrait = false,
+  mood = 'normal',
+  wear = NO_WEAR,
+}: {
+  kind: CharacterKind
+  portrait?: boolean
+  mood?: Mood
+  wear?: WearArt
+}) {
   const gid = useIds()
   const Art = ART[kind]
   // แบบรูปหน้า: ตัดเฉพาะหัวไหล่ขึ้นไป
@@ -632,10 +743,95 @@ export function CharacterSvg({ kind, portrait = false, mood = 'normal' }: { kind
       overflow={portrait ? 'hidden' : 'visible'}
     >
       <MoodContext.Provider value={mood}>
-        <Art gid={gid} />
+        <WearContext.Provider value={wear}>
+          <Art gid={gid} />
+        </WearContext.Provider>
       </MoodContext.Provider>
       {mood === 'happy' && !portrait && <Sparkles />}
       {mood === 'think' && !portrait && <ThinkBubble />}
+    </svg>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* สัตว์เลี้ยงจากร้านของฮีโร่ (กรอบ 60 × 60 เท้าแตะ y ≈ 56)             */
+/* ------------------------------------------------------------------ */
+
+export function PetSvg({ id }: { id: string }) {
+  const eyes = (y: number, gap: number) => (
+    <g className="mh-cs-eyes">
+      {[30 - gap, 30 + gap].map((x) => (
+        <g key={x}>
+          <ellipse cx={x} cy={y} rx="2.6" ry="3.2" fill={INK} />
+          <circle cx={x + 0.9} cy={y - 1.1} r="1" fill="#fff" />
+        </g>
+      ))}
+    </g>
+  )
+  let body: ReactNode = null
+  if (id === 'pet-chick') {
+    body = (
+      <>
+        <ellipse cx="30" cy="38" rx="17" ry="16" fill="#ffd94a" />
+        <ellipse cx="30" cy="30" rx="13" ry="12" fill="#ffe27a" />
+        <path d="M26 14 Q30 8 32 16" stroke="#f0b400" strokeWidth="2.4" fill="none" strokeLinecap="round" />
+        <ellipse cx="17" cy="40" rx="5" ry="8" fill="#f6c832" transform="rotate(20 17 40)" />
+        <ellipse cx="43" cy="40" rx="5" ry="8" fill="#f6c832" transform="rotate(-20 43 40)" />
+        {eyes(28, 5.5)}
+        <path d="M27 33 L33 33 L30 37 Z" fill="#ff9a3c" />
+        <path d="M24 54 l-3 3 M24 54 v4 M36 54 l3 3 M36 54 v4" stroke="#ff9a3c" strokeWidth="2" strokeLinecap="round" />
+      </>
+    )
+  } else if (id === 'pet-piggy') {
+    body = (
+      <>
+        <ellipse cx="30" cy="36" rx="22" ry="17" fill="#ffb3c7" />
+        <rect x="24" y="19" width="12" height="3" rx="1.5" fill="#c74766" />
+        <path d="M14 24 L12 14 L21 20 Z M46 24 L48 14 L39 20 Z" fill="#ff8fb3" />
+        {eyes(31, 7)}
+        <ellipse cx="30" cy="39" rx="7" ry="5" fill="#ff8fb3" />
+        <circle cx="27.5" cy="39" r="1.3" fill="#c74766" />
+        <circle cx="32.5" cy="39" r="1.3" fill="#c74766" />
+        <rect x="16" y="49" width="6" height="7" rx="2" fill="#ff8fb3" />
+        <rect x="38" y="49" width="6" height="7" rx="2" fill="#ff8fb3" />
+        <circle cx="49" cy="10" r="6" fill="#ffd23f" stroke="#d49400" strokeWidth="1.2" className="mh-pet-coin" />
+      </>
+    )
+  } else if (id === 'pet-puppy') {
+    body = (
+      <>
+        <ellipse cx="30" cy="42" rx="14" ry="12" fill="#c99b6d" />
+        <circle cx="30" cy="26" r="14" fill="#d8ac7e" />
+        <ellipse cx="16" cy="27" rx="5" ry="10" fill="#8a5a33" transform="rotate(15 16 27)" />
+        <ellipse cx="44" cy="27" rx="5" ry="10" fill="#8a5a33" transform="rotate(-15 44 27)" />
+        {eyes(25, 5.5)}
+        <ellipse cx="30" cy="31" rx="3.4" ry="2.4" fill="#3b2a20" />
+        <path d="M28 35 Q30 38 32 35" fill="#ff7f9f" />
+        <path d="M44 44 Q53 38 50 30" stroke="#c99b6d" strokeWidth="4" fill="none" strokeLinecap="round" className="mh-pet-tail" />
+        <rect x="21" y="50" width="6" height="7" rx="2.5" fill="#c99b6d" />
+        <rect x="33" y="50" width="6" height="7" rx="2.5" fill="#c99b6d" />
+      </>
+    )
+  } else {
+    body = (
+      <>
+        <path d="M44 46 Q56 40 52 26" stroke="#f29a3c" strokeWidth="4.5" fill="none" strokeLinecap="round" className="mh-pet-tail" />
+        <ellipse cx="30" cy="43" rx="13" ry="11" fill="#ffad5c" />
+        <path d="M17 22 L18 8 L27 16 Z M43 22 L42 8 L33 16 Z" fill="#ffad5c" />
+        <circle cx="30" cy="27" r="13" fill="#ffb86b" />
+        <path d="M24 16 L27 22 M30 15 L30 21 M36 16 L33 22" stroke="#e8822a" strokeWidth="1.8" strokeLinecap="round" />
+        {eyes(27, 5.5)}
+        <path d="M28.5 31 L31.5 31 L30 33 Z" fill="#ff7f9f" />
+        <path d="M22 32 L15 31 M22 34 L15 35 M38 32 L45 31 M38 34 L45 35" stroke="#c97a2a" strokeWidth="0.9" />
+        <rect x="22" y="50" width="6" height="6" rx="2.5" fill="#ffad5c" />
+        <rect x="32" y="50" width="6" height="6" rx="2.5" fill="#ffad5c" />
+      </>
+    )
+  }
+  return (
+    <svg viewBox="0 0 60 60" className="mh-pet-svg" aria-hidden="true" overflow="visible">
+      <ellipse cx="30" cy="57" rx="16" ry="3" fill="#2b2350" opacity="0.18" />
+      <g className="mh-pet-body">{body}</g>
     </svg>
   )
 }

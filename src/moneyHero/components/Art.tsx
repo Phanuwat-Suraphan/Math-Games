@@ -2,7 +2,8 @@ import type { DenomId, NpcId } from '../engine/types'
 import { denom } from '../data/denominations'
 import { AVATARS, CHARACTERS, avatarById } from '../data/characters'
 import { useImage } from '../hooks/useImage'
-import { CharacterSvg, isDrawn, type CharacterKind, type Mood } from './CharacterSvg'
+import { CharacterSvg, PetSvg, isDrawn, type CharacterKind, type Mood } from './CharacterSvg'
+import type { Wear } from '../data/shop'
 import { CoinSvg, NoteSvg } from './MoneyArt'
 
 /**
@@ -11,10 +12,26 @@ import { CoinSvg, NoteSvg } from './MoneyArt'
  */
 
 /** วงกลมรูปหน้า (ใช้ในแถบบน กล่องคำพูด รายชื่อผู้เล่น) */
-function Portrait({ kind, size, tint, src, className, label }: { kind: CharacterKind | null; size: number; tint: string; src: string | null; className: string; label: string }) {
+function Portrait({
+  kind,
+  size,
+  tint,
+  src,
+  className,
+  label,
+  wear,
+}: {
+  kind: CharacterKind | null
+  size: number
+  tint: string
+  src: string | null
+  className: string
+  label: string
+  wear?: { hat?: string; face?: string }
+}) {
   return (
     <div className={`mh-portrait ${className}`} style={{ width: size, height: size, background: tint }} aria-label={label} role="img">
-      {src ? <img src={src} alt="" className="mh-portrait-img" draggable={false} /> : kind ? <CharacterSvg kind={kind} portrait /> : null}
+      {src ? <img src={src} alt="" className="mh-portrait-img" draggable={false} /> : kind ? <CharacterSvg kind={kind} portrait wear={wear} /> : null}
     </div>
   )
 }
@@ -48,33 +65,45 @@ export function AvatarArt({
   className = '',
   portrait = false,
   mood = 'normal',
+  wear,
+  pet = false,
 }: {
   avatar: string
   size?: number
   className?: string
   portrait?: boolean
   mood?: Mood
+  /** ของแต่งตัวจากร้านของฮีโร่ */
+  wear?: Wear
+  /** แสดงสัตว์เลี้ยงที่สวมอยู่ข้าง ๆ ตัวละคร */
+  pet?: boolean
 }) {
   const a = avatarById(avatar)
   const src = useImage(a.image)
   const kind = isDrawn(a.id) ? a.id : null
-  if (portrait) return <Portrait kind={kind} size={size} tint="linear-gradient(180deg,#fff3c4,#ffd36b)" src={src} className={className} label={a.name} />
+  const art = wear ? { hat: wear.hat, face: wear.face } : undefined
+  if (portrait) return <Portrait kind={kind} size={size} tint="linear-gradient(180deg,#fff3c4,#ffd36b)" src={src} className={className} label={a.name} wear={art} />
   return (
     <div className={`mh-char ${className}`} style={{ width: size, height: size * 1.25 }} aria-label={a.name} role="img">
       {src ? (
         <img src={src} alt="" className="mh-char-img" draggable={false} />
       ) : kind ? (
-        <CharacterSvg kind={kind} mood={mood} />
+        <CharacterSvg kind={kind} mood={mood} wear={art} />
       ) : (
         <div className="mh-char-fallback mh-avatar-fallback" style={{ fontSize: size * 0.58 }}>
           {a.emoji}
         </div>
       )}
+      {pet && wear?.pet && (
+        <span className="mh-avatar-pet" style={{ width: size * 0.45, height: size * 0.45 }}>
+          <PetSvg id={wear.pet} />
+        </span>
+      )}
     </div>
   )
 }
 
-export { AVATARS }
+export { AVATARS, PetSvg }
 
 /* ------------------------------------------------------------------ */
 /* เงิน                                                                */

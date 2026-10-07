@@ -589,6 +589,29 @@ test('ล่าเหรียญ AR: ทุกรอบมีทางเก็
   assert(!hunt.checkHunt(100, []).ok, 'ยังไม่เก็บอะไรต้องไม่ผ่าน')
 })
 
+test('ร้านของฮีโร่: ซื้อได้เมื่อเหรียญพอ บอกจำนวนที่ขาด และสวม/ถอดได้', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  p = { ...p, coins: 12 }
+  const short = progress.buyItem(p, 'hat-cap')
+  assert(!short.ok && short.reason === 'short' && short.short === 3, `ต้องบอกว่าขาด 3 เหรียญ: ${JSON.stringify(short)}`)
+  const ok = progress.buyItem(p, 'hat-flower')
+  assert(ok.ok, 'เหรียญพอแต่ซื้อไม่ได้')
+  eq(ok.left, 2, 'เหรียญที่เหลือ')
+  p = ok.player
+  eq(p.coins, 2, 'ต้องตัดเหรียญ')
+  eq(p.wear.hat, 'hat-flower', 'ซื้อแล้วต้องสวมให้ทันที')
+  assert(progress.newBadges(p).includes('shopper'), 'ซื้อชิ้นแรกต้องได้ตรานักช้อปตัวน้อย')
+  const again = progress.buyItem({ ...p, coins: 99 }, 'hat-flower')
+  assert(!again.ok && again.reason === 'owned', 'ซื้อซ้ำต้องไม่ได้')
+  p = progress.toggleWear(p, 'hat-flower')
+  eq(p.wear.hat, undefined, 'กดซ้ำต้องถอด')
+  eq(progress.toggleWear(p, 'pet-piggy'), p, 'ของที่ยังไม่ได้ซื้อสวมไม่ได้')
+  assert(!progress.buyItem(p, 'ไม่มีจริง').ok, 'ของที่ไม่มีในร้านต้องซื้อไม่ได้')
+  // บันทึกเก่าที่ยังไม่มีข้อมูลร้านต้องเปิดได้
+  const old = progress.parseSave(JSON.stringify({ players: { a: { id: 'a', name: 'เก่า' } } }))
+  eq(old.players.a.owned.length, 0, 'บันทึกเก่าต้องมีคลังของว่าง')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

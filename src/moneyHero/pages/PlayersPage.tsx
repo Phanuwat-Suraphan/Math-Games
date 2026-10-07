@@ -38,7 +38,7 @@ export function PlayersPage() {
                 navigate('/map')
               }}
             >
-              <AvatarArt avatar={p.avatar} size={56} portrait />
+              <AvatarArt avatar={p.avatar} size={56} portrait wear={p.wear} />
               <span className="mh-player-info">
                 <b>{p.name}</b>
                 <span>

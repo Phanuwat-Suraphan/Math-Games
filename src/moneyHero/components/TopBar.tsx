@@ -16,7 +16,7 @@ export function TopBar({ compact = false }: { compact?: boolean }) {
   return (
     <header className="mh-topbar">
       <Link to="/profile" className="mh-topbar-player" aria-label="โปรไฟล์">
-        <AvatarArt avatar={player.avatar} size={40} portrait />
+        <AvatarArt avatar={player.avatar} size={40} portrait wear={player.wear} />
         <span className="mh-topbar-name">{player.name}</span>
         <span className="mh-lv">Lv.{lv.level}</span>
       </Link>

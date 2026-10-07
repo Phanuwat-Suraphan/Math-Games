@@ -497,6 +497,27 @@ for (const [name, viewport] of [
     if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
   })
 
+  await step(`[${name}] ร้านของฮีโร่: ซื้อดอกไม้ติดผมและลูกเจี๊ยบ แล้วลูกเจี๊ยบเดินตามบนแผนที่`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-shop').click()
+    await page.getByTestId('mh-shop-wallet').waitFor()
+    await noSideScroll(page, 'ร้านของฮีโร่')
+    const before = (await savedPlayer(page)).coins
+    await page.getByTestId('mh-buy-hat-flower').click()
+    await page.getByTestId('mh-wear-hat-flower').waitFor()
+    await page.getByTestId('mh-shop-tab-pet').click()
+    await page.getByTestId('mh-buy-pet-chick').click()
+    await page.getByTestId('mh-wear-pet-chick').waitFor()
+    await page.getByText('เหลือ').first().waitFor()
+    await snap(page, `${name}-shop`)
+    const p = await savedPlayer(page)
+    if (p.coins !== before - 40) throw new Error(`เหรียญไม่ถูกตัด (${before} → ${p.coins})`)
+    if (p.wear.hat !== 'hat-flower' || p.wear.pet !== 'pet-chick') throw new Error(`ไม่ได้สวม: ${JSON.stringify(p.wear)}`)
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-pet').waitFor()
+    await snap(page, `${name}-map-pet`)
+  })
+
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
     await page.goto(`${BASE}#/badges`)
     await page.getByTestId('mh-badge-pretest').waitFor()

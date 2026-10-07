@@ -20,7 +20,7 @@ import {
   type TownCoin,
 } from '../data/town'
 import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
-import { AvatarArt, CharacterArt } from '../components/Art'
+import { AvatarArt, CharacterArt, PetSvg } from '../components/Art'
 import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
@@ -81,6 +81,7 @@ export function MapPage() {
   const worldRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const puffRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const petRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
 
   const start = useMemo(
@@ -97,6 +98,8 @@ export function MapPage() {
     joy: { x: 0, y: 0 },
     route: null as Pt[] | null,
     walking: false,
+    petX: start.x - 40,
+    petY: start.y + 6,
   })
   const collectedRef = useRef(new Set(player?.mapCoins ?? []))
   const [collected, setCollected] = useState(() => new Set(player?.mapCoins ?? []))
@@ -252,6 +255,21 @@ export function MapPage() {
             { duration: 520, easing: 'ease-out' },
           )
         }
+      }
+
+      // สัตว์เลี้ยงเดินตามหลังฮีโร่ (ค่อย ๆ ไล่ตาม ไม่วาร์ป)
+      if (petRef.current) {
+        const tx = s.x - s.dir * 46
+        const ty = s.y + 8
+        const k = Math.min(1, dt * 5)
+        s.petX += (tx - s.petX) * k
+        s.petY += (ty - s.petY) * k
+        const moving = Math.hypot(tx - s.petX, ty - s.petY) > 6
+        const pet = petRef.current
+        pet.style.transform = `translate3d(${s.petX - 22}px,${s.petY - 44}px,0)`
+        pet.style.zIndex = String(Math.round(s.petY))
+        pet.classList.toggle('is-walking', moving)
+        pet.classList.toggle('is-left', s.petX > s.x)
       }
 
       for (const c of TOWN_COINS) {
@@ -463,10 +481,15 @@ export function MapPage() {
               aria-hidden="true"
             />
           ))}
+          {player.wear?.pet && (
+            <div className="mh-town-pet" ref={petRef} data-testid="mh-pet" aria-hidden="true">
+              <PetSvg id={player.wear.pet} />
+            </div>
+          )}
           <div className="mh-walker mh-town-walker" ref={heroRef} data-testid="mh-hero">
             <span className="mh-walker-shadow" />
             <div className="mh-walker-inner">
-              <AvatarArt avatar={player.avatar} size={74} />
+              <AvatarArt avatar={player.avatar} size={74} wear={player.wear} />
             </div>
           </div>
         </div>
@@ -577,6 +600,9 @@ export function MapPage() {
         </Link>
         <Link to="/stats" className="mh-menu-tile">
           <span aria-hidden="true">📊</span>สถิติ
+        </Link>
+        <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
+          <span aria-hidden="true">🛍️</span>ร้านของฮีโร่
         </Link>
         <Link to="/ar" className="mh-menu-tile mh-menu-ar" data-testid="mh-menu-ar">
           <span aria-hidden="true">📷</span>ล่าเหรียญ AR
