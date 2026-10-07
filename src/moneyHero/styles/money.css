@@ -7940,3 +7940,229 @@ a.mh-stat-coin {
     height: 60px;
   }
 }
+
+/* ================================================================== */
+/* สนามสู้บอส (ขั้น BOSS)                                              */
+/* ================================================================== */
+
+.mh-boss-arena {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr minmax(160px, 260px);
+  align-items: end;
+  gap: 8px;
+  margin-bottom: 10px;
+  background:
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.7), transparent 45%),
+    linear-gradient(180deg, #f3f0ff 0%, #e5dbff 60%, #d0bfff 100%);
+}
+
+.mh-boss-arena.is-ko {
+  background:
+    radial-gradient(circle at 80% 30%, rgba(255, 255, 255, 0.8), transparent 45%),
+    linear-gradient(180deg, #fff9db 0%, #ffec99 100%);
+}
+
+.mh-boss-hero .is-shake {
+  display: inline-block;
+  animation: mh-shake 0.45s ease-in-out;
+}
+
+.mh-boss-lane {
+  position: relative;
+  height: 90px;
+  display: grid;
+  place-items: center;
+}
+
+.mh-boss-vs {
+  font-family: var(--mh-display);
+  font-weight: 800;
+  font-size: 1.6em;
+  color: #7048e8;
+  text-shadow: 0 3px 0 #fff;
+  animation: mh-jelly 1.6s ease-in-out infinite;
+}
+
+.mh-boss-shot {
+  position: absolute;
+  left: 0;
+  top: 40%;
+  font-size: 30px;
+  animation: mh-boss-shot 0.45s ease-in forwards;
+}
+
+@keyframes mh-boss-shot {
+  0% {
+    transform: translate(0, 0) rotate(0) scale(0.8);
+    opacity: 1;
+  }
+  60% {
+    transform: translate(60%, -30px) rotate(300deg) scale(1.1);
+  }
+  100% {
+    transform: translate(calc(100% + 120px), 0) rotate(540deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+.mh-boss-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mh-boss-name {
+  font-weight: 800;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+  justify-content: center;
+}
+
+.mh-boss-hp-text {
+  font-size: 0.85em;
+  background: #fff;
+  border-radius: 999px;
+  padding: 0 8px;
+}
+
+.mh-boss-hp {
+  display: flex;
+  gap: 3px;
+  width: 100%;
+  padding: 4px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #2b2350;
+}
+
+.mh-boss-hp span {
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: #e9ecef;
+  transition: background 0.3s;
+}
+
+.mh-boss-hp span.is-full {
+  background: linear-gradient(180deg, #ff8787, #e03131);
+}
+
+.mh-boss-body-wrap {
+  position: relative;
+  width: 150px;
+  height: 150px;
+}
+
+.mh-boss-body-wrap.is-hit {
+  animation: mh-shake 0.4s ease-in-out;
+  filter: brightness(1.25);
+}
+
+.mh-boss-art {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.mh-boss-art .mh-boss-body {
+  transform-origin: 80px 146px;
+  animation: mh-boss-idle 2.2s ease-in-out infinite;
+}
+
+.mh-boss-art.is-laugh .mh-boss-body {
+  animation: mh-boss-laugh 0.25s ease-in-out 4;
+}
+
+.mh-boss-art.is-ko .mh-boss-body {
+  animation: none;
+  transform: rotate(-8deg) scaleY(0.92);
+}
+
+.mh-boss-arm {
+  transform-origin: 26px 98px;
+  animation: mh-boss-wave 1.4s ease-in-out infinite;
+}
+
+.mh-boss-arm-r {
+  transform-origin: 134px 98px;
+  animation-delay: -0.7s;
+}
+
+@keyframes mh-boss-idle {
+  0%,
+  100% {
+    transform: scale(1, 1);
+  }
+  50% {
+    transform: scale(1.04, 0.96);
+  }
+}
+
+@keyframes mh-boss-laugh {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0);
+  }
+  50% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+}
+
+@keyframes mh-boss-wave {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-14deg);
+  }
+}
+
+.mh-boss-dmg {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  font-weight: 900;
+  font-size: 1.6em;
+  color: #e03131;
+  text-shadow: 0 2px 0 #fff;
+  animation: mh-boss-dmg 0.8s ease-out forwards;
+}
+
+@keyframes mh-boss-dmg {
+  from {
+    transform: translateY(0) scale(0.6);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-34px) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.mh-boss-say {
+  font-weight: 700;
+  text-align: center;
+  max-width: 260px;
+}
+
+@media (max-width: 640px) {
+  .mh-boss-arena {
+    grid-template-columns: auto 1fr;
+  }
+  .mh-boss-lane {
+    display: none;
+  }
+  .mh-boss-hero {
+    align-self: center;
+  }
+  .mh-boss-body-wrap {
+    width: 120px;
+    height: 120px;
+  }
+}

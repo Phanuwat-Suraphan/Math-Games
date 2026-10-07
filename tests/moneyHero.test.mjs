@@ -42,6 +42,7 @@ const kad = load('kad/kadData.js')
 const pinch = load('engine/pinch.js')
 const eco = load('engine/eco.js')
 const changeGame = load('engine/changeGame.js')
+const bosses = load('data/bosses.js')
 
 let passed = 0
 const failures = []
@@ -1078,6 +1079,26 @@ test('ร้านทอนไว: ทุกออร์เดอร์ทอน
   for (let i = 0; i < 200; i += 1) assert(changeGame.makeOrder(2, 'fox').npc !== 'fox', 'ลูกค้าซ้ำคนเดิม')
   const p = { ...progress.newPlayer('ทอน', 'hero'), changeBest: 8 }
   assert(progress.newBadges(p).includes('quick-change'), 'ทอนถูก 8 คนได้ตรา')
+})
+
+test('สู้บอส: ทุกด่านมีบอส และพลังบอสเท่ากับจำนวนข้อที่ต้องตอบถูกเพื่อชนะพอดี', () => {
+  for (let id = 0; id <= 12; id += 1) {
+    const b = bosses.bossOf(id)
+    assert(b.name && b.intro && b.lose && b.taunts.length && b.ouch.length, `บอสด่าน ${id} ข้อมูลไม่ครบ`)
+  }
+  eq(new Set(Array.from({ length: 13 }, (_, i) => bosses.bossOf(i).name)).size, 13, 'ชื่อบอสไม่ซ้ำ')
+  // กติกาชนะบอสใน LevelPage: within2 / originals >= BOSS_PASS
+  for (let n = 1; n <= 40; n += 1) {
+    const hp = bosses.bossHp(n, scoring.BOSS_PASS)
+    assert(hp / n >= scoring.BOSS_PASS, `${n} ข้อ: ตีบอสหมดพลัง (${hp}) ต้องชนะ`)
+    assert((hp - 1) / n < scoring.BOSS_PASS, `${n} ข้อ: ขาดอีก 1 ครั้งต้องยังไม่ชนะ`)
+  }
+  // จำนวนข้อบอสจริงของทุกด่าน
+  for (let id = 0; id <= 12; id += 1) {
+    const qs = gens.buildStep(id, 'boss')
+    const hp = bosses.bossHp(qs.length, scoring.BOSS_PASS)
+    assert(hp >= 1 && hp <= qs.length, `พลังบอสด่าน ${id} ผิด (${hp}/${qs.length})`)
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

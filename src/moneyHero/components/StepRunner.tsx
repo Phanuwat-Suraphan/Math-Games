@@ -70,7 +70,8 @@ export function StepRunner({
   learn?: LearnSlide[]
   /** ชื่อรายการในสมุดบัญชีเมื่อได้เหรียญจากการตอบถูก */
   earnLabel?: string
-  onAnswer?: (q: Question, r: Response, correct: boolean) => void
+  /** ทุกครั้งที่ตอบ (attempt = ครั้งที่ตอบข้อนี้ · retry = ข้อฝึกซ้ำที่เพิ่มต่อท้าย) */
+  onAnswer?: (q: Question, r: Response, correct: boolean, info: { attempt: number; retry: boolean }) => void
   onFinish: (s: RunSummary) => void
 }) {
   const { updatePlayer, player } = useGame()
@@ -136,7 +137,7 @@ export function StepRunner({
       if (!q || phase !== 'answer') return
       const res = checkAnswer(q, r)
       const ms = Date.now() - started.current
-      onAnswer?.(q, r, res.correct)
+      onAnswer?.(q, r, res.correct, { attempt, retry: item.retry })
 
       // บันทึกสถิติทักษะเฉพาะการตอบครั้งแรกของแต่ละข้อ
       if (attempt === 1) {

@@ -20,6 +20,8 @@ import { Bunting } from '../components/Bunting'
 import { CoinRain, Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { PLAYABLE_MAX } from './MapPage'
+import { BossArena } from '../components/BossArena'
+import { bossHp, bossOf } from '../data/bosses'
 
 /**
  * หน้าด่าน: LEARN → PRACTICE → MISSION → BOSS → ผลลัพธ์
@@ -128,6 +130,9 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   const [done, setDone] = useState<RunSummary | null>(null)
   const [bossFail, setBossFail] = useState<RunSummary | null>(null)
   const [round, setRound] = useState(0)
+  // สู้บอส: ตอบถูก (ภายใน 2 ครั้ง) = ปาเหรียญใส่บอส 1 ครั้ง
+  const [hits, setHits] = useState(0)
+  const [bossEvent, setBossEvent] = useState<{ kind: 'hit' | 'miss'; key: number; text: string } | null>(null)
 
   const questions = useMemo(
     () => (step === 'learn' || (level.id === 12 && step === 'mission') ? [] : buildStep(level.id, step)),
@@ -247,6 +252,8 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
             data-testid="mh-boss-retry"
             onClick={() => {
               setBossFail(null)
+              setHits(0)
+              setBossEvent(null)
               setRound((r) => r + 1)
             }}
           >
@@ -297,12 +304,30 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
           }}
         />
       ) : (
+      <>
+      {step === 'boss' && player && (
+        <BossArena boss={bossOf(level.id)} hp={bossHp(questions.length, BOSS_PASS)} hits={hits} event={bossEvent} avatar={player.avatar} wear={player.wear} />
+      )}
       <StepRunner
         key={round}
         questions={questions}
         levelId={level.id}
         mode={step}
         learn={level.learn}
+        onAnswer={
+          step === 'boss'
+            ? (_q, _r, correct, info) => {
+                const boss = bossOf(level.id)
+                if (correct && !info.retry) {
+                  if (hits + 1 === bossHp(questions.length, BOSS_PASS)) window.setTimeout(() => playSound('star'), 300)
+                  setHits(hits + 1)
+                  setBossEvent((e) => ({ kind: 'hit', key: (e?.key ?? 0) + 1, text: boss.ouch[Math.floor(Math.random() * boss.ouch.length)] }))
+                } else if (!correct) {
+                  setBossEvent((e) => ({ kind: 'miss', key: (e?.key ?? 0) + 1, text: boss.taunts[Math.floor(Math.random() * boss.taunts.length)] }))
+                }
+              }
+            : undefined
+        }
         onFinish={(s) => {
           if (step === 'boss') {
             finishBoss(s)
@@ -313,6 +338,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
           setDone(s)
         }}
       />
+      </>
       )}
     </div>
   )
