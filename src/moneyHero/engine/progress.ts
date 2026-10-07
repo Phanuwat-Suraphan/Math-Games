@@ -5,6 +5,7 @@ import { LEVEL_BADGES } from '../data/badges'
 import { shopItem, type Wear } from '../data/shop'
 import { emptyDaily, type DailyRecord } from './daily'
 import { earn, type LedgerEntry } from './ledger'
+import { ecoStage, emptyEco, type EcoRecord } from './eco'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -87,6 +88,8 @@ export interface Player {
   goal?: string
   /** ออมจนซื้อของตามเป้าหมายได้กี่ครั้งแล้ว */
   goalsDone: number
+  /** โหมดกาดรักษ์โลกในเกม */
+  eco: EcoRecord
   mapX?: number
   mapY?: number
 }
@@ -152,6 +155,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     questsDone: 0,
     ledger: [],
     goalsDone: 0,
+    eco: emptyEco(),
   }
 }
 
@@ -167,7 +171,7 @@ function repairPlayer(raw: Partial<Player>): Player | null {
   for (const s of SKILLS) if (raw.skills?.[s]) skills[s] = { ...skills[s], ...raw.skills[s] }
   const levels: Record<number, LevelRecord> = {}
   for (const [k, v] of Object.entries(raw.levels ?? {})) levels[Number(k)] = { ...emptyLevel(), ...v }
-  return { ...base, ...raw, id: raw.id, skills, levels } as Player
+  return { ...base, ...raw, id: raw.id, skills, levels, eco: { ...emptyEco(), ...(raw.eco ?? {}) } } as Player
 }
 
 export function parseSave(text: string | null): SaveData {
@@ -298,6 +302,8 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.daily.best >= 3) want.push('daily3')
   if (p.questsDone >= 4) want.push('helper')
   if (p.goalsDone >= 1) want.push('saver')
+  if (p.eco.days >= 1) want.push('eco-seller')
+  if (ecoStage(p.eco).stage >= 3) want.push('eco-garden')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 

@@ -18,6 +18,7 @@ import { ShopPage } from './pages/ShopPage'
 import { DailyPage } from './pages/DailyPage'
 import { SandboxPage } from './pages/SandboxPage'
 import { BankPage } from './pages/BankPage'
+import { EcoPage } from './pages/EcoPage'
 import { KadPage } from './kad/KadPage'
 import { KadClassPage } from './kad/KadClassPage'
 
@@ -121,6 +122,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <ShopPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/eco"
+              element={
+                <NeedPlayer>
+                  <EcoPage />
                 </NeedPlayer>
               }
             />

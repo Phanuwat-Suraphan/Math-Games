@@ -674,6 +674,9 @@ export function MapPage() {
         <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
           <span aria-hidden="true">🛍️</span>ร้านของฮีโร่
         </Link>
+        <Link to="/eco" className="mh-menu-tile mh-menu-eco" data-testid="mh-menu-eco">
+          <span aria-hidden="true">🌱</span>กาดรักษ์โลก
+        </Link>
         <Link to="/bank" className="mh-menu-tile mh-menu-bank" data-testid="mh-menu-bank">
           <span aria-hidden="true">🐷</span>กระปุกออมสิน
         </Link>

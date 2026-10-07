@@ -47,7 +47,8 @@ const BASE = 'http://localhost:4174/money-hero.html'
 // ด่านสุดท้ายที่เปิดให้เล่นในเวอร์ชันนี้ (ตรงกับ PLAYABLE_MAX ใน MapPage.tsx)
 const LAST_LEVEL = 12
 
-const browser = await chromium.launch()
+// กล้องจำลองของ Chromium (ภาพทดสอบ) และอนุญาตกล้องอัตโนมัติ ใช้ทดสอบโหมด AR ด้วยกล้อง
+const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] })
 const errors = []
 let failed = false
 let shot = 0
@@ -497,6 +498,44 @@ for (const [name, viewport] of [
     if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
   })
 
+  await step(`[${name}] ล่าเหรียญ AR ด้วยกล้อง: จีบนิ้วเก็บเหรียญและกดปุ่มตรวจได้ โหลดตัวตรวจจับมือไม่ได้ก็ยังเล่นต่อได้`, async () => {
+    // ตัดการโหลดโมเดลจาก CDN ให้ผลแน่นอน (บอตไม่มีมือจริงให้กล้องเห็นอยู่แล้ว)
+    const cdn = /cdn\.jsdelivr\.net|unpkg\.com|storage\.googleapis\.com/
+    await page.route(cdn, (r) => r.abort())
+    try {
+      // ขั้นก่อนจบที่หน้าผลของ AR (#/ar) ต้องออกไปแผนที่ก่อน หน้าจะได้เริ่มใหม่
+      await page.goto(`${BASE}#/map`)
+      await page.getByTestId('mh-menu-ar').click()
+      await page.getByTestId('mh-ar-camera').click()
+      await page.waitForFunction(() => (document.querySelector('video.mh-ar-video')?.videoWidth ?? 0) > 0, null, { timeout: 15_000 })
+      await page.waitForFunction(() => document.querySelector('[data-testid="mh-ar-hand"]')?.getAttribute('data-state') === 'error', null, { timeout: 30_000 })
+      await page.getByTestId('mh-ar-hand').getByText('แตะจอแทนได้').waitFor()
+      // จีบนิ้ว (จำลองที่ตำแหน่งบนจอ) ตรงเหรียญชุดคำตอบ แล้วจีบปุ่มตรวจ
+      const info = await page.evaluate(() => window.__MH_AR)
+      const pinchOn = async (testId, dx = 0) => {
+        const box = await page.getByTestId(testId).boundingBox()
+        if (!box) throw new Error(`มองไม่เห็น ${testId}`)
+        const ok = await page.evaluate(([x, y]) => window.__MH_PINCH?.(x, y) ?? false, [box.x + box.width / 2 + dx, box.y + box.height / 2])
+        if (!ok) throw new Error(`จีบนิ้วตรง ${testId} แล้วไม่ได้เลือก`)
+      }
+      for (const [i, k] of info.solution.entries()) await pinchOn(`mh-ar-coin-${k}`, i === 0 ? 4 : 0)
+      await snap(page, `${name}-ar-camera`)
+      await pinchOn('mh-ar-check')
+      await page.getByTestId('mh-ar-right').waitFor()
+      // จีบตรงที่ว่างไกลจากทุกอย่าง ต้องไม่เลือกอะไร
+      const empty = await page.evaluate(() => window.__MH_PINCH?.(2, 2) ?? true)
+      if (empty) throw new Error('จีบตรงที่ว่างแล้วกลับไปเลือกบางอย่าง')
+      await pinchOn('mh-ar-next')
+      await page.getByTestId('mh-ar-round').getByText('รอบ 2/5').waitFor()
+      await page.goto(`${BASE}#/map`)
+      // ออกจากหน้า AR แล้วกล้องต้องปิด
+      const live = await page.evaluate(() => document.querySelectorAll('video').length)
+      if (live !== 0) throw new Error('ออกจากหน้า AR แล้วยังมีวิดีโอกล้องค้างอยู่')
+    } finally {
+      await page.unroute(cdn)
+    }
+  })
+
   await step(`[${name}] ภารกิจประจำวัน: ทำ 5 ข้อ ได้ตราประทับวันนี้ และป้ายบนแผนที่หายไป`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-daily-banner').click()
@@ -608,6 +647,56 @@ for (const [name, viewport] of [
       if (p.goalsDone !== 1 || p.goal) throw new Error(`ออมครบแล้วซื้อ แต่ไม่นับว่าสำเร็จ (${p.goalsDone}, ${p.goal})`)
       if (!p.badges.includes('saver')) throw new Error('ไม่ได้ตรานักออม')
     }
+  })
+
+  await step(`[${name}] กาดรักษ์โลกในเกม: ทำกระถาง คัดแยกขยะ ขายขยะ ซื้ออุปกรณ์ ทำสินค้า ขาย ทอนเงิน คิดกำไร และแบ่งกำไร`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-eco').click()
+    await page.getByTestId('eco-choose').waitFor()
+    await noSideScroll(page, 'กาดรักษ์โลกในเกม')
+    const before = await savedPlayer(page)
+    await page.getByTestId('eco-recipe-pot').click()
+    await page.getByTestId('eco-sort').waitFor()
+    const items = page.locator('[data-testid^="eco-trash-"]')
+    const total = await items.count()
+    // ใส่ผิดถังก่อนหนึ่งครั้ง ต้องไม่นับ
+    const firstBin = await items.first().getAttribute('data-bin')
+    await items.first().click()
+    await page.getByTestId(`eco-bin-${['plastic', 'metal', 'paper'].find((b) => b !== firstBin)}`).click()
+    if ((await items.count()) !== total) throw new Error('ใส่ผิดถังแล้วขยะหายไป')
+    for (let guard = 0; guard < 40 && (await items.count()) > 0; guard += 1) {
+      const bin = await items.first().getAttribute('data-bin')
+      await items.first().click()
+      await page.getByTestId(`eco-bin-${bin}`).click()
+    }
+    if ((await items.count()) !== 0) throw new Error('คัดแยกไม่หมด')
+    await snap(page, `${name}-eco-sort`)
+    await page.getByTestId('eco-to-sell').click()
+    // ขายขยะ + ซื้ออุปกรณ์ (โจทย์ 3 ข้อ)
+    await playUntil(page, 'eco-make')
+    for (let i = 0; i < 3; i += 1) await page.getByTestId(`eco-make-${i}`).click()
+    await page.getByTestId('eco-to-price').click()
+    await noSideScroll(page, 'ตั้งราคา')
+    // ราคาถูกสุดขายหมด 2 ใบ: รายได้ 30 ต้นทุน 11 กำไร 19
+    await page.getByTestId('eco-price-15').click()
+    await page.getByTestId('eco-market').waitFor()
+    await snap(page, `${name}-eco-market`)
+    await playUntil(page, 'eco-share')
+    for (let i = 0; i < 4; i += 1) await page.getByTestId('eco-alloc-save-plus').click()
+    await page.getByTestId('eco-alloc-donate-rest').click()
+    await page.getByTestId('eco-share-left').getByText('0 บาท').waitFor()
+    await page.getByTestId('eco-share-done').click()
+    await page.getByTestId('eco-done').waitFor()
+    await snap(page, `${name}-eco-done`)
+    await noSideScroll(page, 'สรุปกาดรักษ์โลก')
+    const p = await savedPlayer(page)
+    if (p.eco.days !== before.eco.days + 1) throw new Error(`จำนวนวันไม่เพิ่ม (${p.eco.days})`)
+    if (p.eco.sales !== before.eco.sales + 3000) throw new Error(`ยอดขายไม่ถูก (${p.eco.sales})`)
+    if (p.eco.saved !== before.eco.saved + 400 || p.eco.donated !== before.eco.donated + 1500) throw new Error(`แบ่งกำไรไม่ถูก ${JSON.stringify(p.eco)}`)
+    if (!p.badges.includes('eco-seller')) throw new Error('ไม่ได้ตราพ่อค้าแม่ค้ารักษ์โลก')
+    if (!p.ledger.some((e) => e.label === 'ออมจากกาดรักษ์โลก' && e.amount === 4)) throw new Error('เงินออมไม่ลงกระปุก/สมุดบัญชี')
+    const sum = p.ledger.reduce((a, e) => a + e.amount, 0)
+    if (sum !== p.coins) throw new Error(`สมุดบัญชีไม่ครบหลังเล่นกาด: ${sum} ≠ ${p.coins}`)
   })
 
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {

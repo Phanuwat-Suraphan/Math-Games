@@ -39,6 +39,8 @@ const quest = load('engine/npcQuest.js')
 const sandbox = load('engine/sandbox.js')
 const book = load('engine/ledger.js')
 const kad = load('kad/kadData.js')
+const pinch = load('engine/pinch.js')
+const eco = load('engine/eco.js')
 
 let passed = 0
 const failures = []
@@ -842,6 +844,144 @@ test('แดชบอร์ดตลาดนัด: คงเหลือ ก�
   const back = kad.parseGroups(JSON.stringify([{ ...g, entries: [...g.entries, { at: 9, kind: 'hack', amount: 5 }, { at: 10, kind: 'sale', amount: -5 }] }]))
   eq(back.length, 1, 'โหลดกลุ่มที่บันทึกไว้')
   eq(back[0].entries.length, 5, 'ตัดรายการที่ผิดรูปแบบทิ้ง')
+})
+
+test('AR จีบนิ้ว: วัดระยะโป้ง–ชี้เทียบฝ่ามือ จีบ/ปล่อยแบบกันสั่น และแปลงพิกัดกล้องเป็นจอถูกต้อง', () => {
+  // มือจำลอง: ข้อมือ (0) ถึงโคนนิ้วกลาง (9) ยาว 0.2 · ปลายโป้ง (4) กับปลายชี้ (8) ห่าง gap
+  const handAt = (gap, scale = 1, cx = 0.5) => {
+    const lm = Array.from({ length: 21 }, () => ({ x: cx, y: 0.5 }))
+    lm[0] = { x: cx, y: 0.5 + 0.2 * scale }
+    lm[9] = { x: cx, y: 0.5 }
+    lm[4] = { x: cx - (gap * scale) / 2, y: 0.4 }
+    lm[8] = { x: cx + (gap * scale) / 2, y: 0.4 }
+    return lm
+  }
+  assert(Math.abs(pinch.pinchRatio(handAt(0.1)) - 0.5) < 1e-9, 'อัตราส่วน = ระยะนิ้ว / ฝ่ามือ')
+  // มือใกล้หรือไกลกล้อง (ใหญ่/เล็ก) ได้อัตราส่วนเท่ากัน
+  assert(Math.abs(pinch.pinchRatio(handAt(0.05, 2)) - pinch.pinchRatio(handAt(0.05, 0.5))) < 1e-9, 'ไม่ขึ้นกับขนาดมือ')
+  eq(pinch.pinchRatio([]), Infinity, 'ไม่มีจุดมือ')
+  const c = pinch.cursorOf(handAt(0.1))
+  assert(Math.abs(c.x - 0.5) < 1e-9 && Math.abs(c.y - 0.4) < 1e-9, 'ตัวชี้อยู่กลางนิ้วโป้งกับนิ้วชี้')
+  eq(pinch.pinchProgress(1), 0, 'มือกางไม่มีความคืบหน้า')
+  eq(pinch.pinchProgress(0), 1, 'จีบสนิท = เต็ม')
+
+  // จีบต้องค้าง 2 เฟรม ได้ down ครั้งเดียว ขยับเล็กน้อยใกล้เส้นไม่สั่น และต้องกางเกิน PINCH_OFF ถึงปล่อย
+  const d = new pinch.PinchDetector()
+  const seq = [0.9, 0.2, 0.2, 0.25, 0.4, 0.3, 0.45, 0.6, 0.2, 0.2]
+  const events = seq.map((r) => d.update(r))
+  eq(events.filter((e) => e === 'down').length, 2, 'จีบสองครั้ง')
+  eq(events.filter((e) => e === 'up').length, 1, 'ปล่อยหนึ่งครั้งระหว่างกลาง')
+  eq(events[2], 'down', 'จีบเฟรมที่สองติดกันจึงนับ')
+  eq(events[7], 'up', 'ปล่อยเมื่อกางเกินเส้นปล่อย')
+  const d2 = new pinch.PinchDetector()
+  eq([0.2, 0.9, 0.2, 0.9].map((r) => d2.update(r)).filter(Boolean).length, 0, 'จีบแวบเดียวไม่นับ')
+  const d3 = new pinch.PinchDetector()
+  d3.update(0.1)
+  d3.update(0.1)
+  eq(d3.lost(), 'up', 'มือหายไประหว่างจีบ = ปล่อย')
+  eq(d3.lost(), null, 'หายซ้ำไม่ปล่อยซ้ำ')
+
+  // วิดีโอ 1280×720 แสดงแบบ cover บนจอ 400×800: กว้างเกินแล้วถูกตัดซ้ายขวา
+  const box = { left: 0, top: 0, w: 400, h: 800 }
+  const v = { w: 1280, h: 720 }
+  const mid = pinch.videoToScreen({ x: 0.5, y: 0.5 }, v, box, false)
+  assert(Math.abs(mid.x - 200) < 1e-6 && Math.abs(mid.y - 400) < 1e-6, 'กลางภาพ = กลางจอ')
+  const top = pinch.videoToScreen({ x: 0.5, y: 0 }, v, box, false)
+  assert(Math.abs(top.y) < 1e-6, 'ขอบบนภาพ = ขอบบนจอ (สูงพอดี)')
+  const a = pinch.videoToScreen({ x: 0.6, y: 0.5 }, v, box, false)
+  const m = pinch.videoToScreen({ x: 0.6, y: 0.5 }, v, box, true)
+  assert(Math.abs(a.x - 200 - (200 - m.x)) < 1e-6, 'กล้องหน้า: กลับซ้ายขวาเหมือนกระจก')
+  // เป้าหมายใกล้ที่สุดในรัศมี
+  const ts = [
+    { x: 100, y: 100, id: 'a' },
+    { x: 130, y: 100, id: 'b' },
+  ]
+  eq(pinch.nearestTarget({ x: 120, y: 100 }, ts, 60).id, 'b', 'เลือกชิ้นที่ใกล้กว่า')
+  eq(pinch.nearestTarget({ x: 300, y: 300 }, ts, 60), null, 'ไกลเกินรัศมีไม่เลือก')
+})
+
+test('กาดรักษ์โลกในเกม: กองขยะพอทำสินค้าและพอซื้ออุปกรณ์ ทุกวันเล่นจบได้ และโจทย์ทุกข้อคำนวณถูก', () => {
+  const sumCheck = (q) => {
+    assert(q.answer > 0 && q.answer % 25 === 0, `${q.gen}: คำตอบต้องเป็นเงินที่จ่ายได้จริง (${q.answer})`)
+    eq(q.input, q.answer % 100 === 0 ? 'baht' : 'bs', `${q.gen}: ช่องตอบ`)
+    assert(q.explain.length > 0 && q.hint.text, `${q.gen}: ต้องมีวิธีคิดและตัวช่วย`)
+  }
+  for (const r of eco.RECIPES) {
+    assert(kad.PRODUCTS.some((p) => p.id === r.id), `สูตร ${r.id} ต้องมีภาพสินค้า`)
+    for (const id of Object.keys(r.uses)) assert(eco.TRASH_BIN[id], `ขยะ ${id} ต้องมีถัง`)
+    assert(r.prices.length === 3 && r.prices[0] < r.prices[2], `ราคาให้เลือกของ ${r.id}`)
+  }
+  for (const id of kad.TRASH.map((t) => t.id)) assert(eco.BINS.some((b) => b.id === eco.TRASH_BIN[id]), `ขยะ ${id} ไม่มีถังให้ทิ้ง`)
+  for (let k = 0; k < 1500; k += 1) {
+    const r = eco.RECIPES[k % eco.RECIPES.length]
+    const start = k % 3 === 0 ? 0 : (k % 7) * 100
+    const day = eco.makeDay(r, start)
+    const counts = eco.countOf(day.pile)
+    // กองขยะ = ของที่เก็บไว้ + ของที่ขาย
+    for (const [id, n] of Object.entries(r.uses)) assert((counts[id] ?? 0) >= n, `กองขยะไม่พอทำ${r.name}`)
+    eq(day.pile.length, Object.values(day.keep).reduce((a, b) => a + b, 0) + Object.values(day.sell).reduce((a, b) => a + b, 0), 'จำนวนขยะในกอง')
+    assert(day.pile.length <= 30, 'กองขยะใหญ่เกินไป')
+    eq(day.payout, eco.payoutOf(day.sell), 'เงินขายขยะ')
+    assert(day.start + day.payout >= day.cost + 200, `เงินไม่พอซื้ออุปกรณ์ (${day.start} + ${day.payout} < ${day.cost})`)
+    const sq = eco.sellQuestion(day)
+    eq(sq.answer, day.payout, 'โจทย์ขายขยะ')
+    sumCheck(sq)
+    const cq = eco.costQuestion(r)
+    eq(cq.answer, eco.recipeCost(r), 'โจทย์ต้นทุน')
+    sumCheck(cq)
+    const lq = eco.leftQuestion(day.start + day.payout, day.cost)
+    eq(lq.answer, day.start + day.payout - day.cost, 'โจทย์เงินเหลือ')
+    sumCheck(lq)
+    // ทุกราคา: ลูกค้าซื้อไม่เกินของที่มี ทอนถูก และกำไร = ขาย − ต้นทุน
+    const customers = eco.makeCustomers(r)
+    eq(customers.length, 3, 'ลูกค้า 3 คน')
+    eq(new Set(customers.map((c) => c.npc)).size, 3, 'ลูกค้าไม่ซ้ำคน')
+    for (const price of r.prices) {
+      const serves = eco.serveCustomers(customers, price, r.makes)
+      const sold = serves.filter((s) => s.result === 'sold')
+      assert(sold.reduce((a, s) => a + s.sale.qty, 0) <= r.makes, 'ขายเกินของที่มี')
+      for (const s of serves) if (s.result === 'pricey') assert(price > s.customer.max, 'ปฏิเสธทั้งที่ราคาไม่แพง')
+      for (const s of sold) {
+        eq(s.sale.total, s.sale.qty * price * 100, 'ราคารวม')
+        assert(s.sale.paid > s.sale.total, 'ลูกค้าต้องจ่ายเกินเพื่อให้มีเงินทอน')
+        const q = eco.changeQuestion(s.sale, r, price)
+        eq(q.answer, s.sale.paid - s.sale.total, 'โจทย์เงินทอน')
+        sumCheck(q)
+      }
+      const income = sold.reduce((a, s) => a + s.sale.total, 0)
+      const pq = eco.profitQuestion(income, eco.recipeCost(r))
+      if (income === eco.recipeCost(r)) eq(pq, null, 'เท่าทุนไม่ต้องถาม')
+      else {
+        eq(pq.answer, Math.abs(income - eco.recipeCost(r)), 'โจทย์กำไร/ขาดทุน')
+        sumCheck(pq)
+      }
+    }
+    // ราคาถูกสุด: ขายหมดเสมอ และกำไร
+    const cheap = eco.serveCustomers(customers, r.prices[0], r.makes)
+    eq(cheap.filter((s) => s.result === 'sold').reduce((a, s) => a + s.sale.qty, 0), r.makes, 'ราคาถูกสุดต้องขายหมด')
+    assert(r.makes * r.prices[0] * 100 > eco.recipeCost(r), `ราคาถูกสุดของ ${r.id} ต้องยังมีกำไร`)
+  }
+  // บันทึกของผู้เล่น: ทุนยกไปวันถัดไป ออม/บริจาคสะสม ต้นไม้โตตามยอดขาย
+  let rec = eco.emptyEco()
+  rec = eco.recordEcoDay(rec, { sales: 3000, profit: 1900, alloc: { invest: 500, save: 400, donate: 1000, gift: 0 } })
+  rec = eco.recordEcoDay(rec, { sales: 8000, profit: 6000, alloc: { invest: 0, save: 6000, donate: 0, gift: 0 } })
+  eq(rec.days, 2, 'จำนวนวัน')
+  eq(rec.sales, 11000, 'ยอดขายสะสม')
+  eq(rec.saved, 6400, 'ออมสะสม')
+  eq(rec.donated, 1000, 'บริจาคสะสม')
+  eq(rec.invest, 0, 'ทุนยกมาเป็นของวันล่าสุด')
+  eq(rec.bestProfit, 6000, 'กำไรสูงสุด')
+  eq(eco.ecoStage(rec).stage, 1, 'ยอดขาย 110 บาท ปลดล็อกต้นไม้')
+  eq(eco.ecoStage(rec).need, 90, 'อีก 90 บาท ถึงกระถาง')
+  eq(eco.allocTotal({ invest: 100, save: 200, donate: 300, gift: 400 }), 1000, 'รวมการแบ่งกำไร')
+  // ผู้เล่นเก่าไม่มีข้อมูลกาด โหลดแล้วต้องมีค่าเริ่มต้น
+  const old = progress.parseSave(JSON.stringify({ players: { a: { id: 'a', name: 'เก่า', eco: { days: 2 } } }, activeId: 'a' }))
+  eq(old.players.a.eco.days, 2, 'เก็บค่าที่มี')
+  eq(old.players.a.eco.sales, 0, 'เติมค่าที่ขาด')
+  const fresh = { ...progress.newPlayer('กาด', 'hero'), eco: rec }
+  assert(progress.newBadges(fresh).includes('eco-seller'), 'เล่นจบหนึ่งวันได้ตรา')
+  assert(!progress.newBadges(fresh).includes('eco-garden'), 'ยังไม่ถึงสวน')
+  assert(progress.newBadges({ ...fresh, eco: { ...rec, sales: 30000 } }).includes('eco-garden'), 'ขายครบ 300 บาทได้ตราสวน')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
