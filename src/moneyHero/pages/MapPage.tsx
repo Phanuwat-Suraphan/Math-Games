@@ -8,8 +8,13 @@ import { CHARACTERS } from '../data/characters'
 import {
   BRIDGE,
   RIVER,
+  ECO_GARDEN,
+  ECO_MARKET,
+  ECO_SPOT,
   TOWN_COINS,
   TOWN_NPCS,
+  dailyTrash,
+  routeToLane,
   TREES,
   WORLD,
   dist,
@@ -25,7 +30,11 @@ import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
 import { BuildingArt } from '../components/BuildingArt'
-import { doneToday, liveStreak } from '../engine/daily'
+import { dayKey, doneToday, liveStreak } from '../engine/daily'
+import { BAG_MAX, ecoStage, pickTrash } from '../engine/eco'
+import { TrashArt } from '../kad/KadArt'
+import { TreeStage } from '../kad/KadSheets'
+import { trashName } from '../engine/eco'
 import { earn } from '../engine/ledger'
 import { NPC_QUESTS, QUEST_REWARD, isQuestNpc, makeQuest, questAvailable, recordQuest, type QuestNpc } from '../engine/npcQuest'
 import { StepRunner } from '../components/StepRunner'
@@ -111,6 +120,15 @@ export function MapPage() {
   const [collected, setCollected] = useState(() => new Set(player?.mapCoins ?? []))
   const [nearLevel, setNearLevel] = useState<number | null>(null)
   const [nearNpc, setNearNpc] = useState<NpcId | null>(null)
+  const [nearEco, setNearEco] = useState<'market' | 'garden' | null>(null)
+  // ขยะรายวันบนถนน (จุดที่เก็บแล้ววันนี้ไม่แสดง)
+  const today = useMemo(() => dayKey(), [])
+  const trash = useMemo(() => dailyTrash(today), [today])
+  const pickedRef = useRef(new Set(player && player.eco.pickDay === today ? player.eco.picked : []))
+  const [picked, setPicked] = useState(() => new Set(pickedRef.current))
+  const bagFull = useRef(false)
+  const ecoRef = useRef(player?.eco)
+  ecoRef.current = player?.eco
   const [talk, setTalk] = useState<{ npc: NpcId; text: string; quest?: boolean } | null>(null)
   const [quest, setQuest] = useState<{ npc: QuestNpc; q: Question } | null>(null)
   const [questDone, setQuestDone] = useState<{ npc: QuestNpc; ok: boolean } | null>(null)
@@ -119,7 +137,7 @@ export function MapPage() {
   const [showList, setShowList] = useState(false)
   const [pop, setPop] = useState<{ x: number; y: number; key: number } | null>(null)
   const tipIndex = useRef<Record<string, number>>({})
-  const nearRef = useRef<{ level: number | null; npc: NpcId | null }>({ level: null, npc: null })
+  const nearRef = useRef<{ level: number | null; npc: NpcId | null; eco: 'market' | 'garden' | null }>({ level: null, npc: null, eco: null })
 
   const savePosition = useCallback(() => {
     const x = Math.round(sim.current.x)
@@ -138,6 +156,32 @@ export function MapPage() {
     },
     [updatePlayer],
   )
+
+  const pickUp = useCallback(
+    (t: (typeof trash)[number]) => {
+      if (pickedRef.current.has(t.id) || bagFull.current) return
+      const r = ecoRef.current ? pickTrash(ecoRef.current, t.id, t.kind, today) : null
+      if (!r) return
+      if (r.full) {
+        bagFull.current = true
+        setTalk({ npc: 'rabbit', text: `🧺 ถุงขยะเต็มแล้ว (${BAG_MAX} ชิ้น) ไปขายที่แผงกาดรักษ์โลกก่อนนะ` })
+        return
+      }
+      pickedRef.current.add(t.id)
+      setPicked(new Set(pickedRef.current))
+      setPop({ x: t.x, y: t.y, key: Date.now() })
+      playSound('jump')
+      updatePlayer((p) => ({ ...p, eco: pickTrash(p.eco, t.id, t.kind, today).rec }))
+    },
+    [today, updatePlayer],
+  )
+
+  /** แตะแผงกาด/สวน: เดินไปตามถนนรักษ์โลก */
+  const walkToEco = useCallback((at: Pt) => {
+    const s = sim.current
+    s.route = routeToLane({ x: s.x, y: s.y }, at)
+    playSound('click')
+  }, [])
 
   const enter = useCallback(
     (level: LevelDef) => {
@@ -195,7 +239,11 @@ export function MapPage() {
       return
     }
     if (level !== null) enter(LEVELS[level])
-  }, [enter, talkTo])
+    else if (nearRef.current.eco === 'market') {
+      savePosition()
+      navigate('/eco')
+    }
+  }, [enter, talkTo, navigate, savePosition])
 
   /* ---------------- ลูปเกม ---------------- */
   useEffect(() => {
@@ -300,22 +348,27 @@ export function MapPage() {
       for (const c of TOWN_COINS) {
         if (!collectedRef.current.has(c.id) && dist(s, c) < 30) collect(c)
       }
+      for (const t of trash) {
+        if (!pickedRef.current.has(t.id) && dist(s, t) < 32) pickUp(t)
+      }
 
       let level: number | null = null
       for (const l of LEVELS) if (dist(s, doorOf(l.id)) < NEAR_DOOR) level = l.id
       let npc: NpcId | null = null
       for (const n of TOWN_NPCS) if (dist(s, n) < NEAR_NPC) npc = n.id
-      if (level !== nearRef.current.level || npc !== nearRef.current.npc) {
-        nearRef.current = { level, npc }
+      const eco = dist(s, ECO_MARKET) < NEAR_DOOR ? 'market' : dist(s, ECO_GARDEN) < NEAR_DOOR ? 'garden' : null
+      if (level !== nearRef.current.level || npc !== nearRef.current.npc || eco !== nearRef.current.eco) {
+        nearRef.current = { level, npc, eco }
         setNearLevel(level)
         setNearNpc(npc)
+        setNearEco(eco)
       }
 
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
     return () => cancelAnimationFrame(raf)
-  }, [collect])
+  }, [collect, pickUp, trash])
 
   /* ---------------- คีย์บอร์ด ---------------- */
   useEffect(() => {
@@ -481,6 +534,63 @@ export function MapPage() {
               </span>
             ),
           )}
+          {/* ขยะของวันนี้บนถนน เดินผ่านเพื่อเก็บใส่ถุง */}
+          {trash.map((t) =>
+            picked.has(t.id) ? null : (
+              <span key={t.id} className="mh-town-trash" style={{ left: t.x - 20, top: t.y - 40, zIndex: t.y - 1 }} data-testid={`mh-trash-${t.id}`} aria-label={trashName(t.kind)}>
+                <TrashArt id={t.kind} />
+              </span>
+            ),
+          )}
+          {/* แผงกาดรักษ์โลก */}
+          <button
+            type="button"
+            className={`mh-eco-stall ${nearEco === 'market' ? 'is-near' : ''}`}
+            style={{ left: ECO_MARKET.x - ECO_SPOT.w / 2, top: ECO_MARKET.y - ECO_SPOT.gap - ECO_SPOT.h - 40, width: ECO_SPOT.w, zIndex: ECO_MARKET.y - 30 }}
+            onClick={() => (nearRef.current.eco === 'market' ? action() : walkToEco(ECO_MARKET))}
+            aria-label="แผงกาดรักษ์โลก"
+            data-testid="mh-eco-stall"
+          >
+            <span className="mh-house-sign">
+              <b>🌱</b> กาดรักษ์โลก
+            </span>
+            <svg viewBox="0 0 170 120" aria-hidden="true">
+              <rect x="22" y="44" width="126" height="64" rx="6" fill="#fff4e6" stroke="#2b2350" strokeWidth="3" />
+              {[0, 1, 2, 3, 4, 5].map((i) => (
+                <path key={i} d={`M${16 + i * 23} 22 h23 v24 q-11.5 10 -23 0 z`} fill={i % 2 ? '#fff' : '#40c057'} stroke="#2b2350" strokeWidth="2" />
+              ))}
+              <rect x="16" y="14" width="138" height="10" rx="4" fill="#2f9e44" stroke="#2b2350" strokeWidth="2" />
+              <rect x="22" y="80" width="126" height="28" fill="#d9a066" stroke="#2b2350" strokeWidth="3" />
+              <circle cx="54" cy="72" r="8" fill="#69db7c" stroke="#2b2350" strokeWidth="2" />
+              <rect x="74" y="64" width="16" height="16" rx="3" fill="#a5d8ff" stroke="#2b2350" strokeWidth="2" />
+              <circle cx="114" cy="72" r="8" fill="#ffc9de" stroke="#2b2350" strokeWidth="2" />
+              <text x="85" y="100" fontSize="13" textAnchor="middle" fill="#fff" fontWeight="800">
+                {'\u267B\uFE0E'}
+              </text>
+            </svg>
+            {player.eco.bag.length > 0 && <span className="mh-eco-bag">🧺 {player.eco.bag.length}</span>}
+          </button>
+          {/* สวนของฮีโร่: ต้นไม้โตตามยอดขายสะสม ดอกไม้ตามเงินบริจาค */}
+          <button
+            type="button"
+            className={`mh-eco-garden ${nearEco === 'garden' ? 'is-near' : ''}`}
+            style={{ left: ECO_GARDEN.x - ECO_SPOT.w / 2, top: ECO_GARDEN.y - ECO_SPOT.gap - ECO_SPOT.h - 40, width: ECO_SPOT.w, zIndex: ECO_GARDEN.y - 30 }}
+            onClick={() => walkToEco(ECO_GARDEN)}
+            aria-label={`สวนของ${player.name}`}
+            data-testid="mh-eco-garden"
+          >
+            <span className="mh-house-sign">🌳 สวนของ{player.name}</span>
+            <span className="mh-eco-garden-plot">
+              <span className="mh-eco-tree">
+                <TreeStage stage={ecoStage(player.eco).stage} />
+              </span>
+              {Array.from({ length: Math.min(10, Math.floor(player.eco.donated / 100)) }, (_, i) => (
+                <span key={i} className="mh-eco-flower" style={{ left: `${8 + ((i * 37) % 84)}%`, top: `${62 + ((i * 13) % 26)}%` }}>
+                  {['🌷', '🌼', '🌸', '🌻'][i % 4]}
+                </span>
+              ))}
+            </span>
+          </button>
           {BUTTERFLIES.map((b, i) => (
             <span key={i} className="mh-butterfly" style={{ left: b.x, top: b.y, animationDelay: `${i * -2.3}s` }} aria-hidden="true">
               <svg viewBox="-12 -10 24 20" width="22" height="18">
@@ -559,6 +669,36 @@ export function MapPage() {
               </div>
             </div>
           )}
+          {nearEco && !near && !talk && (
+            <div className="mh-card mh-level-panel" data-testid="mh-eco-panel">
+              <div className="mh-level-panel-icon mh-eco-panel-icon">
+                {nearEco === 'market' ? '🌱' : <TreeStage stage={ecoStage(player.eco).stage} />}
+              </div>
+              <div className="mh-level-panel-info">
+                {nearEco === 'market' ? (
+                  <>
+                    <strong>แผงกาดรักษ์โลก</strong>
+                    <span>เปลี่ยนขยะให้เป็นเงิน เปลี่ยนเงินให้เป็นไอเดีย</span>
+                    <span className="mh-level-panel-game">🧺 ขยะในถุง {player.eco.bag.length}/{BAG_MAX} ชิ้น</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>สวนของ{player.name}</strong>
+                    <span>
+                      ยอดขายสะสม {Math.floor(player.eco.sales / 100)} บาท
+                      {ecoStage(player.eco).next ? ` · อีก ${ecoStage(player.eco).need} บาท ${ecoStage(player.eco).next?.label}` : ' · สวนสมบูรณ์แล้ว 🎉'}
+                    </span>
+                    <span className="mh-level-panel-game">🌷 บริจาคกองทุนต้นไม้แล้ว {Math.floor(player.eco.donated / 100)} บาท</span>
+                  </>
+                )}
+              </div>
+              {nearEco === 'market' && (
+                <button type="button" className="mh-btn mh-btn-gold" onClick={action} data-testid="mh-eco-enter">
+                  ▶ เปิดร้าน
+                </button>
+              )}
+            </div>
+          )}
           {near && !talk && (
             <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
               <div className="mh-level-panel-icon">
@@ -607,7 +747,7 @@ export function MapPage() {
         </div>
         <button
           type="button"
-          className={`mh-action-btn ${nearLevel !== null || nearNpc ? 'is-ready' : ''}`}
+          className={`mh-action-btn ${nearLevel !== null || nearNpc || nearEco === 'market' ? 'is-ready' : ''}`}
           onClick={action}
           aria-label="ทำ"
           data-testid="mh-action"

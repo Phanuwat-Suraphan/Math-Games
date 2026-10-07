@@ -7594,3 +7594,110 @@ a.mh-stat-coin {
     justify-content: flex-end;
   }
 }
+
+/* ================================================================== */
+/* กาดรักษ์โลกในเมือง: ขยะบนถนน แผงกาด และสวนของฮีโร่                 */
+/* ================================================================== */
+
+.mh-town-trash {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  pointer-events: none;
+  animation: mh-piggy-bob 2.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.9));
+}
+
+.mh-town-trash::after {
+  content: '!';
+  position: absolute;
+  right: -6px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffd43b;
+  color: #2b2350;
+  font-weight: 900;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: center;
+  border: 2px solid #fff;
+}
+
+.mh-town-trash svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mh-eco-stall,
+.mh-eco-garden {
+  position: absolute;
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font: inherit;
+}
+
+.mh-eco-stall svg {
+  width: 100%;
+  height: auto;
+}
+
+.mh-eco-stall.is-near svg,
+.mh-eco-garden.is-near .mh-eco-garden-plot {
+  filter: drop-shadow(0 0 12px #ffd43b);
+}
+
+.mh-eco-bag {
+  position: absolute;
+  right: 6px;
+  top: 34px;
+  background: #fff;
+  border: 2px solid #2f9e44;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-weight: 800;
+  animation: mh-jelly 1.6s ease-in-out infinite;
+}
+
+.mh-eco-garden-plot {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #8ce99a, #69db7c);
+  border: 4px dashed #8d6e63;
+}
+
+.mh-eco-tree {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 104px;
+  height: 104px;
+  transform: translateX(-50%);
+  animation: mh-piggy-bob 3.2s ease-in-out infinite;
+}
+
+.mh-eco-flower {
+  position: absolute;
+  font-size: 18px;
+  animation: mh-jelly 2s ease-in-out infinite;
+}
+
+.mh-eco-panel-icon {
+  font-size: 40px;
+  display: grid;
+  place-items: center;
+}
+
+.mh-eco-panel-icon svg {
+  width: 64px;
+  height: 64px;
+}

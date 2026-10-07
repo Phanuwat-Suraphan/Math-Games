@@ -54,6 +54,25 @@ export const ROAD: (Pt & { level?: number })[] = [
 
 export const ROAD_WIDTH = 74
 
+/**
+ * ถนนรักษ์โลก: ทางเดินดินใต้แม่น้ำ แยกจากเชิงสะพานไปทางขวา
+ * มีแผงกาดรักษ์โลก (เข้าเล่นโหมดกาด) และสวนของฮีโร่ (ต้นไม้โตตามยอดขาย)
+ */
+export const ECO_LANE: [Pt, Pt] = [
+  { x: 345, y: 1520 },
+  { x: 1180, y: 1520 },
+]
+export const ECO_LANE_WIDTH = 56
+/** จุดยืนหน้าแผงกาด และหน้าสวน (อยู่บนถนนรักษ์โลก) */
+export const ECO_MARKET: Pt = { x: 700, y: 1520 }
+export const ECO_GARDEN: Pt = { x: 1000, y: 1520 }
+/** ขนาดแผงและสวน (อยู่เหนือจุดยืน ใช้กันชนและกันต้นไม้) */
+export const ECO_SPOT = { w: 170, h: 96, gap: 22 }
+
+export function ecoRect(at: Pt): { x: number; y: number; w: number; h: number } {
+  return { x: at.x - ECO_SPOT.w / 2, y: at.y - ECO_SPOT.gap - ECO_SPOT.h, w: ECO_SPOT.w, h: ECO_SPOT.h }
+}
+
 /** ตำแหน่งประตูของแต่ละด่าน */
 export function doorOf(level: number): Pt {
   const p = ROAD.find((r) => r.level === level)
@@ -117,6 +136,24 @@ export function routeTo(from: Pt, level: number): Pt[] {
   return route
 }
 
+/** ระยะจากจุดถึงถนนรักษ์โลก */
+export function nearestOnLane(p: Pt): { pt: Pt; d: number } {
+  const r = nearestOnSegment(p, ECO_LANE[0], ECO_LANE[1])
+  return { pt: r.pt, d: r.d }
+}
+
+/** เส้นทางไปจุดบนถนนรักษ์โลก: อยู่บนถนนรักษ์โลกแล้วเดินตรงไปเลย ไม่งั้นเดินตามถนนมาเชิงสะพานก่อน */
+export function routeToLane(from: Pt, target: Pt): Pt[] {
+  if (nearestOnLane(from).d < ROAD_WIDTH) return [nearestOnLane(from).pt, target]
+  const near = nearestOnRoad(from)
+  const route: Pt[] = [near.pt]
+  // ถนนช่วง 0–1 คือแถวล่างสุด เชิงสะพานคือ ROAD[1]
+  if (near.seg >= 1) for (let i = near.seg; i >= 1; i -= 1) route.push(ROAD[i])
+  else route.push(ROAD[1])
+  route.push(target)
+  return route
+}
+
 /* ------------------------------------------------------------------ */
 /* เพื่อนในเมือง                                                       */
 /* ------------------------------------------------------------------ */
@@ -161,6 +198,16 @@ function nearBuilding(p: Pt, pad: number): boolean {
   return false
 }
 
+/** ใกล้ถนนรักษ์โลก แผงกาด หรือสวน (ต้นไม้และของตกแต่งต้องหลบ) */
+function nearEco(p: Pt, pad: number): boolean {
+  if (nearestOnLane(p).d < ECO_LANE_WIDTH / 2 + pad) return true
+  for (const at of [ECO_MARKET, ECO_GARDEN]) {
+    const b = ecoRect(at)
+    if (p.x > b.x - pad && p.x < b.x + b.w + pad && p.y > b.y - pad && p.y < at.y + pad) return true
+  }
+  return false
+}
+
 function generateTrees(): Tree[] {
   const rnd = seeded(2569)
   const trees: Tree[] = []
@@ -174,6 +221,7 @@ function generateTrees(): Tree[] {
     if (inRiver(p, r + 10)) continue
     if (nearestOnRoad(p).d < ROAD_WIDTH / 2 + r + 30) continue
     if (nearBuilding(p, r + 40)) continue
+    if (nearEco(p, r + 30)) continue
     if (trees.some((t) => dist(t, p) < t.r + r + 8)) continue
     // เว้นที่ว่างรอบค่ายเริ่มต้น และรอบเพื่อน ๆ ในเมือง
     if (dist(p, ROAD[0]) < 170) continue
@@ -198,6 +246,7 @@ function generateDecor(): Decor[] {
     if (inRiver(p, 20)) continue
     if (nearestOnRoad(p).d < ROAD_WIDTH / 2 + 14) continue
     if (nearBuilding(p, 20)) continue
+    if (nearEco(p, 14)) continue
     if (TREES.some((t) => dist(t, p) < t.r + 16)) continue
     if (TOWN_NPCS.some((n) => dist(n, p) < 40)) continue
     out.push({ ...p, kind: kinds[Math.floor(rnd() * kinds.length)] })
@@ -249,6 +298,56 @@ export function walkable(p: Pt): boolean {
     const b = buildingRect(r.level)
     if (p.x > b.x + 10 && p.x < b.x + b.w - 10 && p.y > b.y + 30 && p.y < b.y + b.h + 4) return false
   }
+  for (const at of [ECO_MARKET, ECO_GARDEN]) {
+    const b = ecoRect(at)
+    if (p.x > b.x + 10 && p.x < b.x + b.w - 10 && p.y > b.y + 24 && p.y < b.y + b.h + 4) return false
+  }
   for (const n of TOWN_NPCS) if (dist(n, p) < 26) return false
   return true
+}
+
+/* ------------------------------------------------------------------ */
+/* ขยะรายวันบนถนน (ขั้น "เก็บขยะ" ของกาดรักษ์โลก)                      */
+/* ------------------------------------------------------------------ */
+
+export interface TrashSpot extends Pt {
+  id: string
+}
+
+/** จุดที่อาจมีขยะ: กึ่งกลางระหว่างเหรียญบนถนนทุกช่วง และบนถนนรักษ์โลก */
+function generateTrashSpots(): TrashSpot[] {
+  const spots: TrashSpot[] = []
+  const lines: [Pt, Pt, string][] = ROAD.slice(0, -1).map((a, i) => [a, ROAD[i + 1], `w${i}`])
+  lines.push([ECO_LANE[0], ECO_LANE[1], 'eco'])
+  for (const [a, b, key] of lines) {
+    const n = Math.floor(dist(a, b) / 150)
+    for (let k = 0; k <= n; k += 1) {
+      const t = (k + 0.5) / (n + 1)
+      spots.push({ id: `${key}-${k}`, x: Math.round(a.x + (b.x - a.x) * t), y: Math.round(a.y + (b.y - a.y) * t) })
+    }
+  }
+  return spots
+}
+
+export const TRASH_SPOTS: TrashSpot[] = generateTrashSpots()
+
+export const TRASH_KINDS = ['bottle', 'can', 'box', 'paper', 'cap', 'jar'] as const
+
+export interface DailyTrash extends TrashSpot {
+  kind: (typeof TRASH_KINDS)[number]
+}
+
+/** ขยะของวันนี้ 6 ชิ้น (ทุกเครื่องเห็นเหมือนกันในวันเดียวกัน) */
+export function dailyTrash(day: string, count = 6): DailyTrash[] {
+  let h = 2166136261
+  for (let i = 0; i < day.length; i += 1) h = Math.imul(h ^ day.charCodeAt(i), 16777619)
+  const rnd = seeded(h >>> 0)
+  const pool = TRASH_SPOTS.slice()
+  const out: DailyTrash[] = []
+  while (out.length < count && pool.length > 0) {
+    const spot = pool.splice(Math.floor(rnd() * pool.length), 1)[0]
+    if (out.some((o) => dist(o, spot) < 120)) continue
+    out.push({ ...spot, kind: TRASH_KINDS[Math.floor(rnd() * TRASH_KINDS.length)] })
+  }
+  return out
 }

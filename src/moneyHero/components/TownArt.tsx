@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { BRIDGE, DECOR, RIVER, ROAD, ROAD_WIDTH, WORLD, type Tree } from '../data/town'
+import { BRIDGE, DECOR, ECO_LANE, ECO_LANE_WIDTH, RIVER, ROAD, ROAD_WIDTH, WORLD, type Tree } from '../data/town'
 
 /**
  * ภาพเมืองเงินทองแบบมองจากด้านบน วาดด้วย SVG ทั้งหมด
@@ -196,6 +196,10 @@ export const TownTerrain = memo(function TownTerrain() {
       ))}
       <Riverbank />
       {/* ถนนปูหิน: ขอบหญ้าเข้ม → ขอบหินคันถนน → ผิวหินก้อนกลม */}
+      {/* ถนนรักษ์โลก: ทางดินไปแผงกาดและสวน */}
+      <line x1={ECO_LANE[0].x} y1={ECO_LANE[0].y} x2={ECO_LANE[1].x} y2={ECO_LANE[1].y} stroke="#4f9140" strokeWidth={ECO_LANE_WIDTH + 18} strokeLinecap="round" opacity="0.6" />
+      <line x1={ECO_LANE[0].x} y1={ECO_LANE[0].y} x2={ECO_LANE[1].x} y2={ECO_LANE[1].y} stroke="#c9a46f" strokeWidth={ECO_LANE_WIDTH} strokeLinecap="round" />
+      <line x1={ECO_LANE[0].x} y1={ECO_LANE[0].y} x2={ECO_LANE[1].x} y2={ECO_LANE[1].y} stroke="#e2c48f" strokeWidth="6" strokeDasharray="14 18" strokeLinecap="round" />
       <polyline points={ROAD_POINTS} fill="none" stroke="#4f9140" strokeWidth={ROAD_WIDTH + 24} strokeLinejoin="round" strokeLinecap="round" opacity="0.7" />
       <polyline points={ROAD_POINTS} fill="none" stroke="#8f7a63" strokeWidth={ROAD_WIDTH + 10} strokeLinejoin="round" strokeLinecap="round" />
       <polyline points={ROAD_POINTS} fill="none" stroke="#b9a184" strokeWidth={ROAD_WIDTH + 4} strokeLinejoin="round" strokeLinecap="round" />
