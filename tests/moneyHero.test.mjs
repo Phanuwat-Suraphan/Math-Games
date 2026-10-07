@@ -40,6 +40,7 @@ const sandbox = load('engine/sandbox.js')
 const book = load('engine/ledger.js')
 const kad = load('kad/kadData.js')
 const pinch = load('engine/pinch.js')
+const eco = load('engine/eco.js')
 
 let passed = 0
 const failures = []
@@ -897,6 +898,90 @@ test('AR จีบนิ้ว: วัดระยะโป้ง–ชี้เ
   ]
   eq(pinch.nearestTarget({ x: 120, y: 100 }, ts, 60).id, 'b', 'เลือกชิ้นที่ใกล้กว่า')
   eq(pinch.nearestTarget({ x: 300, y: 300 }, ts, 60), null, 'ไกลเกินรัศมีไม่เลือก')
+})
+
+test('กาดรักษ์โลกในเกม: กองขยะพอทำสินค้าและพอซื้ออุปกรณ์ ทุกวันเล่นจบได้ และโจทย์ทุกข้อคำนวณถูก', () => {
+  const sumCheck = (q) => {
+    assert(q.answer > 0 && q.answer % 25 === 0, `${q.gen}: คำตอบต้องเป็นเงินที่จ่ายได้จริง (${q.answer})`)
+    eq(q.input, q.answer % 100 === 0 ? 'baht' : 'bs', `${q.gen}: ช่องตอบ`)
+    assert(q.explain.length > 0 && q.hint.text, `${q.gen}: ต้องมีวิธีคิดและตัวช่วย`)
+  }
+  for (const r of eco.RECIPES) {
+    assert(kad.PRODUCTS.some((p) => p.id === r.id), `สูตร ${r.id} ต้องมีภาพสินค้า`)
+    for (const id of Object.keys(r.uses)) assert(eco.TRASH_BIN[id], `ขยะ ${id} ต้องมีถัง`)
+    assert(r.prices.length === 3 && r.prices[0] < r.prices[2], `ราคาให้เลือกของ ${r.id}`)
+  }
+  for (const id of kad.TRASH.map((t) => t.id)) assert(eco.BINS.some((b) => b.id === eco.TRASH_BIN[id]), `ขยะ ${id} ไม่มีถังให้ทิ้ง`)
+  for (let k = 0; k < 1500; k += 1) {
+    const r = eco.RECIPES[k % eco.RECIPES.length]
+    const start = k % 3 === 0 ? 0 : (k % 7) * 100
+    const day = eco.makeDay(r, start)
+    const counts = eco.countOf(day.pile)
+    // กองขยะ = ของที่เก็บไว้ + ของที่ขาย
+    for (const [id, n] of Object.entries(r.uses)) assert((counts[id] ?? 0) >= n, `กองขยะไม่พอทำ${r.name}`)
+    eq(day.pile.length, Object.values(day.keep).reduce((a, b) => a + b, 0) + Object.values(day.sell).reduce((a, b) => a + b, 0), 'จำนวนขยะในกอง')
+    assert(day.pile.length <= 30, 'กองขยะใหญ่เกินไป')
+    eq(day.payout, eco.payoutOf(day.sell), 'เงินขายขยะ')
+    assert(day.start + day.payout >= day.cost + 200, `เงินไม่พอซื้ออุปกรณ์ (${day.start} + ${day.payout} < ${day.cost})`)
+    const sq = eco.sellQuestion(day)
+    eq(sq.answer, day.payout, 'โจทย์ขายขยะ')
+    sumCheck(sq)
+    const cq = eco.costQuestion(r)
+    eq(cq.answer, eco.recipeCost(r), 'โจทย์ต้นทุน')
+    sumCheck(cq)
+    const lq = eco.leftQuestion(day.start + day.payout, day.cost)
+    eq(lq.answer, day.start + day.payout - day.cost, 'โจทย์เงินเหลือ')
+    sumCheck(lq)
+    // ทุกราคา: ลูกค้าซื้อไม่เกินของที่มี ทอนถูก และกำไร = ขาย − ต้นทุน
+    const customers = eco.makeCustomers(r)
+    eq(customers.length, 3, 'ลูกค้า 3 คน')
+    eq(new Set(customers.map((c) => c.npc)).size, 3, 'ลูกค้าไม่ซ้ำคน')
+    for (const price of r.prices) {
+      const serves = eco.serveCustomers(customers, price, r.makes)
+      const sold = serves.filter((s) => s.result === 'sold')
+      assert(sold.reduce((a, s) => a + s.sale.qty, 0) <= r.makes, 'ขายเกินของที่มี')
+      for (const s of serves) if (s.result === 'pricey') assert(price > s.customer.max, 'ปฏิเสธทั้งที่ราคาไม่แพง')
+      for (const s of sold) {
+        eq(s.sale.total, s.sale.qty * price * 100, 'ราคารวม')
+        assert(s.sale.paid > s.sale.total, 'ลูกค้าต้องจ่ายเกินเพื่อให้มีเงินทอน')
+        const q = eco.changeQuestion(s.sale, r, price)
+        eq(q.answer, s.sale.paid - s.sale.total, 'โจทย์เงินทอน')
+        sumCheck(q)
+      }
+      const income = sold.reduce((a, s) => a + s.sale.total, 0)
+      const pq = eco.profitQuestion(income, eco.recipeCost(r))
+      if (income === eco.recipeCost(r)) eq(pq, null, 'เท่าทุนไม่ต้องถาม')
+      else {
+        eq(pq.answer, Math.abs(income - eco.recipeCost(r)), 'โจทย์กำไร/ขาดทุน')
+        sumCheck(pq)
+      }
+    }
+    // ราคาถูกสุด: ขายหมดเสมอ และกำไร
+    const cheap = eco.serveCustomers(customers, r.prices[0], r.makes)
+    eq(cheap.filter((s) => s.result === 'sold').reduce((a, s) => a + s.sale.qty, 0), r.makes, 'ราคาถูกสุดต้องขายหมด')
+    assert(r.makes * r.prices[0] * 100 > eco.recipeCost(r), `ราคาถูกสุดของ ${r.id} ต้องยังมีกำไร`)
+  }
+  // บันทึกของผู้เล่น: ทุนยกไปวันถัดไป ออม/บริจาคสะสม ต้นไม้โตตามยอดขาย
+  let rec = eco.emptyEco()
+  rec = eco.recordEcoDay(rec, { sales: 3000, profit: 1900, alloc: { invest: 500, save: 400, donate: 1000, gift: 0 } })
+  rec = eco.recordEcoDay(rec, { sales: 8000, profit: 6000, alloc: { invest: 0, save: 6000, donate: 0, gift: 0 } })
+  eq(rec.days, 2, 'จำนวนวัน')
+  eq(rec.sales, 11000, 'ยอดขายสะสม')
+  eq(rec.saved, 6400, 'ออมสะสม')
+  eq(rec.donated, 1000, 'บริจาคสะสม')
+  eq(rec.invest, 0, 'ทุนยกมาเป็นของวันล่าสุด')
+  eq(rec.bestProfit, 6000, 'กำไรสูงสุด')
+  eq(eco.ecoStage(rec).stage, 1, 'ยอดขาย 110 บาท ปลดล็อกต้นไม้')
+  eq(eco.ecoStage(rec).need, 90, 'อีก 90 บาท ถึงกระถาง')
+  eq(eco.allocTotal({ invest: 100, save: 200, donate: 300, gift: 400 }), 1000, 'รวมการแบ่งกำไร')
+  // ผู้เล่นเก่าไม่มีข้อมูลกาด โหลดแล้วต้องมีค่าเริ่มต้น
+  const old = progress.parseSave(JSON.stringify({ players: { a: { id: 'a', name: 'เก่า', eco: { days: 2 } } }, activeId: 'a' }))
+  eq(old.players.a.eco.days, 2, 'เก็บค่าที่มี')
+  eq(old.players.a.eco.sales, 0, 'เติมค่าที่ขาด')
+  const fresh = { ...progress.newPlayer('กาด', 'hero'), eco: rec }
+  assert(progress.newBadges(fresh).includes('eco-seller'), 'เล่นจบหนึ่งวันได้ตรา')
+  assert(!progress.newBadges(fresh).includes('eco-garden'), 'ยังไม่ถึงสวน')
+  assert(progress.newBadges({ ...fresh, eco: { ...rec, sales: 30000 } }).includes('eco-garden'), 'ขายครบ 300 บาทได้ตราสวน')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

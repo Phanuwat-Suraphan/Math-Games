@@ -7131,3 +7131,466 @@ a.mh-stat-coin {
 .is-pinch-pop {
   animation: mh-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* ================================================================== */
+/* กาดรักษ์โลกในเกม (#/eco)                                            */
+/* ================================================================== */
+
+.eco-page .mh-page-head .mh-title {
+  flex: 1;
+}
+
+.eco-day-chip {
+  background: linear-gradient(180deg, #d3f9d8, #8ce99a);
+  border: 3px solid #fff;
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-weight: 800;
+  box-shadow: 0 3px 0 rgba(47, 158, 68, 0.25);
+}
+
+.eco-steps {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.eco-steps li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  opacity: 0.55;
+}
+
+.eco-steps li span {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #dee2e6;
+  font-size: 18px;
+}
+
+.eco-steps li small {
+  font-size: 0.72em;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.eco-steps li.is-done {
+  opacity: 1;
+}
+
+.eco-steps li.is-done span {
+  background: #d3f9d8;
+  border-color: #40c057;
+  color: #2b8a3e;
+  font-weight: 800;
+}
+
+.eco-steps li.is-now {
+  opacity: 1;
+}
+
+.eco-steps li.is-now span {
+  border-color: #fab005;
+  background: #fff9db;
+  animation: mh-jelly 1.6s ease-in-out infinite;
+}
+
+.eco-tree-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) 1fr;
+  gap: 14px;
+  align-items: center;
+  padding-top: 30px;
+  background: linear-gradient(180deg, #e7f5ff, #ebfbee);
+}
+
+.eco-tree {
+  width: 100%;
+  max-width: 170px;
+  aspect-ratio: 1;
+  animation: mh-piggy-bob 3s ease-in-out infinite;
+}
+
+.eco-tree.is-grow {
+  animation: mh-pop-in 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.eco-note {
+  background: #fff9db;
+  border-radius: 14px;
+  padding: 6px 12px;
+  margin: 6px 0;
+}
+
+.eco-recipes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.eco-recipe {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  border: 4px solid #fff;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #ffffff, #f4fce3);
+  box-shadow: 0 5px 0 rgba(47, 158, 68, 0.22);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.eco-recipe b {
+  font-size: 1.2em;
+  color: #2b8a3e;
+}
+
+.eco-recipe small {
+  line-height: 1.35;
+}
+
+.eco-recipe-art {
+  align-self: center;
+  width: 110px;
+  height: 110px;
+  animation: mh-piggy-bob 2.8s ease-in-out infinite;
+}
+
+@media (hover: hover) {
+  .eco-recipe:hover {
+    outline: 3px solid #b2f2bb;
+    outline-offset: 2px;
+  }
+}
+
+.eco-say {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.eco-say p {
+  margin: 0;
+  background: #fff;
+  border-radius: 16px;
+  padding: 8px 12px;
+}
+
+.eco-pile {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0;
+  min-height: 96px;
+  padding: 10px;
+  border-radius: 20px;
+  background: repeating-linear-gradient(45deg, #fff4e6 0 12px, #ffe8cc 12px 24px);
+}
+
+.eco-trash {
+  appearance: none;
+  border: 3px solid transparent;
+  background: #fff;
+  border-radius: 18px;
+  width: 78px;
+  height: 78px;
+  padding: 4px;
+  cursor: pointer;
+  box-shadow: 0 3px 0 rgba(43, 35, 80, 0.12);
+  animation: mh-piggy-bob 2.4s ease-in-out infinite;
+}
+
+.eco-trash:nth-child(2n) {
+  animation-delay: -0.8s;
+}
+
+.eco-trash:nth-child(3n) {
+  animation-delay: -1.5s;
+}
+
+.eco-trash.is-on {
+  border-color: #fab005;
+  background: #fff9db;
+  animation: mh-jelly 0.9s ease-in-out infinite;
+}
+
+.eco-trash svg {
+  width: 100%;
+  height: 100%;
+}
+
+.eco-done-msg {
+  font-weight: 800;
+  color: #2b8a3e;
+  margin: auto;
+}
+
+.eco-bins {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.eco-bin {
+  appearance: none;
+  font: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border-radius: 16px;
+}
+
+.eco-bin:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.eco-bin:not(:disabled) .kad-bin {
+  animation: mh-jelly 1.8s ease-in-out infinite;
+}
+
+.eco-bin .kad-bin {
+  width: 86px;
+}
+
+.eco-bin .kad-bin span {
+  font-size: 14px;
+  padding: 0 10px;
+}
+
+.eco-bin.is-shake {
+  animation: mh-shake 0.45s ease-in-out;
+}
+
+.eco-runner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.eco-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-weight: 600;
+  background: linear-gradient(180deg, #ffffff, #f4fce3);
+}
+
+.eco-make-stage {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  min-height: 130px;
+}
+
+.eco-make-trash {
+  width: 80px;
+  height: 80px;
+  animation: mh-jelly 1.4s ease-in-out infinite;
+}
+
+.eco-make-plus {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.eco-make-mat {
+  font-size: 46px;
+  animation: mh-piggy-bob 2s ease-in-out infinite;
+}
+
+.eco-made {
+  width: 120px;
+  height: 120px;
+  animation: mh-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.eco-made:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.eco-price-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.eco-price-tag {
+  appearance: none;
+  font: inherit;
+  border: 4px solid #f08c00;
+  border-radius: 18px 40px 40px 18px;
+  background: linear-gradient(180deg, #fff4e6, #ffd8a8);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 5px 0 rgba(240, 140, 0, 0.3);
+}
+
+.eco-price-tag b {
+  font-size: 1.4em;
+}
+
+.eco-price-art {
+  width: 80px;
+  height: 80px;
+}
+
+.eco-queue b {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.eco-customers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.eco-customer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 4px 10px 4px 4px;
+  border: 3px solid #dee2e6;
+}
+
+.eco-customer.is-sold {
+  border-color: #40c057;
+  background: #ebfbee;
+}
+
+.eco-customer.is-pricey,
+.eco-customer.is-soldout {
+  opacity: 0.8;
+}
+
+.eco-share .eco-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.eco-plan-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 16px;
+  padding: 8px 10px;
+}
+
+.eco-plan-icon {
+  font-size: 30px;
+}
+
+.eco-plan-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.eco-plan-ctl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.eco-plan-amt {
+  min-width: 64px;
+  text-align: center;
+}
+
+.eco-eq {
+  font-weight: 700;
+  text-align: center;
+}
+
+.eco-unlock {
+  font-weight: 800;
+  color: #2b8a3e;
+  font-size: 1.2em;
+}
+
+.eco-book {
+  max-width: 420px;
+  margin: 10px auto;
+}
+
+.eco-book td:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.eco-in {
+  color: #2b8a3e;
+}
+
+.eco-out {
+  color: #c92a2a;
+}
+
+.eco-book-profit td {
+  border-top: 3px double #a99fc9;
+  font-weight: 800;
+}
+
+@media (max-width: 640px) {
+  .eco-steps {
+    grid-template-columns: repeat(4, 1fr);
+    row-gap: 8px;
+  }
+  .eco-tree-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .eco-trash {
+    width: 64px;
+    height: 64px;
+  }
+  .eco-bins {
+    gap: 6px;
+  }
+  .eco-bin .kad-bin {
+    width: 72px;
+  }
+  .eco-plan-row {
+    grid-template-columns: auto 1fr;
+  }
+  .eco-plan-ctl {
+    grid-column: span 2;
+    justify-content: flex-end;
+  }
+}

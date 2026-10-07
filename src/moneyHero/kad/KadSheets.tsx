@@ -136,7 +136,7 @@ function Box({ label, unit = 'บาท' }: { label: string; unit?: string }) {
 /* ชุดที่ 1 โปสเตอร์                                                    */
 /* ------------------------------------------------------------------ */
 
-function BinArt({ color, label }: { color: string; label: string }) {
+export function BinArt({ color, label }: { color: string; label: string }) {
   return (
     <div className="kad-bin">
       <svg viewBox="0 0 60 70" aria-hidden="true">
