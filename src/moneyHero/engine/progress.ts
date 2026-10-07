@@ -103,6 +103,8 @@ export interface Settings {
   /** เพลงประกอบเบา ๆ บนหน้าเริ่มเกมและแผนที่ */
   music: boolean
   speech: boolean
+  /** อ่านโจทย์ให้ฟังเองทุกข้อ (ไม่ต้องกดปุ่ม 🔈) */
+  readAloud: boolean
   reduceMotion: boolean
   bigText: boolean
 }
@@ -114,7 +116,7 @@ export interface SaveData {
   settings: Settings
 }
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, reduceMotion: false, bigText: false }
+export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, readAloud: false, reduceMotion: false, bigText: false }
 
 export function emptySkills(): Record<Skill, SkillStat> {
   const out = {} as Record<Skill, SkillStat>

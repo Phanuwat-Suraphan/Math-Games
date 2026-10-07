@@ -64,7 +64,7 @@ export const LEVELS: LevelDef[] = [
       {
         npc: 'hero',
         title: 'ทุกด่านมี 4 ขั้น',
-        lines: ['1. LEARN เรียนรู้ก่อนเล่น', '2. PRACTICE ฝึกง่าย ๆ', '3. MISSION ภารกิจในเมือง', '4. BOSS ด่านท้าทาย'],
+        lines: ['1. เรียนรู้ก่อนเล่น', '2. ฝึกซ้อม (ยิงลูกโป่ง)', '3. ภารกิจในเมือง', '4. สู้บอส'],
         visual: { type: 'rules', items: ['ตอบผิดไม่เป็นไร เกมจะสอนวิธีคิดให้', 'ข้อที่ผิดจะได้ฝึกซ้ำอีกครั้ง'] },
       },
     ],
@@ -440,7 +440,7 @@ export const LEVELS: LevelDef[] = [
   },
   {
     id: 12,
-    name: 'FINAL MONEY MASTER',
+    name: 'ศึกสุดท้าย MONEY MASTER',
     topic: 'ใช้ทุกทักษะใน 1 วัน',
     icon: '👑',
     game: 'หนึ่งวันในเมืองเงินทอง',

@@ -1,4 +1,5 @@
-import { useId } from 'react'
+import { useEffect, useId } from 'react'
+import { speak } from '../utils/speech'
 import type { Boss } from '../data/bosses'
 import type { Wear } from '../data/shop'
 import { AvatarArt } from './Art'
@@ -141,6 +142,11 @@ export function BossArena({
 }) {
   const left = Math.max(0, hp - hits)
   const ko = left === 0
+  // บอสพูดเป็นเสียงไทยตอนเริ่ม และตอนหมดแรง
+  useEffect(() => speak(boss.intro), [boss.intro])
+  useEffect(() => {
+    if (ko) speak(boss.lose, { queue: true })
+  }, [ko, boss.lose])
   const mood: BossMood = ko ? 'ko' : event?.kind === 'hit' ? 'hit' : event?.kind === 'miss' ? 'laugh' : 'idle'
   return (
     <div className={`mh-card mh-boss-arena ${ko ? 'is-ko' : ''}`} data-testid="mh-boss-arena">

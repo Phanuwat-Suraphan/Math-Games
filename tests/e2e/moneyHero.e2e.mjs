@@ -301,7 +301,7 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   if (!m || m[1] !== m[2]) throw new Error(`พลังบอสด่าน ${id} ตอนเริ่มไม่เต็ม: ${hpText}`)
   if (id === 4) await snap(page, `${label}level${id}-boss`)
   await playUntil(page, 'mh-result')
-  await page.getByText('MISSION COMPLETE!').waitFor()
+  await page.getByText('ผ่านด่านแล้ว!', { exact: true }).waitFor()
   // เกณฑ์ดาว: บอกจำนวนข้อที่ถูกตั้งแต่ครั้งแรก
   await page.getByTestId('mh-star-goal').waitFor()
   const tip = await page.getByTestId('mh-star-tip').innerText()

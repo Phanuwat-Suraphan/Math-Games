@@ -10,6 +10,7 @@ const OPTIONS: { key: keyof Settings; icon: string; label: string; note: string 
   { key: 'sound', icon: '🔊', label: 'เสียงประกอบ', note: 'เสียงกดปุ่ม ตอบถูก รับเหรียญ' },
   { key: 'music', icon: '🎵', label: 'เพลงประกอบ', note: 'เพลงเบา ๆ บนหน้าแรกและแผนที่ (ตอนทำโจทย์จะเงียบ)' },
   { key: 'speech', icon: '🗣️', label: 'เสียงพูดภาษาไทย', note: 'ตัวละครพูดชมเมื่อตอบ และกดปุ่ม 🔈 ให้อ่านโจทย์ บทเรียน' },
+  { key: 'readAloud', icon: '👂', label: 'อ่านโจทย์ให้ฟังเองทุกข้อ', note: 'เหมาะกับน้องที่ยังอ่านช้า ไม่ต้องกดปุ่ม 🔈' },
   { key: 'bigText', icon: '🔠', label: 'ตัวหนังสือใหญ่', note: 'อ่านง่ายขึ้น' },
   { key: 'reduceMotion', icon: '🐢', label: 'ลดภาพเคลื่อนไหว', note: 'สำหรับเครื่องช้า หรือเด็กที่ตาลาย' },
 ]

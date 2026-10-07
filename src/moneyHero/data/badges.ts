@@ -21,7 +21,7 @@ export const LEVEL_BADGES: BadgeDef[] = [
   { id: 'level-9', icon: '🧩', name: 'นักไขปริศนา', how: 'ผ่านด่าน 9 ร้านค้าปริศนา' },
   { id: 'level-10', icon: '🎯', name: 'นักวางแผนการเงิน', how: 'ผ่านด่าน 10 ศูนย์ภารกิจ' },
   { id: 'level-11', icon: '📒', name: 'นักบัญชีน้อย', how: 'ผ่านด่าน 11 สมุดบัญชี' },
-  { id: 'level-12', icon: '🏆', name: 'MONEY MASTER ป.3', how: 'ผ่าน FINAL MONEY MASTER' },
+  { id: 'level-12', icon: '🏆', name: 'MONEY MASTER ป.3', how: 'ผ่านด่าน 12 ศึกสุดท้าย' },
 ]
 
 export const SPECIAL_BADGES: BadgeDef[] = [
