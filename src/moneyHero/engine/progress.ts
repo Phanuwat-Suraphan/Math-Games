@@ -3,6 +3,7 @@ import { SKILLS } from '../data/characters'
 import { LEVELS, TOTAL_LESSONS } from '../data/levels'
 import { LEVEL_BADGES } from '../data/badges'
 import { shopItem, type Wear } from '../data/shop'
+import { emptyDaily, type DailyRecord } from './daily'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -74,6 +75,8 @@ export interface Player {
   /** ของที่ซื้อจากร้านของฮีโร่ และของที่สวมอยู่ */
   owned: string[]
   wear: Wear
+  /** ภารกิจประจำวัน */
+  daily: DailyRecord
   mapX?: number
   mapY?: number
 }
@@ -132,6 +135,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     mapCoins: [],
     owned: [],
     wear: {},
+    daily: emptyDaily(),
   }
 }
 
@@ -275,6 +279,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.mapCoins.length >= 15) want.push('explorer')
   if (p.fixedMistakes >= 5) want.push('comeback')
   if (p.owned.length >= 1) want.push('shopper')
+  if (p.daily.best >= 3) want.push('daily3')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 

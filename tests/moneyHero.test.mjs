@@ -34,6 +34,7 @@ const town = load('data/town.js')
 const progress = load('engine/progress.js')
 const report = load('engine/report.js')
 const hunt = load('engine/coinHunt.js')
+const daily = load('engine/daily.js')
 
 let passed = 0
 const failures = []
@@ -610,6 +611,34 @@ test('ร้านของฮีโร่: ซื้อได้เมื่อ
   // บันทึกเก่าที่ยังไม่มีข้อมูลร้านต้องเปิดได้
   const old = progress.parseSave(JSON.stringify({ players: { a: { id: 'a', name: 'เก่า' } } }))
   eq(old.players.a.owned.length, 0, 'บันทึกเก่าต้องมีคลังของว่าง')
+})
+
+test('ภารกิจประจำวัน: สตรีคต่อเมื่อทำวันถัดไป ขาดแล้วเริ่มใหม่ และโจทย์วันเดียวกันได้ชุดเดิม', () => {
+  eq(daily.shiftDay('2026-12-31', 1), '2027-01-01', 'ข้ามปี')
+  eq(daily.shiftDay('2026-03-01', -1), '2026-02-28', 'ย้อนเดือน')
+  let d = daily.recordDaily(undefined, '2026-10-05')
+  eq(d.streak, 1, 'วันแรก')
+  eq(daily.recordDaily(d, '2026-10-05'), d, 'ทำซ้ำวันเดียวกันต้องไม่นับเพิ่ม')
+  d = daily.recordDaily(d, '2026-10-06')
+  d = daily.recordDaily(d, '2026-10-07')
+  eq(d.streak, 3, 'ติดกัน 3 วัน')
+  eq(daily.liveStreak(d, '2026-10-08'), 3, 'วันถัดไปยังไม่ทำ สตรีคยังอยู่')
+  eq(daily.liveStreak(d, '2026-10-09'), 0, 'ขาดไปวันหนึ่ง สตรีคหาย')
+  d = daily.recordDaily(d, '2026-10-10')
+  eq(d.streak, 1, 'ขาดแล้วเริ่มนับใหม่')
+  eq(d.best, 3, 'สถิติสูงสุดยังอยู่')
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  p = { ...p, daily: { last: '2026-10-07', streak: 3, best: 3, days: [] } }
+  assert(progress.newBadges(p).includes('daily3'), 'ติดกัน 3 วันต้องได้ตราขยันทุกวัน')
+  const a = daily.buildDaily(p, '2026-10-07').map((q) => q.title + JSON.stringify(q.answer ?? null))
+  const b = daily.buildDaily(p, '2026-10-07').map((q) => q.title + JSON.stringify(q.answer ?? null))
+  eq(a.join('|'), b.join('|'), 'วันเดียวกันต้องได้โจทย์ชุดเดิม')
+  eq(a.length, daily.DAILY_COUNT, 'จำนวนข้อ')
+  for (const q of daily.buildDaily(p, '2026-10-08')) validateQuestion(q, `ภารกิจประจำวัน ${q.gen}`)
+  // ผ่านด่าน 7 แล้ว ต้องออกโจทย์จากด่านที่ผ่าน
+  p = { ...p, levels: { 7: { ...progress.emptyLevel(), stepDone: 4 } } }
+  eq(daily.dailyLevels(p).join(','), '7', 'ใช้ด่านที่ผ่านแล้ว')
+  assert(daily.dailyReward(10).coins === 20, 'โบนัสสตรีคสูงสุด +10')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

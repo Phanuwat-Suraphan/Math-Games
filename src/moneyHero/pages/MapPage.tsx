@@ -25,6 +25,7 @@ import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
 import { BuildingArt } from '../components/BuildingArt'
+import { doneToday, liveStreak } from '../engine/daily'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
 
@@ -566,6 +567,18 @@ export function MapPage() {
         ⌨️ ลูกศร / WASD เดิน · Enter เข้าอาคาร · 📱 ลากจอยสติกเพื่อเดิน · 👆 แตะอาคารให้ฮีโร่เดินไปเอง
       </p>
 
+      {!doneToday(player.daily) && (
+        <Link to="/daily" className="mh-card mh-test-banner is-daily" data-testid="mh-daily-banner">
+          <span className="mh-test-banner-icon" aria-hidden="true">
+            🌞
+          </span>
+          <span>
+            <b>ภารกิจประจำวัน · {liveStreak(player.daily) > 0 ? `🔥 ${liveStreak(player.daily)} วันติดกัน` : 'เริ่มสตรีคกันเลย!'}</b>
+            <span>วันละ 5 ข้อ ได้เหรียญและตราประทับ ⭐</span>
+          </span>
+          <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
+        </Link>
+      )}
       {!player.preTest && (
         <Link to="/test/pre" className="mh-card mh-test-banner" data-testid="mh-pretest-banner">
           <span className="mh-test-banner-icon" aria-hidden="true">

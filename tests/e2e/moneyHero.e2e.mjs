@@ -497,6 +497,23 @@ for (const [name, viewport] of [
     if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
   })
 
+  await step(`[${name}] ภารกิจประจำวัน: ทำ 5 ข้อ ได้ตราประทับวันนี้ และป้ายบนแผนที่หายไป`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-daily-banner').click()
+    await page.getByTestId('mh-daily-intro').waitFor()
+    await noSideScroll(page, 'ภารกิจประจำวัน')
+    await page.getByTestId('mh-daily-start').click()
+    await page.getByTestId('mh-question').waitFor()
+    await playUntil(page, 'mh-daily-done')
+    await page.getByTestId('mh-daily-streak').getByText('1').waitFor()
+    await snap(page, `${name}-daily`)
+    const p = await savedPlayer(page)
+    if (p.daily.streak !== 1 || !p.daily.last) throw new Error(`ไม่ได้บันทึกภารกิจประจำวัน: ${JSON.stringify(p.daily)}`)
+    await page.getByTestId('mh-daily-to-map').click()
+    await page.getByTestId('mh-world').waitFor()
+    if (await page.getByTestId('mh-daily-banner').isVisible().catch(() => false)) throw new Error('ทำแล้วป้ายยังอยู่')
+  })
+
   await step(`[${name}] ร้านของฮีโร่: ซื้อดอกไม้ติดผมและลูกเจี๊ยบ แล้วลูกเจี๊ยบเดินตามบนแผนที่`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-shop').click()

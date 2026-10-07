@@ -6279,3 +6279,103 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ================================================================== */
+/* ภารกิจประจำวัน                                                     */
+/* ================================================================== */
+
+.mh-test-banner.is-daily {
+  border-color: #ffd36b;
+  background: linear-gradient(90deg, rgba(255, 236, 179, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.mh-daily-card {
+  position: relative;
+  overflow: hidden;
+  padding-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mh-daily-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.mh-daily-head p {
+  margin: 0;
+}
+
+.mh-daily-streak {
+  font-family: var(--mh-display);
+  font-size: 1.5em;
+}
+
+.mh-daily-streak b {
+  font-size: 1.4em;
+  color: #ff7a1a;
+}
+
+.mh-daily-lead {
+  margin: 0;
+  font-size: 1.05em;
+}
+
+.mh-stamp-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mh-stamp-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-stamp {
+  width: 100%;
+  max-width: 54px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.15em;
+  background: rgba(43, 35, 80, 0.06);
+  border: 2px dashed #d9d2ff;
+}
+
+.mh-stamp-day.is-done .mh-stamp {
+  background: radial-gradient(circle at 40% 35%, #fff8d0, #ffd23f 60%, #f0a800);
+  border: 2px solid #e09a00;
+  font-size: 1.5em;
+  animation: mh-stamp-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  box-shadow: 0 4px 0 rgba(160, 100, 0, 0.35);
+}
+
+.mh-stamp-day.is-today .mh-stamp-name {
+  color: var(--mh-purple);
+  font-weight: 700;
+}
+
+.mh-stamp-day.is-today .mh-stamp {
+  border-color: var(--mh-purple);
+}
+
+@keyframes mh-stamp-in {
+  from {
+    transform: scale(1.8) rotate(-25deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}

@@ -15,6 +15,7 @@ import { ReviewPage } from './pages/ReviewPage'
 import { TeacherPage } from './pages/TeacherPage'
 import { CoinHuntPage } from './pages/CoinHuntPage'
 import { ShopPage } from './pages/ShopPage'
+import { DailyPage } from './pages/DailyPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -100,6 +101,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <ReviewPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/daily"
+              element={
+                <NeedPlayer>
+                  <DailyPage />
                 </NeedPlayer>
               }
             />
