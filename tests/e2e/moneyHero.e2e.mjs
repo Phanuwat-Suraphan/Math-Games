@@ -266,8 +266,17 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   await page.getByTestId('mh-learn-done').click()
   await page.waitForURL(new RegExp(`#/level/${id}/practice`))
   await page.getByTestId('mh-question').waitFor()
+  // ลานฝึกลูกโป่ง: ยังไม่มีลูกไหนแตกตอนเริ่ม
+  await page.getByTestId('mh-practice').waitFor()
+  const popStart = await page.getByTestId('mh-practice-count').innerText()
+  if (!/ 0\/\d+$/.test(popStart)) throw new Error(`ลานฝึกด่าน ${id} ตอนเริ่มไม่ว่าง: ${popStart}`)
   await snap(page, `${label}level${id}-practice`)
   await playUntil(page, 'mh-step-done', { makeMistake })
+  // ตอบผิดครบ 2 ครั้งหนึ่งข้อ = ลูกโป่งลอยหนี 1 ลูก นอกนั้นแตกหมด
+  const popEnd = (await page.getByTestId('mh-practice-count').innerText()).match(/(\d+)\/(\d+)$/)
+  if (!popEnd || Number(popEnd[1]) !== Number(popEnd[2]) - (makeMistake ? 1 : 0)) {
+    throw new Error(`ลานฝึกด่าน ${id} จบแล้วนับลูกโป่งผิด: ${popEnd?.[0]}`)
+  }
   await page.getByTestId('mh-next-step').click()
   await page.waitForURL(new RegExp(`#/level/${id}/mission`))
   // ฉากภารกิจ (ด่าน 0–11): ช่องว่างตอนเริ่ม และเต็มเมื่อตอบถูกครบทุกข้อ
@@ -293,6 +302,10 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   if (id === 4) await snap(page, `${label}level${id}-boss`)
   await playUntil(page, 'mh-result')
   await page.getByText('MISSION COMPLETE!').waitFor()
+  // เกณฑ์ดาว: บอกจำนวนข้อที่ถูกตั้งแต่ครั้งแรก
+  await page.getByTestId('mh-star-goal').waitFor()
+  const tip = await page.getByTestId('mh-star-tip').innerText()
+  if (!/ถูกตั้งแต่ครั้งแรก \d+\/\d+ ข้อ/.test(tip)) throw new Error(`เกณฑ์ดาวด่าน ${id} ไม่บอกจำนวนข้อ: ${tip}`)
   await snap(page, `${label}level${id}-result`)
 }
 
