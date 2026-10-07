@@ -503,7 +503,9 @@ for (const [name, viewport] of [
     const cdn = /cdn\.jsdelivr\.net|unpkg\.com|storage\.googleapis\.com/
     await page.route(cdn, (r) => r.abort())
     try {
-      await page.goto(`${BASE}#/ar`)
+      // ขั้นก่อนจบที่หน้าผลของ AR (#/ar) ต้องออกไปแผนที่ก่อน หน้าจะได้เริ่มใหม่
+      await page.goto(`${BASE}#/map`)
+      await page.getByTestId('mh-menu-ar').click()
       await page.getByTestId('mh-ar-camera').click()
       await page.waitForFunction(() => (document.querySelector('video.mh-ar-video')?.videoWidth ?? 0) > 0, null, { timeout: 15_000 })
       await page.waitForFunction(() => document.querySelector('[data-testid="mh-ar-hand"]')?.getAttribute('data-state') === 'error', null, { timeout: 30_000 })
