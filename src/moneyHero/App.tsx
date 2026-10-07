@@ -17,6 +17,7 @@ import { CoinHuntPage } from './pages/CoinHuntPage'
 import { ShopPage } from './pages/ShopPage'
 import { DailyPage } from './pages/DailyPage'
 import { SandboxPage } from './pages/SandboxPage'
+import { BankPage } from './pages/BankPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -118,6 +119,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <ShopPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/bank"
+              element={
+                <NeedPlayer>
+                  <BankPage />
                 </NeedPlayer>
               }
             />

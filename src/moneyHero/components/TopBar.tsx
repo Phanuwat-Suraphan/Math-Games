@@ -22,9 +22,9 @@ export function TopBar({ compact = false }: { compact?: boolean }) {
       </Link>
       <div className="mh-stats">
         {/* key เปลี่ยนเมื่อค่าเปลี่ยน ชิปจะเด้งดุ๊กดิกให้เห็นว่าได้เพิ่ม */}
-        <span key={`c${player.coins}`} className="mh-stat mh-stat-coin" title="เหรียญ" data-testid="mh-coins">
+        <Link key={`c${player.coins}`} to="/bank" className="mh-stat mh-stat-coin" title="เหรียญ (แตะเพื่อดูกระปุกออมสิน)" data-testid="mh-coins">
           🪙 {player.coins}
-        </span>
+        </Link>
         <span key={`s${totalStars(player)}`} className="mh-stat mh-stat-star" title="ดาว">
           ⭐ {totalStars(player)}
         </span>

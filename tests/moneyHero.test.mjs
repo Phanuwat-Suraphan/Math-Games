@@ -37,6 +37,7 @@ const hunt = load('engine/coinHunt.js')
 const daily = load('engine/daily.js')
 const quest = load('engine/npcQuest.js')
 const sandbox = load('engine/sandbox.js')
+const book = load('engine/ledger.js')
 
 let passed = 0
 const failures = []
@@ -677,6 +678,86 @@ test('โต๊ะนับเงิน: รวมยอดถูก แยก�
     eq(f.reduce((a, id) => a + ({ s25: 25, s50: 50, b1: 100, b2: 200, b5: 500, b10: 1000, b20: 2000, b50: 5000, b100: 10000, b500: 50000, b1000: 100000 })[id], 0), total, `แลกแล้วยอดไม่เท่าเดิม (${total})`)
   }
   eq(sandbox.fewestPieces(18875).join(','), 'b100,b50,b20,b10,b5,b2,b1,s50,s25', '188.75 บาท แลกได้ 9 ชิ้น')
+})
+
+test('สมุดบัญชีของฮีโร่: รับ/จ่ายแล้วเหรียญตรง รวมบรรทัดชื่อเดียวกันในวันเดียว และยอดยกมา + รับ − จ่าย = คงเหลือ', () => {
+  const day = new Date(2026, 9, 7, 9).getTime()
+  let p = { ...progress.newPlayer('สมุด', 'hero', day), coins: 40 }
+  p = book.earn(p, 2, 'ตอบถูก ด่าน 3', '✅', day)
+  p = book.earn(p, 3, 'ตอบถูก ด่าน 3', '✅', day + 60000)
+  eq(p.ledger.length, 1, 'ชื่อเดียวกันวันเดียวกันต้องรวมเป็นบรรทัดเดียว')
+  eq(p.ledger[0].amount, 5, 'ยอดที่รวม')
+  p = book.earn(p, 0, 'ไม่มีอะไร', '❔', day)
+  eq(p.ledger.length, 1, 'ศูนย์เหรียญไม่ต้องจด')
+  p = book.earn(p, 3, 'ตอบถูก ด่าน 3', '✅', day + 86400000)
+  eq(p.ledger.length, 2, 'ข้ามวันต้องขึ้นบรรทัดใหม่')
+  p = book.earn(p, -20, 'ซื้อหมวก', '🎩', day + 86400000)
+  eq(p.coins, 28, 'เหรียญหลังรับและจ่าย')
+  const b = book.ledgerBook(p)
+  eq(b.opening, 40, 'ยอดยกมาคือเงินก่อนบรรทัดแรก')
+  eq(b.income, 8, 'รายรับรวม')
+  eq(b.expense, 20, 'รายจ่ายรวม')
+  eq(b.rows[b.rows.length - 1].balance, 28, 'คงเหลือบรรทัดสุดท้าย')
+  eq(b.opening + b.income - b.expense, b.closing, 'สมการสมุดบัญชี')
+  // สุ่มรับจ่ายหลายร้อยครั้ง: สมการต้องจริงทุกครั้ง ทั้งแบบเต็มเล่มและแบบดูบางบรรทัด
+  for (let k = 0; k < 400; k += 1) {
+    const amt = Math.random() < 0.7 ? 1 + Math.floor(Math.random() * 12) : -Math.min(p.coins, 1 + Math.floor(Math.random() * 30))
+    p = book.earn(p, amt, `รายการ ${k % 7}`, '•', day + k * 3600000)
+    assert(p.coins >= 0, 'เหรียญติดลบ')
+  }
+  assert(p.ledger.length <= book.LEDGER_MAX, 'สมุดยาวเกินกำหนด')
+  for (const limit of [undefined, 1, 10, 500]) {
+    const x = book.ledgerBook(p, limit)
+    eq(x.opening + x.income - x.expense, x.closing, `สมการสมุดบัญชี (limit ${limit})`)
+    eq(x.closing, p.coins, 'คงเหลือต้องเท่าเหรียญที่มี')
+    let bal = x.opening
+    for (const r of x.rows) {
+      bal += r.amount
+      eq(r.balance, bal, 'คงเหลือทีละบรรทัด')
+    }
+  }
+})
+
+test('สมุดบัญชีของฮีโร่: นกฮูกถามจากสมุด คำตอบถูก ตัวเลือกไม่ซ้ำ', () => {
+  let p = { ...progress.newPlayer('ถาม', 'hero'), coins: 12 }
+  eq(book.ledgerQuiz(book.ledgerBook(p)), null, 'สมุดว่างไม่ต้องถาม')
+  for (let k = 0; k < 30; k += 1) p = book.earn(p, k % 4 === 3 ? -5 : 4, `รายการ ${k}`, '•')
+  const b = book.ledgerBook(p)
+  for (let i = 0; i < 500; i += 1) {
+    const q = book.ledgerQuiz(b)
+    eq(q.answer, q.before + q.entry.amount, 'คำตอบ = ก่อน ± รายการ')
+    assert(q.choices.includes(q.answer), 'ต้องมีคำตอบในตัวเลือก')
+    eq(new Set(q.choices).size, q.choices.length, 'ตัวเลือกซ้ำ')
+    eq(q.choices.length, 3, 'ต้องมี 3 ตัวเลือก')
+    assert(q.choices.every((c) => c >= 0), 'ตัวเลือกติดลบ')
+  }
+})
+
+test('เป้าหมายการออม: ขาดอีกเท่าไร ซื้อของตามเป้าแล้วได้ตรานักออม และทุกการได้/จ่ายเหรียญลงสมุด', () => {
+  let p = { ...progress.newPlayer('ออม', 'hero'), coins: 25 }
+  const g = book.goalProgress(p.coins, 60)
+  eq(g.need, 35, 'ขาดอีก')
+  assert(!g.done, 'ยังไม่ครบ')
+  assert(book.goalProgress(80, 60).done, 'เกินราคาถือว่าครบ')
+  eq(book.goalProgress(80, 60).ratio, 1, 'แถบเต็ม')
+  p = progress.setGoal(p, 'hat-crown')
+  eq(p.goal, 'hat-crown', 'ตั้งเป้าหมาย')
+  eq(progress.setGoal(p, 'ไม่มีจริง').goal, 'hat-crown', 'ของที่ไม่มีในร้านตั้งไม่ได้')
+  p = { ...p, coins: 70 }
+  const r = progress.buyItem(p, 'hat-crown')
+  assert(r.ok, 'ซื้อได้')
+  eq(r.player.goal, undefined, 'ซื้อแล้วเป้าหมายหายไป')
+  eq(r.player.goalsDone, 1, 'นับว่าออมสำเร็จ')
+  eq(r.player.ledger[r.player.ledger.length - 1].amount, -60, 'การซื้อลงสมุดเป็นรายจ่าย')
+  assert(progress.newBadges(r.player).includes('saver'), 'ได้ตรานักออม')
+  eq(progress.setGoal(r.player, 'hat-crown').goal, undefined, 'ของที่มีแล้วตั้งเป็นเป้าไม่ได้')
+  const other = progress.buyItem({ ...progress.newPlayer('ไม่ตั้ง', 'hero'), coins: 70 }, 'hat-crown')
+  eq(other.player.goalsDone, 0, 'ซื้อโดยไม่ได้ตั้งเป้า ไม่นับว่าออมสำเร็จ')
+  const t = progress.recordTest(progress.newPlayer('สอบ', 'hero'), 'pre', progress.testResultFrom({ firstTry: 1, originals: 2, ms: 1, bySkill: {} }))
+  eq(t.ledger[0].amount, progress.TEST_REWARD.pre.coins, 'รางวัลแบบทดสอบลงสมุด')
+  const qd = quest.recordQuest(progress.newPlayer('เพื่อน', 'hero'), 'owl', true, '2026-10-07')
+  eq(qd.ledger[0].amount, quest.QUEST_REWARD.coins, 'รางวัลภารกิจเพื่อนลงสมุด')
+  eq(qd.ledger.reduce((a, e) => a + e.amount, 0), qd.coins, 'ผู้เล่นใหม่: ผลรวมสมุด = เหรียญที่มี')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

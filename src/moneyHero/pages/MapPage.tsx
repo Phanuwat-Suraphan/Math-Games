@@ -26,6 +26,7 @@ import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
 import { BuildingArt } from '../components/BuildingArt'
 import { doneToday, liveStreak } from '../engine/daily'
+import { earn } from '../engine/ledger'
 import { NPC_QUESTS, QUEST_REWARD, isQuestNpc, makeQuest, questAvailable, recordQuest, type QuestNpc } from '../engine/npcQuest'
 import { StepRunner } from '../components/StepRunner'
 import { Confetti } from '../components/Effects'
@@ -133,7 +134,7 @@ export function MapPage() {
       setCollected(new Set(collectedRef.current))
       setPop({ x: coin.x, y: coin.y, key: Date.now() })
       playSound('coin')
-      updatePlayer((p) => (p.mapCoins.includes(coin.id) ? p : { ...p, coins: p.coins + 1, mapCoins: [...p.mapCoins, coin.id] }))
+      updatePlayer((p) => (p.mapCoins.includes(coin.id) ? p : { ...earn(p, 1, 'เก็บเหรียญในเมือง', '🪙'), mapCoins: [...p.mapCoins, coin.id] }))
     },
     [updatePlayer],
   )
@@ -673,6 +674,9 @@ export function MapPage() {
         <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
           <span aria-hidden="true">🛍️</span>ร้านของฮีโร่
         </Link>
+        <Link to="/bank" className="mh-menu-tile mh-menu-bank" data-testid="mh-menu-bank">
+          <span aria-hidden="true">🐷</span>กระปุกออมสิน
+        </Link>
         <Link to="/ar" className="mh-menu-tile mh-menu-ar" data-testid="mh-menu-ar">
           <span aria-hidden="true">📷</span>ล่าเหรียญ AR
         </Link>
@@ -696,6 +700,7 @@ export function MapPage() {
               questions={[quest.q]}
               levelId={-1}
               mode="practice"
+              earnLabel={`ตอบถูก ภารกิจของ${CHARACTERS[quest.npc].name}`}
               onFinish={(s) => {
                 const ok = s.within2 > 0
                 updatePlayer((p) => recordQuest(p, quest.npc, ok))

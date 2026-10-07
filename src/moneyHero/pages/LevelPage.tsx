@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { StepId } from '../engine/types'
 import { LEVELS, levelById, type LevelDef } from '../data/levels'
 import { useGame } from '../hooks/useMoneyGame'
+import { earn } from '../engine/ledger'
 import { emptyLevel, isLevelUnlocked, levelRecord, type LevelRecord } from '../engine/progress'
 import { BOSS_PASS, levelReward, starsFor } from '../engine/scoring'
 import { buildStep } from '../generators'
@@ -200,7 +201,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
             runTotal: r.total,
             runHints: prev.runHints + s.hints,
           }
-          return { ...p, exp: p.exp + r.reward.exp, coins: p.coins + r.reward.coins, levels: { ...p.levels, [level.id]: rec } }
+          return { ...earn(p, r.reward.coins, `รางวัลผ่านด่าน ${level.id}`, '🏆'), exp: p.exp + r.reward.exp, levels: { ...p.levels, [level.id]: rec } }
         },
         s.hints === 0 ? ['nohint-boss'] : [],
       )

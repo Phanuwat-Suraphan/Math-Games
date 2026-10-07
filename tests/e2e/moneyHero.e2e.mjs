@@ -566,6 +566,50 @@ for (const [name, viewport] of [
     await snap(page, `${name}-map-pet`)
   })
 
+  await step(`[${name}] กระปุกออมสิน: สมุดบัญชีตรงกับเหรียญ ตั้งเป้าหมาย ออมจนซื้อได้ และนกฮูกถามจากสมุด`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-bank').click()
+    await page.getByTestId('mh-bank-balance').waitFor()
+    await noSideScroll(page, 'กระปุกออมสิน')
+    let p = await savedPlayer(page)
+    // ทุกเหรียญที่ได้และจ่ายตั้งแต่สร้างผู้เล่น ต้องลงสมุดครบ ผลรวมสมุดจึงเท่ากับเหรียญที่มี
+    const sum = p.ledger.reduce((a, e) => a + e.amount, 0)
+    if (sum !== p.coins) throw new Error(`สมุดบัญชีไม่ครบ: ผลรวม ${sum} แต่มี ${p.coins} เหรียญ`)
+    if (!p.ledger.some((e) => e.amount < 0)) throw new Error('การซื้อของในร้านไม่ลงสมุดเป็นรายจ่าย')
+    await page.getByTestId('mh-ledger-eq').getByText(`คงเหลือ ${p.coins}`).waitFor()
+    const rows = await page.getByTestId('mh-ledger-row').count()
+    if (rows < 1) throw new Error('สมุดบัญชีไม่มีรายการ')
+    await page.getByTestId('mh-piggy').click()
+
+    // ตั้งเป้าหมายเป็นของแพง แล้วต้องบอกว่าขาดอีกเท่าไรถูกต้อง
+    await page.getByTestId('mh-goal-pet-unicorn').click()
+    const need = Math.max(0, 200 - p.coins)
+    await page.getByTestId('mh-goal-text').getByText(need > 0 ? `ขาดอีก ${need} เหรียญ` : 'เก็บครบแล้ว').first().waitFor()
+    await snap(page, `${name}-bank`)
+
+    // นกฮูกถามจากสมุด: เลือกคำตอบที่ถูก (คำนวณจากสมุดเอง)
+    await page.getByTestId('mh-ledger-ask').click()
+    const text = await page.locator('.mh-ledger-quiz .mh-bubble').innerText()
+    const m = text.match(/มีอยู่ (\d+) เหรียญ แล้ว(ได้รับ|จ่ายไป) (\d+) เหรียญ/)
+    if (!m) throw new Error(`อ่านคำถามนกฮูกไม่ได้: ${text}`)
+    const right = m[2] === 'ได้รับ' ? Number(m[1]) + Number(m[3]) : Number(m[1]) - Number(m[3])
+    await page.getByTestId('mh-ledger-choice').filter({ hasText: new RegExp(`^${right} เหรียญ$`) }).click()
+    await page.getByTestId('mh-ledger-explain').getByText('ถูกต้อง').waitFor()
+
+    // เปลี่ยนเป้าเป็นหมวกแก๊ป (15 เหรียญ) ออมครบแล้วไปซื้อที่ร้าน → ได้ตรานักออม
+    p = await savedPlayer(page)
+    if (p.coins >= 15) {
+      await page.getByRole('button', { name: 'เปลี่ยนเป้าหมาย' }).click()
+      await page.getByTestId('mh-goal-hat-cap').click()
+      await page.getByTestId('mh-goal-shop').click()
+      await page.getByTestId('mh-buy-hat-cap').click()
+      await page.getByTestId('mh-wear-hat-cap').waitFor()
+      p = await savedPlayer(page)
+      if (p.goalsDone !== 1 || p.goal) throw new Error(`ออมครบแล้วซื้อ แต่ไม่นับว่าสำเร็จ (${p.goalsDone}, ${p.goal})`)
+      if (!p.badges.includes('saver')) throw new Error('ไม่ได้ตรานักออม')
+    }
+  })
+
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
     await page.goto(`${BASE}#/badges`)
     await page.getByTestId('mh-badge-pretest').waitFor()

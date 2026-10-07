@@ -4,6 +4,7 @@ import { LEVELS, TOTAL_LESSONS } from '../data/levels'
 import { LEVEL_BADGES } from '../data/badges'
 import { shopItem, type Wear } from '../data/shop'
 import { emptyDaily, type DailyRecord } from './daily'
+import { earn, type LedgerEntry } from './ledger'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -80,6 +81,12 @@ export interface Player {
   /** ภารกิจเสริมจากเพื่อนในเมือง: เพื่อน → วันที่ทำล่าสุด */
   npcQuests: Record<string, string>
   questsDone: number
+  /** สมุดบัญชีรายรับรายจ่าย (ทุกเหรียญที่ได้และจ่าย) */
+  ledger: LedgerEntry[]
+  /** เป้าหมายการออม: ของในร้านที่อยากได้ */
+  goal?: string
+  /** ออมจนซื้อของตามเป้าหมายได้กี่ครั้งแล้ว */
+  goalsDone: number
   mapX?: number
   mapY?: number
 }
@@ -143,6 +150,8 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     daily: emptyDaily(),
     npcQuests: {},
     questsDone: 0,
+    ledger: [],
+    goalsDone: 0,
   }
 }
 
@@ -288,6 +297,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.owned.length >= 1) want.push('shopper')
   if (p.daily.best >= 3) want.push('daily3')
   if (p.questsDone >= 4) want.push('helper')
+  if (p.goalsDone >= 1) want.push('saver')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 
@@ -340,10 +350,10 @@ export function testResultFrom(
 export function recordTest(p: Player, kind: TestKind, result: TestResult): Player {
   const first = kind === 'pre' ? !p.preTest : !p.postTest
   const reward = first ? TEST_REWARD[kind] : { exp: 0, coins: 0 }
+  const paid = earn(p, reward.coins, kind === 'pre' ? 'รางวัลแบบทดสอบก่อนเรียน' : 'รางวัลแบบทดสอบหลังเรียน', kind === 'pre' ? '🧭' : '🎓')
   return {
-    ...p,
+    ...paid,
     exp: p.exp + reward.exp,
-    coins: p.coins + reward.coins,
     ...(kind === 'pre' ? { preTest: result } : { postTest: result }),
   }
 }
@@ -383,8 +393,25 @@ export function buyItem(p: Player, id: string): BuyResult {
   if (!item) return { ok: false, reason: 'unknown', short: 0 }
   if (p.owned.includes(id)) return { ok: false, reason: 'owned', short: 0 }
   if (p.coins < item.price) return { ok: false, reason: 'short', short: item.price - p.coins }
-  const left = p.coins - item.price
-  return { ok: true, left, player: { ...p, coins: left, owned: [...p.owned, id], wear: { ...p.wear, [item.slot]: id } } }
+  const paid = earn(p, -item.price, `ซื้อ${item.name}`, item.icon)
+  const reached = p.goal === id
+  return {
+    ok: true,
+    left: paid.coins,
+    player: {
+      ...paid,
+      owned: [...p.owned, id],
+      wear: { ...p.wear, [item.slot]: id },
+      goal: reached ? undefined : p.goal,
+      goalsDone: p.goalsDone + (reached ? 1 : 0),
+    },
+  }
+}
+
+/** ตั้ง/ยกเลิกเป้าหมายการออม (ของที่มีแล้วตั้งไม่ได้) */
+export function setGoal(p: Player, id: string | undefined): Player {
+  if (id !== undefined && (!shopItem(id) || p.owned.includes(id))) return p
+  return { ...p, goal: id }
 }
 
 /** สวม/ถอดของที่มีอยู่แล้ว (ของที่ยังไม่ได้ซื้อ สวมไม่ได้) */

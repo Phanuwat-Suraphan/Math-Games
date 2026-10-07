@@ -79,6 +79,7 @@ export function ReviewPage() {
             questions={questions}
             levelId={-1}
             mode="review"
+            earnLabel="ตอบถูก ฝึกข้อที่เคยผิด"
             onAnswer={(q, _r, correct) => {
               if (!correct) return
               setFixed((n) => n + 1)

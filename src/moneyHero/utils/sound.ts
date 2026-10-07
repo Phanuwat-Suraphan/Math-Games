@@ -3,7 +3,7 @@
  * กดปุ่ม · ตอบถูก · ตอบผิด · ผ่านด่าน · รับเหรียญ · ได้ดาว · ชนะบอส
  */
 
-export type SoundName = 'click' | 'correct' | 'wrong' | 'complete' | 'coin' | 'star' | 'boss' | 'jump' | 'unlock'
+export type SoundName = 'click' | 'correct' | 'wrong' | 'complete' | 'coin' | 'star' | 'boss' | 'jump' | 'unlock' | 'oink' | 'jingle'
 
 let enabled = true
 let ctx: AudioContext | null = null
@@ -82,6 +82,18 @@ const NOTES: Record<SoundName, [number, number, number, OscillatorType?][]> = {
     [784, 0, 0.1, 'triangle'],
     [1175, 0.1, 0.3, 'triangle'],
   ],
+  // หมูออมสินร้อง อู๊ด ๆ
+  oink: [
+    [330, 0, 0.09, 'sawtooth'],
+    [280, 0.12, 0.12, 'sawtooth'],
+  ],
+  // เขย่ากระปุก เหรียญกรุ๊งกริ๊ง
+  jingle: [
+    [1568, 0, 0.05, 'square'],
+    [1319, 0.06, 0.05, 'square'],
+    [1760, 0.12, 0.05, 'square'],
+    [1397, 0.18, 0.08, 'square'],
+  ],
 }
 
 export function playSound(name: SoundName): void {
@@ -89,6 +101,6 @@ export function playSound(name: SoundName): void {
   const ac = audio()
   if (!ac) return
   const now = ac.currentTime + 0.01
-  const quiet = name === 'click' || name === 'jump' || name === 'coin' ? 0.07 : 0.14
+  const quiet = name === 'click' || name === 'jump' || name === 'coin' || name === 'oink' || name === 'jingle' ? 0.07 : 0.14
   for (const [freq, at, dur, type] of NOTES[name]) tone(ac, freq, now + at, dur, type, quiet)
 }

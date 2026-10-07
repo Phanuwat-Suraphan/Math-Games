@@ -25,7 +25,7 @@ const SLOTS: { id: ShopSlot; label: string }[] = [
   { id: 'pet', label: '🐾 สัตว์เลี้ยง' },
 ]
 
-function ItemPreview({ item }: { item: ShopItem }) {
+export function ItemPreview({ item }: { item: ShopItem }) {
   if (item.slot === 'pet') return <PetSvg id={item.id} />
   // ลองสวมบนฮีโร่ให้ดูก่อนซื้อ (เฉพาะส่วนหัว)
   return <CharacterSvg kind="hero" portrait wear={item.slot === 'hat' ? { hat: item.id } : { face: item.id }} />
