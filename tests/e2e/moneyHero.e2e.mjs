@@ -707,6 +707,35 @@ for (const [name, viewport] of [
     if (sum !== p.coins) throw new Error(`สมุดบัญชีไม่ครบหลังเล่นกาด: ${sum} ≠ ${p.coins}`)
   })
 
+  await step(`[${name}] ร้านทอนไว (โหมดฝึก): ทอนผิดต้องบอกว่าเกิน แล้วทอนถูกครบ 8 ลูกค้า`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-change').click()
+    await page.getByTestId('change-intro').waitFor()
+    await noSideScroll(page, 'ร้านทอนไว')
+    const coinsBefore = (await savedPlayer(page)).coins
+    await page.getByTestId('change-practice').click()
+    // ทอนเกินด้วยแบงก์ 100 (เงินทอนน้อยกว่า 100 เสมอ)
+    await page.getByTestId('change-tray-b100').click()
+    await page.getByTestId('change-give').click()
+    await page.getByTestId('change-wrong').getByText('ทอนเกิน').waitFor()
+    await page.getByRole('button', { name: '↺ ล้าง' }).click()
+    for (let k = 0; k < 8; k += 1) {
+      const info = await page.evaluate(() => window.__MH_CHANGE)
+      if (!info || info.served !== k) throw new Error(`ข้อมูลลูกค้าไม่ตรง: ${JSON.stringify(info)}`)
+      for (const id of info.solution) await page.getByTestId(`change-tray-${id}`).click()
+      if (k === 2) await snap(page, `${name}-change-play`)
+      await page.getByTestId('change-give').click()
+      await page.getByTestId('change-right').waitFor()
+      if (k < 7) await page.waitForFunction((n) => window.__MH_CHANGE?.served === n && !document.querySelector('[data-testid="change-right"]'), k + 1)
+    }
+    await page.getByTestId('change-done').waitFor()
+    await snap(page, `${name}-change-done`)
+    await noSideScroll(page, 'ผลร้านทอนไว')
+    const p = await savedPlayer(page)
+    if (p.coins !== coinsBefore + 8) throw new Error(`รางวัลร้านทอนไวไม่ถูก (${coinsBefore} → ${p.coins})`)
+    if (!p.ledger.some((e) => e.label === 'ร้านทอนไว')) throw new Error('รางวัลร้านทอนไวไม่ลงสมุดบัญชี')
+  })
+
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
     await page.goto(`${BASE}#/badges`)
     await page.getByTestId('mh-badge-pretest').waitFor()
