@@ -31,6 +31,7 @@ import {
 } from './arithmetic'
 import { generateWordProblemQuestion } from './word'
 import { generateIncomeExpenseQuestion, generateLedgerQuestion, generateLedgerSet } from './ledger'
+import { shuffle } from '../utils/random'
 
 /**
  * ทะเบียนตัวสร้างโจทย์ทั้งหมด
@@ -194,6 +195,25 @@ export function buildStep(levelId: number, step: Exclude<StepId, 'learn'>): Ques
   const plan = LEVEL_PLANS[levelId]
   if (!plan) throw new Error(`ไม่มีด่าน ${levelId}`)
   return plan[step].flatMap(([gen, d]) => generate(gen, d))
+}
+
+/* ------------------------------------------------------------------ */
+/* ด่านย่อย X-2 / X-3                                                  */
+/* ------------------------------------------------------------------ */
+
+/** ชนิดโจทย์ทั้งหมดของด่าน (ไม่ซ้ำ) ใช้สร้างด่านย่อย */
+export function stageGens(levelId: number): string[] {
+  const plan = LEVEL_PLANS[levelId]
+  if (!plan) throw new Error(`ไม่มีด่าน ${levelId}`)
+  return Array.from(new Set([...plan.practice, ...plan.mission, ...plan.boss].map(([gen]) => gen)))
+}
+
+/** โจทย์ของด่านย่อย: วนชนิดโจทย์ของด่าน (สลับลำดับ) ที่ระดับความยากของด่านย่อย จนได้จำนวนข้อตามเป้า */
+export function buildStage(levelId: number, difficulty: Difficulty, target: number): Question[] {
+  const gens = shuffle(stageGens(levelId))
+  const out: Question[] = []
+  for (let i = 0; out.length < target; i += 1) out.push(...generate(gens[i % gens.length], difficulty))
+  return out
 }
 
 /* ------------------------------------------------------------------ */

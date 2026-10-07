@@ -8612,3 +8612,101 @@ a.mh-stat-coin {
   margin: 4px 0 0;
   font-size: 0.9em;
 }
+
+/* ================================================================== */
+/* ด่านย่อย X-1 · X-2 · X-3                                            */
+/* ================================================================== */
+
+.mh-stage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+
+.mh-level-panel-info .mh-stage-chips {
+  margin: 4px 0 0;
+}
+
+.mh-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px 3px 4px;
+  border-radius: 999px;
+  border: 3px solid #d0bfff;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9em;
+  white-space: nowrap;
+  box-shadow: 0 3px 0 rgba(95, 61, 196, 0.18);
+}
+
+a.mh-stage-chip:hover {
+  background: #f3f0ff;
+}
+
+.mh-stage-chip.is-current {
+  border-color: #7048e8;
+  background: #f3f0ff;
+}
+
+.mh-stage-chip.is-clear {
+  border-color: #69db7c;
+}
+
+.mh-stage-chip.is-locked {
+  opacity: 0.55;
+  box-shadow: none;
+  filter: grayscale(0.6);
+}
+
+.mh-stage-chip-no {
+  display: grid;
+  place-items: center;
+  min-width: 30px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #7048e8;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85em;
+}
+
+.mh-stage-chip-stars span {
+  color: #dee2e6;
+}
+
+.mh-stage-chip-stars span.is-on {
+  color: #fab005;
+}
+
+.mh-stage-offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 12px 2px;
+  border-radius: 18px;
+  background: #f8f0fc;
+  border: 2px dashed #e599f7;
+}
+
+.mh-stage-offer .mh-stage-chips {
+  justify-content: center;
+}
+
+.mh-stage-score {
+  margin: 0;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .mh-stage-chip {
+    font-size: 0.82em;
+    gap: 4px;
+  }
+}
