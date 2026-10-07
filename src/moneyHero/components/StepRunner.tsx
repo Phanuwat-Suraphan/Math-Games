@@ -5,6 +5,7 @@ import type { LearnSlide } from '../data/levels'
 import { ENCOURAGE, PRAISE } from '../data/characters'
 import { answerText, checkAnswer } from '../engine/check'
 import { recordAnswer } from '../engine/progress'
+import { earn } from '../engine/ledger'
 import { scoreAnswer } from '../engine/scoring'
 import { regenerate } from '../generators'
 import { useGame } from '../hooks/useMoneyGame'
@@ -59,6 +60,7 @@ export function StepRunner({
   levelId,
   mode,
   learn,
+  earnLabel,
   onAnswer,
   onFinish,
 }: {
@@ -66,6 +68,8 @@ export function StepRunner({
   levelId: number
   mode: RunMode
   learn?: LearnSlide[]
+  /** ชื่อรายการในสมุดบัญชีเมื่อได้เหรียญจากการตอบถูก */
+  earnLabel?: string
   onAnswer?: (q: Question, r: Response, correct: boolean) => void
   onFinish: (s: RunSummary) => void
 }) {
@@ -169,9 +173,8 @@ export function StepRunner({
         summary.current.exp += score.exp
         summary.current.coins += score.coins
         updatePlayer((p) => ({
-          ...p,
+          ...earn(p, score.coins, earnLabel ?? (levelId >= 0 ? `ตอบถูก ด่าน ${levelId}` : 'ตอบโจทย์ถูก'), '✅'),
           exp: p.exp + score.exp,
-          coins: p.coins + score.coins,
           fixedMistakes: item.retry || mode === 'review' ? p.fixedMistakes + 1 : p.fixedMistakes,
         }))
         setGain(score)

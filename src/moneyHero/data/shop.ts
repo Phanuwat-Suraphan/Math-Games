@@ -19,12 +19,17 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'hat-party', slot: 'hat', name: 'หมวกปาร์ตี้', price: 20, icon: '🥳' },
   { id: 'hat-grad', slot: 'hat', name: 'หมวกบัณฑิต', price: 40, icon: '🎓' },
   { id: 'hat-crown', slot: 'hat', name: 'มงกุฎทองคำ', price: 60, icon: '👑' },
+  { id: 'hat-catear', slot: 'hat', name: 'ที่คาดผมหูแมว', price: 80, icon: '🐱' },
+  { id: 'hat-wizard', slot: 'hat', name: 'หมวกพ่อมดดวงดาว', price: 120, icon: '🧙' },
   { id: 'face-round', slot: 'face', name: 'แว่นกลมนักคิด', price: 15, icon: '👓' },
   { id: 'face-sun', slot: 'face', name: 'แว่นกันแดดเท่ ๆ', price: 25, icon: '🕶️' },
+  { id: 'face-star', slot: 'face', name: 'แว่นดาวซุปตาร์', price: 70, icon: '⭐' },
   { id: 'pet-chick', slot: 'pet', name: 'ลูกเจี๊ยบ', price: 30, icon: '🐥' },
   { id: 'pet-kitten', slot: 'pet', name: 'ลูกแมวส้ม', price: 45, icon: '🐱' },
   { id: 'pet-puppy', slot: 'pet', name: 'ลูกหมา', price: 45, icon: '🐶' },
   { id: 'pet-piggy', slot: 'pet', name: 'หมูออมสิน', price: 50, icon: '🐷' },
+  { id: 'pet-dragon', slot: 'pet', name: 'มังกรน้อย', price: 150, icon: '🐲' },
+  { id: 'pet-unicorn', slot: 'pet', name: 'ยูนิคอร์นสายรุ้ง', price: 200, icon: '🦄' },
 ]
 
 export function shopItem(id: string | undefined): ShopItem | undefined {

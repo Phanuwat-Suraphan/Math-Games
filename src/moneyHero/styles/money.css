@@ -6087,6 +6087,29 @@ button:disabled {
   animation: mh-cs-wag 0.9s ease-in-out infinite;
 }
 
+.mh-pet-wing {
+  transform-box: fill-box;
+  transform-origin: 100% 60%;
+  animation: mh-pet-flap 0.5s ease-in-out infinite alternate;
+}
+
+.mh-pet-wing-r {
+  transform-origin: 0% 60%;
+  animation-name: mh-pet-flap-r;
+}
+
+@keyframes mh-pet-flap {
+  to {
+    transform: rotate(14deg);
+  }
+}
+
+@keyframes mh-pet-flap-r {
+  to {
+    transform: rotate(-14deg);
+  }
+}
+
 .mh-pet-coin {
   animation: mh-twinkle 1.2s ease-in-out infinite alternate;
   transform-box: fill-box;
@@ -6545,4 +6568,464 @@ button.mh-town-npc {
 
 .mh-sandbox-pick:active {
   transform: scale(0.94);
+}
+
+/* ================================================================== */
+/* กระปุกออมสิน + สมุดบัญชีรายรับรายจ่าย                                */
+/* ================================================================== */
+
+a.mh-stat-coin {
+  color: inherit;
+  text-decoration: none;
+}
+
+.mh-bank-top {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.mh-bank-stage {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 34px;
+  background: radial-gradient(circle at 50% 40%, #fff 0%, #ffeef5 55%, #ffd9e8 100%);
+}
+
+.mh-piggy-btn {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 24px;
+}
+
+.mh-piggy-btn:focus-visible {
+  outline: 4px solid #ff8fb3;
+  outline-offset: 4px;
+}
+
+.mh-piggy-wrap {
+  position: relative;
+  display: block;
+  width: 210px;
+  animation: mh-piggy-bob 2.6s ease-in-out infinite;
+}
+
+.mh-piggy-wrap.is-shake {
+  animation: mh-piggy-shake 0.7s ease-in-out 1, mh-piggy-bob 2.6s ease-in-out 0.7s infinite;
+}
+
+.mh-piggy {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.mh-piggy-tail {
+  transform-origin: 30px 92px;
+  animation: mh-piggy-tail 1.2s ease-in-out infinite;
+}
+
+.mh-piggy-ear {
+  transform-origin: 140px 54px;
+  animation: mh-piggy-ear 3.2s ease-in-out infinite;
+}
+
+.mh-piggy-ear-2 {
+  transform-origin: 162px 62px;
+  animation-delay: 0.3s;
+}
+
+.mh-piggy-eyes {
+  transform-origin: 146px 82px;
+  animation: mh-piggy-blink 4s infinite;
+}
+
+.mh-piggy-snout {
+  transform-origin: 160px 104px;
+  animation: mh-piggy-sniff 2.2s ease-in-out infinite;
+}
+
+.mh-piggy-coin {
+  position: absolute;
+  left: 46%;
+  top: 22%;
+  font-size: 26px;
+  pointer-events: none;
+  animation: mh-piggy-pop 0.9s ease-out 1 both;
+}
+
+.mh-piggy-coin-1 {
+  animation-delay: 0.12s;
+  --mh-pop-x: -48px;
+}
+
+.mh-piggy-coin-2 {
+  animation-delay: 0.24s;
+  --mh-pop-x: 52px;
+}
+
+@keyframes mh-piggy-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(1.5deg);
+  }
+}
+
+@keyframes mh-piggy-shake {
+  0%,
+  100% {
+    transform: rotate(0) scale(1);
+  }
+  15% {
+    transform: rotate(-9deg) scale(1.06, 0.94);
+  }
+  35% {
+    transform: rotate(8deg) scale(0.96, 1.05);
+  }
+  55% {
+    transform: rotate(-6deg);
+  }
+  75% {
+    transform: rotate(4deg);
+  }
+}
+
+@keyframes mh-piggy-tail {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+@keyframes mh-piggy-ear {
+  0%,
+  86%,
+  100% {
+    transform: rotate(0);
+  }
+  90% {
+    transform: rotate(-12deg);
+  }
+  95% {
+    transform: rotate(6deg);
+  }
+}
+
+@keyframes mh-piggy-blink {
+  0%,
+  92%,
+  100% {
+    transform: scaleY(1);
+  }
+  95% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes mh-piggy-sniff {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.06, 0.94);
+  }
+  50% {
+    transform: scale(0.97, 1.04);
+  }
+}
+
+@keyframes mh-piggy-pop {
+  0% {
+    opacity: 0;
+    transform: translate(0, 20px) scale(0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--mh-pop-x, 0px), -70px) scale(1.1) rotate(200deg);
+  }
+}
+
+.mh-bank-balance {
+  margin-top: 6px;
+  font-weight: 700;
+  font-size: 1.15em;
+  background: linear-gradient(180deg, #fff6c9, #ffe27a);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 0 rgba(210, 150, 20, 0.35);
+  border-radius: 999px;
+  padding: 6px 20px;
+}
+
+.mh-bank-balance b {
+  font-size: 1.3em;
+  color: #b35d00;
+}
+
+.mh-bank-pieces {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mh-bank-piece-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.mh-bank-piece {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 6px 10px;
+  box-shadow: 0 3px 0 rgba(43, 35, 80, 0.1);
+  animation: mh-pop-in 0.4s ease-out both;
+}
+
+.mh-bank-sum {
+  font-weight: 600;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* เป้าหมายการออม */
+.mh-goal-card {
+  position: relative;
+  overflow: hidden;
+  margin-top: 14px;
+}
+
+.mh-goal-body {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.mh-goal-preview {
+  flex: 0 0 110px;
+  height: 110px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #ffeef5 70%, #ffd2e3 100%);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  box-shadow: inset 0 -4px 0 rgba(233, 98, 143, 0.2);
+}
+
+.mh-goal-preview svg {
+  width: 100%;
+  height: 100%;
+}
+
+.mh-goal-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mh-goal-name {
+  display: block;
+  font-size: 1.1em;
+  margin-bottom: 8px;
+}
+
+.mh-goal-track {
+  position: relative;
+  height: 26px;
+  border-radius: 999px;
+  background: #ffe3ee;
+  border: 3px solid #fff;
+  box-shadow: inset 0 2px 4px rgba(201, 68, 119, 0.2);
+}
+
+.mh-goal-fill {
+  position: relative;
+  height: 100%;
+  min-width: 26px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(-45deg, #ffd34d 0 10px, #ffbf1f 10px 20px);
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mh-goal-pig {
+  position: absolute;
+  right: -14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 26px;
+  animation: mh-piggy-bob 1.8s ease-in-out infinite;
+}
+
+.mh-goal-text {
+  margin: 10px 0;
+  font-weight: 600;
+}
+
+.mh-goal-choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.mh-goal-choice {
+  appearance: none;
+  border: 3px solid #fff;
+  border-radius: 18px;
+  background: linear-gradient(180deg, #fff, #fff1f6);
+  box-shadow: 0 4px 0 rgba(201, 68, 119, 0.18);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.mh-goal-choice.is-on {
+  border-color: #ff8fb3;
+}
+
+.mh-goal-choice-art {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+}
+
+.mh-goal-choice-art svg {
+  width: 100%;
+  height: 100%;
+}
+
+@media (hover: hover) {
+  .mh-goal-choice:hover {
+    filter: brightness(1.04);
+    outline: 3px solid #ffb3cb;
+    outline-offset: 2px;
+  }
+}
+
+/* สมุดบัญชี */
+.mh-ledger-card {
+  margin-top: 14px;
+  background: repeating-linear-gradient(180deg, #fffdf4 0 31px, #e9f0ff 31px 32px);
+}
+
+.mh-ledger td,
+.mh-ledger th {
+  white-space: nowrap;
+}
+
+.mh-ledger td:nth-child(2) {
+  white-space: normal;
+}
+
+.mh-ledger .mh-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mh-in {
+  color: #1a8a4a;
+}
+
+.mh-out {
+  color: #d23c3c;
+}
+
+.mh-ledger-open td {
+  font-style: italic;
+  color: #6b6385;
+}
+
+.mh-ledger tfoot th {
+  border-top: 3px double #a99fc9;
+}
+
+.mh-ledger-eq {
+  font-weight: 600;
+  background: #fff;
+  border-radius: 14px;
+  padding: 8px 12px;
+  border: 2px dashed #ffd34d;
+  overflow-wrap: anywhere;
+}
+
+/* นกฮูกถามจากสมุด */
+.mh-ledger-quiz {
+  position: relative;
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.mh-ledger-quiz-head {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.mh-ledger-choices {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mh-ledger-choices .mh-choice {
+  min-width: 120px;
+}
+
+.mh-ledger-choices .mh-choice.is-right {
+  background: linear-gradient(180deg, #d9ffe6, #9be8b6);
+  border-color: #1a8a4a;
+}
+
+.mh-ledger-explain {
+  font-weight: 700;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .mh-bank-top {
+    grid-template-columns: 1fr;
+  }
+  .mh-goal-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .mh-goal-preview {
+    align-self: center;
+  }
+  .mh-ledger {
+    font-size: 0.85em;
+  }
+  .mh-ledger td,
+  .mh-ledger th {
+    padding: 6px 5px;
+  }
 }

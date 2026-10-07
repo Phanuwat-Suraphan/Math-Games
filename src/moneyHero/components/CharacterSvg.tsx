@@ -27,6 +27,17 @@ export interface WearArt {
 const WearContext = createContext<WearArt>({})
 
 /** หมวก/ของบนหัว วางบนหัวเด็ก (กึ่งกลาง x 50 ยอดหัว y ≈ 17) */
+/** จุดยอดดาว 5 แฉก (ใช้กับ <polygon>) */
+function starPoints(cx: number, cy: number, r: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < 10; i += 1) {
+    const rad = i % 2 === 0 ? r : r * 0.45
+    const a = (Math.PI / 5) * i - Math.PI / 2
+    pts.push(`${(cx + Math.cos(a) * rad).toFixed(2)},${(cy + Math.sin(a) * rad).toFixed(2)}`)
+  }
+  return pts.join(' ')
+}
+
 function HatArt({ id }: { id: string }) {
   switch (id) {
     case 'hat-cap':
@@ -70,6 +81,28 @@ function HatArt({ id }: { id: string }) {
           <path d="M70 26 L74 26 L73 34 L71 34 Z" fill="#ffd23f" />
         </g>
       )
+    case 'hat-wizard':
+      return (
+        <g>
+          <path d="M33 26 L53 -12 Q56 -17 61 -13 L57 -11 L67 26 Z" fill="#7c5cff" stroke="#4b2fa8" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M20 27 Q50 18 80 27 Q50 34 20 27 Z" fill="#5b3fb5" stroke="#4b2fa8" strokeWidth="1.4" />
+          <path d="M34 25 Q50 20 66 25 L65 20 Q50 15 35 20 Z" fill="#ffd23f" />
+          <polygon points={starPoints(47, 7, 4.2)} fill="#ffe27a" />
+          <polygon points={starPoints(56, -3, 3)} fill="#ffe27a" />
+          <circle cx="53" cy="13" r="1.6" fill="#fff" opacity="0.85" />
+        </g>
+      )
+    case 'hat-catear':
+      return (
+        <g>
+          <path d="M29 17 L27 -2 L42 9 Z" fill="#ffad5c" stroke="#e8822a" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M31 13 L30.5 3 L38 9.5 Z" fill="#ffc6d8" />
+          <path d="M71 17 L73 -2 L58 9 Z" fill="#ffad5c" stroke="#e8822a" strokeWidth="1.6" strokeLinejoin="round" />
+          <path d="M69 13 L69.5 3 L62 9.5 Z" fill="#ffc6d8" />
+          <path d="M26 26 Q50 1 74 26" stroke="#ff6f96" strokeWidth="4.5" fill="none" strokeLinecap="round" />
+          <circle cx="50" cy="13.5" r="2.4" fill="#ffd23f" />
+        </g>
+      )
     case 'hat-flower':
       return (
         <g transform="translate(69 22)">
@@ -93,6 +126,19 @@ function FaceArt({ id }: { id: string }) {
         <rect x="52" y="40" width="17" height="11" rx="5" fill="#2b2350" />
         <path d="M48 44 Q50 42 52 44 M31 43 L25 41 M69 43 L75 41" stroke="#2b2350" strokeWidth="2" fill="none" />
         <path d="M34 43 L39 42 M55 43 L60 42" stroke="#9fd8ff" strokeWidth="1.8" strokeLinecap="round" />
+      </g>
+    )
+  }
+  if (id === 'face-star') {
+    return (
+      <g>
+        <polygon points={starPoints(40.5, 46.5, 10)} fill="#ffd23f" stroke="#e08a00" strokeWidth="1.4" strokeLinejoin="round" />
+        <polygon points={starPoints(59.5, 46.5, 10)} fill="#ffd23f" stroke="#e08a00" strokeWidth="1.4" strokeLinejoin="round" />
+        <circle cx="40.5" cy="47" r="4.6" fill="#ff8fb8" opacity="0.85" />
+        <circle cx="59.5" cy="47" r="4.6" fill="#ff8fb8" opacity="0.85" />
+        <path d="M49 45 Q50 43.5 51 45" stroke="#e08a00" strokeWidth="1.8" fill="none" />
+        <circle cx="38.8" cy="45.4" r="1.3" fill="#fff" />
+        <circle cx="57.8" cy="45.4" r="1.3" fill="#fff" />
       </g>
     )
   }
@@ -795,6 +841,59 @@ export function PetSvg({ id }: { id: string }) {
         <rect x="16" y="49" width="6" height="7" rx="2" fill="#ff8fb3" />
         <rect x="38" y="49" width="6" height="7" rx="2" fill="#ff8fb3" />
         <circle cx="49" cy="10" r="6" fill="#ffd23f" stroke="#d49400" strokeWidth="1.2" className="mh-pet-coin" />
+      </>
+    )
+  } else if (id === 'pet-dragon') {
+    body = (
+      <>
+        <path d="M41 47 Q56 50 54 37 L59 35 L52 31" stroke="#4cba5c" strokeWidth="4.5" fill="none" strokeLinecap="round" strokeLinejoin="round" className="mh-pet-tail" />
+        <path className="mh-pet-wing" d="M19 36 Q4 26 8 42 Q13 37 18 41 Z" fill="#7cc8ff" stroke="#3d93d9" strokeWidth="1.2" />
+        <path className="mh-pet-wing mh-pet-wing-r" d="M41 36 Q56 26 52 42 Q47 37 42 41 Z" fill="#7cc8ff" stroke="#3d93d9" strokeWidth="1.2" />
+        <ellipse cx="30" cy="43" rx="13" ry="11" fill="#6cd17a" />
+        <ellipse cx="30" cy="46" rx="7.5" ry="6.5" fill="#fff3b0" />
+        <path d="M26.5 11 L30 5 L33.5 11 Z M21 14 L23 9 L26 13 Z M39 14 L37 9 L34 13 Z" fill="#ffad5c" />
+        <path d="M20 17 L16 7 L25 14 Z M40 17 L44 7 L35 14 Z" fill="#ffd23f" stroke="#d49400" strokeWidth="1" strokeLinejoin="round" />
+        <circle cx="30" cy="25" r="13" fill="#7ee08a" />
+        {eyes(23, 5.5)}
+        <ellipse cx="30" cy="31" rx="6.5" ry="4" fill="#9cf0a7" />
+        <circle cx="28" cy="30.5" r="0.9" fill="#2f8a3e" />
+        <circle cx="32" cy="30.5" r="0.9" fill="#2f8a3e" />
+        <path d="M27 34 Q30 36 33 34" stroke="#2f8a3e" strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        <ellipse cx="20.5" cy="29" rx="2.6" ry="1.6" fill="#ff8fb3" opacity="0.7" />
+        <ellipse cx="39.5" cy="29" rx="2.6" ry="1.6" fill="#ff8fb3" opacity="0.7" />
+        <rect x="21" y="50" width="6" height="7" rx="2.5" fill="#4cba5c" />
+        <rect x="33" y="50" width="6" height="7" rx="2.5" fill="#4cba5c" />
+      </>
+    )
+  } else if (id === 'pet-unicorn') {
+    body = (
+      <>
+        <g className="mh-pet-tail" fill="none" strokeLinecap="round" strokeWidth="2.6">
+          <path d="M42 41 Q54 38 52 50" stroke="#ff6f91" />
+          <path d="M42 43 Q55 42 51 53" stroke="#ffd23f" />
+          <path d="M42 45 Q53 47 48 55" stroke="#4fc3f7" />
+        </g>
+        <ellipse cx="30" cy="43" rx="14" ry="10" fill="#fff" stroke="#d9cffc" strokeWidth="1.4" />
+        <rect x="19" y="49" width="5" height="8" rx="2" fill="#fff" stroke="#d9cffc" strokeWidth="1.2" />
+        <rect x="36" y="49" width="5" height="8" rx="2" fill="#fff" stroke="#d9cffc" strokeWidth="1.2" />
+        <path d="M20 16 L18 7 L25 13 Z M40 16 L42 7 L35 13 Z" fill="#fff" stroke="#d9cffc" strokeWidth="1.2" strokeLinejoin="round" />
+        <circle cx="30" cy="25" r="13" fill="#fff" stroke="#d9cffc" strokeWidth="1.4" />
+        <path d="M27 13 L30 -2 L33 13 Z" fill="#ffd23f" stroke="#e0a000" strokeWidth="1" strokeLinejoin="round" />
+        <path d="M28 9 L32 7.5 M28.6 5 L31.4 4" stroke="#fff" strokeWidth="1.1" />
+        {[
+          [41, 16, '#ff6f91'],
+          [43.5, 22, '#ffad5c'],
+          [43.5, 28, '#ffd23f'],
+          [41.5, 34, '#7ed957'],
+          [37, 38, '#4fc3f7'],
+        ].map(([x, y, c]) => (
+          <circle key={String(c)} cx={x} cy={y} r="4.2" fill={String(c)} />
+        ))}
+        {eyes(24, 5.5)}
+        <ellipse cx="30" cy="31.5" rx="6" ry="3.8" fill="#ffe1ee" />
+        <path d="M28 33 Q30 34.6 32 33" stroke="#c74766" strokeWidth="1" fill="none" strokeLinecap="round" />
+        <ellipse cx="20.5" cy="29" rx="2.6" ry="1.6" fill="#ff8fb3" opacity="0.7" />
+        <ellipse cx="39.5" cy="29" rx="2.6" ry="1.6" fill="#ff8fb3" opacity="0.7" />
       </>
     )
   } else if (id === 'pet-puppy') {

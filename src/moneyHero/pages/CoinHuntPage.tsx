@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft, Camera, CameraOff } from 'lucide-react'
 import type { DenomId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
+import { earn } from '../engine/ledger'
 import { HUNT_LEVELS, HUNT_REWARD, HUNT_ROUNDS, checkHunt, makeRound, type HuntCheck, type HuntRound } from '../engine/coinHunt'
 import { formatBS } from '../utils/money'
 import { denom } from '../data/denominations'
@@ -136,7 +137,7 @@ export function CoinHuntPage() {
     if (r.ok) {
       playSound('correct')
       setCleared((n) => n + 1)
-      updatePlayer((p) => ({ ...p, exp: p.exp + HUNT_REWARD.exp, coins: p.coins + HUNT_REWARD.coins }))
+      updatePlayer((p) => ({ ...earn(p, HUNT_REWARD.coins, 'ล่าเหรียญ AR', '📷'), exp: p.exp + HUNT_REWARD.exp }))
     } else {
       playSound('wrong')
     }
