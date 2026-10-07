@@ -107,7 +107,8 @@ export function spoken(text: string): string {
   return s
 }
 
-export function speak(text: string): void {
+/** พูดข้อความ (queue = ต่อคิวหลังประโยคที่กำลังพูด ไม่ตัดทิ้ง) */
+export function speak(text: string, opts: { queue?: boolean } = {}): void {
   if (!enabled || !speechAvailable()) return
   const say = spoken(text)
   if (!say) return
@@ -117,7 +118,7 @@ export function speak(text: string): void {
     done = true
     try {
       const synth = window.speechSynthesis
-      synth.cancel()
+      if (!opts.queue) synth.cancel()
       const u = new SpeechSynthesisUtterance(say)
       u.lang = 'th-TH'
       u.rate = 0.9

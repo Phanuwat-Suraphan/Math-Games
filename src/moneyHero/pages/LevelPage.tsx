@@ -34,10 +34,10 @@ import { StageChips } from '../components/StageChips'
  */
 
 const STEPS: { id: StepId; label: string; icon: string }[] = [
-  { id: 'learn', label: 'LEARN', icon: '📖' },
-  { id: 'practice', label: 'PRACTICE', icon: '✏️' },
-  { id: 'mission', label: 'MISSION', icon: '🎯' },
-  { id: 'boss', label: 'BOSS', icon: '👑' },
+  { id: 'learn', label: 'เรียนรู้', icon: '📖' },
+  { id: 'practice', label: 'ฝึกซ้อม', icon: '✏️' },
+  { id: 'mission', label: 'ภารกิจ', icon: '🎯' },
+  { id: 'boss', label: 'สู้บอส', icon: '👑' },
 ]
 
 const STEP_NAME: Record<StepId, string> = {
@@ -71,7 +71,7 @@ function StepTrack({ level, rec, current }: { level: LevelDef; rec: LevelRecord;
           <li key={s.id} className={`${done ? 'is-done' : ''} ${on ? 'is-on' : ''}`}>
             <span className="mh-step-dot">{done ? '✔' : s.icon}</span>
             <span className="mh-step-name">
-              STEP {i + 1} {s.label}
+              ขั้นที่ {i + 1} {s.label}
             </span>
           </li>
         )
@@ -237,7 +237,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   if (step === 'learn') {
     return (
       <div className="mh-card mh-step-card">
-        <h2 className="mh-step-title">📖 STEP 1 · {STEP_NAME.learn}</h2>
+        <h2 className="mh-step-title">📖 ขั้นที่ 1 · {STEP_NAME.learn}</h2>
         <LearnSlides
           slides={level.learn}
           onDone={() => {
@@ -286,8 +286,8 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
     const nextStep = step === 'practice' ? 'mission' : 'boss'
     return (
       <div className="mh-step-wrap">
-      {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} />}
-      {range && player && <PracticeRange total={questions.length} balloons={balloons} nudge={0} coach={coach} avatar={player.avatar} wear={player.wear} />}
+      {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} voice={false} />}
+      {range && player && <PracticeRange total={questions.length} balloons={balloons} nudge={0} coach={coach} avatar={player.avatar} wear={player.wear} voice={false} />}
       <div className="mh-card mh-step-card mh-center" data-testid="mh-step-done">
         <div className="mh-step-done-icon">{step === 'practice' ? '✏️' : '🎯'}</div>
         <h2 className="mh-step-title">{step === 'practice' ? 'ฝึกครบแล้ว!' : 'ภารกิจสำเร็จ!'}</h2>
@@ -303,7 +303,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
             navigate(`/level/${level.id}/${nextStep}`)
           }}
         >
-          ไป {nextStep === 'mission' ? 'MISSION 🎯' : 'BOSS 👑'}
+          ไป {nextStep === 'mission' ? 'ภารกิจ 🎯' : 'สู้บอส 👑'}
         </button>
       </div>
       </div>
@@ -314,7 +314,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   return (
     <div className="mh-step-wrap">
       <h2 className="mh-step-title mh-step-title-out">
-        {step === 'practice' ? '✏️' : step === 'mission' ? '🎯' : '👑'} STEP {stepNo} · {STEP_NAME[step]}
+        {step === 'practice' ? '✏️' : step === 'mission' ? '🎯' : '👑'} ขั้นที่ {stepNo} · {STEP_NAME[step]}
       </h2>
       {level.id === 12 && step === 'mission' ? (
         <JourneyMission
@@ -425,7 +425,7 @@ function ResultView({ level }: { level: LevelDef }) {
       <Confetti />
       <CoinRain n={result?.coins ?? 6} />
       <Bunting className="mh-result-bunting" count={12} />
-      <div className="mh-result-banner">MISSION COMPLETE!</div>
+      <div className="mh-result-banner">ผ่านด่านแล้ว!</div>
       <div className="mh-result-cast">
         <AvatarArt avatar={player.avatar} size={120} mood="happy" wear={player.wear} pet />
         {level.npc !== 'hero' && <CharacterArt id={level.npc} size={96} mood="happy" />}
@@ -439,7 +439,7 @@ function ResultView({ level }: { level: LevelDef }) {
         <div className="mh-result-rewards">
           <span className="mh-reward">✨ +{result.exp} EXP</span>
           <span className="mh-reward">🪙 +{result.coins}</span>
-          <span className="mh-reward">🌟 MONEY STAR × {stars}</span>
+          <span className="mh-reward">🌟 ดาวเงินทอง × {stars}</span>
           <span className="mh-reward">🎯 ถูกครั้งแรก {Math.round(result.accuracy * 100)}%</span>
         </div>
       )}

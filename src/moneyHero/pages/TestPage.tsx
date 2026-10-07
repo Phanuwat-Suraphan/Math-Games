@@ -73,7 +73,7 @@ export function TestPage() {
             <CharacterArt id="owl" size={110} />
             {locked ? (
               <>
-                <p className="mh-test-lead">🔒 แบบทดสอบหลังเรียนจะเปิดเมื่อผ่านด่าน 12 FINAL MONEY MASTER</p>
+                <p className="mh-test-lead">🔒 แบบทดสอบหลังเรียนจะเปิดเมื่อผ่านด่าน 12 ศึกสุดท้าย</p>
                 <Link to="/map" className="mh-btn mh-btn-gold">
                   🗺 กลับไปผจญภัยต่อ
                 </Link>

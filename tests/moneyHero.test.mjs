@@ -1256,6 +1256,28 @@ test('เสียงพูดภาษาไทย: อ่านเป็นค
   eq(speech.pickThaiVoice([v('Narisa', 'th-TH'), v('Narisa (Premium)', 'th-TH')]).name, 'Narisa (Premium)', 'Premium ก่อน')
 })
 
+test('ทุกประโยคที่ตัวละครพูด อ่านออกเสียงเป็นภาษาไทยล้วน', () => {
+  const sp = speech.spoken
+  const lines = []
+  for (let id = 0; id <= 12; id += 1) {
+    const b = bosses.bossOf(id)
+    lines.push(b.intro, b.lose, ...b.taunts, ...b.ouch)
+    const m = missions.missionOf(id)
+    if (m) lines.push(`${m.title} ${m.story}`, m.done)
+  }
+  for (const total of [1, 4]) {
+    lines.push(practice.coachLine([], total, false), practice.coachLine(['star'], total, true), practice.coachLine(['away'], total, false))
+    lines.push(practice.coachLine(['star', 'star', 'star', 'star'], total, false))
+  }
+  const levels = load('data/levels.js')
+  for (const l of levels.LEVELS) {
+    lines.push(l.name)
+    for (const slide of l.learn) lines.push(`${slide.title} ${slide.lines.join(' ')}`)
+  }
+  const bad = lines.filter((line) => /[A-Za-z]/.test(sp(line)))
+  eq(bad.length, 0, `มีคำอังกฤษหลุด: ${bad.slice(0, 3).map(sp).join(' | ')}`)
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

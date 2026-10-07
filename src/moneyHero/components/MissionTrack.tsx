@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react'
+import { useEffect, type CSSProperties } from 'react'
+import { speak } from '../utils/speech'
 import type { MissionScene, SlotState } from '../data/missions'
 import type { Wear } from '../data/shop'
 import { AvatarArt, CharacterArt } from './Art'
@@ -7,10 +8,32 @@ import { AvatarArt, CharacterArt } from './Art'
  * แถบภารกิจ (ขั้น MISSION): เพื่อนเล่าภารกิจ ฮีโร่เดินไปตามช่องทีละข้อ
  * ช่องที่เสร็จเติมด้วยของประจำภารกิจ (ตอบผิดครบ 2 ครั้งได้ 💪 แทน)
  */
-export function MissionTrack({ scene, total, slots, avatar, wear }: { scene: MissionScene; total: number; slots: readonly SlotState[]; avatar: string; wear: Wear }) {
+export function MissionTrack({
+  scene,
+  total,
+  slots,
+  avatar,
+  wear,
+  voice = true,
+}: {
+  scene: MissionScene
+  total: number
+  slots: readonly SlotState[]
+  avatar: string
+  wear: Wear
+  /** false = ไม่พูด (ใช้บนการ์ดสรุปขั้นที่แสดงซ้ำ) */
+  voice?: boolean
+}) {
   const done = slots.length >= total
   const at = Math.min(slots.length, total - 1)
   const good = slots.filter((s) => s === 'good').length
+  // เพื่อนเล่าภารกิจเป็นเสียงไทยตอนเริ่ม และชมตอนภารกิจครบ
+  useEffect(() => {
+    if (voice && !done) speak(`${scene.title} ${scene.story}`)
+  }, [scene.title, scene.story])
+  useEffect(() => {
+    if (voice && done) speak(scene.done, { queue: true })
+  }, [done, scene.done])
   return (
     <div className={`mh-card mh-mission-track ${done ? 'is-done' : ''}`} data-testid="mh-mission-track">
       <div className="mh-mission-head">

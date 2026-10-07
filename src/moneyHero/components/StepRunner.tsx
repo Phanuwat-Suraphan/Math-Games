@@ -74,7 +74,7 @@ export function StepRunner({
   onAnswer?: (q: Question, r: Response, correct: boolean, info: { attempt: number; retry: boolean }) => void
   onFinish: (s: RunSummary) => void
 }) {
-  const { updatePlayer, player } = useGame()
+  const { updatePlayer, player, settings } = useGame()
   const [items, setItems] = useState<Item[]>(() => questions.map((q) => ({ q, retry: false })))
   const [index, setIndex] = useState(0)
   const [attempt, setAttempt] = useState(1)
@@ -217,6 +217,11 @@ export function StepRunner({
 
   const praise = useMemo(() => pick(PRAISE), [index, phase])
   const encourage = useMemo(() => pick(ENCOURAGE), [index, attempt])
+
+  // อ่านโจทย์ให้ฟังเองเมื่อขึ้นข้อใหม่ (เปิดในหน้าตั้งค่า) ต่อคิวหลังคำพูดของตัวละคร
+  useEffect(() => {
+    if (settings.readAloud && q) speak(`${q.story ?? ''} ${q.title}`, { queue: true })
+  }, [q?.id])
 
   // ตัวละครพูดเป็นเสียงภาษาไทยหลังตอบ (แบบทดสอบไม่บอกถูกผิด จึงไม่พูด)
   useEffect(() => {

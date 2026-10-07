@@ -1,4 +1,5 @@
-import type { CSSProperties } from 'react'
+import { useEffect, type CSSProperties } from 'react'
+import { speak } from '../utils/speech'
 import type { NpcId } from '../engine/types'
 import type { Wear } from '../data/shop'
 import { BALLOON_COLORS, coachLine, comboOf, type Balloon } from '../data/practice'
@@ -30,6 +31,7 @@ export function PracticeRange({
   coach,
   avatar,
   wear,
+  voice = true,
 }: {
   total: number
   balloons: readonly Balloon[]
@@ -38,12 +40,18 @@ export function PracticeRange({
   coach: NpcId
   avatar: string
   wear: Wear
+  /** false = ไม่พูด (ใช้บนการ์ดสรุปขั้นที่แสดงซ้ำ) */
+  voice?: boolean
 }) {
   const done = balloons.length >= total
   const popped = balloons.filter((b) => b !== 'away').length
   const stars = balloons.filter((b) => b === 'star').length
   const combo = comboOf(balloons)
   const line = coachLine(balloons, total, nudge > 0)
+  // โค้ชอธิบายกติกาเป็นเสียงไทยตอนเริ่ม
+  useEffect(() => {
+    if (voice && !done) speak(`ลานฝึกยิงลูกโป่ง ${coachLine([], total, false)}`)
+  }, [total])
   return (
     <div className={`mh-card mh-practice ${done ? 'is-done' : ''}`} data-testid="mh-practice">
       <div className="mh-practice-head">
