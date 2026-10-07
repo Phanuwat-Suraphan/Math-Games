@@ -559,7 +559,12 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   b.skills.count = { attempts: 4, correct: 4, timeMs: 1 }
   b.answered = 4
   const c = progress.newPlayer('ซี', 'adventurer', 3)
+  b.eco = { ...b.eco, days: 2, sales: 4500, donated: 1000, bestProfit: 2500 }
+  c.eco = { ...c.eco, days: 1, sales: 3000, donated: 500 }
   const sum = report.classSummary([a, b, c])
+  eq(sum.ecoPlayers, 2, 'จำนวนคนที่เล่นกาด')
+  eq(sum.ecoSales, 75, 'ยอดขายกาดรวมทั้งห้อง (บาท)')
+  eq(sum.ecoDonated, 15, 'บริจาครวมทั้งห้อง (บาท)')
   eq(sum.players, 3, 'จำนวนนักเรียน')
   eq(sum.skills.count, 75, 'ค่าเฉลี่ยทักษะ (50% กับ 100%)')
   eq(sum.skills.ledger, null, 'ทักษะที่ไม่มีใครทำต้องเป็น null')
@@ -574,6 +579,8 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   assert(lines[1].startsWith('"เอ, ""ก"""'), `ชื่อที่มีจุลภาคและอัญประกาศต้องถูกครอบ: ${lines[1].slice(0, 20)}`)
   const cols = lines[0].split(',').length
   for (const l of lines.slice(2)) eq(l.split(',').length, cols, 'จำนวนคอลัมน์ต้องเท่ากันทุกแถว')
+  assert(lines[0].includes('กาดรักษ์โลก: ยอดขายสะสม (บาท)'), 'CSV ต้องมีผลกาดรักษ์โลก')
+  assert(lines[2].includes(',2,45,25,0,10,'), `ผลกาดของบีใน CSV: ${lines[2]}`)
 })
 
 test('ล่าเหรียญ AR: ทุกรอบมีทางเก็บได้พอดี และตัวตรวจบอกขาด/เกินถูกต้อง', () => {

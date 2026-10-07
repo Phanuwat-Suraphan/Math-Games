@@ -81,6 +81,7 @@ export function TeacherPage() {
             <StatTile icon="🧭" label="ก่อนเรียนเฉลี่ย" value={fmt(sum.pre)} />
             <StatTile icon="🎓" label="หลังเรียนเฉลี่ย" value={fmt(sum.post)} />
             <StatTile icon="📈" label="พัฒนาการเฉลี่ย" value={sum.improvement === null ? '–' : `${sum.improvement > 0 ? '+' : ''}${sum.improvement}%`} />
+            <StatTile icon="🌱" label={`กาดรักษ์โลก (${sum.ecoPlayers} คน) ยอดขายรวม`} value={`${sum.ecoSales} ฿`} />
           </div>
 
           <div className="mh-stats-grid">
@@ -116,6 +117,7 @@ export function TeacherPage() {
                   <th>พัฒนาการ</th>
                   <th>เวลา</th>
                   <th>ควรฝึก</th>
+                  <th>กาด</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,6 +141,7 @@ export function TeacherPage() {
                       <td>{imp === null ? '–' : <span className={imp > 0 ? 'mh-up' : imp < 0 ? 'mh-down' : ''}>{`${imp > 0 ? '▲ +' : imp < 0 ? '▼ ' : ''}${imp}%`}</span>}</td>
                       <td>{minutes(p.totalTimeMs)} น.</td>
                       <td className="mh-table-weak">{weakSkills(p).map((s) => SKILL_ICONS[s]).join(' ') || '–'}</td>
+                      <td>{p.eco.days > 0 ? `${p.eco.days} วัน · ${p.eco.sales / 100} ฿` : '–'}</td>
                     </tr>
                   )
                 })}
@@ -177,6 +180,15 @@ function StudentDetail({ p }: { p: Player }) {
         <SkillBars values={values} counts={counts} />
         <div>
           {p.preTest || p.postTest ? <BeforeAfter pre={p.preTest} post={p.postTest} /> : <p className="mh-soft">ยังไม่ได้ทำแบบทดสอบ</p>}
+          <h4 className="mh-card-title">🌱 กาดรักษ์โลก</h4>
+          {p.eco.days > 0 ? (
+            <p className="mh-soft" data-testid="mh-student-eco">
+              เล่น {p.eco.days} วัน · ยอดขายสะสม {p.eco.sales / 100} บาท · กำไรสูงสุด {p.eco.bestProfit / 100} บาท · ออม {p.eco.saved / 100} บาท · บริจาคกองทุนต้นไม้{' '}
+              {p.eco.donated / 100} บาท
+            </p>
+          ) : (
+            <p className="mh-soft">ยังไม่ได้เล่นกาดรักษ์โลก</p>
+          )}
           <h4 className="mh-card-title">โจทย์ที่ยังพลาด ({mistakes.length})</h4>
           <ul className="mh-mistake-list">
             {mistakes.map((m) => (
