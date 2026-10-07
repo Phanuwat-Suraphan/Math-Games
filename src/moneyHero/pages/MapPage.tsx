@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { List } from 'lucide-react'
-import type { NpcId } from '../engine/types'
-import { useGame } from '../hooks/useMoneyGame'
+import type { NpcId, Question } from '../engine/types'
+import { useGame, useMusic } from '../hooks/useMoneyGame'
 import { LEVELS, TOTAL_LESSONS, type LevelDef } from '../data/levels'
 import { CHARACTERS } from '../data/characters'
 import {
@@ -20,11 +20,15 @@ import {
   type TownCoin,
 } from '../data/town'
 import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
-import { AvatarArt, CharacterArt } from '../components/Art'
+import { AvatarArt, CharacterArt, PetSvg } from '../components/Art'
 import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
 import { BuildingArt } from '../components/BuildingArt'
+import { doneToday, liveStreak } from '../engine/daily'
+import { NPC_QUESTS, QUEST_REWARD, isQuestNpc, makeQuest, questAvailable, recordQuest, type QuestNpc } from '../engine/npcQuest'
+import { StepRunner } from '../components/StepRunner'
+import { Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
 
@@ -77,10 +81,12 @@ function startPoint(mapX?: number, mapY?: number, next = 0): Pt {
 export function MapPage() {
   const { player, updatePlayer } = useGame()
   const navigate = useNavigate()
+  useMusic()
   const viewRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const puffRefs = useRef<(HTMLSpanElement | null)[]>([])
+  const petRef = useRef<HTMLDivElement>(null)
   const knobRef = useRef<HTMLDivElement>(null)
 
   const start = useMemo(
@@ -97,12 +103,18 @@ export function MapPage() {
     joy: { x: 0, y: 0 },
     route: null as Pt[] | null,
     walking: false,
+    petX: start.x - 40,
+    petY: start.y + 6,
   })
   const collectedRef = useRef(new Set(player?.mapCoins ?? []))
   const [collected, setCollected] = useState(() => new Set(player?.mapCoins ?? []))
   const [nearLevel, setNearLevel] = useState<number | null>(null)
   const [nearNpc, setNearNpc] = useState<NpcId | null>(null)
-  const [talk, setTalk] = useState<{ npc: NpcId; text: string } | null>(null)
+  const [talk, setTalk] = useState<{ npc: NpcId; text: string; quest?: boolean } | null>(null)
+  const [quest, setQuest] = useState<{ npc: QuestNpc; q: Question } | null>(null)
+  const [questDone, setQuestDone] = useState<{ npc: QuestNpc; ok: boolean } | null>(null)
+  const modalOpen = useRef(false)
+  modalOpen.current = quest !== null || questDone !== null
   const [showList, setShowList] = useState(false)
   const [pop, setPop] = useState<{ x: number; y: number; key: number } | null>(null)
   const tipIndex = useRef<Record<string, number>>({})
@@ -154,20 +166,35 @@ export function MapPage() {
     playSound('click')
   }, [])
 
-  const action = useCallback(() => {
-    const { level, npc } = nearRef.current
-    if (npc && npc !== 'hero') {
+  /** คุยกับเพื่อน: ถ้าวันนี้ยังไม่ได้ช่วย จะชวนทำภารกิจ ไม่งั้นบอกเคล็ดลับ */
+  const talkTo = useCallback(
+    (npc: NpcId) => {
+      if (!player || npc === 'hero') return
+      playSound('click')
+      if (isQuestNpc(npc) && questAvailable(player, npc)) {
+        const text = NPC_QUESTS[npc].ask
+        setTalk({ npc, text, quest: true })
+        speak(text)
+        return
+      }
       const tips = TIPS[npc as keyof typeof TIPS]
       const i = tipIndex.current[npc] ?? 0
       tipIndex.current[npc] = i + 1
       const text = tips[i % tips.length]
       setTalk({ npc, text })
       speak(text)
-      playSound('click')
+    },
+    [player],
+  )
+
+  const action = useCallback(() => {
+    const { level, npc } = nearRef.current
+    if (npc && npc !== 'hero') {
+      talkTo(npc)
       return
     }
     if (level !== null) enter(LEVELS[level])
-  }, [enter])
+  }, [enter, talkTo])
 
   /* ---------------- ลูปเกม ---------------- */
   useEffect(() => {
@@ -254,6 +281,21 @@ export function MapPage() {
         }
       }
 
+      // สัตว์เลี้ยงเดินตามหลังฮีโร่ (ค่อย ๆ ไล่ตาม ไม่วาร์ป)
+      if (petRef.current) {
+        const tx = s.x - s.dir * 46
+        const ty = s.y + 8
+        const k = Math.min(1, dt * 5)
+        s.petX += (tx - s.petX) * k
+        s.petY += (ty - s.petY) * k
+        const moving = Math.hypot(tx - s.petX, ty - s.petY) > 6
+        const pet = petRef.current
+        pet.style.transform = `translate3d(${s.petX - 22}px,${s.petY - 44}px,0)`
+        pet.style.zIndex = String(Math.round(s.petY))
+        pet.classList.toggle('is-walking', moving)
+        pet.classList.toggle('is-left', s.petX > s.x)
+      }
+
       for (const c of TOWN_COINS) {
         if (!collectedRef.current.has(c.id) && dist(s, c) < 30) collect(c)
       }
@@ -285,7 +327,7 @@ export function MapPage() {
       return null
     }
     const down = (e: KeyboardEvent) => {
-      if (document.activeElement instanceof HTMLInputElement) return
+      if (modalOpen.current || document.activeElement instanceof HTMLInputElement) return
       const k = keyOf(e.key)
       if (k) {
         sim.current.keys[k] = true
@@ -309,7 +351,7 @@ export function MapPage() {
 
   // คำพูดหายไปเองหลังอ่านจบ แผงเข้าด่านจึงกลับมา
   useEffect(() => {
-    if (!talk) return
+    if (!talk || talk.quest) return
     const t = window.setTimeout(() => setTalk(null), 3500)
     return () => window.clearTimeout(t)
   }, [talk])
@@ -411,14 +453,24 @@ export function MapPage() {
           })}
 
           {TOWN_NPCS.map((n) => (
-            <div
+            <button
               key={n.id}
+              type="button"
               className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`}
               style={{ left: n.x - 32, top: n.y - 80, zIndex: n.y, animationDelay: `${(n.x % 7) * -0.6}s` }}
+              onClick={() => talkTo(n.id)}
+              aria-label={`คุยกับ${CHARACTERS[n.id].name}`}
+              data-testid={`mh-npc-${n.id}`}
             >
-              {nearNpc === n.id && <span className="mh-npc-hint">💬</span>}
+              {questAvailable(player, n.id) ? (
+                <span className="mh-npc-quest" aria-label="มีภารกิจ">
+                  ❗
+                </span>
+              ) : (
+                nearNpc === n.id && <span className="mh-npc-hint">💬</span>
+              )}
               <CharacterArt id={n.id} size={64} mood={nearNpc === n.id ? 'happy' : 'normal'} />
-            </div>
+            </button>
           ))}
 
           {TOWN_COINS.map((c) =>
@@ -463,10 +515,15 @@ export function MapPage() {
               aria-hidden="true"
             />
           ))}
+          {player.wear?.pet && (
+            <div className="mh-town-pet" ref={petRef} data-testid="mh-pet" aria-hidden="true">
+              <PetSvg id={player.wear.pet} />
+            </div>
+          )}
           <div className="mh-walker mh-town-walker" ref={heroRef} data-testid="mh-hero">
             <span className="mh-walker-shadow" />
             <div className="mh-walker-inner">
-              <AvatarArt avatar={player.avatar} size={74} />
+              <AvatarArt avatar={player.avatar} size={74} wear={player.wear} />
             </div>
           </div>
         </div>
@@ -475,9 +532,29 @@ export function MapPage() {
           {talk && (
             <div className="mh-card mh-talk" aria-live="polite">
               <CharacterArt id={talk.npc} size={52} />
-              <div>
+              <div className="mh-talk-body">
                 <strong>{CHARACTERS[talk.npc].name}</strong>
                 <p>{talk.text}</p>
+                {talk.quest && isQuestNpc(talk.npc) && (
+                  <div className="mh-row-buttons mh-talk-buttons">
+                    <button type="button" className="mh-btn mh-btn-soft mh-btn-sm" onClick={() => setTalk(null)}>
+                      ไว้ก่อนนะ
+                    </button>
+                    <button
+                      type="button"
+                      className="mh-btn mh-btn-gold mh-btn-sm"
+                      data-testid="mh-quest-accept"
+                      onClick={() => {
+                        const npc = talk.npc as QuestNpc
+                        playSound('unlock')
+                        setTalk(null)
+                        setQuest({ npc, q: makeQuest(npc) })
+                      }}
+                    >
+                      🎁 ช่วยเลย! (+{QUEST_REWARD.coins} 🪙)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -543,6 +620,18 @@ export function MapPage() {
         ⌨️ ลูกศร / WASD เดิน · Enter เข้าอาคาร · 📱 ลากจอยสติกเพื่อเดิน · 👆 แตะอาคารให้ฮีโร่เดินไปเอง
       </p>
 
+      {!doneToday(player.daily) && (
+        <Link to="/daily" className="mh-card mh-test-banner is-daily" data-testid="mh-daily-banner">
+          <span className="mh-test-banner-icon" aria-hidden="true">
+            🌞
+          </span>
+          <span>
+            <b>ภารกิจประจำวัน · {liveStreak(player.daily) > 0 ? `🔥 ${liveStreak(player.daily)} วันติดกัน` : 'เริ่มสตรีคกันเลย!'}</b>
+            <span>วันละ 5 ข้อ ได้เหรียญและตราประทับ ⭐</span>
+          </span>
+          <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
+        </Link>
+      )}
       {!player.preTest && (
         <Link to="/test/pre" className="mh-card mh-test-banner" data-testid="mh-pretest-banner">
           <span className="mh-test-banner-icon" aria-hidden="true">
@@ -578,6 +667,12 @@ export function MapPage() {
         <Link to="/stats" className="mh-menu-tile">
           <span aria-hidden="true">📊</span>สถิติ
         </Link>
+        <Link to="/sandbox" className="mh-menu-tile mh-menu-sandbox" data-testid="mh-menu-sandbox">
+          <span aria-hidden="true">🧮</span>โต๊ะนับเงิน
+        </Link>
+        <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
+          <span aria-hidden="true">🛍️</span>ร้านของฮีโร่
+        </Link>
         <Link to="/ar" className="mh-menu-tile mh-menu-ar" data-testid="mh-menu-ar">
           <span aria-hidden="true">📷</span>ล่าเหรียญ AR
         </Link>
@@ -592,6 +687,43 @@ export function MapPage() {
           <List size={22} /> {showList ? 'ซ่อนรายการด่าน' : 'ดูรายการด่าน'}
         </button>
       </div>
+
+      {quest && (
+        <div className="mh-modal mh-quest-modal" role="dialog" aria-label={`ภารกิจของ${CHARACTERS[quest.npc].name}`}>
+          <div className="mh-card mh-modal-card mh-quest-card" data-testid="mh-quest">
+            <div className="mh-quest-title">🎁 ภารกิจของ{CHARACTERS[quest.npc].name}</div>
+            <StepRunner
+              questions={[quest.q]}
+              levelId={-1}
+              mode="practice"
+              onFinish={(s) => {
+                const ok = s.within2 > 0
+                updatePlayer((p) => recordQuest(p, quest.npc, ok))
+                setQuestDone({ npc: quest.npc, ok })
+                setQuest(null)
+                playSound(ok ? 'complete' : 'click')
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {questDone && (
+        <div className="mh-modal mh-quest-modal" role="dialog" aria-label="ผลภารกิจ">
+          <div className="mh-card mh-modal-card mh-center" data-testid="mh-quest-done">
+            {questDone.ok && <Confetti count={24} />}
+            <CharacterArt id={questDone.npc} size={96} mood={questDone.ok ? 'happy' : 'normal'} />
+            <h2 className="mh-step-title">{questDone.ok ? 'ขอบใจมากนะ! 💖' : 'ไม่เป็นไรนะ พรุ่งนี้มาช่วยกันใหม่'}</h2>
+            {questDone.ok && (
+              <p>
+                ได้ +{QUEST_REWARD.coins} 🪙 · +{QUEST_REWARD.exp} EXP
+              </p>
+            )}
+            <button type="button" className="mh-btn mh-btn-gold" onClick={() => setQuestDone(null)} data-testid="mh-quest-close">
+              กลับไปเดินเล่น ▶
+            </button>
+          </div>
+        </div>
+      )}
 
       {showList && (
         <div className="mh-level-list" data-testid="mh-level-list">

@@ -4622,7 +4622,7 @@ button:disabled {
 
 .mh-map-menu {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 10px;
   margin: 12px 0;
 }
@@ -5169,6 +5169,7 @@ button:disabled {
 .mh-teacher-actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -5576,14 +5577,15 @@ button:disabled {
   transition: transform 0.18s cubic-bezier(0.3, 1.8, 0.5, 1), box-shadow 0.12s ease, filter 0.2s;
 }
 
+/* ชี้แล้วเรืองแสง แต่ไม่ขยับตำแหน่ง: ถ้าปุ่มขยับหนีเมาส์ จะเกิดชี้-ไม่ชี้สลับไปมาไม่หยุด */
 @media (hover: hover) {
   .mh-btn:hover:not(:disabled),
   .mh-menu-tile:hover,
-  .mh-icon-btn:hover {
-    transform: translateY(-2px) scale(1.03) rotate(-1deg);
-  }
+  .mh-icon-btn:hover,
   .mh-choice:hover:not(:disabled) {
-    transform: translateY(-3px) scale(1.02);
+    filter: brightness(1.06) saturate(1.1);
+    outline: 3px solid rgba(255, 255, 255, 0.75);
+    outline-offset: 2px;
   }
 }
 
@@ -6053,4 +6055,494 @@ button:disabled {
     width: 80px !important;
     height: 40px !important;
   }
+}
+
+/* ================================================================== */
+/* ร้านของฮีโร่ และสัตว์เลี้ยง                                         */
+/* ================================================================== */
+
+.mh-menu-shop {
+  background: linear-gradient(180deg, #fff8e1, #ffe7a8);
+  border-color: #ffe08a;
+}
+
+
+
+.mh-pet-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.mh-pet-body {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: mh-cs-breathe 2.2s ease-in-out infinite;
+}
+
+.mh-pet-tail {
+  transform-box: fill-box;
+  transform-origin: 0% 100%;
+  animation: mh-cs-wag 0.9s ease-in-out infinite;
+}
+
+.mh-pet-coin {
+  animation: mh-twinkle 1.2s ease-in-out infinite alternate;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.mh-avatar-pet {
+  position: absolute;
+  right: -30%;
+  bottom: 0;
+  display: block;
+}
+
+/* สัตว์เลี้ยงบนแผนที่ */
+.mh-town-pet {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.mh-town-pet.is-left .mh-pet-svg {
+  transform: scaleX(-1);
+}
+
+.mh-town-pet.is-walking .mh-pet-body {
+  animation: mh-pet-hop 0.32s ease-in-out infinite alternate;
+}
+
+@keyframes mh-pet-hop {
+  from {
+    transform: translateY(0) scale(1.04, 0.96);
+  }
+  to {
+    transform: translateY(-6px) scale(0.97, 1.03);
+  }
+}
+
+/* หน้าร้าน */
+.mh-shop-top {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.mh-shop-stage {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 36px;
+}
+
+.mh-shop-stage .mh-pedestal {
+  padding-right: 54px;
+}
+
+.mh-shop-wallet {
+  margin-top: 8px;
+  font-weight: 700;
+  background: linear-gradient(180deg, #fff6c9, #ffe27a);
+  border-radius: 999px;
+  padding: 4px 16px;
+}
+
+.mh-shop-keeper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mh-shop-keeper .mh-bubble {
+  font-size: 1.05em;
+}
+
+.mh-shop-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 16px 0 12px;
+  flex-wrap: wrap;
+}
+
+.mh-shop-tab {
+  border: 2px solid #fff;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-weight: 700;
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.12);
+  transition: transform 0.18s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+.mh-shop-tab.is-on {
+  background: var(--mh-purple);
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.mh-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.mh-shop-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border-radius: 22px;
+  background: var(--mh-card-strong);
+  border: 3px solid #fff;
+  box-shadow: 0 6px 0 rgba(43, 35, 80, 0.1);
+  text-align: center;
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-shop-item.is-wearing {
+  border-color: var(--mh-mint);
+  background: #effff7;
+}
+
+.mh-shop-item.is-owned::after {
+  content: '✔';
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--mh-mint);
+  color: #fff;
+  font-size: 0.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mh-shop-preview {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: radial-gradient(circle at 40% 35%, #fffaf0, #ffe8c2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mh-shop-preview .mh-pet-svg {
+  width: 70px;
+  height: 70px;
+}
+
+.mh-shop-preview .mh-cs {
+  filter: none;
+}
+
+.mh-shop-name {
+  font-size: 0.92em;
+}
+
+.mh-price-tag {
+  font-weight: 700;
+  background: #fff1d6;
+  border-radius: 999px;
+  padding: 1px 12px;
+}
+
+@media (hover: hover) {
+  .mh-shop-item:hover .mh-shop-preview {
+    animation: mh-jelly 0.6s ease-in-out;
+  }
+}
+
+@media (max-width: 640px) {
+  .mh-shop-top {
+    grid-template-columns: 1fr;
+  }
+  .mh-shop-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ================================================================== */
+/* ภารกิจประจำวัน                                                     */
+/* ================================================================== */
+
+.mh-test-banner.is-daily {
+  border-color: #ffd36b;
+  background: linear-gradient(90deg, rgba(255, 236, 179, 0.95), rgba(255, 255, 255, 0.9));
+}
+
+.mh-daily-card {
+  position: relative;
+  overflow: hidden;
+  padding-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mh-daily-head {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.mh-daily-head p {
+  margin: 0;
+}
+
+.mh-daily-streak {
+  font-family: var(--mh-display);
+  font-size: 1.5em;
+}
+
+.mh-daily-streak b {
+  font-size: 1.4em;
+  color: #ff7a1a;
+}
+
+.mh-daily-lead {
+  margin: 0;
+  font-size: 1.05em;
+}
+
+.mh-stamp-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.mh-stamp-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78em;
+  color: var(--mh-ink-soft);
+}
+
+.mh-stamp {
+  width: 100%;
+  max-width: 54px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.15em;
+  background: rgba(43, 35, 80, 0.06);
+  border: 2px dashed #d9d2ff;
+}
+
+.mh-stamp-day.is-done .mh-stamp {
+  background: radial-gradient(circle at 40% 35%, #fff8d0, #ffd23f 60%, #f0a800);
+  border: 2px solid #e09a00;
+  font-size: 1.5em;
+  animation: mh-stamp-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  box-shadow: 0 4px 0 rgba(160, 100, 0, 0.35);
+}
+
+.mh-stamp-day.is-today .mh-stamp-name {
+  color: var(--mh-purple);
+  font-weight: 700;
+}
+
+.mh-stamp-day.is-today .mh-stamp {
+  border-color: var(--mh-purple);
+}
+
+@keyframes mh-stamp-in {
+  from {
+    transform: scale(1.8) rotate(-25deg);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+/* ================================================================== */
+/* ภารกิจเสริมจากเพื่อนในเมือง                                          */
+/* ================================================================== */
+
+button.mh-town-npc {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mh-npc-quest {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  translate: -50% 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff8d0, #ffd23f 60%, #f0a800);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px -2px rgba(160, 100, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  animation: mh-quest-bounce 0.9s ease-in-out infinite;
+}
+
+@keyframes mh-quest-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.1);
+  }
+}
+
+.mh-talk-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mh-talk-buttons {
+  justify-content: flex-start;
+  margin: 6px 0 0;
+}
+
+.mh-quest-modal {
+  z-index: 10000;
+}
+
+.mh-quest-card {
+  background: linear-gradient(180deg, #fffbea, #ffffff);
+}
+
+.mh-quest-title {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 1.25em;
+  margin-bottom: 8px;
+}
+
+/* ================================================================== */
+/* โต๊ะนับเงิน                                                         */
+/* ================================================================== */
+
+.mh-menu-sandbox {
+  background: linear-gradient(180deg, #ecfff4, #c9f2da);
+  border-color: #b4ecc9;
+}
+
+.mh-sandbox-total {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mh-sandbox-big {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: clamp(1.6em, 5vw, 2.4em);
+  color: var(--mh-purple);
+  line-height: 1.15;
+}
+
+.mh-sandbox-dot {
+  font-size: 0.95em;
+}
+
+.mh-sandbox-note {
+  margin: 4px 0 0;
+}
+
+.mh-sandbox-mat {
+  margin: 14px 0;
+  min-height: 150px;
+  padding: 14px;
+  border-radius: 24px;
+  background: repeating-linear-gradient(45deg, #2f8a4b 0 14px, #349451 14px 28px);
+  border: 6px solid #a8643a;
+  box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.25), 0 8px 0 #7d4521;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 6px;
+}
+
+.mh-sandbox-empty {
+  color: #d9ffe6;
+  font-weight: 700;
+  margin: auto;
+}
+
+.mh-sandbox-piece {
+  border: none;
+  background: none;
+  padding: 2px;
+  animation: mh-pop-in 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.mh-sandbox-groups ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.mh-sandbox-groups li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--mh-line);
+}
+
+.mh-sandbox-groups li.is-total {
+  border-bottom: none;
+  font-size: 1.1em;
+  color: var(--mh-purple);
+}
+
+.mh-sandbox-drawer {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.mh-sandbox-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 96px;
+  padding: 8px 4px;
+  border-radius: 16px;
+  border: 2px solid #f0e8ff;
+  background: #fff;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.mh-sandbox-pick:active {
+  transform: scale(0.94);
 }

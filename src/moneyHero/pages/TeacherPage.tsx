@@ -50,6 +50,9 @@ export function TeacherPage() {
         </Link>
         <h1 className="mh-title">🍎 แผงคุณครู</h1>
         <div className="mh-teacher-actions">
+          <Link to="/sandbox" className="mh-btn mh-btn-soft">
+            🧮 โต๊ะนับเงิน (สาธิต)
+          </Link>
           <button type="button" className="mh-btn mh-btn-soft" onClick={() => window.print()} disabled={players.length === 0}>
             <Printer size={20} /> พิมพ์
           </button>

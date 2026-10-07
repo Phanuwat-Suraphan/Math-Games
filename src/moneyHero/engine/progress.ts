@@ -2,6 +2,8 @@ import type { Difficulty, Question, Skill } from './types'
 import { SKILLS } from '../data/characters'
 import { LEVELS, TOTAL_LESSONS } from '../data/levels'
 import { LEVEL_BADGES } from '../data/badges'
+import { shopItem, type Wear } from '../data/shop'
+import { emptyDaily, type DailyRecord } from './daily'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -70,12 +72,22 @@ export interface Player {
   hintsUsed: number
   answered: number
   mapCoins: string[]
+  /** ของที่ซื้อจากร้านของฮีโร่ และของที่สวมอยู่ */
+  owned: string[]
+  wear: Wear
+  /** ภารกิจประจำวัน */
+  daily: DailyRecord
+  /** ภารกิจเสริมจากเพื่อนในเมือง: เพื่อน → วันที่ทำล่าสุด */
+  npcQuests: Record<string, string>
+  questsDone: number
   mapX?: number
   mapY?: number
 }
 
 export interface Settings {
   sound: boolean
+  /** เพลงประกอบเบา ๆ บนหน้าเริ่มเกมและแผนที่ */
+  music: boolean
   speech: boolean
   reduceMotion: boolean
   bigText: boolean
@@ -88,7 +100,7 @@ export interface SaveData {
   settings: Settings
 }
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, speech: true, reduceMotion: false, bigText: false }
+export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, reduceMotion: false, bigText: false }
 
 export function emptySkills(): Record<Skill, SkillStat> {
   const out = {} as Record<Skill, SkillStat>
@@ -126,6 +138,11 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     hintsUsed: 0,
     answered: 0,
     mapCoins: [],
+    owned: [],
+    wear: {},
+    daily: emptyDaily(),
+    npcQuests: {},
+    questsDone: 0,
   }
 }
 
@@ -268,6 +285,9 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.coins >= 300) want.push('coins-300')
   if (p.mapCoins.length >= 15) want.push('explorer')
   if (p.fixedMistakes >= 5) want.push('comeback')
+  if (p.owned.length >= 1) want.push('shopper')
+  if (p.daily.best >= 3) want.push('daily3')
+  if (p.questsDone >= 4) want.push('helper')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 
@@ -349,4 +369,30 @@ export function pendingMistakes(p: Player, max = 8): Mistake[] {
 export function markMistakeFixed(p: Player, gen: string): Player {
   if (!p.mistakes.some((m) => m.gen === gen && !m.fixed)) return p
   return { ...p, mistakes: p.mistakes.map((m) => (m.gen === gen && !m.fixed ? { ...m, fixed: true } : m)) }
+}
+
+/* ------------------------------------------------------------------ */
+/* ร้านของฮีโร่                                                        */
+/* ------------------------------------------------------------------ */
+
+export type BuyResult = { ok: true; player: Player; left: number } | { ok: false; reason: 'unknown' | 'owned' | 'short'; short: number }
+
+/** ซื้อของ: ตัดเหรียญ เพิ่มเข้าคลัง แล้วสวมให้ทันที */
+export function buyItem(p: Player, id: string): BuyResult {
+  const item = shopItem(id)
+  if (!item) return { ok: false, reason: 'unknown', short: 0 }
+  if (p.owned.includes(id)) return { ok: false, reason: 'owned', short: 0 }
+  if (p.coins < item.price) return { ok: false, reason: 'short', short: item.price - p.coins }
+  const left = p.coins - item.price
+  return { ok: true, left, player: { ...p, coins: left, owned: [...p.owned, id], wear: { ...p.wear, [item.slot]: id } } }
+}
+
+/** สวม/ถอดของที่มีอยู่แล้ว (ของที่ยังไม่ได้ซื้อ สวมไม่ได้) */
+export function toggleWear(p: Player, id: string): Player {
+  const item = shopItem(id)
+  if (!item || !p.owned.includes(id)) return p
+  const wear = { ...p.wear }
+  if (wear[item.slot] === id) delete wear[item.slot]
+  else wear[item.slot] = id
+  return { ...p, wear }
 }

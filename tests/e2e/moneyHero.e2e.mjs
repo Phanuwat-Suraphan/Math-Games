@@ -497,6 +497,75 @@ for (const [name, viewport] of [
     if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
   })
 
+  await step(`[${name}] ภารกิจประจำวัน: ทำ 5 ข้อ ได้ตราประทับวันนี้ และป้ายบนแผนที่หายไป`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-daily-banner').click()
+    await page.getByTestId('mh-daily-intro').waitFor()
+    await noSideScroll(page, 'ภารกิจประจำวัน')
+    await page.getByTestId('mh-daily-start').click()
+    await page.getByTestId('mh-question').waitFor()
+    await playUntil(page, 'mh-daily-done')
+    await page.getByTestId('mh-daily-streak').getByText('1').waitFor()
+    await snap(page, `${name}-daily`)
+    const p = await savedPlayer(page)
+    if (p.daily.streak !== 1 || !p.daily.last) throw new Error(`ไม่ได้บันทึกภารกิจประจำวัน: ${JSON.stringify(p.daily)}`)
+    await page.getByTestId('mh-daily-to-map').click()
+    await page.getByTestId('mh-world').waitFor()
+    if (await page.getByTestId('mh-daily-banner').isVisible().catch(() => false)) throw new Error('ทำแล้วป้ายยังอยู่')
+  })
+
+  await step(`[${name}] ภารกิจจากเพื่อนในเมือง: แตะลุงหมี รับภารกิจ ตอบถูก ได้เหรียญ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-world').waitFor()
+    const before = (await savedPlayer(page)).coins
+    await page.getByTestId('mh-npc-bear').evaluate((el) => el.click())
+    await page.getByTestId('mh-quest-accept').click()
+    await page.getByTestId('mh-quest').waitFor()
+    await page.getByTestId('mh-question').waitFor()
+    await snap(page, `${name}-quest`)
+    await playUntil(page, 'mh-quest-done')
+    await page.getByText('ขอบใจมากนะ').waitFor()
+    await page.getByTestId('mh-quest-close').click()
+    const p = await savedPlayer(page)
+    // ได้รางวัลภารกิจ 8 เหรียญ บวกเหรียญปกติของการตอบถูกอีกเล็กน้อย
+    if (p.coins < before + 8 || p.questsDone !== 1) throw new Error(`รางวัลภารกิจไม่ถูก (${before} → ${p.coins}, ${p.questsDone})`)
+    // ทำแล้ววันนี้ แตะอีกครั้งต้องได้เคล็ดลับแทน
+    await page.getByTestId('mh-npc-bear').evaluate((el) => el.click())
+    if (await page.getByTestId('mh-quest-accept').isVisible().catch(() => false)) throw new Error('ทำแล้วยังรับภารกิจซ้ำได้')
+  })
+
+  await step(`[${name}] โต๊ะนับเงิน: วางเงิน เห็นยอดรวม แล้วแลกให้น้อยชิ้นที่สุด`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-sandbox').click()
+    for (const id of ['b10', 'b10', 'b5', 'b5', 's50', 's50']) await page.getByTestId(`mh-sandbox-add-${id}`).click()
+    await page.getByTestId('mh-sandbox-total').getByText('31 บาท').first().waitFor()
+    await page.getByTestId('mh-sandbox-tidy').click()
+    await page.getByText('จาก 6 ชิ้น เหลือ 3 ชิ้น').waitFor()
+    await snap(page, `${name}-sandbox`)
+    await noSideScroll(page, 'โต๊ะนับเงิน')
+  })
+
+  await step(`[${name}] ร้านของฮีโร่: ซื้อดอกไม้ติดผมและลูกเจี๊ยบ แล้วลูกเจี๊ยบเดินตามบนแผนที่`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-shop').click()
+    await page.getByTestId('mh-shop-wallet').waitFor()
+    await noSideScroll(page, 'ร้านของฮีโร่')
+    const before = (await savedPlayer(page)).coins
+    await page.getByTestId('mh-buy-hat-flower').click()
+    await page.getByTestId('mh-wear-hat-flower').waitFor()
+    await page.getByTestId('mh-shop-tab-pet').click()
+    await page.getByTestId('mh-buy-pet-chick').click()
+    await page.getByTestId('mh-wear-pet-chick').waitFor()
+    await page.getByText('เหลือ').first().waitFor()
+    await snap(page, `${name}-shop`)
+    const p = await savedPlayer(page)
+    if (p.coins !== before - 40) throw new Error(`เหรียญไม่ถูกตัด (${before} → ${p.coins})`)
+    if (p.wear.hat !== 'hat-flower' || p.wear.pet !== 'pet-chick') throw new Error(`ไม่ได้สวม: ${JSON.stringify(p.wear)}`)
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-pet').waitFor()
+    await snap(page, `${name}-map-pet`)
+  })
+
   await step(`[${name}] หน้าตรา โปรไฟล์ และแผงคุณครู (ดาวน์โหลด CSV ได้)`, async () => {
     await page.goto(`${BASE}#/badges`)
     await page.getByTestId('mh-badge-pretest').waitFor()

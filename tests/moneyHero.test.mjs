@@ -34,6 +34,9 @@ const town = load('data/town.js')
 const progress = load('engine/progress.js')
 const report = load('engine/report.js')
 const hunt = load('engine/coinHunt.js')
+const daily = load('engine/daily.js')
+const quest = load('engine/npcQuest.js')
+const sandbox = load('engine/sandbox.js')
 
 let passed = 0
 const failures = []
@@ -587,6 +590,93 @@ test('ล่าเหรียญ AR: ทุกรอบมีทางเก็
   const more = hunt.checkHunt(150, ['b1', 's50', 's25'])
   assert(!more.ok && more.diff === 25 && more.message.includes('เกินมา 25 สตางค์'), more.message)
   assert(!hunt.checkHunt(100, []).ok, 'ยังไม่เก็บอะไรต้องไม่ผ่าน')
+})
+
+test('ร้านของฮีโร่: ซื้อได้เมื่อเหรียญพอ บอกจำนวนที่ขาด และสวม/ถอดได้', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  p = { ...p, coins: 12 }
+  const short = progress.buyItem(p, 'hat-cap')
+  assert(!short.ok && short.reason === 'short' && short.short === 3, `ต้องบอกว่าขาด 3 เหรียญ: ${JSON.stringify(short)}`)
+  const ok = progress.buyItem(p, 'hat-flower')
+  assert(ok.ok, 'เหรียญพอแต่ซื้อไม่ได้')
+  eq(ok.left, 2, 'เหรียญที่เหลือ')
+  p = ok.player
+  eq(p.coins, 2, 'ต้องตัดเหรียญ')
+  eq(p.wear.hat, 'hat-flower', 'ซื้อแล้วต้องสวมให้ทันที')
+  assert(progress.newBadges(p).includes('shopper'), 'ซื้อชิ้นแรกต้องได้ตรานักช้อปตัวน้อย')
+  const again = progress.buyItem({ ...p, coins: 99 }, 'hat-flower')
+  assert(!again.ok && again.reason === 'owned', 'ซื้อซ้ำต้องไม่ได้')
+  p = progress.toggleWear(p, 'hat-flower')
+  eq(p.wear.hat, undefined, 'กดซ้ำต้องถอด')
+  eq(progress.toggleWear(p, 'pet-piggy'), p, 'ของที่ยังไม่ได้ซื้อสวมไม่ได้')
+  assert(!progress.buyItem(p, 'ไม่มีจริง').ok, 'ของที่ไม่มีในร้านต้องซื้อไม่ได้')
+  // บันทึกเก่าที่ยังไม่มีข้อมูลร้านต้องเปิดได้
+  const old = progress.parseSave(JSON.stringify({ players: { a: { id: 'a', name: 'เก่า' } } }))
+  eq(old.players.a.owned.length, 0, 'บันทึกเก่าต้องมีคลังของว่าง')
+})
+
+test('ภารกิจประจำวัน: สตรีคต่อเมื่อทำวันถัดไป ขาดแล้วเริ่มใหม่ และโจทย์วันเดียวกันได้ชุดเดิม', () => {
+  eq(daily.shiftDay('2026-12-31', 1), '2027-01-01', 'ข้ามปี')
+  eq(daily.shiftDay('2026-03-01', -1), '2026-02-28', 'ย้อนเดือน')
+  let d = daily.recordDaily(undefined, '2026-10-05')
+  eq(d.streak, 1, 'วันแรก')
+  eq(daily.recordDaily(d, '2026-10-05'), d, 'ทำซ้ำวันเดียวกันต้องไม่นับเพิ่ม')
+  d = daily.recordDaily(d, '2026-10-06')
+  d = daily.recordDaily(d, '2026-10-07')
+  eq(d.streak, 3, 'ติดกัน 3 วัน')
+  eq(daily.liveStreak(d, '2026-10-08'), 3, 'วันถัดไปยังไม่ทำ สตรีคยังอยู่')
+  eq(daily.liveStreak(d, '2026-10-09'), 0, 'ขาดไปวันหนึ่ง สตรีคหาย')
+  d = daily.recordDaily(d, '2026-10-10')
+  eq(d.streak, 1, 'ขาดแล้วเริ่มนับใหม่')
+  eq(d.best, 3, 'สถิติสูงสุดยังอยู่')
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  p = { ...p, daily: { last: '2026-10-07', streak: 3, best: 3, days: [] } }
+  assert(progress.newBadges(p).includes('daily3'), 'ติดกัน 3 วันต้องได้ตราขยันทุกวัน')
+  const a = daily.buildDaily(p, '2026-10-07').map((q) => q.title + JSON.stringify(q.answer ?? null))
+  const b = daily.buildDaily(p, '2026-10-07').map((q) => q.title + JSON.stringify(q.answer ?? null))
+  eq(a.join('|'), b.join('|'), 'วันเดียวกันต้องได้โจทย์ชุดเดิม')
+  eq(a.length, daily.DAILY_COUNT, 'จำนวนข้อ')
+  for (const q of daily.buildDaily(p, '2026-10-08')) validateQuestion(q, `ภารกิจประจำวัน ${q.gen}`)
+  // ผ่านด่าน 7 แล้ว ต้องออกโจทย์จากด่านที่ผ่าน
+  p = { ...p, levels: { 7: { ...progress.emptyLevel(), stepDone: 4 } } }
+  eq(daily.dailyLevels(p).join(','), '7', 'ใช้ด่านที่ผ่านแล้ว')
+  assert(daily.dailyReward(10).coins === 20, 'โบนัสสตรีคสูงสุด +10')
+})
+
+test('ภารกิจจากเพื่อนในเมือง: วันละครั้งต่อเพื่อน ได้รางวัลเมื่อตอบถูก', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  for (const npc of ['rabbit', 'fox', 'bear', 'owl']) {
+    for (let i = 0; i < 50; i += 1) {
+      const q = quest.makeQuest(npc)
+      eq(q.npc, npc, 'โจทย์ต้องเป็นของเพื่อนคนนั้น')
+      validateQuestion(q, `ภารกิจของ ${npc}`)
+    }
+  }
+  assert(quest.questAvailable(p, 'bear', '2026-10-07'), 'วันใหม่ต้องมีภารกิจ')
+  p = quest.recordQuest(p, 'bear', true, '2026-10-07')
+  eq(p.coins, quest.QUEST_REWARD.coins, 'ตอบถูกได้เหรียญ')
+  assert(!quest.questAvailable(p, 'bear', '2026-10-07'), 'ทำแล้ววันเดียวกันต้องไม่มีอีก')
+  eq(quest.recordQuest(p, 'bear', true, '2026-10-07'), p, 'ทำซ้ำวันเดียวกันต้องไม่ได้เพิ่ม')
+  assert(quest.questAvailable(p, 'bear', '2026-10-08'), 'วันถัดไปมีภารกิจใหม่')
+  const fail = quest.recordQuest(p, 'fox', false, '2026-10-07')
+  eq(fail.coins, p.coins, 'ตอบไม่ถูกไม่ได้เหรียญ')
+  assert(!quest.questAvailable(fail, 'fox', '2026-10-07'), 'ตอบไม่ถูกก็นับว่าทำแล้ววันนี้')
+  p = { ...p, questsDone: 4 }
+  assert(progress.newBadges(p).includes('helper'), 'ช่วยเพื่อน 4 ครั้งต้องได้ตรา')
+})
+
+test('โต๊ะนับเงิน: รวมยอดถูก แยกนับตามชนิด และแลกให้น้อยชิ้นที่สุดได้ยอดเท่าเดิม', () => {
+  const s = sandbox.summarize(['b1', 'b100', 's50', 'b1', 'b100'])
+  eq(s.total, 20250, 'ยอดรวม')
+  eq(s.groups[0].id, 'b100', 'ชนิดค่ามากต้องอยู่ก่อน')
+  eq(s.groups[0].count, 2, 'จำนวนใบ')
+  eq(s.groups[0].label, 'ธนบัตร 100 บาท 2 ใบ', 'ชื่อกลุ่ม')
+  for (let i = 0; i < 2000; i += 1) {
+    const total = (1 + Math.floor(Math.random() * 400000)) * 25
+    const f = sandbox.fewestPieces(total)
+    eq(f.reduce((a, id) => a + ({ s25: 25, s50: 50, b1: 100, b2: 200, b5: 500, b10: 1000, b20: 2000, b50: 5000, b100: 10000, b500: 50000, b1000: 100000 })[id], 0), total, `แลกแล้วยอดไม่เท่าเดิม (${total})`)
+  }
+  eq(sandbox.fewestPieces(18875).join(','), 'b100,b50,b20,b10,b5,b2,b1,s50,s25', '188.75 บาท แลกได้ 9 ชิ้น')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

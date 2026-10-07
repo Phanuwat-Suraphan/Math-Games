@@ -335,7 +335,7 @@ function ResultView({ level }: { level: LevelDef }) {
       <Bunting className="mh-result-bunting" count={12} />
       <div className="mh-result-banner">MISSION COMPLETE!</div>
       <div className="mh-result-cast">
-        <AvatarArt avatar={player.avatar} size={120} mood="happy" />
+        <AvatarArt avatar={player.avatar} size={120} mood="happy" wear={player.wear} pet />
         {level.npc !== 'hero' && <CharacterArt id={level.npc} size={96} mood="happy" />}
       </div>
       <div className="mh-result-stars" aria-label={`ได้ ${stars} ดาว`}>

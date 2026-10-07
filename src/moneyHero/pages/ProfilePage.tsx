@@ -39,7 +39,7 @@ export function ProfilePage() {
         <div className="mh-profile">
           <div className="mh-card mh-profile-card" data-testid="mh-profile">
             <div className="mh-pedestal">
-              <AvatarArt avatar={player.avatar} size={150} />
+              <AvatarArt avatar={player.avatar} size={150} wear={player.wear} pet />
             </div>
             {editing ? (
               <form

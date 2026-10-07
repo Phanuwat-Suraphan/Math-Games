@@ -10,6 +10,7 @@ import {
 } from '../engine/progress'
 import { badgeById } from '../data/badges'
 import { setSoundEnabled } from '../utils/sound'
+import { setMusicEnabled, wantMusic } from '../utils/music'
 import { setSpeechEnabled } from '../utils/speech'
 
 /**
@@ -51,6 +52,7 @@ export function GameProvider({ children }: { children?: ReactNode }) {
 
   useEffect(() => {
     setSoundEnabled(save.settings.sound)
+    setMusicEnabled(save.settings.music && save.settings.sound)
     setSpeechEnabled(save.settings.speech)
     document.documentElement.classList.toggle('mh-reduce-motion', save.settings.reduceMotion)
     document.documentElement.classList.toggle('mh-big-text', save.settings.bigText)
@@ -137,4 +139,12 @@ export function useGame(): GameApi {
   const ctx = useContext(GameContext)
   if (!ctx) throw new Error('useGame ต้องใช้ภายใน GameProvider')
   return ctx
+}
+
+/** เปิดเพลงประกอบระหว่างที่หน้านี้แสดงอยู่ (ปิดเองเมื่อออกจากหน้า) */
+export function useMusic(): void {
+  useEffect(() => {
+    wantMusic(true)
+    return () => wantMusic(false)
+  }, [])
 }

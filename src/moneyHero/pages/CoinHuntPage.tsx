@@ -259,7 +259,7 @@ export function CoinHuntPage() {
             </div>
             {result && (
               <div className={`mh-ar-result ${result.ok ? 'is-ok' : 'is-off'}`} data-testid={result.ok ? 'mh-ar-right' : 'mh-ar-wrong'} role="status">
-                {result.ok ? <AvatarArt avatar={player.avatar} size={52} mood="happy" /> : <CharacterArt id="fox" size={48} mood="think" />}
+                {result.ok ? <AvatarArt avatar={player.avatar} size={52} mood="happy" wear={player.wear} /> : <CharacterArt id="fox" size={48} mood="think" />}
                 <span>
                   {result.message}
                   {result.ok && (
@@ -303,7 +303,7 @@ export function CoinHuntPage() {
           <Confetti />
           <div className="mh-result-banner">เก่งมาก!</div>
           <div className="mh-result-cast">
-            <AvatarArt avatar={player.avatar} size={110} mood="happy" />
+            <AvatarArt avatar={player.avatar} size={110} mood="happy" wear={player.wear} pet />
             <CharacterArt id="rabbit" size={88} mood="happy" />
           </div>
           <Stars n={cleared >= HUNT_ROUNDS ? 3 : cleared >= 3 ? 2 : 1} size={56} reveal />

@@ -270,7 +270,7 @@ export function StepRunner({
       {phase === 'right' && (
         <div className="mh-feedback mh-feedback-right" data-testid="mh-feedback" role="status" ref={feedbackRef}>
           <Burst />
-          {player && <AvatarArt avatar={player.avatar} size={68} mood="happy" className="mh-feedback-char" />}
+          {player && <AvatarArt avatar={player.avatar} size={68} mood="happy" wear={player.wear} className="mh-feedback-char" />}
           <div className="mh-feedback-head">
             <span className="mh-feedback-icon" aria-hidden="true">
               ✔
