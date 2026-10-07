@@ -46,6 +46,7 @@ const bosses = load('data/bosses.js')
 const missions = load('data/missions.js')
 const practice = load('data/practice.js')
 const stages = load('engine/stages.js')
+const speech = load('utils/speech.js')
 
 let passed = 0
 const failures = []
@@ -1231,6 +1232,28 @@ test('ด่านย่อย X-2 / X-3: โจทย์ครบทุกด�
   delete old.stages
   const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
   eq(JSON.stringify(save.players[old.id].stages), '{}', 'บันทึกเก่าได้ stages ว่าง')
+})
+
+test('เสียงพูดภาษาไทย: อ่านเป็นคำไทยล้วน ไม่อ่านอีโมจิ และเลือกเสียงไทยเสมอ', () => {
+  const sp = speech.spoken
+  eq(sp('ราคา 25.50 บาท'), 'ราคา 25 บาท 50 สตางค์', 'อ่านบาทสตางค์')
+  eq(sp('ได้ +10 EXP ⭐🎈🔥'), 'ได้ +10 แต้มประสบการณ์', 'คำอังกฤษเป็นไทย ตัดอีโมจิ')
+  eq(sp('5 × 3 = 15'), '5 คูณ 3 เท่ากับ 15', 'อ่านเครื่องหมายคูณ')
+  eq(sp('20 − 5'), '20 ลบ 5', 'อ่านเครื่องหมายลบ')
+  eq(sp('12 ÷ 4'), '12 หาร 4', 'อ่านเครื่องหมายหาร')
+  eq(sp('ถูก 3/4 ข้อ'), 'ถูก 3 จาก 4 ข้อ', 'อ่านเศษส่วนจำนวนข้อ')
+  eq(sp('👾 BOSS · MISSION COMPLETE!'), 'บอส ภารกิจสำเร็จ!', 'ชื่อขั้นเป็นไทย')
+  eq(sp('ยินดีต้อนรับสู่ MONEY HERO'), 'ยินดีต้อนรับสู่ มันนี่ฮีโร่', 'ชื่อเกม')
+  eq(sp('🎉🎉'), '', 'มีแต่อีโมจิไม่ต้องพูด')
+  // คำชมและกำลังใจทุกประโยคไม่มีตัวอักษรอังกฤษหลุดไปให้เสียงอ่าน
+  const chars = load('data/characters.js')
+  for (const line of [...chars.PRAISE, ...chars.ENCOURAGE]) assert(!/[A-Za-z]/.test(sp(line)), `มีคำอังกฤษ: ${line}`)
+  // เลือกเสียง
+  const v = (name, lang, localService = false) => ({ name, lang, localService })
+  eq(speech.pickThaiVoice([v('Samantha', 'en-US'), v('Daniel', 'en-GB')]), null, 'ไม่มีเสียงไทย')
+  eq(speech.pickThaiVoice([v('Samantha', 'en-US'), v('Kanya', 'th-TH')]).name, 'Kanya', 'เลือกเสียงไทย')
+  eq(speech.pickThaiVoice([v('Microsoft Pattara', 'th-TH', true), v('Google ไทย', 'th_TH')]).name, 'Google ไทย', 'เสียงคุณภาพสูงก่อน รองรับ th_TH')
+  eq(speech.pickThaiVoice([v('Narisa', 'th-TH'), v('Narisa (Premium)', 'th-TH')]).name, 'Narisa (Premium)', 'Premium ก่อน')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
