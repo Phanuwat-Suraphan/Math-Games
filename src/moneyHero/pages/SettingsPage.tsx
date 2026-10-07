@@ -8,6 +8,7 @@ import { speak } from '../utils/speech'
 
 const OPTIONS: { key: keyof Settings; icon: string; label: string; note: string }[] = [
   { key: 'sound', icon: '🔊', label: 'เสียงประกอบ', note: 'เสียงกดปุ่ม ตอบถูก รับเหรียญ' },
+  { key: 'music', icon: '🎵', label: 'เพลงประกอบ', note: 'เพลงเบา ๆ บนหน้าแรกและแผนที่ (ตอนทำโจทย์จะเงียบ)' },
   { key: 'speech', icon: '🗣️', label: 'อ่านโจทย์ให้ฟัง', note: 'กดปุ่ม 🔈 แล้วเกมจะอ่านโจทย์' },
   { key: 'bigText', icon: '🔠', label: 'ตัวหนังสือใหญ่', note: 'อ่านง่ายขึ้น' },
   { key: 'reduceMotion', icon: '🐢', label: 'ลดภาพเคลื่อนไหว', note: 'สำหรับเครื่องช้า หรือเด็กที่ตาลาย' },

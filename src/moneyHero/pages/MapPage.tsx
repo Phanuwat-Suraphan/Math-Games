@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as
 import { Link, useNavigate } from 'react-router-dom'
 import { List } from 'lucide-react'
 import type { NpcId, Question } from '../engine/types'
-import { useGame } from '../hooks/useMoneyGame'
+import { useGame, useMusic } from '../hooks/useMoneyGame'
 import { LEVELS, TOTAL_LESSONS, type LevelDef } from '../data/levels'
 import { CHARACTERS } from '../data/characters'
 import {
@@ -81,6 +81,7 @@ function startPoint(mapX?: number, mapY?: number, next = 0): Pt {
 export function MapPage() {
   const { player, updatePlayer } = useGame()
   const navigate = useNavigate()
+  useMusic()
   const viewRef = useRef<HTMLDivElement>(null)
   const worldRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)

@@ -86,6 +86,8 @@ export interface Player {
 
 export interface Settings {
   sound: boolean
+  /** เพลงประกอบเบา ๆ บนหน้าเริ่มเกมและแผนที่ */
+  music: boolean
   speech: boolean
   reduceMotion: boolean
   bigText: boolean
@@ -98,7 +100,7 @@ export interface SaveData {
   settings: Settings
 }
 
-export const DEFAULT_SETTINGS: Settings = { sound: true, speech: true, reduceMotion: false, bigText: false }
+export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, reduceMotion: false, bigText: false }
 
 export function emptySkills(): Record<Skill, SkillStat> {
   const out = {} as Record<Skill, SkillStat>

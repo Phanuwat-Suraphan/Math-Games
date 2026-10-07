@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { GraduationCap, Settings, UserPlus, Users, Volume2, VolumeX } from 'lucide-react'
-import { useGame } from '../hooks/useMoneyGame'
+import { GraduationCap, Music, Settings, UserPlus, Users, Volume2, VolumeX } from 'lucide-react'
+import { useGame, useMusic } from '../hooks/useMoneyGame'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { Sky } from '../components/Sky'
 import { LogoLetters } from '../components/LogoLetters'
@@ -15,6 +15,7 @@ import { playSound } from '../utils/sound'
  */
 export function StartPage() {
   const { player, save, settings, updateSettings } = useGame()
+  useMusic()
   const navigate = useNavigate()
   // มีผู้เล่นในเครื่องแล้ว ให้เปลี่ยนหรือลบผู้เล่นได้เสมอ
   const hasOthers = Object.keys(save.players).length > 0
@@ -30,6 +31,15 @@ export function StartPage() {
       <div className="mh-start-top">
         <span className="mh-start-badge">🎓 คณิตศาสตร์ ป.3 · เรื่องเงิน</span>
         <div className="mh-topbar-nav">
+          <button
+            type="button"
+            className={`mh-icon-btn ${settings.music ? '' : 'is-off'}`}
+            onClick={() => updateSettings({ music: !settings.music })}
+            aria-label={settings.music ? 'ปิดเพลง' : 'เปิดเพลง'}
+            data-testid="mh-music"
+          >
+            <Music size={24} />
+          </button>
           <button
             type="button"
             className={`mh-icon-btn ${settings.sound ? '' : 'is-off'}`}
