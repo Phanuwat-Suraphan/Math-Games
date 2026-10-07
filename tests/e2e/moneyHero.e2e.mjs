@@ -903,6 +903,22 @@ for (const [name, viewport] of [
     if (sound !== false) throw new Error('กดปิดเสียงแล้วค่าไม่ถูกบันทึก')
   })
 
+  await step(`[${name}] เสียงพูดภาษาไทย: หน้าตั้งค่าบอกสถานะเสียงไทย และปุ่มทดลองพูดเป็นภาษาไทย`, async () => {
+    await page.goto(`${BASE}#/settings`)
+    await page.getByTestId('mh-voice-status').waitFor()
+    // จับข้อความที่ส่งให้เครื่องพูด แทนการเปิดเสียงจริง
+    await page.evaluate(() => {
+      window.__MH_SPOKEN = []
+      window.speechSynthesis.speak = (u) => window.__MH_SPOKEN.push({ text: u.text, lang: u.lang })
+    })
+    await page.getByTestId('mh-voice-test').click()
+    await page.waitForFunction(() => window.__MH_SPOKEN.length > 0, null, { timeout: 3000 })
+    const said = await page.evaluate(() => window.__MH_SPOKEN[0])
+    if (said.lang !== 'th-TH') throw new Error(`เสียงพูดไม่ได้ตั้งเป็นภาษาไทย: ${said.lang}`)
+    if (/[A-Za-z]/.test(said.text)) throw new Error(`เสียงพูดมีคำภาษาอังกฤษ: ${said.text}`)
+    await snap(page, `${name}-settings-voice`)
+  })
+
   await page.context().close()
 }
 

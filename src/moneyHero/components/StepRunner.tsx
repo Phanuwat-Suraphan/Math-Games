@@ -218,6 +218,15 @@ export function StepRunner({
   const praise = useMemo(() => pick(PRAISE), [index, phase])
   const encourage = useMemo(() => pick(ENCOURAGE), [index, attempt])
 
+  // ตัวละครพูดเป็นเสียงภาษาไทยหลังตอบ (แบบทดสอบไม่บอกถูกผิด จึงไม่พูด)
+  useEffect(() => {
+    if (isTest || phase === 'answer') return
+    if (phase === 'right') speak(praise)
+    else if (phase === 'wrong') speak(`ลองคิดอีกครั้งนะ ${result?.feedback ?? encourage}`)
+    else speak('เก่งมากที่ลองคิดเอง มาดูวิธีคิดทีละขั้นกัน')
+    // พูดครั้งเดียวต่อการตอบ
+  }, [phase, index])
+
   if (!q) return null
   const explain = result?.explain ?? q.explain
   const progress = Math.round((index / items.length) * 100)

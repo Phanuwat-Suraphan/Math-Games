@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import type { Settings } from '../engine/progress'
 import { Sky } from '../components/Sky'
-import { speak } from '../utils/speech'
+import { hasThaiVoice, onVoicesChanged, speak, speechAvailable } from '../utils/speech'
 
 const OPTIONS: { key: keyof Settings; icon: string; label: string; note: string }[] = [
   { key: 'sound', icon: '🔊', label: 'เสียงประกอบ', note: 'เสียงกดปุ่ม ตอบถูก รับเหรียญ' },
   { key: 'music', icon: '🎵', label: 'เพลงประกอบ', note: 'เพลงเบา ๆ บนหน้าแรกและแผนที่ (ตอนทำโจทย์จะเงียบ)' },
-  { key: 'speech', icon: '🗣️', label: 'อ่านโจทย์ให้ฟัง', note: 'กดปุ่ม 🔈 แล้วเกมจะอ่านโจทย์' },
+  { key: 'speech', icon: '🗣️', label: 'เสียงพูดภาษาไทย', note: 'ตัวละครพูดชมเมื่อตอบ และกดปุ่ม 🔈 ให้อ่านโจทย์ บทเรียน' },
   { key: 'bigText', icon: '🔠', label: 'ตัวหนังสือใหญ่', note: 'อ่านง่ายขึ้น' },
   { key: 'reduceMotion', icon: '🐢', label: 'ลดภาพเคลื่อนไหว', note: 'สำหรับเครื่องช้า หรือเด็กที่ตาลาย' },
 ]
@@ -18,6 +18,8 @@ export function SettingsPage() {
   const { settings, updateSettings, resetAll, player } = useGame()
   const navigate = useNavigate()
   const [confirm, setConfirm] = useState(false)
+  const [thai, setThai] = useState(hasThaiVoice())
+  useEffect(() => onVoicesChanged(() => setThai(hasThaiVoice())), [])
 
   return (
     <div className="mh-page mh-page-narrow">
@@ -43,11 +45,33 @@ export function SettingsPage() {
               checked={settings[o.key]}
               onChange={(e) => {
                 updateSettings({ [o.key]: e.target.checked })
-                if (o.key === 'speech' && e.target.checked) window.setTimeout(() => speak('สวัสดีจ้ะ'), 50)
+                if (o.key === 'speech' && e.target.checked) window.setTimeout(() => speak('สวัสดีจ้ะ เปิดเสียงพูดภาษาไทยแล้ว'), 50)
               }}
             />
           </label>
         ))}
+        {settings.speech && (
+          <div className={`mh-voice-status ${thai ? 'is-ok' : 'is-missing'}`} data-testid="mh-voice-status">
+            {!speechAvailable() ? (
+              <span>เบราว์เซอร์นี้ไม่รองรับเสียงพูด ลองเปิดเกมด้วย Chrome หรือ Safari</span>
+            ) : thai ? (
+              <span>✅ เครื่องนี้มีเสียงพูดภาษาไทยแล้ว</span>
+            ) : (
+              <>
+                <b>⚠️ เครื่องนี้ยังไม่มีเสียงพูดภาษาไทย</b>
+                <span>เพิ่มเสียงไทยในเครื่องก่อน แล้วเปิดเกมใหม่:</span>
+                <ul>
+                  <li>แท็บเล็ต / มือถือ Android: ตั้งค่า → การช่วยเหลือพิเศษ → เอาต์พุตการอ่านออกเสียง → ติดตั้งข้อมูลเสียง → ภาษาไทย</li>
+                  <li>iPad / iPhone: ตั้งค่า → การช่วยการเข้าถึง → เนื้อหาที่พูด → เสียง → ไทย</li>
+                  <li>คอมพิวเตอร์ Windows: Settings → Time &amp; language → Speech → Add voices → ไทย</li>
+                </ul>
+              </>
+            )}
+            <button type="button" className="mh-btn mh-btn-soft" data-testid="mh-voice-test" onClick={() => speak('สวัสดีจ้ะ ฉันคือมันนี่ฮีโร่ มาเรียนเรื่องเงินด้วยกันนะ')}>
+              🔈 ทดลองฟังเสียง
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mh-card mh-settings">
