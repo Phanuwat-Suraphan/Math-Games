@@ -66,6 +66,7 @@
     "src/moneyHero/engine/**/*.ts",
     "src/moneyHero/utils/**/*.ts",
     "src/moneyHero/data/**/*.ts",
-    "src/moneyHero/generators/**/*.ts"
+    "src/moneyHero/generators/**/*.ts",
+    "src/moneyHero/kad/**/*.ts"
   ]
 }

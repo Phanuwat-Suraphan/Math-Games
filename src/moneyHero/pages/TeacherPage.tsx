@@ -50,6 +50,9 @@ export function TeacherPage() {
         </Link>
         <h1 className="mh-title">🍎 แผงคุณครู</h1>
         <div className="mh-teacher-actions">
+          <Link to="/kad" className="mh-btn mh-btn-go" data-testid="mh-teacher-kad">
+            🌱 กาดรักษ์โลก (สื่อพิมพ์)
+          </Link>
           <Link to="/sandbox" className="mh-btn mh-btn-soft">
             🧮 โต๊ะนับเงิน (สาธิต)
           </Link>
