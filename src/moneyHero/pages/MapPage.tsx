@@ -667,6 +667,9 @@ export function MapPage() {
         <Link to="/stats" className="mh-menu-tile">
           <span aria-hidden="true">📊</span>สถิติ
         </Link>
+        <Link to="/sandbox" className="mh-menu-tile mh-menu-sandbox" data-testid="mh-menu-sandbox">
+          <span aria-hidden="true">🧮</span>โต๊ะนับเงิน
+        </Link>
         <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
           <span aria-hidden="true">🛍️</span>ร้านของฮีโร่
         </Link>

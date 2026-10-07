@@ -534,6 +534,17 @@ for (const [name, viewport] of [
     if (await page.getByTestId('mh-quest-accept').isVisible().catch(() => false)) throw new Error('ทำแล้วยังรับภารกิจซ้ำได้')
   })
 
+  await step(`[${name}] โต๊ะนับเงิน: วางเงิน เห็นยอดรวม แล้วแลกให้น้อยชิ้นที่สุด`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-sandbox').click()
+    for (const id of ['b10', 'b10', 'b5', 'b5', 's50', 's50']) await page.getByTestId(`mh-sandbox-add-${id}`).click()
+    await page.getByTestId('mh-sandbox-total').getByText('31 บาท').first().waitFor()
+    await page.getByTestId('mh-sandbox-tidy').click()
+    await page.getByText('จาก 6 ชิ้น เหลือ 3 ชิ้น').waitFor()
+    await snap(page, `${name}-sandbox`)
+    await noSideScroll(page, 'โต๊ะนับเงิน')
+  })
+
   await step(`[${name}] ร้านของฮีโร่: ซื้อดอกไม้ติดผมและลูกเจี๊ยบ แล้วลูกเจี๊ยบเดินตามบนแผนที่`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-shop').click()

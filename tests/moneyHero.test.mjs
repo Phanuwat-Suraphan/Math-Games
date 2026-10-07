@@ -36,6 +36,7 @@ const report = load('engine/report.js')
 const hunt = load('engine/coinHunt.js')
 const daily = load('engine/daily.js')
 const quest = load('engine/npcQuest.js')
+const sandbox = load('engine/sandbox.js')
 
 let passed = 0
 const failures = []
@@ -662,6 +663,20 @@ test('ภารกิจจากเพื่อนในเมือง: วั
   assert(!quest.questAvailable(fail, 'fox', '2026-10-07'), 'ตอบไม่ถูกก็นับว่าทำแล้ววันนี้')
   p = { ...p, questsDone: 4 }
   assert(progress.newBadges(p).includes('helper'), 'ช่วยเพื่อน 4 ครั้งต้องได้ตรา')
+})
+
+test('โต๊ะนับเงิน: รวมยอดถูก แยกนับตามชนิด และแลกให้น้อยชิ้นที่สุดได้ยอดเท่าเดิม', () => {
+  const s = sandbox.summarize(['b1', 'b100', 's50', 'b1', 'b100'])
+  eq(s.total, 20250, 'ยอดรวม')
+  eq(s.groups[0].id, 'b100', 'ชนิดค่ามากต้องอยู่ก่อน')
+  eq(s.groups[0].count, 2, 'จำนวนใบ')
+  eq(s.groups[0].label, 'ธนบัตร 100 บาท 2 ใบ', 'ชื่อกลุ่ม')
+  for (let i = 0; i < 2000; i += 1) {
+    const total = (1 + Math.floor(Math.random() * 400000)) * 25
+    const f = sandbox.fewestPieces(total)
+    eq(f.reduce((a, id) => a + ({ s25: 25, s50: 50, b1: 100, b2: 200, b5: 500, b10: 1000, b20: 2000, b50: 5000, b100: 10000, b500: 50000, b1000: 100000 })[id], 0), total, `แลกแล้วยอดไม่เท่าเดิม (${total})`)
+  }
+  eq(sandbox.fewestPieces(18875).join(','), 'b100,b50,b20,b10,b5,b2,b1,s50,s25', '188.75 บาท แลกได้ 9 ชิ้น')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

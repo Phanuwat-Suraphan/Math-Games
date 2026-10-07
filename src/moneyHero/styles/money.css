@@ -4622,7 +4622,7 @@ button:disabled {
 
 .mh-map-menu {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 10px;
   margin: 12px 0;
 }
@@ -5169,6 +5169,7 @@ button:disabled {
 .mh-teacher-actions {
   margin-left: auto;
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -6065,11 +6066,7 @@ button:disabled {
   border-color: #ffe08a;
 }
 
-@media (max-width: 640px) {
-  .mh-map-menu {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
+
 
 .mh-pet-svg {
   width: 100%;
@@ -6443,4 +6440,109 @@ button.mh-town-npc {
   font-weight: 700;
   font-size: 1.25em;
   margin-bottom: 8px;
+}
+
+/* ================================================================== */
+/* โต๊ะนับเงิน                                                         */
+/* ================================================================== */
+
+.mh-menu-sandbox {
+  background: linear-gradient(180deg, #ecfff4, #c9f2da);
+  border-color: #b4ecc9;
+}
+
+.mh-sandbox-total {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.mh-sandbox-big {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: clamp(1.6em, 5vw, 2.4em);
+  color: var(--mh-purple);
+  line-height: 1.15;
+}
+
+.mh-sandbox-dot {
+  font-size: 0.95em;
+}
+
+.mh-sandbox-note {
+  margin: 4px 0 0;
+}
+
+.mh-sandbox-mat {
+  margin: 14px 0;
+  min-height: 150px;
+  padding: 14px;
+  border-radius: 24px;
+  background: repeating-linear-gradient(45deg, #2f8a4b 0 14px, #349451 14px 28px);
+  border: 6px solid #a8643a;
+  box-shadow: inset 0 6px 14px rgba(0, 0, 0, 0.25), 0 8px 0 #7d4521;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: flex-start;
+  gap: 6px;
+}
+
+.mh-sandbox-empty {
+  color: #d9ffe6;
+  font-weight: 700;
+  margin: auto;
+}
+
+.mh-sandbox-piece {
+  border: none;
+  background: none;
+  padding: 2px;
+  animation: mh-pop-in 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+.mh-sandbox-groups ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.mh-sandbox-groups li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px dashed var(--mh-line);
+}
+
+.mh-sandbox-groups li.is-total {
+  border-bottom: none;
+  font-size: 1.1em;
+  color: var(--mh-purple);
+}
+
+.mh-sandbox-drawer {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+
+.mh-sandbox-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 96px;
+  padding: 8px 4px;
+  border-radius: 16px;
+  border: 2px solid #f0e8ff;
+  background: #fff;
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.mh-sandbox-pick:active {
+  transform: scale(0.94);
 }
