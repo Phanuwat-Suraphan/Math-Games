@@ -673,6 +673,37 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] แดชบอร์ดตลาดนัด: จดเงินกลุ่ม คิดกำไร ต้นไม้ของห้องโต และคิดเงินทอน`, async () => {
+    await page.goto(`${BASE}#/kad`)
+    await page.getByTestId('kad-to-class').click()
+    await page.getByTestId('kad-class-page').waitFor()
+    await noSideScroll(page, 'แดชบอร์ดตลาดนัด')
+    // กลุ่ม Green Garden: ขายขยะ 40 ซื้ออุปกรณ์ 20 ขายกระถาง 45 → กำไร 25 คงเหลือ 165
+    const add = async (kind, amount) => {
+      await page.getByTestId(`kad-kind-garden-${kind}`).click()
+      await page.getByTestId('kad-amount-garden').fill(String(amount))
+      await page.getByTestId('kad-add-garden').click()
+    }
+    await add('trash', 40)
+    await add('buy', 20)
+    await add('sale', 45)
+    await page.getByTestId('kad-profit-garden').getByText('กำไร 25 บาท').waitFor()
+    await page.getByTestId('kad-balance-garden').getByText('165 บาท').waitFor()
+    await page.getByTestId('kad-class-sales').getByText('45 บาท').waitFor()
+    await page.getByTestId('kad-class-next').getByText('อีก 55 บาท').waitFor()
+    // ขายอีก 60 บาท ยอดรวม 105 → ปลดล็อกต้นไม้ต้นแรก
+    await add('sale', 60)
+    await page.getByTestId('kad-class-next').getByText('อีก 95 บาท').waitFor()
+    // เครื่องคิดเงินทอน: 35 บาท จ่าย 50 → ทอน 15
+    await page.getByTestId('kad-change-price').fill('35')
+    await page.getByTestId('kad-change-paid').fill('50')
+    await page.getByTestId('kad-change-result').getByText('ทอน 15 บาท').waitFor()
+    await snap(page, `${name}-kad-class`)
+    // รีเฟรชแล้วข้อมูลยังอยู่
+    await page.reload()
+    await page.getByTestId('kad-balance-garden').getByText('225 บาท').waitFor()
+  })
+
   await step(`[${name}] ปุ่มบนหน้าเริ่มเกมไม่มีทางตัน`, async () => {
     for (const label of ['โหมดคุณครู', 'เปลี่ยนผู้เล่น']) {
       await page.goto(`${BASE}#/start`)

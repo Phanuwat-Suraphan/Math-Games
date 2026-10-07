@@ -861,7 +861,7 @@ export function DocSheets() {
 /* ชุดที่ 8 ภารกิจและรางวัล                                              */
 /* ------------------------------------------------------------------ */
 
-function TreeStage({ stage }: { stage: number }) {
+export function TreeStage({ stage }: { stage: number }) {
   return (
     <svg viewBox="0 0 80 80" className="kad-tree" aria-hidden="true">
       <ellipse cx="40" cy="74" rx="30" ry="4" fill="#2b2350" opacity="0.12" />

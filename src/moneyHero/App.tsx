@@ -19,6 +19,7 @@ import { DailyPage } from './pages/DailyPage'
 import { SandboxPage } from './pages/SandboxPage'
 import { BankPage } from './pages/BankPage'
 import { KadPage } from './kad/KadPage'
+import { KadClassPage } from './kad/KadClassPage'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
 function NeedPlayer({ children }: { children: JSX.Element }) {
@@ -142,6 +143,7 @@ export default function App() {
             <Route path="/sandbox" element={<SandboxPage />} />
             <Route path="/teacher" element={<TeacherPage />} />
             <Route path="/kad" element={<KadPage />} />
+            <Route path="/kad/class" element={<KadClassPage />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>
           <Toasts />

@@ -801,6 +801,49 @@ test('กาดรักษ์โลก: ราคาขยะ เงินจ�
   eq(kad.classProgress(300).next, null, 'ครบทุกเป้า')
 })
 
+test('แดชบอร์ดตลาดนัด: คงเหลือ กำไร ยอดขายทั้งห้อง เงินทอน และข้อมูลเสียไม่ทำให้พัง', () => {
+  // ตัวอย่างกลุ่มกระถาง: ขายขยะ 40 ซื้ออุปกรณ์ 20 ขายกระถาง 3 ใบ ใบละ 15 → กำไร 25
+  const g = {
+    ...kad.defaultGroups()[0],
+    entries: [
+      { at: 1, kind: 'trash', amount: 4000 },
+      { at: 2, kind: 'buy', amount: 2000 },
+      { at: 3, kind: 'sale', amount: 1500 },
+      { at: 4, kind: 'sale', amount: 1500 },
+      { at: 5, kind: 'sale', amount: 1500 },
+    ],
+  }
+  const s = kad.groupSummary(g)
+  eq(s.sales, 4500, 'รายได้จากการขาย')
+  eq(s.cost, 2000, 'ต้นทุน')
+  eq(s.profit, 2500, 'กำไร 25 บาท')
+  eq(s.balance, kad.START_MONEY + 4000 + 4500 - 2000, 'คงเหลือ = ตั้งต้น + รับ − จ่าย')
+  eq(s.income - s.expense + kad.START_MONEY, s.balance, 'สมการคงเหลือ')
+  const loss = kad.groupSummary({ ...g, entries: [{ at: 1, kind: 'buy', amount: 3000 }, { at: 2, kind: 'sale', amount: 1000 }] })
+  eq(loss.profit, -2000, 'ขาดทุน')
+  eq(kad.classSales([g, g]), 9000, 'ยอดขายรวมทั้งห้อง')
+  // เงินทอน: 50 − 35 = 15 → 10 + 5
+  const c = kad.changeFor(3500, 5000)
+  eq(c.change, 1500, 'เงินทอน')
+  eq(c.pieces.map((m) => m.value).join('+'), '1000+500', 'ทอนด้วย 10 + 5')
+  eq(kad.changeFor(4500, 4000).short, 500, 'เงินไม่พอ ขาดอีก 5 บาท')
+  eq(kad.changeFor(2000, 2000).pieces.length, 0, 'จ่ายพอดี')
+  for (let i = 0; i < 1000; i += 1) {
+    const price = (1 + Math.floor(Math.random() * 400)) * 50
+    const paid = price + Math.floor(Math.random() * 400) * 50
+    const r = kad.changeFor(price, paid)
+    assert(r.ok, 'ทอนไม่ได้')
+    eq(r.pieces.reduce((a, m) => a + m.value, 0), paid - price, 'ชิ้นเงินทอนรวมไม่เท่าเงินทอน')
+  }
+  // ข้อมูลเสีย / ว่าง → กลับเป็น 5 กลุ่มเริ่มต้น
+  eq(kad.parseGroups(null).length, 5, 'ไม่มีข้อมูล')
+  eq(kad.parseGroups('{พัง').length, 5, 'JSON เสีย')
+  eq(kad.parseGroups('[]').length, 5, 'ว่าง')
+  const back = kad.parseGroups(JSON.stringify([{ ...g, entries: [...g.entries, { at: 9, kind: 'hack', amount: 5 }, { at: 10, kind: 'sale', amount: -5 }] }]))
+  eq(back.length, 1, 'โหลดกลุ่มที่บันทึกไว้')
+  eq(back[0].entries.length, 5, 'ตัดรายการที่ผิดรูปแบบทิ้ง')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

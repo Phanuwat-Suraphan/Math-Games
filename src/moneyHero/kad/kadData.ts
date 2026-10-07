@@ -175,3 +175,113 @@ export function classProgress(totalBaht: number): { unlocked: number; next: (typ
   const next = CLASS_GOALS[unlocked] ?? null
   return { unlocked, next, need: next ? next.at - totalBaht : 0 }
 }
+
+/* ------------------------------------------------------------------ */
+/* แดชบอร์ดตลาดนัด (ครูจดเงินของแต่ละกลุ่มระหว่างเล่นจริง)              */
+/* ------------------------------------------------------------------ */
+
+/** ชนิดรายการ: ขายขยะ / ขายสินค้า = รายรับ · ซื้ออุปกรณ์ = รายจ่าย (ต้นทุน) · อื่น ๆ */
+export type KadEntryKind = 'trash' | 'sale' | 'buy' | 'in' | 'out'
+
+export const ENTRY_KINDS: { id: KadEntryKind; icon: string; label: string; sign: 1 | -1 }[] = [
+  { id: 'trash', icon: '♻️', label: 'ขายขยะ', sign: 1 },
+  { id: 'sale', icon: '🛍️', label: 'ขายสินค้า', sign: 1 },
+  { id: 'buy', icon: '🛒', label: 'ซื้ออุปกรณ์', sign: -1 },
+  { id: 'in', icon: '➕', label: 'รายรับอื่น', sign: 1 },
+  { id: 'out', icon: '➖', label: 'รายจ่ายอื่น', sign: -1 },
+]
+
+export interface KadEntry {
+  at: number
+  kind: KadEntryKind
+  /** สตางค์ (บวกเสมอ เครื่องหมายดูจากชนิด) */
+  amount: number
+  note?: string
+}
+
+export interface KadGroup {
+  id: string
+  name: string
+  icon: string
+  color: string
+  /** เงินตั้งต้น (สตางค์) */
+  start: number
+  entries: KadEntry[]
+}
+
+export const START_MONEY = 10000
+
+export function defaultGroups(): KadGroup[] {
+  return SHOPS.map((s) => ({ id: s.id, name: s.name, icon: s.icon, color: s.color, start: START_MONEY, entries: [] }))
+}
+
+export function kindOf(id: KadEntryKind) {
+  return ENTRY_KINDS.find((k) => k.id === id) ?? ENTRY_KINDS[0]
+}
+
+export interface GroupSummary {
+  /** รายรับรวม / รายจ่ายรวม */
+  income: number
+  expense: number
+  /** ขายขยะ / ขายสินค้า (รายได้) / ซื้ออุปกรณ์ (ต้นทุน) */
+  trash: number
+  sales: number
+  cost: number
+  /** กำไร = รายได้จากการขายสินค้า − ต้นทุน */
+  profit: number
+  /** เงินคงเหลือ = เงินตั้งต้น + รายรับ − รายจ่าย */
+  balance: number
+}
+
+export function groupSummary(g: KadGroup): GroupSummary {
+  const sum = (k: KadEntryKind) => g.entries.filter((e) => e.kind === k).reduce((s, e) => s + e.amount, 0)
+  const trash = sum('trash')
+  const sales = sum('sale')
+  const cost = sum('buy')
+  const income = trash + sales + sum('in')
+  const expense = cost + sum('out')
+  return { income, expense, trash, sales, cost, profit: sales - cost, balance: g.start + income - expense }
+}
+
+/** ยอดขายสินค้ารวมทั้งห้อง (สตางค์) ใช้ปลดล็อกต้นไม้ */
+export function classSales(groups: readonly KadGroup[]): number {
+  return groups.reduce((s, g) => s + groupSummary(g).sales, 0)
+}
+
+/** เงินทอน และทอนด้วยเงินจำลองของกาดให้น้อยชิ้นที่สุด */
+export function changeFor(price: number, paid: number): { ok: boolean; change: number; short: number; pieces: EcoMoney[] } {
+  if (paid < price) return { ok: false, change: 0, short: price - paid, pieces: [] }
+  let left = paid - price
+  const change = left
+  const pieces: EcoMoney[] = []
+  for (const m of [...ECO_MONEY].sort((a, b) => b.value - a.value)) {
+    while (left >= m.value) {
+      pieces.push(m)
+      left -= m.value
+    }
+  }
+  return { ok: left === 0, change, short: 0, pieces }
+}
+
+/** ซ่อมข้อมูลแดชบอร์ดที่โหลดมา (ข้อมูลเสียให้กลับเป็นค่าเริ่มต้น) */
+export function parseGroups(text: string | null): KadGroup[] {
+  try {
+    const raw = JSON.parse(text ?? 'null') as KadGroup[] | null
+    if (!Array.isArray(raw) || raw.length === 0) return defaultGroups()
+    const list = raw
+      .filter((g) => g && typeof g.id === 'string' && typeof g.name === 'string')
+      .map((g) => ({
+        id: g.id,
+        name: g.name.slice(0, 30),
+        icon: typeof g.icon === 'string' ? g.icon : '🏪',
+        color: typeof g.color === 'string' ? g.color : '#2f9e44',
+        start: Number.isFinite(g.start) && g.start >= 0 ? Math.round(g.start) : START_MONEY,
+        entries: (Array.isArray(g.entries) ? g.entries : []).filter(
+          (e) => e && ENTRY_KINDS.some((k) => k.id === e.kind) && Number.isFinite(e.amount) && e.amount > 0,
+        ),
+      }))
+    return list.length > 0 ? list : defaultGroups()
+  } catch {
+    return defaultGroups()
+  }
+}

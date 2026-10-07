@@ -89,6 +89,9 @@ export function KadPage() {
             <ArrowLeft size={24} />
           </Link>
           <h1 className="mh-title">🌱 กาดรักษ์โลก ป.3</h1>
+          <Link to="/kad/class" className="mh-btn mh-btn-go" data-testid="kad-to-class">
+            📺 แดชบอร์ดตลาดนัด
+          </Link>
           {!library && (
             <button type="button" className="mh-btn mh-btn-gold" onClick={() => window.print()} data-testid="kad-print">
               <Printer size={20} /> พิมพ์ชุดนี้
