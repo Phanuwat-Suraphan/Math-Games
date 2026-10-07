@@ -39,6 +39,7 @@ const quest = load('engine/npcQuest.js')
 const sandbox = load('engine/sandbox.js')
 const book = load('engine/ledger.js')
 const kad = load('kad/kadData.js')
+const pinch = load('engine/pinch.js')
 
 let passed = 0
 const failures = []
@@ -842,6 +843,60 @@ test('แดชบอร์ดตลาดนัด: คงเหลือ ก�
   const back = kad.parseGroups(JSON.stringify([{ ...g, entries: [...g.entries, { at: 9, kind: 'hack', amount: 5 }, { at: 10, kind: 'sale', amount: -5 }] }]))
   eq(back.length, 1, 'โหลดกลุ่มที่บันทึกไว้')
   eq(back[0].entries.length, 5, 'ตัดรายการที่ผิดรูปแบบทิ้ง')
+})
+
+test('AR จีบนิ้ว: วัดระยะโป้ง–ชี้เทียบฝ่ามือ จีบ/ปล่อยแบบกันสั่น และแปลงพิกัดกล้องเป็นจอถูกต้อง', () => {
+  // มือจำลอง: ข้อมือ (0) ถึงโคนนิ้วกลาง (9) ยาว 0.2 · ปลายโป้ง (4) กับปลายชี้ (8) ห่าง gap
+  const handAt = (gap, scale = 1, cx = 0.5) => {
+    const lm = Array.from({ length: 21 }, () => ({ x: cx, y: 0.5 }))
+    lm[0] = { x: cx, y: 0.5 + 0.2 * scale }
+    lm[9] = { x: cx, y: 0.5 }
+    lm[4] = { x: cx - (gap * scale) / 2, y: 0.4 }
+    lm[8] = { x: cx + (gap * scale) / 2, y: 0.4 }
+    return lm
+  }
+  assert(Math.abs(pinch.pinchRatio(handAt(0.1)) - 0.5) < 1e-9, 'อัตราส่วน = ระยะนิ้ว / ฝ่ามือ')
+  // มือใกล้หรือไกลกล้อง (ใหญ่/เล็ก) ได้อัตราส่วนเท่ากัน
+  assert(Math.abs(pinch.pinchRatio(handAt(0.05, 2)) - pinch.pinchRatio(handAt(0.05, 0.5))) < 1e-9, 'ไม่ขึ้นกับขนาดมือ')
+  eq(pinch.pinchRatio([]), Infinity, 'ไม่มีจุดมือ')
+  const c = pinch.cursorOf(handAt(0.1))
+  assert(Math.abs(c.x - 0.5) < 1e-9 && Math.abs(c.y - 0.4) < 1e-9, 'ตัวชี้อยู่กลางนิ้วโป้งกับนิ้วชี้')
+  eq(pinch.pinchProgress(1), 0, 'มือกางไม่มีความคืบหน้า')
+  eq(pinch.pinchProgress(0), 1, 'จีบสนิท = เต็ม')
+
+  // จีบต้องค้าง 2 เฟรม ได้ down ครั้งเดียว ขยับเล็กน้อยใกล้เส้นไม่สั่น และต้องกางเกิน PINCH_OFF ถึงปล่อย
+  const d = new pinch.PinchDetector()
+  const seq = [0.9, 0.2, 0.2, 0.25, 0.4, 0.3, 0.45, 0.6, 0.2, 0.2]
+  const events = seq.map((r) => d.update(r))
+  eq(events.filter((e) => e === 'down').length, 2, 'จีบสองครั้ง')
+  eq(events.filter((e) => e === 'up').length, 1, 'ปล่อยหนึ่งครั้งระหว่างกลาง')
+  eq(events[2], 'down', 'จีบเฟรมที่สองติดกันจึงนับ')
+  eq(events[7], 'up', 'ปล่อยเมื่อกางเกินเส้นปล่อย')
+  const d2 = new pinch.PinchDetector()
+  eq([0.2, 0.9, 0.2, 0.9].map((r) => d2.update(r)).filter(Boolean).length, 0, 'จีบแวบเดียวไม่นับ')
+  const d3 = new pinch.PinchDetector()
+  d3.update(0.1)
+  d3.update(0.1)
+  eq(d3.lost(), 'up', 'มือหายไประหว่างจีบ = ปล่อย')
+  eq(d3.lost(), null, 'หายซ้ำไม่ปล่อยซ้ำ')
+
+  // วิดีโอ 1280×720 แสดงแบบ cover บนจอ 400×800: กว้างเกินแล้วถูกตัดซ้ายขวา
+  const box = { left: 0, top: 0, w: 400, h: 800 }
+  const v = { w: 1280, h: 720 }
+  const mid = pinch.videoToScreen({ x: 0.5, y: 0.5 }, v, box, false)
+  assert(Math.abs(mid.x - 200) < 1e-6 && Math.abs(mid.y - 400) < 1e-6, 'กลางภาพ = กลางจอ')
+  const top = pinch.videoToScreen({ x: 0.5, y: 0 }, v, box, false)
+  assert(Math.abs(top.y) < 1e-6, 'ขอบบนภาพ = ขอบบนจอ (สูงพอดี)')
+  const a = pinch.videoToScreen({ x: 0.6, y: 0.5 }, v, box, false)
+  const m = pinch.videoToScreen({ x: 0.6, y: 0.5 }, v, box, true)
+  assert(Math.abs(a.x - 200 - (200 - m.x)) < 1e-6, 'กล้องหน้า: กลับซ้ายขวาเหมือนกระจก')
+  // เป้าหมายใกล้ที่สุดในรัศมี
+  const ts = [
+    { x: 100, y: 100, id: 'a' },
+    { x: 130, y: 100, id: 'b' },
+  ]
+  eq(pinch.nearestTarget({ x: 120, y: 100 }, ts, 60).id, 'b', 'เลือกชิ้นที่ใกล้กว่า')
+  eq(pinch.nearestTarget({ x: 300, y: 300 }, ts, 60), null, 'ไกลเกินรัศมีไม่เลือก')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

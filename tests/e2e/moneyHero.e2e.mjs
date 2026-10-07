@@ -47,7 +47,8 @@ const BASE = 'http://localhost:4174/money-hero.html'
 // ด่านสุดท้ายที่เปิดให้เล่นในเวอร์ชันนี้ (ตรงกับ PLAYABLE_MAX ใน MapPage.tsx)
 const LAST_LEVEL = 12
 
-const browser = await chromium.launch()
+// กล้องจำลองของ Chromium (ภาพทดสอบ) และอนุญาตกล้องอัตโนมัติ ใช้ทดสอบโหมด AR ด้วยกล้อง
+const browser = await chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] })
 const errors = []
 let failed = false
 let shot = 0
@@ -495,6 +496,42 @@ for (const [name, viewport] of [
     await noSideScroll(page, 'ผลล่าเหรียญ')
     const p = await savedPlayer(page)
     if (!p.badges.includes('ar-hunter')) throw new Error('ไม่ได้ตรานักล่าเหรียญ AR')
+  })
+
+  await step(`[${name}] ล่าเหรียญ AR ด้วยกล้อง: จีบนิ้วเก็บเหรียญและกดปุ่มตรวจได้ โหลดตัวตรวจจับมือไม่ได้ก็ยังเล่นต่อได้`, async () => {
+    // ตัดการโหลดโมเดลจาก CDN ให้ผลแน่นอน (บอตไม่มีมือจริงให้กล้องเห็นอยู่แล้ว)
+    const cdn = /cdn\.jsdelivr\.net|unpkg\.com|storage\.googleapis\.com/
+    await page.route(cdn, (r) => r.abort())
+    try {
+      await page.goto(`${BASE}#/ar`)
+      await page.getByTestId('mh-ar-camera').click()
+      await page.waitForFunction(() => (document.querySelector('video.mh-ar-video')?.videoWidth ?? 0) > 0, null, { timeout: 15_000 })
+      await page.waitForFunction(() => document.querySelector('[data-testid="mh-ar-hand"]')?.getAttribute('data-state') === 'error', null, { timeout: 30_000 })
+      await page.getByTestId('mh-ar-hand').getByText('แตะจอแทนได้').waitFor()
+      // จีบนิ้ว (จำลองที่ตำแหน่งบนจอ) ตรงเหรียญชุดคำตอบ แล้วจีบปุ่มตรวจ
+      const info = await page.evaluate(() => window.__MH_AR)
+      const pinchOn = async (testId, dx = 0) => {
+        const box = await page.getByTestId(testId).boundingBox()
+        if (!box) throw new Error(`มองไม่เห็น ${testId}`)
+        const ok = await page.evaluate(([x, y]) => window.__MH_PINCH?.(x, y) ?? false, [box.x + box.width / 2 + dx, box.y + box.height / 2])
+        if (!ok) throw new Error(`จีบนิ้วตรง ${testId} แล้วไม่ได้เลือก`)
+      }
+      for (const [i, k] of info.solution.entries()) await pinchOn(`mh-ar-coin-${k}`, i === 0 ? 4 : 0)
+      await snap(page, `${name}-ar-camera`)
+      await pinchOn('mh-ar-check')
+      await page.getByTestId('mh-ar-right').waitFor()
+      // จีบตรงที่ว่างไกลจากทุกอย่าง ต้องไม่เลือกอะไร
+      const empty = await page.evaluate(() => window.__MH_PINCH?.(2, 2) ?? true)
+      if (empty) throw new Error('จีบตรงที่ว่างแล้วกลับไปเลือกบางอย่าง')
+      await pinchOn('mh-ar-next')
+      await page.getByTestId('mh-ar-round').getByText('รอบ 2/5').waitFor()
+      await page.goto(`${BASE}#/map`)
+      // ออกจากหน้า AR แล้วกล้องต้องปิด
+      const live = await page.evaluate(() => document.querySelectorAll('video').length)
+      if (live !== 0) throw new Error('ออกจากหน้า AR แล้วยังมีวิดีโอกล้องค้างอยู่')
+    } finally {
+      await page.unroute(cdn)
+    }
   })
 
   await step(`[${name}] ภารกิจประจำวัน: ทำ 5 ข้อ ได้ตราประทับวันนี้ และป้ายบนแผนที่หายไป`, async () => {

@@ -7029,3 +7029,105 @@ a.mh-stat-coin {
     padding: 6px 5px;
   }
 }
+
+/* ================================================================== */
+/* AR: จีบนิ้วเลือก (ตรวจจับมือ)                                        */
+/* ================================================================== */
+
+.mh-ar-video.is-mirror {
+  transform: scaleX(-1);
+}
+
+.mh-ar-howto {
+  background: #fff9db;
+  border-radius: 14px;
+  padding: 6px 12px;
+}
+
+.mh-ar-hand {
+  appearance: none;
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9em;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: linear-gradient(180deg, #d3f9d8, #8ce99a);
+  box-shadow: 0 3px 0 rgba(43, 35, 80, 0.15);
+  cursor: pointer;
+}
+
+.mh-ar-hand[data-state='loading'] {
+  background: linear-gradient(180deg, #fff9db, #ffe066);
+}
+
+.mh-ar-hand[data-state='error'],
+.mh-ar-hand.is-off {
+  background: #f1f3f5;
+}
+
+.mh-hand-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.mh-hand-cursor.is-on {
+  opacity: 1;
+}
+
+.mh-hand-ring,
+.mh-hand-dot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* วงแหวนหดเล็กลงตามระยะจีบ (--p 0 → 1) */
+.mh-hand-ring {
+  width: 64px;
+  height: 64px;
+  border: 5px solid #fff;
+  box-shadow:
+    0 0 0 3px rgba(43, 35, 80, 0.35),
+    0 0 18px rgba(255, 255, 255, 0.8);
+  transform: translate(-50%, -50%) scale(calc(1 - var(--p, 0) * 0.55));
+  transition: transform 0.06s linear;
+}
+
+.mh-hand-dot {
+  width: 14px;
+  height: 14px;
+  background: #ffd43b;
+  border: 3px solid #2b2350;
+}
+
+.mh-hand-cursor.is-pinched .mh-hand-ring {
+  border-color: #ffd43b;
+  box-shadow:
+    0 0 0 3px #2b2350,
+    0 0 24px #ffd43b;
+}
+
+.is-pinch-hover {
+  outline: 4px solid #ffd43b;
+  outline-offset: 2px;
+  border-radius: 18px;
+}
+
+.mh-ar-float.is-pinch-hover {
+  outline: none;
+  filter: drop-shadow(0 0 14px #ffd43b) drop-shadow(0 8px 8px rgba(43, 35, 80, 0.35));
+}
+
+.is-pinch-pop {
+  animation: mh-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}

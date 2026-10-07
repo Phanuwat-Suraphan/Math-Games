@@ -14,6 +14,8 @@ import { Confetti } from '../components/Effects'
 import { Hills } from '../components/Sky'
 import { Bunting } from '../components/Bunting'
 import { Stars } from '../components/Stars'
+import { PinchDetector, cursorOf, nearestTarget, pinchProgress, pinchRatio, videoToScreen } from '../engine/pinch'
+import { loadHandTracker } from '../utils/handTracker'
 
 /**
  * มินิเกม AR ล่าเหรียญ
@@ -28,8 +30,23 @@ import { Stars } from '../components/Stars'
 declare global {
   interface Window {
     __MH_AR?: { round: number; target: number; solution: number[] }
+    /** จำลองการจีบนิ้วที่ตำแหน่งบนจอ (ใช้กับบอตทดสอบ) */
+    __MH_PINCH?: (x: number, y: number) => boolean
   }
 }
+
+/** หาสิ่งที่เลือกได้ (data-pinch) ใต้ตัวชี้ หรือใกล้ที่สุดในรัศมี 60px */
+function pinchTarget(x: number, y: number): HTMLElement | null {
+  const items = Array.from(document.querySelectorAll<HTMLElement>('[data-pinch]')).map((el) => {
+    const r = el.getBoundingClientRect()
+    return { el, x: r.left + r.width / 2, y: r.top + r.height / 2, inside: x >= r.left && x <= r.right && y >= r.top && y <= r.bottom }
+  })
+  const inside = items.filter((i) => i.inside)
+  if (inside.length > 0) return nearestTarget({ x, y }, inside, Infinity)?.el ?? inside[0].el
+  return nearestTarget({ x, y }, items, 60)?.el ?? null
+}
+
+type HandState = 'off' | 'loading' | 'ready' | 'error'
 
 /** ตำแหน่งและจังหวะลอยของแต่ละชิ้น (สุ่มครั้งเดียวต่อรอบ) */
 interface Floater {
@@ -73,6 +90,13 @@ export function CoinHuntPage() {
   const [cam, setCam] = useState<CamState>('off')
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  // จีบนิ้วเลือก: กล้องหน้าภาพกลับซ้ายขวาเหมือนกระจก
+  const [mirror, setMirror] = useState(false)
+  const [pinchOn, setPinchOn] = useState(true)
+  const [hand, setHand] = useState<HandState>('off')
+  const [handSeen, setHandSeen] = useState(false)
+  const cursorRef = useRef<HTMLDivElement>(null)
+  const hoverRef = useRef<HTMLElement | null>(null)
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -90,21 +114,124 @@ export function CoinHuntPage() {
     }
   }, [phase, round, roundNo])
 
-  const startCamera = async () => {
+  const startCamera = async (facing: 'user' | 'environment') => {
     if (!navigator.mediaDevices?.getUserMedia) {
       setCam('denied')
       return
     }
     setCam('starting')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
       streamRef.current = stream
+      // คอมพิวเตอร์มักไม่บอกทิศกล้อง ถือว่าเป็นกล้องที่หันหาผู้เล่น (ภาพกลับเหมือนกระจก)
+      const actual = stream.getVideoTracks()[0]?.getSettings().facingMode
+      setMirror((actual ?? 'user') === 'user')
       setCam('on')
       setPhase('play')
     } catch {
       setCam('denied')
     }
   }
+
+  /** จีบนิ้วที่ตำแหน่งบนจอ = แตะสิ่งที่อยู่ใต้ตัวชี้ */
+  const pinchAt = useCallback((x: number, y: number): boolean => {
+    const el = pinchTarget(x, y)
+    if (!el) return false
+    el.classList.remove('is-pinch-pop')
+    void el.offsetWidth
+    el.classList.add('is-pinch-pop')
+    el.click()
+    return true
+  }, [])
+
+  useEffect(() => {
+    if (phase !== 'play') return
+    window.__MH_PINCH = pinchAt
+    return () => {
+      window.__MH_PINCH = undefined
+    }
+  }, [phase, pinchAt])
+
+  // วนตรวจมือทุกเฟรมขณะเล่นด้วยกล้อง
+  const tracking = cam === 'on' && phase === 'play' && pinchOn
+  useEffect(() => {
+    if (!tracking) {
+      setHand('off')
+      return
+    }
+    let raf = 0
+    let alive = true
+    let seen = false
+    const det = new PinchDetector()
+    const cursor = cursorRef.current
+    const setHover = (el: HTMLElement | null) => {
+      if (hoverRef.current === el) return
+      hoverRef.current?.classList.remove('is-pinch-hover')
+      el?.classList.add('is-pinch-hover')
+      hoverRef.current = el
+    }
+    const lose = () => {
+      det.lost()
+      setHover(null)
+      cursor?.classList.remove('is-on', 'is-pinched')
+      if (seen) {
+        seen = false
+        setHandSeen(false)
+      }
+    }
+    setHand('loading')
+    loadHandTracker()
+      .then((tracker) => {
+        if (!alive) return
+        setHand('ready')
+        const loop = () => {
+          if (!alive) return
+          raf = requestAnimationFrame(loop)
+          const video = videoRef.current
+          if (!video) return
+          let lm: ReturnType<typeof tracker.detect>
+          try {
+            lm = tracker.detect(video, performance.now())
+          } catch {
+            // ตัวตรวจจับมือพังกลางทาง (เช่น GPU หลุด) หยุดตรวจ ให้แตะจอแทน
+            alive = false
+            cancelAnimationFrame(raf)
+            lose()
+            setHand('error')
+            return
+          }
+          if (lm === undefined) return
+          if (lm === null) {
+            lose()
+            return
+          }
+          if (!seen) {
+            seen = true
+            setHandSeen(true)
+          }
+          const ratio = pinchRatio(lm)
+          const r = video.getBoundingClientRect()
+          const pt = videoToScreen(cursorOf(lm), { w: video.videoWidth, h: video.videoHeight }, { left: r.left, top: r.top, w: r.width, h: r.height }, mirror)
+          if (cursor) {
+            cursor.style.transform = `translate(${pt.x}px, ${pt.y}px)`
+            cursor.style.setProperty('--p', String(pinchProgress(ratio)))
+            cursor.classList.add('is-on')
+            cursor.classList.toggle('is-pinched', det.pinched)
+          }
+          setHover(pinchTarget(pt.x, pt.y))
+          if (det.update(ratio) === 'down') pinchAt(pt.x, pt.y)
+        }
+        loop()
+      })
+      .catch(() => {
+        if (alive) setHand('error')
+      })
+    return () => {
+      alive = false
+      cancelAnimationFrame(raf)
+      lose()
+    }
+  }, [tracking, mirror, pinchAt])
 
   // ต่อภาพกล้องเข้ากับ <video> เมื่อหน้าเล่นแสดงแล้ว
   useEffect(() => {
@@ -149,6 +276,7 @@ export function CoinHuntPage() {
     if (roundNo + 1 >= HUNT_ROUNDS) {
       setPhase('done')
       stopCamera()
+      setCam('off')
       playSound('complete')
       updatePlayer((p) => p, cleared >= HUNT_ROUNDS ? ['ar-hunter'] : [])
       return
@@ -175,7 +303,7 @@ export function CoinHuntPage() {
     <div className={`mh-ar ${cam === 'on' && phase === 'play' ? 'is-camera' : ''}`} data-testid="mh-ar">
       {/* ฉากหลัง: ภาพจากกล้อง หรือฉากตลาดการ์ตูน */}
       {cam === 'on' && phase === 'play' ? (
-        <video ref={videoRef} className="mh-ar-video" playsInline muted autoPlay aria-hidden="true" />
+        <video ref={videoRef} className={`mh-ar-video ${mirror ? 'is-mirror' : ''}`} playsInline muted autoPlay aria-hidden="true" />
       ) : (
         <div className="mh-ar-scene" aria-hidden="true">
           <Bunting count={16} className="mh-ar-bunting" />
@@ -195,17 +323,49 @@ export function CoinHuntPage() {
             รอบ {roundNo + 1}/{HUNT_ROUNDS} · {HUNT_LEVELS[roundNo].name}
           </span>
         )}
+        {phase === 'play' && cam === 'on' && (
+          <button
+            type="button"
+            className={`mh-ar-hand ${pinchOn ? '' : 'is-off'}`}
+            onClick={() => setPinchOn((v) => !v)}
+            aria-pressed={pinchOn}
+            data-testid="mh-ar-hand"
+            data-state={pinchOn ? hand : 'off'}
+          >
+            {!pinchOn
+              ? '🤏 จีบนิ้ว: ปิด'
+              : hand === 'loading'
+                ? '⏳ กำลังเตรียมตัวตรวจจับมือ…'
+                : hand === 'error'
+                  ? '👆 ตรวจจับมือไม่ได้ แตะจอแทนได้'
+                  : handSeen
+                    ? '🤏 จีบนิ้วโป้ง+นิ้วชี้ = เลือก'
+                    : '✋ ชูมือให้กล้องเห็น'}
+          </button>
+        )}
       </div>
+      {tracking && (
+        <div ref={cursorRef} className="mh-hand-cursor" aria-hidden="true">
+          <span className="mh-hand-ring" />
+          <span className="mh-hand-dot" />
+        </div>
+      )}
 
       {phase === 'intro' && (
         <div className="mh-card mh-ar-intro mh-center" data-testid="mh-ar-intro">
           <CharacterArt id="rabbit" size={100} mood="happy" />
           <h1 className="mh-step-title">ล่าเหรียญรอบตัวเรา!</h1>
-          <p>เหรียญและธนบัตรจะลอยอยู่รอบตัว แตะเก็บให้ได้จำนวนเงิน <b>พอดี</b> ตามโจทย์ มีทั้งหมด {HUNT_ROUNDS} รอบ</p>
-          <p className="mh-soft">ภาพจากกล้องแสดงบนเครื่องนี้เท่านั้น ไม่มีการบันทึกหรือส่งไปที่ไหน</p>
+          <p>เหรียญและธนบัตรจะลอยอยู่รอบตัว เก็บให้ได้จำนวนเงิน <b>พอดี</b> ตามโจทย์ มีทั้งหมด {HUNT_ROUNDS} รอบ</p>
+          <p className="mh-ar-howto">
+            🤏 <b>จีบนิ้วโป้งกับนิ้วชี้</b> ตรงเหรียญเพื่อเก็บ (ใช้ได้กับปุ่มด้วย) · หรือแตะจอก็ได้
+          </p>
+          <p className="mh-soft">ภาพจากกล้องประมวลผลบนเครื่องนี้เท่านั้น ไม่มีการบันทึกหรือส่งไปที่ไหน</p>
           <div className="mh-row-buttons">
-            <button type="button" className="mh-btn mh-btn-gold mh-btn-xl" onClick={startCamera} disabled={cam === 'starting'} data-testid="mh-ar-camera">
-              <Camera size={26} /> {cam === 'starting' ? 'กำลังเปิดกล้อง…' : 'เปิดกล้องเล่น AR'}
+            <button type="button" className="mh-btn mh-btn-gold mh-btn-xl" onClick={() => void startCamera('user')} disabled={cam === 'starting'} data-testid="mh-ar-camera">
+              <Camera size={26} /> {cam === 'starting' ? 'กำลังเปิดกล้อง…' : 'กล้องหน้า + จีบนิ้ว'}
+            </button>
+            <button type="button" className="mh-btn mh-btn-go" onClick={() => void startCamera('environment')} disabled={cam === 'starting'} data-testid="mh-ar-camera-back">
+              <Camera size={22} /> กล้องหลัง (ส่องรอบตัว)
             </button>
             <button
               type="button"
@@ -234,6 +394,7 @@ export function CoinHuntPage() {
                   className={`mh-ar-float is-${denom(f.id).kind}`}
                   style={{ left: `${f.x}%`, top: `${f.y}%`, '--dur': `${f.dur}s`, '--delay': `${f.delay}s` } as CSSProperties}
                   onClick={() => grab(i)}
+                  data-pinch
                   data-testid={`mh-ar-coin-${i}`}
                 >
                   <MoneyPiece id={f.id} base={56} />
@@ -251,9 +412,9 @@ export function CoinHuntPage() {
               </span>
             </div>
             <div className="mh-ar-wallet" aria-label="เงินที่เก็บแล้ว แตะเพื่อคืน">
-              {picked.length === 0 && <span className="mh-soft">แตะเงินที่ลอยอยู่เพื่อเก็บ 👆</span>}
+              {picked.length === 0 && <span className="mh-soft">{tracking ? 'จีบนิ้วตรงเงินที่ลอยอยู่เพื่อเก็บ 🤏' : 'แตะเงินที่ลอยอยู่เพื่อเก็บ 👆'}</span>}
               {picked.map((i) => (
-                <button key={i} type="button" className="mh-ar-chip" onClick={() => giveBack(i)} aria-label="คืนเงินชิ้นนี้">
+                <button key={i} type="button" className="mh-ar-chip" onClick={() => giveBack(i)} aria-label="คืนเงินชิ้นนี้" data-pinch>
                   <MoneyPiece id={round.spawns[i]} base={34} />
                 </button>
               ))}
@@ -274,7 +435,7 @@ export function CoinHuntPage() {
             )}
             <div className="mh-row-buttons">
               {result?.ok ? (
-                <button type="button" className="mh-btn mh-btn-gold" onClick={next} data-testid="mh-ar-next">
+                <button type="button" className="mh-btn mh-btn-gold" onClick={next} data-pinch data-testid="mh-ar-next">
                   {roundNo + 1 >= HUNT_ROUNDS ? '🏁 ดูผล' : 'รอบต่อไป ▶'}
                 </button>
               ) : (
@@ -286,10 +447,11 @@ export function CoinHuntPage() {
                       setPicked([])
                       setResult(null)
                     }}
+                    data-pinch
                   >
                     ↺ คืนทั้งหมด
                   </button>
-                  <button type="button" className="mh-btn mh-btn-go" onClick={check} data-testid="mh-ar-check">
+                  <button type="button" className="mh-btn mh-btn-go" onClick={check} data-pinch data-testid="mh-ar-check">
                     ✔ ตรวจ
                   </button>
                 </>
