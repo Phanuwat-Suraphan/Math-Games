@@ -8166,3 +8166,115 @@ a.mh-stat-coin {
     height: 120px;
   }
 }
+
+/* ================================================================== */
+/* แถบภารกิจ (ขั้น MISSION)                                            */
+/* ================================================================== */
+
+.mh-mission-track {
+  margin-bottom: 10px;
+  background: linear-gradient(180deg, #fffdf4, #fff4e6);
+}
+
+.mh-mission-track.is-done {
+  background: linear-gradient(180deg, #ebfbee, #d3f9d8);
+}
+
+.mh-mission-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mh-mission-say {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mh-mission-count {
+  font-weight: 800;
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 10px;
+  border: 3px solid #ffd43b;
+  white-space: nowrap;
+}
+
+.mh-mission-road {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--n, 6), 1fr);
+  gap: 6px;
+  margin-top: 44px;
+  padding: 6px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(90deg, #e9d8c4 0 18px, #dcc29e 18px 36px);
+  border: 3px solid #b8834a;
+}
+
+.mh-mission-slot {
+  display: grid;
+  place-items: center;
+  justify-self: center;
+  width: 100%;
+  max-width: 46px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px dashed #c0a27a;
+  font-weight: 800;
+  color: #a9845a;
+  font-size: 1.1em;
+}
+
+.mh-mission-slot.is-now {
+  border-style: solid;
+  border-color: #fab005;
+  animation: mh-jelly 1.4s ease-in-out infinite;
+}
+
+.mh-mission-slot.is-good,
+.mh-mission-slot.is-try {
+  border-style: solid;
+  font-size: 1.4em;
+  animation: mh-pop-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mh-mission-slot.is-good {
+  background: #fff9db;
+  border-color: #40c057;
+}
+
+.mh-mission-slot.is-try {
+  background: #f1f3f5;
+  border-color: #adb5bd;
+}
+
+.mh-mission-hero {
+  position: absolute;
+  top: -46px;
+  transform: translateX(-50%);
+  transition: left 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: mh-piggy-bob 1.6s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+  .mh-mission-head {
+    flex-wrap: wrap;
+  }
+  .mh-mission-say {
+    flex-basis: calc(100% - 74px);
+  }
+  .mh-mission-count {
+    margin-left: auto;
+  }
+  .mh-mission-road {
+    gap: 3px;
+    padding: 4px;
+  }
+  .mh-mission-slot {
+    font-size: 0.9em;
+  }
+}

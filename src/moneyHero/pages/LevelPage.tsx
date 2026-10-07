@@ -22,6 +22,8 @@ import { playSound } from '../utils/sound'
 import { PLAYABLE_MAX } from './MapPage'
 import { BossArena } from '../components/BossArena'
 import { bossHp, bossOf } from '../data/bosses'
+import { MissionTrack } from '../components/MissionTrack'
+import { advanceMission, missionOf, type SlotState } from '../data/missions'
 
 /**
  * หน้าด่าน: LEARN → PRACTICE → MISSION → BOSS → ผลลัพธ์
@@ -133,6 +135,9 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   // สู้บอส: ตอบถูก (ภายใน 2 ครั้ง) = ปาเหรียญใส่บอส 1 ครั้ง
   const [hits, setHits] = useState(0)
   const [bossEvent, setBossEvent] = useState<{ kind: 'hit' | 'miss'; key: number; text: string } | null>(null)
+  // ภารกิจ: ช่องความคืบหน้าของแต่ละข้อหลัก
+  const [slots, setSlots] = useState<SlotState[]>([])
+  const scene = step === 'mission' ? missionOf(level.id) : null
 
   const questions = useMemo(
     () => (step === 'learn' || (level.id === 12 && step === 'mission') ? [] : buildStep(level.id, step)),
@@ -267,6 +272,8 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   if (done) {
     const nextStep = step === 'practice' ? 'mission' : 'boss'
     return (
+      <div className="mh-step-wrap">
+      {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} />}
       <div className="mh-card mh-step-card mh-center" data-testid="mh-step-done">
         <div className="mh-step-done-icon">{step === 'practice' ? '✏️' : '🎯'}</div>
         <h2 className="mh-step-title">{step === 'practice' ? 'ฝึกครบแล้ว!' : 'ภารกิจสำเร็จ!'}</h2>
@@ -284,6 +291,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
         >
           ไป {nextStep === 'mission' ? 'MISSION 🎯' : 'BOSS 👑'}
         </button>
+      </div>
       </div>
     )
   }
@@ -305,6 +313,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
         />
       ) : (
       <>
+      {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} />}
       {step === 'boss' && player && (
         <BossArena boss={bossOf(level.id)} hp={bossHp(questions.length, BOSS_PASS)} hits={hits} event={bossEvent} avatar={player.avatar} wear={player.wear} />
       )}
@@ -315,7 +324,9 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
         mode={step}
         learn={level.learn}
         onAnswer={
-          step === 'boss'
+          scene
+            ? (_q, _r, correct, info) => setSlots((list) => advanceMission(list, correct, info.attempt, info.retry))
+            : step === 'boss'
             ? (_q, _r, correct, info) => {
                 const boss = bossOf(level.id)
                 if (correct && !info.retry) {

@@ -270,7 +270,19 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   await playUntil(page, 'mh-step-done', { makeMistake })
   await page.getByTestId('mh-next-step').click()
   await page.waitForURL(new RegExp(`#/level/${id}/mission`))
+  // ฉากภารกิจ (ด่าน 0–11): ช่องว่างตอนเริ่ม และเต็มเมื่อตอบถูกครบทุกข้อ
+  const scene = id !== 12
+  if (scene) {
+    await page.getByTestId('mh-mission-track').waitFor()
+    const startCount = await page.getByTestId('mh-mission-count').innerText()
+    if (!/ 0\/\d+$/.test(startCount)) throw new Error(`ภารกิจด่าน ${id} ตอนเริ่มไม่ว่าง: ${startCount}`)
+  }
   await playUntil(page, 'mh-step-done')
+  if (scene) {
+    const endCount = (await page.getByTestId('mh-mission-count').innerText()).match(/(\d+)\/(\d+)$/)
+    if (!endCount || endCount[1] !== endCount[2]) throw new Error(`ภารกิจด่าน ${id} จบแล้วช่องไม่เต็ม: ${endCount?.[0]}`)
+  }
+  if (id === 2) await snap(page, `${label}level${id}-mission`)
   await page.getByTestId('mh-next-step').click()
   await page.waitForURL(new RegExp(`#/level/${id}/boss`))
   // สนามสู้บอส: บอสพลังเต็มก่อนเริ่ม
