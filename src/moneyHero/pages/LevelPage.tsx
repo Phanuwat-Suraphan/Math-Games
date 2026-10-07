@@ -6,7 +6,7 @@ import { LEVELS, levelById, type LevelDef } from '../data/levels'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
 import { emptyLevel, isLevelUnlocked, levelRecord, type LevelRecord } from '../engine/progress'
-import { BOSS_PASS, levelReward, starsFor } from '../engine/scoring'
+import { BOSS_PASS, levelReward, nextStar, STAR_LINES, starsFor } from '../engine/scoring'
 import { buildStep } from '../generators'
 import { TopBar } from '../components/TopBar'
 import { LearnSlides } from '../components/LearnSlides'
@@ -24,6 +24,8 @@ import { BossArena } from '../components/BossArena'
 import { bossHp, bossOf } from '../data/bosses'
 import { MissionTrack } from '../components/MissionTrack'
 import { advanceMission, missionOf, type SlotState } from '../data/missions'
+import { PracticeRange } from '../components/PracticeRange'
+import { advanceBalloons, type Balloon } from '../data/practice'
 
 /**
  * หน้าด่าน: LEARN → PRACTICE → MISSION → BOSS → ผลลัพธ์
@@ -53,6 +55,9 @@ export interface LevelResult {
   firstClear: boolean
   bossWithin2: number
   bossTotal: number
+  /** ข้อหลักที่ถูกตั้งแต่ครั้งแรก / ทั้งหมด ของรอบนี้ (ทุกขั้นรวมกัน) */
+  runCorrect: number
+  runTotal: number
 }
 
 function StepTrack({ level, rec, current }: { level: LevelDef; rec: LevelRecord; current: StepId | 'result' }) {
@@ -138,6 +143,11 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   // ภารกิจ: ช่องความคืบหน้าของแต่ละข้อหลัก
   const [slots, setSlots] = useState<SlotState[]>([])
   const scene = step === 'mission' ? missionOf(level.id) : null
+  // ลานฝึก: ลูกโป่งของแต่ละข้อหลัก และสัญญาณให้ลูกโป่งส่ายเมื่อตอบผิดครั้งแรก
+  const [balloons, setBalloons] = useState<Balloon[]>([])
+  const [nudge, setNudge] = useState(0)
+  const range = step === 'practice'
+  const coach = level.npc === 'hero' ? 'rabbit' : level.npc
 
   const questions = useMemo(
     () => (step === 'learn' || (level.id === 12 && step === 'mission') ? [] : buildStep(level.id, step)),
@@ -195,6 +205,8 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
         firstClear: now.firstClear,
         bossWithin2: s.within2,
         bossTotal: s.originals,
+        runCorrect: now.correct,
+        runTotal: now.total,
       }
       updatePlayer(
         (p) => {
@@ -274,6 +286,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
     return (
       <div className="mh-step-wrap">
       {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} />}
+      {range && player && <PracticeRange total={questions.length} balloons={balloons} nudge={0} coach={coach} avatar={player.avatar} wear={player.wear} />}
       <div className="mh-card mh-step-card mh-center" data-testid="mh-step-done">
         <div className="mh-step-done-icon">{step === 'practice' ? '✏️' : '🎯'}</div>
         <h2 className="mh-step-title">{step === 'practice' ? 'ฝึกครบแล้ว!' : 'ภารกิจสำเร็จ!'}</h2>
@@ -314,6 +327,7 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
       ) : (
       <>
       {scene && player && <MissionTrack scene={scene} total={questions.length} slots={slots} avatar={player.avatar} wear={player.wear} />}
+      {range && player && <PracticeRange total={questions.length} balloons={balloons} nudge={nudge} coach={coach} avatar={player.avatar} wear={player.wear} />}
       {step === 'boss' && player && (
         <BossArena boss={bossOf(level.id)} hp={bossHp(questions.length, BOSS_PASS)} hits={hits} event={bossEvent} avatar={player.avatar} wear={player.wear} />
       )}
@@ -326,6 +340,11 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
         onAnswer={
           scene
             ? (_q, _r, correct, info) => setSlots((list) => advanceMission(list, correct, info.attempt, info.retry))
+            : range
+            ? (_q, _r, correct, info) => {
+                setBalloons((list) => advanceBalloons(list, correct, info.attempt, info.retry))
+                setNudge((n) => (!correct && info.attempt === 1 && !info.retry ? n + 1 : 0))
+              }
             : step === 'boss'
             ? (_q, _r, correct, info) => {
                 const boss = bossOf(level.id)
@@ -355,6 +374,40 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   )
 }
 
+/** แถบเกณฑ์ดาว: ตอนนี้อยู่ตรงไหน และต้องถูกตั้งแต่ครั้งแรกเพิ่มอีกกี่ข้อจึงได้ดาวเพิ่ม */
+function StarGoal({ correct, total }: { correct: number; total: number }) {
+  const ratio = total === 0 ? 1 : correct / total
+  const pct = Math.round(ratio * 100)
+  const next = nextStar(correct, total)
+  return (
+    <div className="mh-star-goal" data-testid="mh-star-goal">
+      <div className="mh-star-meter" role="img" aria-label={`ถูกตั้งแต่ครั้งแรก ${pct}%`}>
+        <div className="mh-star-fill" style={{ width: `${pct}%` }} />
+        {STAR_LINES.map((line) => (
+          <span key={line.stars} className={`mh-star-line ${ratio >= line.at ? 'is-reached' : ''}`} style={{ left: `${line.at * 100}%` }}>
+            <span className="mh-star-line-label">{'⭐'.repeat(line.stars)}</span>
+          </span>
+        ))}
+        <span className="mh-star-you" style={{ left: `clamp(22px, ${pct}%, calc(100% - 22px))` }}>
+          {pct}%
+        </span>
+      </div>
+      <p className="mh-star-tip" data-testid="mh-star-tip">
+        {next ? (
+          <>
+            ถูกตั้งแต่ครั้งแรก {correct}/{total} ข้อ · ถ้าตอบถูกตั้งแต่ครั้งแรกอีก <b>{next.need} ข้อ</b> จะได้ {'⭐'.repeat(next.stars)}
+          </>
+        ) : (
+          <>
+            ถูกตั้งแต่ครั้งแรก {correct}/{total} ข้อ · ได้ดาวเต็มแล้ว เก่งมาก!
+          </>
+        )}
+      </p>
+      {next && <p className="mh-soft mh-star-hint">🎈 ลูกโป่งดาวในลานฝึก และช่องภารกิจที่ถูกตั้งแต่ครั้งแรก ก็นับด้วยนะ ลองเล่นด่านนี้อีกครั้งเพื่อเก็บดาวเพิ่ม</p>}
+    </div>
+  )
+}
+
 function ResultView({ level }: { level: LevelDef }) {
   const { player } = useGame()
   const location = useLocation()
@@ -380,6 +433,7 @@ function ResultView({ level }: { level: LevelDef }) {
         <Stars n={stars} size={64} reveal />
       </div>
       <p className="mh-result-grade">{stars === 3 ? '⭐⭐⭐ ยอดเยี่ยม!' : stars === 2 ? '⭐⭐ ดีมาก!' : '⭐ ผ่านแล้ว!'}</p>
+      {result && typeof result.runTotal === 'number' && <StarGoal correct={result.runCorrect} total={result.runTotal} />}
       {result && (
         <div className="mh-result-rewards">
           <span className="mh-reward">✨ +{result.exp} EXP</span>

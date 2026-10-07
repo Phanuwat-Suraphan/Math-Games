@@ -44,6 +44,7 @@ const eco = load('engine/eco.js')
 const changeGame = load('engine/changeGame.js')
 const bosses = load('data/bosses.js')
 const missions = load('data/missions.js')
+const practice = load('data/practice.js')
 
 let passed = 0
 const failures = []
@@ -1123,6 +1124,54 @@ test('ฉากภารกิจ: ด่าน 0–11 มีฉากของ�
   slots = go(slots, true, 1, true)
   eq(slots.length, plan.length, 'ช่องเท่าจำนวนข้อหลัก')
   eq(slots.filter((x) => x === 'good').length, 3, 'นับของที่ได้ถูกต้อง')
+})
+
+test('ลานฝึกลูกโป่ง: ถูกครั้งแรกได้ดาว ผิดครบ 2 ครั้งลูกโป่งลอยหนี และคอมโบนับดาวติดกัน', () => {
+  const go = practice.advanceBalloons
+  eq(go([], true, 1, false).join(), 'star', 'ถูกครั้งแรกได้ดาว')
+  eq(go([], true, 2, false).join(), 'pop', 'ถูกครั้งที่ 2 ลูกโป่งแตก')
+  eq(go([], false, 1, false).join(), '', 'ผิดครั้งแรกยังไม่เปลี่ยน')
+  eq(go([], false, 2, false).join(), 'away', 'ผิดครบ 2 ครั้งลอยหนี')
+  eq(go(['star'], true, 1, true).join(), 'star', 'ข้อฝึกซ้ำไม่เพิ่มลูกโป่ง')
+  eq(practice.comboOf([]), 0, 'ยังไม่มีคอมโบ')
+  eq(practice.comboOf(['star', 'away', 'star', 'star']), 2, 'คอมโบนับจากท้าย')
+  eq(practice.comboOf(['star', 'star', 'pop']), 0, 'ถูกครั้งที่ 2 ตัดคอมโบ')
+  // คำพูดโค้ช
+  assert(practice.coachLine([], 4, false).includes('ลูกโป่ง'), 'โค้ชอธิบายกติกาตอนเริ่ม')
+  assert(practice.coachLine(['star'], 4, true).includes('เกือบแล้ว'), 'ผิดครั้งแรกโค้ชให้กำลังใจ')
+  assert(practice.coachLine(['star', 'star', 'star'], 4, false).includes('คอมโบ 3'), 'คอมโบ 3 โค้ชชม')
+  assert(practice.coachLine(['away'], 4, false).includes('ไม่เป็นไร'), 'ลูกโป่งลอยหนีไม่ลงโทษ')
+  assert(practice.coachLine(['star', 'star'], 2, false).includes('ครบทุกลูก'), 'ได้ดาวครบ')
+  assert(practice.coachLine(['star', 'pop'], 2, true).includes('ฝึกครบแล้ว'), 'จบแล้วไม่สนสัญญาณผิด')
+  // ทุกด่านมีโจทย์ฝึกอย่างน้อย 1 ลูก และไม่เกินจำนวนสีที่วนได้สวย
+  for (let id = 0; id <= 12; id += 1) {
+    const n = gens.buildStep(id, 'practice').length
+    assert(n >= 1 && n <= 8, `ด่าน ${id} ลูกโป่ง ${n} ลูก`)
+  }
+})
+
+test('เกณฑ์ดาว: บอกได้ว่าต้องถูกตั้งแต่ครั้งแรกอีกกี่ข้อจึงได้ดาวเพิ่ม', () => {
+  eq(scoring.nextStar(10, 10), null, '3 ดาวแล้วไม่มีขั้นถัดไป')
+  eq(JSON.stringify(scoring.nextStar(6, 10)), JSON.stringify({ stars: 2, need: 1 }), '60% → อีก 1 ข้อได้ 2 ดาว')
+  eq(JSON.stringify(scoring.nextStar(7, 10)), JSON.stringify({ stars: 3, need: 2 }), '70% → อีก 2 ข้อได้ 3 ดาว')
+  eq(JSON.stringify(scoring.nextStar(2, 3)), JSON.stringify({ stars: 2, need: 1 }), '2/3 ยังไม่ถึง 70%')
+  // ทุกกรณี: เพิ่มตามที่บอกแล้วได้ดาวตามนั้นพอดี และน้อยกว่านั้นยังไม่ได้
+  for (let total = 1; total <= 40; total += 1) {
+    for (let correct = 0; correct <= total; correct += 1) {
+      const n = scoring.nextStar(correct, total)
+      const now = scoring.starsFor(correct / total)
+      if (now === 3) {
+        eq(n, null, `${correct}/${total} ได้ 3 ดาวแล้ว`)
+        continue
+      }
+      assert(n && n.stars === now + 1, `${correct}/${total} ดาวถัดไปผิด`)
+      assert(scoring.starsFor((correct + n.need) / total) >= n.stars, `${correct}/${total} เพิ่ม ${n.need} ข้อต้องได้ดาว`)
+      if (n.need > 0) assert(scoring.starsFor((correct + n.need - 1) / total) < n.stars, `${correct}/${total} บอกจำนวนเกิน`)
+    }
+  }
+  eq(scoring.STAR_LINES.map((l) => l.at).join(), '0.7,0.9', 'เส้นเกณฑ์ตรงกับ starsFor')
+  eq(scoring.starsFor(0.7), 2, 'เส้น 2 ดาว')
+  eq(scoring.starsFor(0.9), 3, 'เส้น 3 ดาว')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

@@ -53,6 +53,25 @@ export function starsFor(accuracy: number): 1 | 2 | 3 {
   return 1
 }
 
+/** เกณฑ์ดาวแต่ละระดับ (สัดส่วนข้อที่ถูกในครั้งแรก) ใช้วาดเส้นบนหน้าผลลัพธ์ */
+export const STAR_LINES = [
+  { stars: 2, at: 0.7 },
+  { stars: 3, at: 0.9 },
+] as const
+
+/**
+ * ดาวขั้นถัดไป: ต้องตอบถูกตั้งแต่ครั้งแรกเพิ่มอีกกี่ข้อ (จากจำนวนข้อเท่าเดิม) จึงจะได้ดาวเพิ่ม
+ * ได้ 3 ดาวแล้วคืน null
+ */
+export function nextStar(correct: number, total: number): { stars: 2 | 3; need: number } | null {
+  const now = starsFor(total === 0 ? 1 : correct / total)
+  if (now === 3) return null
+  const target = (now + 1) as 2 | 3
+  let need = 0
+  while (correct + need < total && starsFor((correct + need) / total) < target) need += 1
+  return { stars: target, need }
+}
+
 /** รางวัลเมื่อผ่านด่าน */
 export function levelReward(stars: number, firstClear: boolean): { exp: number; coins: number } {
   const exp = 50 + stars * 20
