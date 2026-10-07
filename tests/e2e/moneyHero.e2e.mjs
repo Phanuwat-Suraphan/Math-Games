@@ -721,6 +721,8 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-teacher-table').waitFor()
     await page.getByRole('button', { name: 'ทดสอบ' }).click()
     await page.getByTestId('mh-student-detail').waitFor()
+    // เล่นกาดมาแล้วหนึ่งวัน (ขายกระถาง 30 บาท) ต้องเห็นในรายละเอียดนักเรียน
+    await page.getByTestId('mh-student-eco').getByText('ยอดขายสะสม 30 บาท').waitFor()
     await snap(page, `${name}-teacher`)
     await noSideScroll(page, 'แผงคุณครู')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv').click()])

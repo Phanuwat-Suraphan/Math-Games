@@ -69,6 +69,11 @@ export function buildCsv(players: Player[]): string {
     ...SKILLS.map((s) => `${SKILL_NAMES[s]} (%)`),
     'หัวข้อที่ยังอ่อน',
     'ข้อที่เคยผิด',
+    'กาดรักษ์โลก: วันที่เล่น',
+    'กาดรักษ์โลก: ยอดขายสะสม (บาท)',
+    'กาดรักษ์โลก: กำไรสูงสุด (บาท)',
+    'กาดรักษ์โลก: เก็บออม (บาท)',
+    'กาดรักษ์โลก: บริจาคกองทุนต้นไม้ (บาท)',
     'เล่นล่าสุด',
   ]
   const rows = players.map((p) => [
@@ -88,6 +93,11 @@ export function buildCsv(players: Player[]): string {
     ...SKILLS.map((s) => skillPercent(p, s)),
     weakSkills(p).map((s) => SKILL_NAMES[s]).join(' / '),
     p.mistakes.length,
+    p.eco.days,
+    p.eco.sales / 100,
+    p.eco.bestProfit / 100,
+    p.eco.saved / 100,
+    p.eco.donated / 100,
     dateText(p.lastPlayed),
   ])
   return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
@@ -105,6 +115,10 @@ export interface ClassSummary {
   post: number | null
   /** พัฒนาการเฉลี่ย (เฉพาะคนที่ทำครบทั้งสองแบบทดสอบ) */
   improvement: number | null
+  /** กาดรักษ์โลก: จำนวนคนที่เล่นแล้ว ยอดขายรวม และเงินบริจาครวมของห้อง (บาท) */
+  ecoPlayers: number
+  ecoSales: number
+  ecoDonated: number
   /** ค่าเฉลี่ยรายทักษะของทั้งห้อง */
   skills: Record<Skill, number | null>
   /** จำนวนนักเรียนที่ทักษะนั้นยังอ่อน */
@@ -121,6 +135,9 @@ export function classSummary(players: Player[]): ClassSummary {
   }
   return {
     players: players.length,
+    ecoPlayers: players.filter((p) => p.eco.days > 0).length,
+    ecoSales: players.reduce((s, p) => s + p.eco.sales, 0) / 100,
+    ecoDonated: players.reduce((s, p) => s + p.eco.donated, 0) / 100,
     accuracy: average(players.filter((p) => p.answered > 0).map((p) => percent(overallAccuracy(p)))),
     pre: average(players.map((p) => testPercent(p.preTest)).filter((v): v is number => v !== null)),
     post: average(players.map((p) => testPercent(p.postTest)).filter((v): v is number => v !== null)),
