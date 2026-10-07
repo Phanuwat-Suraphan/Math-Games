@@ -77,6 +77,9 @@ export interface Player {
   wear: Wear
   /** ภารกิจประจำวัน */
   daily: DailyRecord
+  /** ภารกิจเสริมจากเพื่อนในเมือง: เพื่อน → วันที่ทำล่าสุด */
+  npcQuests: Record<string, string>
+  questsDone: number
   mapX?: number
   mapY?: number
 }
@@ -136,6 +139,8 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     owned: [],
     wear: {},
     daily: emptyDaily(),
+    npcQuests: {},
+    questsDone: 0,
   }
 }
 
@@ -280,6 +285,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.fixedMistakes >= 5) want.push('comeback')
   if (p.owned.length >= 1) want.push('shopper')
   if (p.daily.best >= 3) want.push('daily3')
+  if (p.questsDone >= 4) want.push('helper')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 

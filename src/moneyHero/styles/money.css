@@ -6379,3 +6379,67 @@ button:disabled {
     opacity: 1;
   }
 }
+
+/* ================================================================== */
+/* ภารกิจเสริมจากเพื่อนในเมือง                                          */
+/* ================================================================== */
+
+button.mh-town-npc {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.mh-npc-quest {
+  position: absolute;
+  top: -34px;
+  left: 50%;
+  translate: -50% 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #fff8d0, #ffd23f 60%, #f0a800);
+  border: 3px solid #fff;
+  box-shadow: 0 4px 10px -2px rgba(160, 100, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  animation: mh-quest-bounce 0.9s ease-in-out infinite;
+}
+
+@keyframes mh-quest-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.1);
+  }
+}
+
+.mh-talk-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mh-talk-buttons {
+  justify-content: flex-start;
+  margin: 6px 0 0;
+}
+
+.mh-quest-modal {
+  z-index: 10000;
+}
+
+.mh-quest-card {
+  background: linear-gradient(180deg, #fffbea, #ffffff);
+}
+
+.mh-quest-title {
+  font-family: var(--mh-display);
+  font-weight: 700;
+  font-size: 1.25em;
+  margin-bottom: 8px;
+}

@@ -514,6 +514,25 @@ for (const [name, viewport] of [
     if (await page.getByTestId('mh-daily-banner').isVisible().catch(() => false)) throw new Error('ทำแล้วป้ายยังอยู่')
   })
 
+  await step(`[${name}] ภารกิจจากเพื่อนในเมือง: แตะลุงหมี รับภารกิจ ตอบถูก ได้เหรียญ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-world').waitFor()
+    const before = (await savedPlayer(page)).coins
+    await page.getByTestId('mh-npc-bear').evaluate((el) => el.click())
+    await page.getByTestId('mh-quest-accept').click()
+    await page.getByTestId('mh-quest').waitFor()
+    await page.getByTestId('mh-question').waitFor()
+    await snap(page, `${name}-quest`)
+    await playUntil(page, 'mh-quest-done')
+    await page.getByText('ขอบใจมากนะ').waitFor()
+    await page.getByTestId('mh-quest-close').click()
+    const p = await savedPlayer(page)
+    if (p.coins !== before + 8 || p.questsDone !== 1) throw new Error(`รางวัลภารกิจไม่ถูก (${before} → ${p.coins}, ${p.questsDone})`)
+    // ทำแล้ววันนี้ แตะอีกครั้งต้องได้เคล็ดลับแทน
+    await page.getByTestId('mh-npc-bear').evaluate((el) => el.click())
+    if (await page.getByTestId('mh-quest-accept').isVisible().catch(() => false)) throw new Error('ทำแล้วยังรับภารกิจซ้ำได้')
+  })
+
   await step(`[${name}] ร้านของฮีโร่: ซื้อดอกไม้ติดผมและลูกเจี๊ยบ แล้วลูกเจี๊ยบเดินตามบนแผนที่`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-shop').click()

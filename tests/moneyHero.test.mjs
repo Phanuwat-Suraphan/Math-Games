@@ -35,6 +35,7 @@ const progress = load('engine/progress.js')
 const report = load('engine/report.js')
 const hunt = load('engine/coinHunt.js')
 const daily = load('engine/daily.js')
+const quest = load('engine/npcQuest.js')
 
 let passed = 0
 const failures = []
@@ -639,6 +640,28 @@ test('ภารกิจประจำวัน: สตรีคต่อเม
   p = { ...p, levels: { 7: { ...progress.emptyLevel(), stepDone: 4 } } }
   eq(daily.dailyLevels(p).join(','), '7', 'ใช้ด่านที่ผ่านแล้ว')
   assert(daily.dailyReward(10).coins === 20, 'โบนัสสตรีคสูงสุด +10')
+})
+
+test('ภารกิจจากเพื่อนในเมือง: วันละครั้งต่อเพื่อน ได้รางวัลเมื่อตอบถูก', () => {
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  for (const npc of ['rabbit', 'fox', 'bear', 'owl']) {
+    for (let i = 0; i < 50; i += 1) {
+      const q = quest.makeQuest(npc)
+      eq(q.npc, npc, 'โจทย์ต้องเป็นของเพื่อนคนนั้น')
+      validateQuestion(q, `ภารกิจของ ${npc}`)
+    }
+  }
+  assert(quest.questAvailable(p, 'bear', '2026-10-07'), 'วันใหม่ต้องมีภารกิจ')
+  p = quest.recordQuest(p, 'bear', true, '2026-10-07')
+  eq(p.coins, quest.QUEST_REWARD.coins, 'ตอบถูกได้เหรียญ')
+  assert(!quest.questAvailable(p, 'bear', '2026-10-07'), 'ทำแล้ววันเดียวกันต้องไม่มีอีก')
+  eq(quest.recordQuest(p, 'bear', true, '2026-10-07'), p, 'ทำซ้ำวันเดียวกันต้องไม่ได้เพิ่ม')
+  assert(quest.questAvailable(p, 'bear', '2026-10-08'), 'วันถัดไปมีภารกิจใหม่')
+  const fail = quest.recordQuest(p, 'fox', false, '2026-10-07')
+  eq(fail.coins, p.coins, 'ตอบไม่ถูกไม่ได้เหรียญ')
+  assert(!quest.questAvailable(fail, 'fox', '2026-10-07'), 'ตอบไม่ถูกก็นับว่าทำแล้ววันนี้')
+  p = { ...p, questsDone: 4 }
+  assert(progress.newBadges(p).includes('helper'), 'ช่วยเพื่อน 4 ครั้งต้องได้ตรา')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

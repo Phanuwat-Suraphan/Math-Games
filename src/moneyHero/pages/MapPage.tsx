@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { List } from 'lucide-react'
-import type { NpcId } from '../engine/types'
+import type { NpcId, Question } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { LEVELS, TOTAL_LESSONS, type LevelDef } from '../data/levels'
 import { CHARACTERS } from '../data/characters'
@@ -26,6 +26,9 @@ import { Stars } from '../components/Stars'
 import { TownTerrain, TreeSprite } from '../components/TownArt'
 import { BuildingArt } from '../components/BuildingArt'
 import { doneToday, liveStreak } from '../engine/daily'
+import { NPC_QUESTS, QUEST_REWARD, isQuestNpc, makeQuest, questAvailable, recordQuest, type QuestNpc } from '../engine/npcQuest'
+import { StepRunner } from '../components/StepRunner'
+import { Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
 
@@ -106,7 +109,11 @@ export function MapPage() {
   const [collected, setCollected] = useState(() => new Set(player?.mapCoins ?? []))
   const [nearLevel, setNearLevel] = useState<number | null>(null)
   const [nearNpc, setNearNpc] = useState<NpcId | null>(null)
-  const [talk, setTalk] = useState<{ npc: NpcId; text: string } | null>(null)
+  const [talk, setTalk] = useState<{ npc: NpcId; text: string; quest?: boolean } | null>(null)
+  const [quest, setQuest] = useState<{ npc: QuestNpc; q: Question } | null>(null)
+  const [questDone, setQuestDone] = useState<{ npc: QuestNpc; ok: boolean } | null>(null)
+  const modalOpen = useRef(false)
+  modalOpen.current = quest !== null || questDone !== null
   const [showList, setShowList] = useState(false)
   const [pop, setPop] = useState<{ x: number; y: number; key: number } | null>(null)
   const tipIndex = useRef<Record<string, number>>({})
@@ -158,20 +165,35 @@ export function MapPage() {
     playSound('click')
   }, [])
 
-  const action = useCallback(() => {
-    const { level, npc } = nearRef.current
-    if (npc && npc !== 'hero') {
+  /** คุยกับเพื่อน: ถ้าวันนี้ยังไม่ได้ช่วย จะชวนทำภารกิจ ไม่งั้นบอกเคล็ดลับ */
+  const talkTo = useCallback(
+    (npc: NpcId) => {
+      if (!player || npc === 'hero') return
+      playSound('click')
+      if (isQuestNpc(npc) && questAvailable(player, npc)) {
+        const text = NPC_QUESTS[npc].ask
+        setTalk({ npc, text, quest: true })
+        speak(text)
+        return
+      }
       const tips = TIPS[npc as keyof typeof TIPS]
       const i = tipIndex.current[npc] ?? 0
       tipIndex.current[npc] = i + 1
       const text = tips[i % tips.length]
       setTalk({ npc, text })
       speak(text)
-      playSound('click')
+    },
+    [player],
+  )
+
+  const action = useCallback(() => {
+    const { level, npc } = nearRef.current
+    if (npc && npc !== 'hero') {
+      talkTo(npc)
       return
     }
     if (level !== null) enter(LEVELS[level])
-  }, [enter])
+  }, [enter, talkTo])
 
   /* ---------------- ลูปเกม ---------------- */
   useEffect(() => {
@@ -304,7 +326,7 @@ export function MapPage() {
       return null
     }
     const down = (e: KeyboardEvent) => {
-      if (document.activeElement instanceof HTMLInputElement) return
+      if (modalOpen.current || document.activeElement instanceof HTMLInputElement) return
       const k = keyOf(e.key)
       if (k) {
         sim.current.keys[k] = true
@@ -328,7 +350,7 @@ export function MapPage() {
 
   // คำพูดหายไปเองหลังอ่านจบ แผงเข้าด่านจึงกลับมา
   useEffect(() => {
-    if (!talk) return
+    if (!talk || talk.quest) return
     const t = window.setTimeout(() => setTalk(null), 3500)
     return () => window.clearTimeout(t)
   }, [talk])
@@ -430,14 +452,24 @@ export function MapPage() {
           })}
 
           {TOWN_NPCS.map((n) => (
-            <div
+            <button
               key={n.id}
+              type="button"
               className={`mh-town-npc ${nearNpc === n.id ? 'is-near' : ''}`}
               style={{ left: n.x - 32, top: n.y - 80, zIndex: n.y, animationDelay: `${(n.x % 7) * -0.6}s` }}
+              onClick={() => talkTo(n.id)}
+              aria-label={`คุยกับ${CHARACTERS[n.id].name}`}
+              data-testid={`mh-npc-${n.id}`}
             >
-              {nearNpc === n.id && <span className="mh-npc-hint">💬</span>}
+              {questAvailable(player, n.id) ? (
+                <span className="mh-npc-quest" aria-label="มีภารกิจ">
+                  ❗
+                </span>
+              ) : (
+                nearNpc === n.id && <span className="mh-npc-hint">💬</span>
+              )}
               <CharacterArt id={n.id} size={64} mood={nearNpc === n.id ? 'happy' : 'normal'} />
-            </div>
+            </button>
           ))}
 
           {TOWN_COINS.map((c) =>
@@ -499,9 +531,29 @@ export function MapPage() {
           {talk && (
             <div className="mh-card mh-talk" aria-live="polite">
               <CharacterArt id={talk.npc} size={52} />
-              <div>
+              <div className="mh-talk-body">
                 <strong>{CHARACTERS[talk.npc].name}</strong>
                 <p>{talk.text}</p>
+                {talk.quest && isQuestNpc(talk.npc) && (
+                  <div className="mh-row-buttons mh-talk-buttons">
+                    <button type="button" className="mh-btn mh-btn-soft mh-btn-sm" onClick={() => setTalk(null)}>
+                      ไว้ก่อนนะ
+                    </button>
+                    <button
+                      type="button"
+                      className="mh-btn mh-btn-gold mh-btn-sm"
+                      data-testid="mh-quest-accept"
+                      onClick={() => {
+                        const npc = talk.npc as QuestNpc
+                        playSound('unlock')
+                        setTalk(null)
+                        setQuest({ npc, q: makeQuest(npc) })
+                      }}
+                    >
+                      🎁 ช่วยเลย! (+{QUEST_REWARD.coins} 🪙)
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -631,6 +683,43 @@ export function MapPage() {
           <List size={22} /> {showList ? 'ซ่อนรายการด่าน' : 'ดูรายการด่าน'}
         </button>
       </div>
+
+      {quest && (
+        <div className="mh-modal mh-quest-modal" role="dialog" aria-label={`ภารกิจของ${CHARACTERS[quest.npc].name}`}>
+          <div className="mh-card mh-modal-card mh-quest-card" data-testid="mh-quest">
+            <div className="mh-quest-title">🎁 ภารกิจของ{CHARACTERS[quest.npc].name}</div>
+            <StepRunner
+              questions={[quest.q]}
+              levelId={-1}
+              mode="practice"
+              onFinish={(s) => {
+                const ok = s.within2 > 0
+                updatePlayer((p) => recordQuest(p, quest.npc, ok))
+                setQuestDone({ npc: quest.npc, ok })
+                setQuest(null)
+                playSound(ok ? 'complete' : 'click')
+              }}
+            />
+          </div>
+        </div>
+      )}
+      {questDone && (
+        <div className="mh-modal mh-quest-modal" role="dialog" aria-label="ผลภารกิจ">
+          <div className="mh-card mh-modal-card mh-center" data-testid="mh-quest-done">
+            {questDone.ok && <Confetti count={24} />}
+            <CharacterArt id={questDone.npc} size={96} mood={questDone.ok ? 'happy' : 'normal'} />
+            <h2 className="mh-step-title">{questDone.ok ? 'ขอบใจมากนะ! 💖' : 'ไม่เป็นไรนะ พรุ่งนี้มาช่วยกันใหม่'}</h2>
+            {questDone.ok && (
+              <p>
+                ได้ +{QUEST_REWARD.coins} 🪙 · +{QUEST_REWARD.exp} EXP
+              </p>
+            )}
+            <button type="button" className="mh-btn mh-btn-gold" onClick={() => setQuestDone(null)} data-testid="mh-quest-close">
+              กลับไปเดินเล่น ▶
+            </button>
+          </div>
+        </div>
+      )}
 
       {showList && (
         <div className="mh-level-list" data-testid="mh-level-list">
