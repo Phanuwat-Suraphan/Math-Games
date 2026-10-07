@@ -43,6 +43,7 @@ const pinch = load('engine/pinch.js')
 const eco = load('engine/eco.js')
 const changeGame = load('engine/changeGame.js')
 const bosses = load('data/bosses.js')
+const missions = load('data/missions.js')
 
 let passed = 0
 const failures = []
@@ -1099,6 +1100,29 @@ test('สู้บอส: ทุกด่านมีบอส และพล�
     const hp = bosses.bossHp(qs.length, scoring.BOSS_PASS)
     assert(hp >= 1 && hp <= qs.length, `พลังบอสด่าน ${id} ผิด (${hp}/${qs.length})`)
   }
+})
+
+test('ฉากภารกิจ: ด่าน 0–11 มีฉากของตัวเอง และช่องความคืบหน้าเดินหนึ่งช่องต่อข้อหลัก', () => {
+  for (let id = 0; id <= 11; id += 1) {
+    const m = missions.missionOf(id)
+    assert(m && m.title && m.story && m.item && m.done, `ด่าน ${id} ไม่มีฉากภารกิจ`)
+    assert(gens.buildStep(id, 'mission').length >= 1, `ด่าน ${id} ไม่มีโจทย์ภารกิจ`)
+  }
+  eq(missions.missionOf(12), null, 'ด่าน 12 ใช้ภารกิจหนึ่งวันในเมืองแยกต่างหาก')
+  eq(new Set(Array.from({ length: 12 }, (_, i) => missions.missionOf(i).title)).size, 12, 'ชื่อภารกิจไม่ซ้ำ')
+  const go = missions.advanceMission
+  eq(go([], true, 1, false).join(), 'good', 'ตอบถูกครั้งแรก')
+  eq(go(['good'], true, 2, false).join(), 'good,good', 'ตอบถูกครั้งที่ 2 ก็ได้ของ')
+  eq(go(['good'], false, 1, false).join(), 'good', 'ผิดครั้งแรกยังไม่เดิน')
+  eq(go(['good'], false, 2, false).join(), 'good,try', 'ผิดครบ 2 ครั้ง ได้ช่อง 💪')
+  eq(go(['good', 'try'], true, 1, true).join(), 'good,try', 'ข้อฝึกซ้ำไม่เพิ่มช่อง')
+  // จำลองทั้งชุด: ทุกข้อหลักจบด้วยถูก (ครั้งที่ 1/2) หรือผิดครั้งที่ 2 เสมอ → ช่องเต็มพอดี
+  let slots = []
+  const plan = [[true], [false, true], [false, false], [true], [false, false]]
+  for (const tries of plan) tries.forEach((ok, i) => (slots = go(slots, ok, i + 1, false)))
+  slots = go(slots, true, 1, true)
+  eq(slots.length, plan.length, 'ช่องเท่าจำนวนข้อหลัก')
+  eq(slots.filter((x) => x === 'good').length, 3, 'นับของที่ได้ถูกต้อง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
