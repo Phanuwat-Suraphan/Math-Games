@@ -273,6 +273,12 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   await playUntil(page, 'mh-step-done')
   await page.getByTestId('mh-next-step').click()
   await page.waitForURL(new RegExp(`#/level/${id}/boss`))
+  // สนามสู้บอส: บอสพลังเต็มก่อนเริ่ม
+  await page.getByTestId('mh-boss-arena').waitFor()
+  const hpText = await page.getByTestId('mh-boss-hp').innerText()
+  const m = hpText.match(/พลัง (\d+)\/(\d+)/)
+  if (!m || m[1] !== m[2]) throw new Error(`พลังบอสด่าน ${id} ตอนเริ่มไม่เต็ม: ${hpText}`)
+  if (id === 4) await snap(page, `${label}level${id}-boss`)
   await playUntil(page, 'mh-result')
   await page.getByText('MISSION COMPLETE!').waitFor()
   await snap(page, `${label}level${id}-result`)
