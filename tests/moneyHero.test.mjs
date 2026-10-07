@@ -41,6 +41,7 @@ const book = load('engine/ledger.js')
 const kad = load('kad/kadData.js')
 const pinch = load('engine/pinch.js')
 const eco = load('engine/eco.js')
+const changeGame = load('engine/changeGame.js')
 
 let passed = 0
 const failures = []
@@ -1039,6 +1040,44 @@ test('กาดรักษ์โลกในเมือง: ถนนรัก
   const after = eco.recordEcoDay(rec, { sales: 3000, profit: 1000, alloc: eco.emptyAlloc() })
   eq(after.bag.length, 0, 'ขายแล้วถุงว่าง')
   eq(after.pickDay, rec.pickDay, 'ยังจำจุดที่เก็บวันนี้')
+})
+
+test('ร้านทอนไว: ทุกออร์เดอร์ทอนได้พอดีด้วยเงินในลิ้นชัก ระดับยากขึ้นตามคอมโบ และตัวตรวจบอกขาด/เกินถูก', () => {
+  for (let i = 0; i < 4000; i += 1) {
+    const level = [1, 2, 3][i % 3]
+    const o = changeGame.makeOrder(level)
+    eq(o.total, o.price * o.qty, 'ราคารวม')
+    eq(o.change, o.paid - o.total, 'เงินทอน = จ่าย − ราคา')
+    assert(o.change > 0, `ต้องมีเงินทอน (${o.paid} − ${o.total})`)
+    assert(o.change % 50 === 0, 'เงินทอนต้องทอนด้วยเหรียญที่มีได้')
+    eq(denoms.sumDenoms(o.paidWith), o.paid, 'เงินที่ลูกค้าจ่าย')
+    eq(denoms.sumDenoms(o.solution), o.change, 'ตัวอย่างการทอนต้องพอดี')
+    assert(o.solution.every((id) => changeGame.CHANGE_TRAY.includes(id)), 'ทอนด้วยเงินในลิ้นชักเท่านั้น')
+    assert(changeGame.checkChange(o, o.solution).ok, 'ทอนตามตัวอย่างต้องผ่าน')
+    if (level === 1) {
+      assert(o.change <= 2000 + 4000 && o.paid <= 5000, 'ระดับ 1 ใช้ธนบัตรไม่เกิน 50')
+      eq(o.qty, 1, 'ระดับ 1 ซื้อชิ้นเดียว')
+      eq(o.price % 100, 0, 'ระดับ 1 ไม่มีสตางค์')
+    }
+    assert(kad.PRODUCTS.some((p) => p.id === o.product), 'สินค้าต้องมีภาพ')
+  }
+  const o = changeGame.makeOrder(1)
+  const short = changeGame.checkChange(o, [])
+  assert(!short.ok && short.diff === -o.change, 'ยังไม่หยิบ = ขาดเท่าเงินทอน')
+  const over = changeGame.checkChange(o, [...o.solution, 'b1'])
+  assert(!over.ok && over.diff === 100 && over.message.includes('เกิน'), 'ทอนเกิน 1 บาท')
+  eq(changeGame.levelFor(0), 1, 'เริ่มระดับ 1')
+  eq(changeGame.levelFor(3), 2, 'คอมโบ 3 ขึ้นระดับ 2')
+  eq(changeGame.levelFor(6), 3, 'คอมโบ 6 ขึ้นระดับ 3')
+  eq(changeGame.serveScore(0), 10, 'คะแนนพื้นฐาน')
+  eq(changeGame.serveScore(9), 20, 'โบนัสคอมโบสูงสุด +10')
+  eq(changeGame.roundCoins(30), 12, 'เหรียญต่อรอบไม่เกิน 12')
+  eq(changeGame.roundStars(10, 'timed', 0), 3, 'ท้าเวลา 10 คนได้ 3 ดาว')
+  eq(changeGame.roundStars(8, 'practice', 3), 1, 'ฝึกแต่ผิดหลายครั้ง')
+  // ลูกค้าคนถัดไปไม่ใช่คนเดิม
+  for (let i = 0; i < 200; i += 1) assert(changeGame.makeOrder(2, 'fox').npc !== 'fox', 'ลูกค้าซ้ำคนเดิม')
+  const p = { ...progress.newPlayer('ทอน', 'hero'), changeBest: 8 }
+  assert(progress.newBadges(p).includes('quick-change'), 'ทอนถูก 8 คนได้ตรา')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
