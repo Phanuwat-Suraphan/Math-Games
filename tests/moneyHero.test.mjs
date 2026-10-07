@@ -38,6 +38,7 @@ const daily = load('engine/daily.js')
 const quest = load('engine/npcQuest.js')
 const sandbox = load('engine/sandbox.js')
 const book = load('engine/ledger.js')
+const kad = load('kad/kadData.js')
 
 let passed = 0
 const failures = []
@@ -758,6 +759,46 @@ test('เป้าหมายการออม: ขาดอีกเท่า
   const qd = quest.recordQuest(progress.newPlayer('เพื่อน', 'hero'), 'owl', true, '2026-10-07')
   eq(qd.ledger[0].amount, quest.QUEST_REWARD.coins, 'รางวัลภารกิจเพื่อนลงสมุด')
   eq(qd.ledger.reduce((a, e) => a + e.amount, 0), qd.coins, 'ผู้เล่นใหม่: ผลรวมสมุด = เหรียญที่มี')
+})
+
+test('กาดรักษ์โลก: ราคาขยะ เงินจำลอง ร้าน ภารกิจ และคณิตศาสตร์ของกาดถูกต้อง', () => {
+  // ราคาขยะต้องเป็นเงินที่ทอนได้จริง (ลงตัวที่ 25 สตางค์)
+  for (const t of kad.TRASH) assert(t.price > 0 && t.price % 25 === 0, `ราคา ${t.name} ทอนไม่ได้`)
+  eq(new Set(kad.TRASH.map((t) => t.id)).size, kad.TRASH.length, 'ชนิดขยะซ้ำ')
+  // เงินจำลองเรียงจากน้อยไปมาก ไม่ซ้ำ ครบตามที่ใช้ในกิจกรรม
+  const values = kad.ECO_MONEY.map((m) => m.value)
+  eq(values.join(','), '50,100,200,500,1000,2000,5000,10000', 'ชนิดเงินจำลอง')
+  for (const m of kad.ECO_MONEY) eq(m.label, money.formatBS(m.value), `ชื่อเงินจำลอง ${m.value}`)
+  // สินค้า: ราคาแนะนำสมเหตุสมผล ร้านอ้างสินค้าที่มีจริง
+  for (const p of kad.PRODUCTS) assert(p.min > 0 && p.min <= p.max, `ราคาแนะนำ ${p.name}`)
+  for (const s of kad.SHOPS) for (const id of s.products) assert(kad.PRODUCTS.some((p) => p.id === id), `ร้าน ${s.name} อ้างสินค้า ${id} ที่ไม่มี`)
+  eq(new Set(kad.SHOPS.map((s) => s.letter)).size, kad.SHOPS.length, 'ตัวอักษรร้านซ้ำ')
+  eq(kad.MISSIONS.length, 7, 'ภารกิจ 7 อย่าง')
+  eq(kad.CYCLE.length, 10, 'วงจร 10 ขั้น')
+  eq(kad.priceRange(kad.PRODUCTS.find((p) => p.id === 'frame')), '15 บาท', 'ราคาเดียว')
+  eq(kad.priceRange(kad.PRODUCTS[0]), '15–25 บาท', 'ช่วงราคา')
+  // ใบรับซื้อขยะ: ขวด 6 ขวด + กระป๋อง 4 ใบ + ฝา 3 ฝา = 6 + 8 + 1.50 = 15.50 บาท
+  const pay = kad.trashPayout({ bottle: 6, can: 4, cap: 3 })
+  eq(pay.total, 1550, 'ใบรับซื้อขยะรวมเงิน')
+  eq(pay.lines.length, 3, 'บรรทัดเฉพาะชนิดที่มี')
+  eq(kad.trashPayout({ bottle: 2 }, { ...kad.defaultPrices(), bottle: 150 }).total, 300, 'ครูปรับราคาเองได้')
+  for (let i = 0; i < 500; i += 1) {
+    const counts = Object.fromEntries(kad.TRASH.map((t) => [t.id, Math.floor(Math.random() * 20)]))
+    const r = kad.trashPayout(counts)
+    eq(r.total, kad.TRASH.reduce((s, t) => s + counts[t.id] * t.price, 0), 'รวมเงินใบรับซื้อ')
+    eq(r.total % 25, 0, 'ยอดต้องทอนได้')
+  }
+  // กำไร: ตัวอย่างในเอกสาร 3 × 15 − 20 = 25
+  eq(kad.profitOf(3 * 15, 20).profit, 25, 'กำไรตัวอย่าง')
+  eq(kad.profitOf(45, 20).word, 'กำไร', 'คำว่ากำไร')
+  eq(kad.profitOf(10, 20).word, 'ขาดทุน', 'คำว่าขาดทุน')
+  eq(kad.profitOf(20, 20).word, 'เท่าทุน', 'คำว่าเท่าทุน')
+  // เป้าหมายทั้งห้อง 100 / 200 / 300 บาท
+  eq(kad.classProgress(0).unlocked, 0, 'ยังไม่ปลดล็อก')
+  eq(kad.classProgress(0).need, 100, 'ขาดอีก 100')
+  eq(kad.classProgress(150).unlocked, 1, 'ปลดล็อกต้นไม้')
+  eq(kad.classProgress(150).need, 50, 'ขาดอีก 50 ถึงกระถาง')
+  eq(kad.classProgress(300).next, null, 'ครบทุกเป้า')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

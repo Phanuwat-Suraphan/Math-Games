@@ -631,6 +631,48 @@ for (const [name, viewport] of [
     if (csv.charCodeAt(0) !== 0xfeff || !csv.includes('ทดสอบ') || !csv.includes('Pre-test')) throw new Error(`ไฟล์ CSV ไม่ถูกต้อง: ${csv.slice(0, 80)}`)
   })
 
+  await step(`[${name}] กาดรักษ์โลก: สื่อพิมพ์ครบ 8 ชุด ไม่มีเนื้อหาล้นแผ่น และพิมพ์ได้แผ่นละหนึ่งหน้า A4`, async () => {
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-kad').click()
+    await page.getByTestId('kad-page').waitFor()
+    const expected = { poster: 2, trash: 1, money: 4, bank: 4, products: 2, shops: 6, docs: 10, missions: 3 }
+    for (const [id, n] of Object.entries(expected)) {
+      await page.getByTestId(`kad-tab-${id}`).click()
+      const count = await page.locator('.kad-sheet').count()
+      if (count !== n) throw new Error(`ชุด ${id} มี ${count} แผ่น ควรมี ${n}`)
+      await noSideScroll(page, `กาดรักษ์โลก ${id}`)
+      if (name !== 'desktop') continue
+      // ทุกแผ่นต้องจบในกระดาษ ไม่มีอะไรล้นจนถูกตัดตอนพิมพ์
+      const spill = await page.evaluate(() =>
+        [...document.querySelectorAll('.kad-sheet-in')].map((el, i) => (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2 ? i + 1 : 0)).filter(Boolean),
+      )
+      if (spill.length > 0) throw new Error(`ชุด ${id} แผ่นที่ ${spill.join(', ')} เนื้อหาล้นกระดาษ`)
+      await page.locator('.kad-sheet').first().screenshot({ path: path.join(SHOTS, `money-hero-kad-${id}.png`) })
+    }
+    // คลังภาพ: ดาวน์โหลดภาพเป็น PNG และ SVG ได้จริง
+    await page.getByTestId('kad-tab-library').click()
+    await page.getByTestId('kad-library').waitFor()
+    await noSideScroll(page, 'คลังภาพกาดรักษ์โลก')
+    for (const kind of ['png', 'svg']) {
+      const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId(`kad-${kind}-money-note-2000`).click()])
+      const file = download.suggestedFilename()
+      if (file !== `kad-money-note-2000.${kind}`) throw new Error(`ชื่อไฟล์ภาพไม่ถูก: ${file}`)
+      const size = fs.statSync(await download.path()).size
+      if (size < 2000) throw new Error(`ไฟล์ภาพ ${file} เล็กผิดปกติ (${size} ไบต์)`)
+    }
+    if (name === 'desktop') {
+      for (const [id, n] of [
+        ['docs', 10],
+        ['shops', 6],
+      ]) {
+        await page.getByTestId(`kad-tab-${id}`).click()
+        const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+        const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+        if (pages !== n) throw new Error(`พิมพ์ชุด ${id} ได้ ${pages} หน้า ควรได้ ${n}`)
+      }
+    }
+  })
+
   await step(`[${name}] ปุ่มบนหน้าเริ่มเกมไม่มีทางตัน`, async () => {
     for (const label of ['โหมดคุณครู', 'เปลี่ยนผู้เล่น']) {
       await page.goto(`${BASE}#/start`)

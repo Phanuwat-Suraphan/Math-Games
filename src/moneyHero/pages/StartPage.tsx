@@ -97,6 +97,9 @@ export function StartPage() {
           <Link to="/teacher" className="mh-btn mh-btn-soft mh-btn-block">
             <GraduationCap size={22} /> โหมดคุณครู
           </Link>
+          <Link to="/kad" className="mh-btn mh-btn-go mh-btn-block" data-testid="mh-start-kad">
+            🌱 กาดรักษ์โลก ป.3 (สื่อพิมพ์เล่นจริง)
+          </Link>
         </div>
         <p className="mh-foot-note mh-pill">ไม่ต้องสมัครสมาชิก · ความก้าวหน้าบันทึกไว้ในเครื่องนี้</p>
       </div>
