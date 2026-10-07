@@ -154,12 +154,13 @@ export function payoutOf(sell: Record<string, number>, prices: TrashPrices = def
 }
 
 /** กองขยะมีของพอทำสินค้า และขายส่วนที่เหลือได้เงินพอซื้ออุปกรณ์ (มีเงินเหลืออย่างน้อย 2 บาท) */
-export function makeDay(recipe: Recipe, start = 0, prices: TrashPrices = defaultPrices()): EcoDay {
+export function makeDay(recipe: Recipe, start = 0, prices: TrashPrices = defaultPrices(), bonus: readonly string[] = []): EcoDay {
   const cost = recipeCost(recipe)
   const keep = { ...recipe.uses }
-  const sellList: string[] = []
+  // ขยะที่ฮีโร่เก็บจากถนนในเมือง ขายเพิ่มได้
+  const sellList: string[] = bonus.slice(0, BAG_MAX)
   const ids = TRASH.map((t) => t.id)
-  const extras = int(4, 6)
+  const extras = Math.max(2, int(4, 6) - Math.floor(sellList.length / 2))
   for (let i = 0; i < extras; i += 1) sellList.push(pick(ids))
   // เติมกล่องกระดาษ (ราคาดี) จนเงินพอ
   let guard = 0
@@ -361,6 +362,14 @@ export function profitQuestion(income: number, cost: number): AmountQ | null {
   })
 }
 
+/** เก็บขยะบนถนน: ได้ถ้ายังไม่เคยเก็บจุดนี้วันนี้และถุงยังไม่เต็ม */
+export function pickTrash(rec: EcoRecord, spotId: string, kind: string, today: string): { ok: boolean; rec: EcoRecord; full: boolean } {
+  const picked = rec.pickDay === today ? rec.picked : []
+  if (picked.includes(spotId)) return { ok: false, rec, full: false }
+  if (rec.bag.length >= BAG_MAX) return { ok: false, rec, full: true }
+  return { ok: true, full: false, rec: { ...rec, bag: [...rec.bag, kind], pickDay: today, picked: [...picked, spotId] } }
+}
+
 /* ------------------------------------------------------------------ */
 /* ใช้กำไร และบันทึกของผู้เล่น                                           */
 /* ------------------------------------------------------------------ */
@@ -384,7 +393,15 @@ export function allocTotal(a: Allocation): number {
   return a.invest + a.gift + a.save + a.donate
 }
 
+/** ถุงขยะใส่ได้สูงสุดกี่ชิ้น */
+export const BAG_MAX = 12
+
 export interface EcoRecord {
+  /** ขยะที่เก็บจากถนนในเมือง (ยังไม่ได้ขาย) */
+  bag: string[]
+  /** วันที่เก็บขยะบนถนนล่าสุด และจุดที่เก็บไปแล้ววันนั้น */
+  pickDay: string
+  picked: string[]
   days: number
   /** ยอดขายสินค้าสะสม (สตางค์) ทำให้ต้นไม้โต */
   sales: number
@@ -397,11 +414,14 @@ export interface EcoRecord {
 }
 
 export function emptyEco(): EcoRecord {
-  return { days: 0, sales: 0, donated: 0, saved: 0, gifted: 0, invest: 0, bestProfit: 0 }
+  return { bag: [], pickDay: '', picked: [], days: 0, sales: 0, donated: 0, saved: 0, gifted: 0, invest: 0, bestProfit: 0 }
 }
 
 export function recordEcoDay(rec: EcoRecord, day: { sales: number; profit: number; alloc: Allocation }): EcoRecord {
   return {
+    ...rec,
+    // ขยะในถุงถูกขายไปในวันนี้แล้ว
+    bag: [],
     days: rec.days + 1,
     sales: rec.sales + day.sales,
     donated: rec.donated + day.alloc.donate,

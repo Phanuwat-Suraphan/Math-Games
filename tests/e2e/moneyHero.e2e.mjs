@@ -651,8 +651,16 @@ for (const [name, viewport] of [
 
   await step(`[${name}] กาดรักษ์โลกในเกม: ทำกระถาง คัดแยกขยะ ขายขยะ ซื้ออุปกรณ์ ทำสินค้า ขาย ทอนเงิน คิดกำไร และแบ่งกำไร`, async () => {
     await page.goto(`${BASE}#/map`)
-    await page.getByTestId('mh-menu-eco').click()
+    // ขยะของวันนี้วางอยู่บนถนน 6 ชิ้น
+    const onStreet = await page.locator('[data-testid^="mh-trash-"]').count()
+    if (onStreet < 1 || onStreet > 6) throw new Error(`ขยะบนถนนผิดจำนวน (${onStreet})`)
+    // แตะแผงกาด: ฮีโร่เดินตามถนนไปเอง แล้วเปิดร้าน
+    await page.getByTestId('mh-eco-stall').evaluate((el) => el.click())
+    await page.getByTestId('mh-eco-panel').waitFor({ timeout: 40_000 })
+    await snap(page, `${name}-map-eco`)
+    await page.getByTestId('mh-eco-enter').click()
     await page.getByTestId('eco-choose').waitFor()
+    await page.getByTestId('eco-bag').waitFor()
     await noSideScroll(page, 'กาดรักษ์โลกในเกม')
     const before = await savedPlayer(page)
     await page.getByTestId('eco-recipe-pot').click()

@@ -10,6 +10,7 @@ import {
   RECIPES,
   TRASH_BIN,
   allocTotal,
+  countOf,
   changeQuestion,
   costQuestion,
   ecoStage,
@@ -137,7 +138,7 @@ export function EcoPage() {
 
   const start = (r: Recipe) => {
     playSound('click')
-    setDay(makeDay(r, eco.invest))
+    setDay(makeDay(r, eco.invest, undefined, eco.bag))
     setSorted([])
     setSelected(null)
     setMade(0)
@@ -223,6 +224,14 @@ export function EcoPage() {
                   )}
                 </p>
                 {eco.invest > 0 && <p className="eco-note">🌱 มีทุนยกมาจากเมื่อวาน {formatBS(eco.invest)}</p>}
+                <p className="eco-note" data-testid="eco-bag">
+                  🧺 ถุงขยะที่เก็บจากถนนในเมือง:{' '}
+                  {eco.bag.length > 0
+                    ? `${Object.entries(countOf(eco.bag))
+                        .map(([id, n]) => `${trashName(id)} ${n}`)
+                        .join(' · ')} (จะขายได้เงินเพิ่ม!)`
+                    : 'ยังว่าง เดินเก็บขยะบนถนนในแผนที่ได้วันละ 6 ชิ้น'}
+                </p>
               </div>
             </div>
             <h2 className="mh-section-title">วันนี้อยากทำสินค้าอะไรขาย?</h2>

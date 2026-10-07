@@ -984,6 +984,56 @@ test('กาดรักษ์โลกในเกม: กองขยะพอ
   assert(progress.newBadges({ ...fresh, eco: { ...rec, sales: 30000 } }).includes('eco-garden'), 'ขายครบ 300 บาทได้ตราสวน')
 })
 
+test('กาดรักษ์โลกในเมือง: ถนนรักษ์โลกเดินได้ ขยะรายวันเก็บได้จริง เส้นทางไปแผงกาดถึงจริง และถุงขยะใช้ขายได้', () => {
+  const [a, b] = town.ECO_LANE
+  for (let k = 0; k <= 100; k += 1) {
+    const p = { x: a.x + ((b.x - a.x) * k) / 100, y: a.y }
+    assert(town.walkable(p), `ถนนรักษ์โลกถูกขวางที่ ${Math.round(p.x)}`)
+  }
+  assert(town.walkable(town.ECO_MARKET) && town.walkable(town.ECO_GARDEN), 'หน้าแผงกาด/สวนต้องยืนได้')
+  for (const t of town.TREES) assert(town.nearestOnLane(t).d > t.r, `ต้นไม้ทับถนนรักษ์โลก (${t.x}, ${t.y})`)
+  assert(town.TRASH_SPOTS.length >= 20, 'จุดขยะน้อยเกินไป')
+  for (const sp of town.TRASH_SPOTS) assert(town.walkable(sp), `จุดขยะ ${sp.id} เดินไปไม่ได้`)
+  for (const c of town.TOWN_COINS) for (const sp of town.TRASH_SPOTS) assert(town.dist(c, sp) > 40, 'ขยะทับเหรียญ')
+  for (const day of ['2026-10-07', '2026-10-08', '2027-01-01']) {
+    const t1 = town.dailyTrash(day)
+    eq(JSON.stringify(t1), JSON.stringify(town.dailyTrash(day)), 'วันเดียวกันได้ขยะชุดเดิม')
+    eq(t1.length, 6, 'วันละ 6 ชิ้น')
+    eq(new Set(t1.map((t) => t.id)).size, 6, 'จุดไม่ซ้ำ')
+    for (const t of t1) assert(kad.TRASH.some((x) => x.id === t.kind), 'ชนิดขยะต้องมีราคารับซื้อ')
+  }
+  assert(JSON.stringify(town.dailyTrash('2026-10-07')) !== JSON.stringify(town.dailyTrash('2026-10-08')), 'วันใหม่ขยะเปลี่ยน')
+  for (const from of [town.doorOf(0), town.doorOf(6), town.doorOf(12), { x: 900, y: 1520 }]) {
+    const route = town.routeToLane(from, town.ECO_MARKET)
+    const end = route[route.length - 1]
+    eq(`${end.x},${end.y}`, `${town.ECO_MARKET.x},${town.ECO_MARKET.y}`, 'เส้นทางต้องจบที่แผงกาด')
+    let prev = from
+    for (const p of route) {
+      for (let k = 0; k <= 20; k += 1) {
+        const q = { x: prev.x + ((p.x - prev.x) * k) / 20, y: prev.y + ((p.y - prev.y) * k) / 20 }
+        assert(town.walkable(q), `เส้นทางไปแผงกาดถูกขวางที่ (${Math.round(q.x)}, ${Math.round(q.y)})`)
+      }
+      prev = p
+    }
+  }
+  // ถุงขยะ: เก็บจุดเดิมซ้ำไม่ได้ ถุงเต็มเก็บไม่ได้ วันใหม่เก็บใหม่ได้ ขายแล้วถุงว่าง
+  let rec = eco.emptyEco()
+  let r = eco.pickTrash(rec, 'w0-0', 'bottle', '2026-10-07')
+  assert(r.ok, 'เก็บได้')
+  rec = r.rec
+  assert(!eco.pickTrash(rec, 'w0-0', 'bottle', '2026-10-07').ok, 'จุดเดิมวันเดียวกันเก็บซ้ำไม่ได้')
+  assert(eco.pickTrash(rec, 'w0-0', 'can', '2026-10-08').ok, 'วันใหม่เก็บได้อีก')
+  for (let i = 1; i < eco.BAG_MAX; i += 1) rec = eco.pickTrash(rec, `x${i}`, 'can', '2026-10-07').rec
+  eq(rec.bag.length, eco.BAG_MAX, 'ถุงเต็ม')
+  assert(eco.pickTrash(rec, 'x99', 'can', '2026-10-07').full, 'ถุงเต็มต้องบอก')
+  const day = eco.makeDay(eco.RECIPES[0], 0, undefined, rec.bag)
+  for (const id of rec.bag) assert((eco.countOf(day.pile)[id] ?? 0) >= 1, 'ขยะในถุงต้องอยู่ในกอง')
+  assert((day.sell.can ?? 0) >= rec.bag.filter((x) => x === 'can').length, 'ขยะในถุงขายได้')
+  const after = eco.recordEcoDay(rec, { sales: 3000, profit: 1000, alloc: eco.emptyAlloc() })
+  eq(after.bag.length, 0, 'ขายแล้วถุงว่าง')
+  eq(after.pickDay, rec.pickDay, 'ยังจำจุดที่เก็บวันนี้')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
