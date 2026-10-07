@@ -306,6 +306,8 @@ async function playLevel(page, id, { makeMistake = false, label = '' } = {}) {
   await page.getByTestId('mh-star-goal').waitFor()
   const tip = await page.getByTestId('mh-star-tip').innerText()
   if (!/ถูกตั้งแต่ครั้งแรก \d+\/\d+ ข้อ/.test(tip)) throw new Error(`เกณฑ์ดาวด่าน ${id} ไม่บอกจำนวนข้อ: ${tip}`)
+  // ผ่านด่านหลักแล้ว ด่านย่อย X-2 เปิดให้กดเข้าได้
+  await page.getByTestId('mh-stage-go-2').waitFor()
   await snap(page, `${label}level${id}-result`)
 }
 
@@ -494,6 +496,32 @@ for (const [name, viewport] of [
       const p = await savedPlayer(page)
       if (!p.postTest || p.postTest.total !== 20 || p.postTest.score !== 20) throw new Error(`ผลหลังเรียนผิด: ${JSON.stringify(p.postTest)?.slice(0, 120)}`)
       for (const b of ['posttest', 'improver']) if (!p.badges.includes(b)) throw new Error(`ไม่ได้ตรา ${b}`)
+    })
+
+    await step(`[${name}] ด่านย่อย: X-3 ล็อกจนกว่าจะผ่าน X-2 แล้วเล่น 3-2 ฝึกเก่ง ต่อ 3-3 ท้าทาย`, async () => {
+      await page.goto(`${BASE}#/level/3/stage/3`)
+      await page.waitForURL(/#\/map/)
+      await page.goto(`${BASE}#/level/3/stage/2`)
+      await page.getByTestId('mh-stage-chips').waitFor()
+      await page.getByTestId('mh-practice').waitFor()
+      await page.getByTestId('mh-question').waitFor()
+      await snap(page, `${name}-stage-3-2`)
+      await playUntil(page, 'mh-stage-done')
+      await page.getByText('ผ่านด่านย่อย 3-2!').waitFor()
+      await snap(page, `${name}-stage-3-2-done`)
+      await page.getByTestId('mh-stage-next').click()
+      await page.waitForURL(/#\/level\/3\/stage\/3/)
+      await page.getByTestId('mh-boss-arena').waitFor()
+      await page.getByText(/ร่างโหด/).first().waitFor()
+      await playUntil(page, 'mh-stage-done')
+      await page.getByText('ผ่านด่านย่อย 3-3!').waitFor()
+      const p = await savedPlayer(page)
+      for (const k of ['3-2', '3-3']) {
+        if (p.stages?.[k]?.stars !== 3) throw new Error(`ดาวด่านย่อย ${k} ไม่ถูกบันทึก: ${JSON.stringify(p.stages)}`)
+      }
+      if (!p.ledger.some((e) => e.label === 'รางวัลด่านย่อย 3-3')) throw new Error('รางวัลด่านย่อยไม่ลงสมุดบัญชี')
+      await page.getByTestId('mh-stage-again').click()
+      await page.getByTestId('mh-question').waitFor()
     })
   }
 

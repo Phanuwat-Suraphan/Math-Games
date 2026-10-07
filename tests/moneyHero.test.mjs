@@ -45,6 +45,7 @@ const changeGame = load('engine/changeGame.js')
 const bosses = load('data/bosses.js')
 const missions = load('data/missions.js')
 const practice = load('data/practice.js')
+const stages = load('engine/stages.js')
 
 let passed = 0
 const failures = []
@@ -1172,6 +1173,64 @@ test('เกณฑ์ดาว: บอกได้ว่าต้องถูก
   eq(scoring.STAR_LINES.map((l) => l.at).join(), '0.7,0.9', 'เส้นเกณฑ์ตรงกับ starsFor')
   eq(scoring.starsFor(0.7), 2, 'เส้น 2 ดาว')
   eq(scoring.starsFor(0.9), 3, 'เส้น 3 ดาว')
+})
+
+test('ด่านย่อย X-2 / X-3: โจทย์ครบทุกด่าน ปลดล็อกตามลำดับ เก็บดาวที่ดีที่สุด และให้รางวัล', () => {
+  for (let id = 0; id <= 12; id += 1) {
+    for (const n of [2, 3]) {
+      const def = stages.STAGES[n]
+      for (let round = 0; round < 5; round += 1) {
+        const qs = gens.buildStage(id, def.difficulty, def.target)
+        assert(qs.length >= def.target && qs.length <= def.target + 6, `ด่าน ${id}-${n} ได้ ${qs.length} ข้อ`)
+        for (const q of qs) assert(q.difficulty === def.difficulty, `ด่าน ${id}-${n} ระดับความยากผิด (${q.gen})`)
+      }
+      assert(gens.stageGens(id).length >= 1, `ด่าน ${id} ไม่มีชนิดโจทย์`)
+    }
+  }
+  // ใช้ชนิดโจทย์หลากหลาย ไม่ใช่ชนิดเดียวซ้ำ
+  assert(new Set(gens.buildStage(4, 2, 6).map((q) => q.gen)).size >= 3, 'ด่านย่อยควรมีโจทย์หลายแบบ')
+
+  let p = progress.newPlayer('ด่านย่อย', 'hero')
+  eq(stages.isStageUnlocked(p, 1, 2), false, 'ยังไม่ผ่านด่านหลัก X-2 ล็อก')
+  p = { ...p, levels: { 1: { ...progress.emptyLevel(), stepDone: 4, bestStars: 2 } } }
+  eq(stages.isStageUnlocked(p, 1, 2), true, 'ผ่านด่านหลักแล้วเปิด X-2')
+  eq(stages.isStageUnlocked(p, 1, 3), false, 'ยังไม่ผ่าน X-2 X-3 ล็อก')
+
+  // ไม่ผ่าน: ถูกภายใน 2 ครั้งไม่ถึง 60%
+  const fail = stages.stageResult({ originals: 6, firstTry: 2, within2: 3 })
+  eq(fail.passed, false, '3/6 ไม่ผ่าน')
+  eq(fail.stars, 0, 'ไม่ผ่านไม่มีดาว')
+  const coins0 = p.coins
+  p = stages.recordStage(p, 1, 2, fail)
+  eq(p.coins, coins0, 'ไม่ผ่านไม่ได้เหรียญ')
+  eq(stages.isStageUnlocked(p, 1, 3), false, 'ไม่ผ่าน X-2 ยังล็อก X-3')
+
+  const ok = stages.stageResult({ originals: 6, firstTry: 6, within2: 6 })
+  eq(ok.stars, 3, 'ถูกหมดได้ 3 ดาว')
+  p = stages.recordStage(p, 1, 2, ok)
+  const r1 = stages.stageReward(2, 3, true)
+  eq(p.coins, coins0 + r1.coins, 'ผ่านครั้งแรกได้รางวัลเต็ม')
+  eq(stages.isStageUnlocked(p, 1, 3), true, 'ผ่าน X-2 เปิด X-3')
+  // เล่นซ้ำได้ดาวน้อยกว่า: เก็บดาวที่ดีที่สุด ได้รางวัลครึ่งหนึ่ง
+  const worse = stages.stageResult({ originals: 6, firstTry: 4, within2: 6 })
+  const before = p.coins
+  p = stages.recordStage(p, 1, 2, worse)
+  eq(stages.stageRecord(p, 1, 2).stars, 3, 'เก็บดาวที่ดีที่สุด')
+  eq(stages.stageRecord(p, 1, 2).plays, 3, 'นับจำนวนครั้งที่เล่น')
+  eq(p.coins - before, stages.stageReward(2, worse.stars, false).coins, 'เล่นซ้ำได้รางวัลครึ่งหนึ่ง')
+  assert(stages.stageReward(3, 3, true).coins > stages.stageReward(2, 3, true).coins, 'ด่านท้าทายได้รางวัลมากกว่า')
+  assert(p.ledger.some((e) => e.label === 'รางวัลด่านย่อย 1-2'), 'รางวัลลงสมุดบัญชี')
+  eq(stages.stageStars(p), 3, 'ดาวด่านย่อยรวม')
+
+  // ตรานักล่าความท้าทาย: ผ่าน X-3 ครบ 3 ด่าน
+  for (const id of [0, 1, 2]) p = stages.recordStage(p, id, 3, ok)
+  eq(stages.challengesCleared(p), 3, 'นับด่านท้าทายที่ผ่าน')
+  assert(progress.newBadges(p).includes('challenger'), 'ได้ตรานักล่าความท้าทาย')
+  // บันทึกเก่าที่ไม่มีช่อง stages ยังโหลดได้
+  const old = { ...progress.newPlayer('เก่า', 'hero') }
+  delete old.stages
+  const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
+  eq(JSON.stringify(save.players[old.id].stages), '{}', 'บันทึกเก่าได้ stages ว่าง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

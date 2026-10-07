@@ -7,6 +7,7 @@ import { MapPage } from './pages/MapPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LevelPage } from './pages/LevelPage'
+import { StagePage } from './pages/StagePage'
 import { TestPage } from './pages/TestPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -65,6 +66,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <LevelPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/level/:id/stage/:n"
+              element={
+                <NeedPlayer>
+                  <StagePage />
                 </NeedPlayer>
               }
             />

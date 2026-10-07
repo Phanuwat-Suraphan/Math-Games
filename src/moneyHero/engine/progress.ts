@@ -92,6 +92,8 @@ export interface Player {
   eco: EcoRecord
   /** ร้านทอนไว: จำนวนลูกค้าที่ทอนถูกมากที่สุดในโหมดท้าเวลา 60 วินาที */
   changeBest: number
+  /** ด่านย่อย X-2 / X-3: "ด่าน-ด่านย่อย" → ผลที่ดีที่สุด */
+  stages: Record<string, { stars: number; plays: number; bestAccuracy: number }>
   mapX?: number
   mapY?: number
 }
@@ -159,6 +161,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     goalsDone: 0,
     eco: emptyEco(),
     changeBest: 0,
+    stages: {},
   }
 }
 
@@ -308,6 +311,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (p.eco.days >= 1) want.push('eco-seller')
   if (p.changeBest >= 8) want.push('quick-change')
   if (ecoStage(p.eco).stage >= 3) want.push('eco-garden')
+  if (Object.entries(p.stages ?? {}).filter(([k, r]) => k.endsWith('-3') && r.stars > 0).length >= 3) want.push('challenger')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }
 

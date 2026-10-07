@@ -24,6 +24,7 @@ import {
   type Pt,
   type TownCoin,
 } from '../data/town'
+import { StageChips } from '../components/StageChips'
 import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
 import { AvatarArt, CharacterArt, PetSvg } from '../components/Art'
 import { TopBar } from '../components/TopBar'
@@ -710,6 +711,7 @@ export function MapPage() {
                 </strong>
                 <span>{near.topic}</span>
                 <span className="mh-level-panel-game">🎮 {near.game}</span>
+                {isLevelPassed(player, near.id) && <StageChips player={player} level={near.id} />}
               </div>
               <button
                 type="button"
