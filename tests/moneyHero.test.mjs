@@ -599,6 +599,12 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   }
   const csv2 = report.buildCsv([d]).slice(1).split('\r\n')
   assert(csv2[1].includes(',4,1,6,1,'), `ด่านย่อย 4 ดาว · ท้าทาย 1 ด่าน · ดาวรวม 6 · หีบ 1: ${csv2[1]}`)
+  // วางแผนใช้เงิน: จัดสำเร็จ 2 งาน ดาวรวม 5
+  const planner = { ...d, plan: { best: { 'rabbit-party': 2, 'fox-picnic': 3 }, done: 3 } }
+  const csv3 = report.buildCsv([planner]).slice(1).split('\r\n')
+  assert(csv3[0].includes('วางแผนใช้เงิน: งานที่จัดสำเร็จ (จาก 4)'), 'CSV มีหัวคอลัมน์วางแผนใช้เงิน')
+  assert(csv3[1].includes(',4,1,6,1,2,5,'), `ผลวางแผนใช้เงินใน CSV: ${csv3[1]}`)
+  eq(report.planStarsTotal(planner), 5, 'ดาวรวมวางแผนใช้เงิน')
   const sum2 = report.classSummary([a, d])
   eq(sum2.stagePlayers, 1, 'คนที่เล่นด่านย่อย')
   eq(sum2.challengePlayers, 1, 'คนที่ผ่านด่านท้าทาย')
@@ -1368,6 +1374,8 @@ test('วางแผนใช้เงิน: ทุกงานจัดได
       priciest += e.items.filter((i) => i.cat === cat).map((i) => i.price).sort((a, b) => b - a).slice(0, n).reduce((a, b) => a + b, 0)
     }
     assert(priciest > e.budget, `${e.id}: เลือกของแพงสุดต้องเกินงบ (${priciest} / ${e.budget})`)
+    eq(budget.cartTotal(e, budget.priciestPlan(e)), priciest, `${e.id}: แผนแพงสุดในใบงานตรงกับที่คิด`)
+    assert(budget.needsMet(e, budget.priciestPlan(e)), `${e.id}: แผนแพงสุดครบรายการ`)
   }
   const party = budget.planEvent('rabbit-party')
   eq(JSON.stringify(budget.missingNeeds(party, ['cookie'])), JSON.stringify({ cake: 1, snack: 1, deco: 1 }), 'บอกหมวดที่ยังขาด')

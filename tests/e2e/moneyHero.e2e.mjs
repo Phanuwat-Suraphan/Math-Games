@@ -892,6 +892,8 @@ for (const [name, viewport] of [
         if (cell !== '★★★') throw new Error(`ดาวด่านย่อย 3-${n} ในแผงคุณครูผิด: ${cell}`)
       }
     }
+    // เล่นวางแผนใช้เงินมาแล้วหนึ่งงาน
+    await page.getByTestId('mh-student-plan').getByText('จัดงานสำเร็จ 1/4 งาน').waitFor()
     await snap(page, `${name}-teacher`)
     await noSideScroll(page, 'แผงคุณครู')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv').click()])
@@ -938,6 +940,27 @@ for (const [name, viewport] of [
         const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
         if (pages !== n) throw new Error(`พิมพ์ชุด ${id} ได้ ${pages} หน้า ควรได้ ${n}`)
       }
+    }
+  })
+
+  await step(`[${name}] ใบงานวางแผนใช้เงิน: 4 แผ่นไม่ล้นกระดาษ เปิดเฉลยได้ และพิมพ์ได้แผ่นละหนึ่งหน้า A4`, async () => {
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-plan').click()
+    await page.getByTestId('pp-page').waitFor()
+    if ((await page.locator('.kad-sheet').count()) !== 4) throw new Error('ใบงานต้องมี 4 แผ่น')
+    await page.getByTestId('pp-key-toggle').check()
+    await page.getByTestId('pp-key').waitFor()
+    if ((await page.locator('.kad-sheet').count()) !== 5) throw new Error('เปิดเฉลยแล้วต้องมี 5 แผ่น')
+    await noSideScroll(page, 'ใบงานวางแผนใช้เงิน')
+    if (name === 'desktop') {
+      const spill = await page.evaluate(() =>
+        [...document.querySelectorAll('.kad-sheet-in')].map((el, i) => (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2 ? i + 1 : 0)).filter(Boolean),
+      )
+      if (spill.length > 0) throw new Error(`ใบงานแผ่นที่ ${spill.join(', ')} เนื้อหาล้นกระดาษ`)
+      await page.locator('.kad-sheet').nth(2).screenshot({ path: path.join(SHOTS, 'money-hero-plan-sheet.png') })
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== 5) throw new Error(`พิมพ์ใบงานได้ ${pages} หน้า ควรได้ 5`)
     }
   })
 

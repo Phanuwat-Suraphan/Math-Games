@@ -12,6 +12,7 @@ import {
 } from './progress'
 import { challengesCleared, stageRecord, stageStars, type StageNo } from './stages'
 import { allStars, CHESTS, MAX_STARS } from './starRoad'
+import { PLAN_EVENTS, plannedEvents } from './budget'
 import { LEVELS } from '../data/levels'
 
 /**
@@ -81,6 +82,8 @@ export function buildCsv(players: Player[]): string {
     'ด่านท้าทายที่ผ่าน (จาก 13)',
     `ดาวรวมถนนดาว (เต็ม ${MAX_STARS})`,
     `หีบสมบัติที่เปิด (จาก ${CHESTS.length})`,
+    `วางแผนใช้เงิน: งานที่จัดสำเร็จ (จาก ${PLAN_EVENTS.length})`,
+    `วางแผนใช้เงิน: ดาวรวม (เต็ม ${PLAN_EVENTS.length * 3})`,
     'เล่นล่าสุด',
   ]
   const rows = players.map((p) => [
@@ -109,6 +112,8 @@ export function buildCsv(players: Player[]): string {
     challengesCleared(p),
     allStars(p),
     (p.chests ?? []).length,
+    plannedEvents(p),
+    planStarsTotal(p),
     dateText(p.lastPlayed),
   ])
   return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
@@ -185,4 +190,9 @@ export function stageTable(p: Player): StageRow[] {
     name: l.name,
     stars: [p.levels[l.id]?.bestStars ?? 0, ...([2, 3] as StageNo[]).map((n) => stageRecord(p, l.id, n).stars)] as [number, number, number],
   }))
+}
+
+/** ดาวรวมของเกมวางแผนใช้เงิน (ดาวที่ดีที่สุดของแต่ละงาน) */
+export function planStarsTotal(p: Player): number {
+  return Object.values(p.plan?.best ?? {}).reduce((a, b) => a + b, 0)
 }
