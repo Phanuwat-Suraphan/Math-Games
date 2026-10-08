@@ -10,6 +10,9 @@ import {
   type Player,
   type TestResult,
 } from './progress'
+import { challengesCleared, stageRecord, stageStars, type StageNo } from './stages'
+import { allStars, CHESTS, MAX_STARS } from './starRoad'
+import { LEVELS } from '../data/levels'
 
 /**
  * รายงานสำหรับคุณครู และไฟล์ CSV
@@ -74,6 +77,10 @@ export function buildCsv(players: Player[]): string {
     'กาดรักษ์โลก: กำไรสูงสุด (บาท)',
     'กาดรักษ์โลก: เก็บออม (บาท)',
     'กาดรักษ์โลก: บริจาคกองทุนต้นไม้ (บาท)',
+    'ดาวด่านย่อย (เต็ม 78)',
+    'ด่านท้าทายที่ผ่าน (จาก 13)',
+    `ดาวรวมถนนดาว (เต็ม ${MAX_STARS})`,
+    `หีบสมบัติที่เปิด (จาก ${CHESTS.length})`,
     'เล่นล่าสุด',
   ]
   const rows = players.map((p) => [
@@ -98,6 +105,10 @@ export function buildCsv(players: Player[]): string {
     p.eco.bestProfit / 100,
     p.eco.saved / 100,
     p.eco.donated / 100,
+    stageStars(p),
+    challengesCleared(p),
+    allStars(p),
+    (p.chests ?? []).length,
     dateText(p.lastPlayed),
   ])
   return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
@@ -119,6 +130,11 @@ export interface ClassSummary {
   ecoPlayers: number
   ecoSales: number
   ecoDonated: number
+  /** ด่านย่อย: จำนวนคนที่เคยผ่านด่านย่อย และคนที่ผ่านด่านท้าทาย (X-3) อย่างน้อยหนึ่งด่าน */
+  stagePlayers: number
+  challengePlayers: number
+  /** ดาวรวมเฉลี่ยบนถนนดาว (เต็ม 117) */
+  avgStars: number | null
   /** ค่าเฉลี่ยรายทักษะของทั้งห้อง */
   skills: Record<Skill, number | null>
   /** จำนวนนักเรียนที่ทักษะนั้นยังอ่อน */
@@ -138,6 +154,9 @@ export function classSummary(players: Player[]): ClassSummary {
     ecoPlayers: players.filter((p) => p.eco.days > 0).length,
     ecoSales: players.reduce((s, p) => s + p.eco.sales, 0) / 100,
     ecoDonated: players.reduce((s, p) => s + p.eco.donated, 0) / 100,
+    stagePlayers: players.filter((p) => stageStars(p) > 0).length,
+    challengePlayers: players.filter((p) => challengesCleared(p) > 0).length,
+    avgStars: average(players.map(allStars)),
     accuracy: average(players.filter((p) => p.answered > 0).map((p) => percent(overallAccuracy(p)))),
     pre: average(players.map((p) => testPercent(p.preTest)).filter((v): v is number => v !== null)),
     post: average(players.map((p) => testPercent(p.postTest)).filter((v): v is number => v !== null)),
@@ -151,4 +170,19 @@ export function classSummary(players: Player[]): ClassSummary {
 export function testSkillPercent(t: TestResult | undefined, s: Skill): number | null {
   const v = t?.skills[s]
   return v && v.total > 0 ? percent(v.correct / v.total) : null
+}
+
+/** ดาวรายด่านของนักเรียน: ด่านผจญภัย (X-1) · ฝึกเก่ง (X-2) · ท้าทาย (X-3) */
+export interface StageRow {
+  level: number
+  name: string
+  stars: [number, number, number]
+}
+
+export function stageTable(p: Player): StageRow[] {
+  return LEVELS.map((l) => ({
+    level: l.id,
+    name: l.name,
+    stars: [p.levels[l.id]?.bestStars ?? 0, ...([2, 3] as StageNo[]).map((n) => stageRecord(p, l.id, n).stars)] as [number, number, number],
+  }))
 }

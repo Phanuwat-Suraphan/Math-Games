@@ -836,6 +836,14 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-student-detail').waitFor()
     // เล่นกาดมาแล้วหนึ่งวัน (ขายกระถาง 30 บาท) ต้องเห็นในรายละเอียดนักเรียน
     await page.getByTestId('mh-student-eco').getByText('ยอดขายสะสม 30 บาท').waitFor()
+    // ดาวรายด่าน: เครื่องคอมเล่นด่านย่อย 3-2 และ 3-3 ได้ 3 ดาว
+    await page.getByTestId('mh-student-stages').waitFor()
+    if (name === 'desktop') {
+      for (const n of [2, 3]) {
+        const cell = (await page.getByTestId(`mh-stage-cell-3-${n}`).innerText()).trim()
+        if (cell !== '★★★') throw new Error(`ดาวด่านย่อย 3-${n} ในแผงคุณครูผิด: ${cell}`)
+      }
+    }
     await snap(page, `${name}-teacher`)
     await noSideScroll(page, 'แผงคุณครู')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv').click()])

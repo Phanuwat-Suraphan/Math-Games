@@ -6,7 +6,9 @@ import { useGame } from '../hooks/useMoneyGame'
 import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
 import { lessonsPassed, overallAccuracy, pendingMistakes, totalStars, weakSkills, type Player } from '../engine/progress'
-import { buildCsv, classSummary, improvement, minutes, percent, skillPercent, testPercent } from '../engine/report'
+import { buildCsv, classSummary, improvement, minutes, percent, skillPercent, stageTable, testPercent } from '../engine/report'
+import { challengesCleared, stageStars } from '../engine/stages'
+import { allStars, CHESTS, MAX_STARS } from '../engine/starRoad'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { BeforeAfter, SkillBars, StatTile } from '../components/Charts'
 import { Sky } from '../components/Sky'
@@ -82,6 +84,8 @@ export function TeacherPage() {
             <StatTile icon="🎓" label="หลังเรียนเฉลี่ย" value={fmt(sum.post)} />
             <StatTile icon="📈" label="พัฒนาการเฉลี่ย" value={sum.improvement === null ? '–' : `${sum.improvement > 0 ? '+' : ''}${sum.improvement}%`} />
             <StatTile icon="🌱" label={`กาดรักษ์โลก (${sum.ecoPlayers} คน) ยอดขายรวม`} value={`${sum.ecoSales} ฿`} />
+            <StatTile icon="🧰" label={`ดาวรวมเฉลี่ย (เต็ม ${MAX_STARS})`} value={sum.avgStars === null ? '–' : `⭐ ${sum.avgStars}`} />
+            <StatTile icon="🔥" label={`เล่นด่านย่อย ${sum.stagePlayers} คน · ผ่านด่านท้าทาย`} value={`${sum.challengePlayers} คน`} />
           </div>
 
           <div className="mh-stats-grid">
@@ -111,6 +115,7 @@ export function TeacherPage() {
                   <th>ชื่อ</th>
                   <th>ด่านที่ผ่าน</th>
                   <th>ดาว</th>
+                  <th>ด่านย่อย</th>
                   <th>ตอบถูก</th>
                   <th>ก่อนเรียน</th>
                   <th>หลังเรียน</th>
@@ -135,6 +140,7 @@ export function TeacherPage() {
                         {lessonsPassed(p)}/{TOTAL_LESSONS}
                       </td>
                       <td>⭐ {totalStars(p)}</td>
+                      <td>{stageStars(p) > 0 ? `⭐ ${stageStars(p)} · 🔥 ${challengesCleared(p)}` : '–'}</td>
                       <td>{p.answered ? `${percent(overallAccuracy(p))}%` : '–'}</td>
                       <td>{fmt(testPercent(p.preTest))}</td>
                       <td>{fmt(testPercent(p.postTest))}</td>
@@ -177,7 +183,10 @@ function StudentDetail({ p }: { p: Player }) {
         </div>
       </div>
       <div className="mh-stats-grid">
-        <SkillBars values={values} counts={counts} />
+        <div className="mh-student-left">
+          <SkillBars values={values} counts={counts} />
+          <StageStars p={p} />
+        </div>
         <div>
           {p.preTest || p.postTest ? <BeforeAfter pre={p.preTest} post={p.postTest} /> : <p className="mh-soft">ยังไม่ได้ทำแบบทดสอบ</p>}
           <h4 className="mh-card-title">🌱 กาดรักษ์โลก</h4>
@@ -189,6 +198,10 @@ function StudentDetail({ p }: { p: Player }) {
           ) : (
             <p className="mh-soft">ยังไม่ได้เล่นกาดรักษ์โลก</p>
           )}
+          <h4 className="mh-card-title">🧰 ถนนดาว</h4>
+          <p className="mh-soft">
+            ดาวรวม {allStars(p)}/{MAX_STARS} · เปิดหีบสมบัติ {(p.chests ?? []).length}/{CHESTS.length} หีบ
+          </p>
           <h4 className="mh-card-title">โจทย์ที่ยังพลาด ({mistakes.length})</h4>
           <ul className="mh-mistake-list">
             {mistakes.map((m) => (
@@ -199,6 +212,43 @@ function StudentDetail({ p }: { p: Player }) {
             {mistakes.length === 0 && <li className="mh-soft">ไม่มี 🎉</li>}
           </ul>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/** ดาวรายด่าน: ผจญภัย · ฝึกเก่ง · ท้าทาย (ครูเห็นว่านักเรียนเล่นถึงระดับไหนในแต่ละหัวข้อ) */
+function StageStars({ p }: { p: Player }) {
+  const rows = stageTable(p)
+  const stars = (n: number) => (n > 0 ? '★'.repeat(n) + '☆'.repeat(3 - n) : '–')
+  return (
+    <div className="mh-student-stages" data-testid="mh-student-stages">
+      <h4 className="mh-card-title">🎮 ดาวรายด่าน</h4>
+      <div className="mh-stage-scroll">
+      <table className="mh-table mh-stage-table">
+        <thead>
+          <tr>
+            <th>ด่าน</th>
+            <th>🗺️ ผจญภัย</th>
+            <th>🎈 ฝึกเก่ง</th>
+            <th>🔥 ท้าทาย</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.level}>
+              <td>
+                {r.level} · {r.name}
+              </td>
+              {r.stars.map((n, i) => (
+                <td key={i} className={n > 0 ? 'mh-stage-cell is-on' : 'mh-stage-cell'} data-testid={`mh-stage-cell-${r.level}-${i + 1}`}>
+                  {stars(n)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
       </div>
     </div>
   )

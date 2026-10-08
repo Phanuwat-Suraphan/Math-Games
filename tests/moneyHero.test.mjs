@@ -588,6 +588,24 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   for (const l of lines.slice(2)) eq(l.split(',').length, cols, 'จำนวนคอลัมน์ต้องเท่ากันทุกแถว')
   assert(lines[0].includes('กาดรักษ์โลก: ยอดขายสะสม (บาท)'), 'CSV ต้องมีผลกาดรักษ์โลก')
   assert(lines[2].includes(',2,45,25,0,10,'), `ผลกาดของบีใน CSV: ${lines[2]}`)
+  // ด่านย่อยและถนนดาว
+  assert(lines[0].includes('ดาวด่านย่อย (เต็ม 78)') && lines[0].includes('หีบสมบัติที่เปิด'), 'CSV ต้องมีด่านย่อยและถนนดาว')
+  const d = {
+    ...progress.newPlayer('ดี', 'hero', 4),
+    levels: { 2: { ...progress.emptyLevel(), stepDone: 4, bestStars: 2 } },
+    stages: { '2-2': { stars: 3, plays: 1, bestAccuracy: 1 }, '2-3': { stars: 1, plays: 2, bestAccuracy: 0.6 } },
+    chests: [3],
+  }
+  const csv2 = report.buildCsv([d]).slice(1).split('\r\n')
+  assert(csv2[1].includes(',4,1,6,1,'), `ด่านย่อย 4 ดาว · ท้าทาย 1 ด่าน · ดาวรวม 6 · หีบ 1: ${csv2[1]}`)
+  const sum2 = report.classSummary([a, d])
+  eq(sum2.stagePlayers, 1, 'คนที่เล่นด่านย่อย')
+  eq(sum2.challengePlayers, 1, 'คนที่ผ่านด่านท้าทาย')
+  eq(sum2.avgStars, 3, 'ดาวรวมเฉลี่ย (0 กับ 6)')
+  const rows = report.stageTable(d)
+  eq(rows.length, 13, 'ตารางดาวครบ 13 ด่าน')
+  eq(rows[2].stars.join(), '2,3,1', 'ดาวด่าน 2: ผจญภัย ฝึกเก่ง ท้าทาย')
+  eq(rows[0].stars.join(), '0,0,0', 'ด่านที่ยังไม่เล่น')
 })
 
 test('ล่าเหรียญ AR: ทุกรอบมีทางเก็บได้พอดี และตัวตรวจบอกขาด/เกินถูกต้อง', () => {
