@@ -523,6 +523,31 @@ for (const [name, viewport] of [
       await page.getByTestId('mh-stage-again').click()
       await page.getByTestId('mh-question').waitFor()
     })
+
+    await step(`[${name}] ถนนดาว: เมนูบอกจำนวนหีบที่รอเปิด เปิดหีบได้เหรียญและของฟรี เปิดซ้ำไม่ได้`, async () => {
+      await page.goto(`${BASE}#/map`)
+      await page.getByTestId('mh-menu-stars').click()
+      await page.waitForURL(/#\/stars/)
+      await page.getByTestId('mh-star-total').waitFor()
+      await snap(page, `${name}-star-road`)
+      const before = await savedPlayer(page)
+      await page.getByTestId('mh-chest-open-3').click()
+      await page.getByTestId('mh-chest-reward').waitFor()
+      await snap(page, `${name}-chest-open`)
+      await page.getByTestId('mh-chest-close').click()
+      await page.getByTestId('mh-chest-3').getByText('เปิดแล้ว').waitFor()
+      if (await page.getByTestId('mh-chest-open-3').count()) throw new Error('หีบที่เปิดแล้วยังมีปุ่มเปิด')
+      // หีบที่มีของฟรี
+      await page.getByTestId('mh-chest-open-8').click()
+      await page.getByTestId('mh-chest-reward').getByText('แว่นกลมนักคิด').waitFor()
+      await page.getByTestId('mh-chest-close').click()
+      const after = await savedPlayer(page)
+      if (!after.chests.includes(3) || !after.chests.includes(8)) throw new Error(`หีบไม่ถูกบันทึก: ${JSON.stringify(after.chests)}`)
+      if (after.coins < before.coins + 35) throw new Error(`เหรียญจากหีบไม่เพิ่ม: ${before.coins} → ${after.coins}`)
+      if (!after.owned.includes('face-round')) throw new Error('ไม่ได้ของฟรีจากหีบ')
+      await page.reload()
+      await page.getByTestId('mh-chest-8').getByText('เปิดแล้ว').waitFor()
+    })
   }
 
   await step(`[${name}] ล่าเหรียญ AR (เล่นแบบไม่ใช้กล้อง): เก็บเงินพอดีครบ 5 รอบ`, async () => {

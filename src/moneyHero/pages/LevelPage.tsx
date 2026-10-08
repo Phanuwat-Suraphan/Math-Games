@@ -27,6 +27,7 @@ import { advanceMission, missionOf, type SlotState } from '../data/missions'
 import { PracticeRange } from '../components/PracticeRange'
 import { advanceBalloons, type Balloon } from '../data/practice'
 import { StageChips } from '../components/StageChips'
+import { ChestNotice } from '../components/ChestNotice'
 
 /**
  * หน้าด่าน: LEARN → PRACTICE → MISSION → BOSS → ผลลัพธ์
@@ -456,6 +457,7 @@ function ResultView({ level }: { level: LevelDef }) {
         <span className="mh-soft">ฝึกเก่ง 🎈 โจทย์ระดับกลาง · ท้าทาย 🔥 โจทย์ยากสู้บอสร่างโหด เก็บดาวเพิ่มได้อีก!</span>
         <StageChips player={player} level={level.id} current={1} />
       </div>
+      <ChestNotice player={player} />
       {next && (
         <div className="mh-unlock">
           {nextOpen ? (

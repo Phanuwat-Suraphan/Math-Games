@@ -25,6 +25,7 @@ import {
   type TownCoin,
 } from '../data/town'
 import { StageChips } from '../components/StageChips'
+import { readyChests } from '../engine/starRoad'
 import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
 import { AvatarArt, CharacterArt, PetSvg } from '../components/Art'
 import { TopBar } from '../components/TopBar'
@@ -812,6 +813,10 @@ export function MapPage() {
         </Link>
         <Link to="/sandbox" className="mh-menu-tile mh-menu-sandbox" data-testid="mh-menu-sandbox">
           <span aria-hidden="true">🧮</span>โต๊ะนับเงิน
+        </Link>
+        <Link to="/stars" className="mh-menu-tile mh-menu-stars" data-testid="mh-menu-stars">
+          <span aria-hidden="true">🧰</span>ถนนดาว
+          {readyChests(player).length > 0 && <em className="mh-menu-badge">{readyChests(player).length}</em>}
         </Link>
         <Link to="/shop" className="mh-menu-tile mh-menu-shop" data-testid="mh-menu-shop">
           <span aria-hidden="true">🛍️</span>ร้านของฮีโร่

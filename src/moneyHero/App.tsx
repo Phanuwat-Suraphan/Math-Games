@@ -8,6 +8,7 @@ import { PlayersPage } from './pages/PlayersPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { LevelPage } from './pages/LevelPage'
 import { StagePage } from './pages/StagePage'
+import { StarRoadPage } from './pages/StarRoadPage'
 import { TestPage } from './pages/TestPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -74,6 +75,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <StagePage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/stars"
+              element={
+                <NeedPlayer>
+                  <StarRoadPage />
                 </NeedPlayer>
               }
             />

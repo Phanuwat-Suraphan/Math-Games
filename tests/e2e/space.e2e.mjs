@@ -285,7 +285,8 @@ async function playAsteroid() {
     const text = await visibleText(Content.ASTEROID_QUESTIONS.map((question) => question.text))
     const question = Content.ASTEROID_QUESTIONS.find((entry) => entry.text === text)
     if (!question) throw new Error('ไม่เจอคำถามของดงอุกกาบาต')
-    await page.locator('button.pq-rock').filter({ has: page.locator('span', { hasText: new RegExp(`^${escapeRegex(question.answer)}$`) }) }).click()
+    // ก้อนหินลอยขึ้นลงตลอด (pq-rock-float) ไม่มีวันนิ่ง จึงกดโดยไม่รอให้หยุด กลางปุ่มยังอยู่ในปุ่มเสมอ
+    await page.locator('button.pq-rock').filter({ has: page.locator('span', { hasText: new RegExp(`^${escapeRegex(question.answer)}$`) }) }).click({ force: true })
     await page.getByText('💥 ตูม! ยิงโดนเป้า').waitFor()
     await clickFirstVisible(['คลื่นต่อไป', 'จบด่าน'])
   }
