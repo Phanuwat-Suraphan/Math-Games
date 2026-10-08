@@ -8930,3 +8930,35 @@ a.mh-stage-chip:hover {
     padding: 8px;
   }
 }
+
+/* แผงคุณครู: ดาวรายด่าน */
+.mh-student-stages {
+  margin-top: 12px;
+}
+
+.mh-stage-table td,
+.mh-stage-table th {
+  padding: 4px 8px;
+  font-size: 0.9em;
+}
+
+.mh-stage-cell {
+  color: #adb5bd;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.mh-stage-cell.is-on {
+  color: #f08c00;
+  font-weight: 800;
+}
+
+.mh-stage-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ให้ตารางดาวรายด่านเลื่อนในกล่อง ไม่ดันคอลัมน์ให้กว้างเกินจอ */
+.mh-student-left {
+  min-width: 0;
+}
