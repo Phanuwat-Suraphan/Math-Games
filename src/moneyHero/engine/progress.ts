@@ -1,4 +1,4 @@
-import type { Difficulty, Question, Skill } from './types'
+import type { DenomId, Difficulty, Question, Skill } from './types'
 import { SKILLS } from '../data/characters'
 import { LEVELS, TOTAL_LESSONS } from '../data/levels'
 import { LEVEL_BADGES } from '../data/badges'
@@ -99,6 +99,8 @@ export interface Player {
   chests: number[]
   /** วางแผนใช้เงิน: ดาวที่ดีที่สุดของแต่ละงาน และจำนวนครั้งที่จัดสำเร็จ */
   plan: PlanRecord
+  /** สมุดสะสมเงินไทย: สติกเกอร์ของเงินแต่ละชนิดที่ได้แล้ว */
+  album: DenomId[]
   mapX?: number
   mapY?: number
 }
@@ -171,6 +173,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
     stages: {},
     chests: [],
     plan: emptyPlan(),
+    album: [],
   }
 }
 
@@ -322,6 +325,7 @@ export function newBadges(p: Player, extra: string[] = []): string[] {
   if (ecoStage(p.eco).stage >= 3) want.push('eco-garden')
   if ((p.chests ?? []).length >= 5) want.push('treasure')
   if (Object.values(p.plan?.best ?? {}).filter((s) => s > 0).length >= 3) want.push('planner')
+  if ((p.album ?? []).length >= 11) want.push('collector')
   if (Object.entries(p.stages ?? {}).filter(([k, r]) => k.endsWith('-3') && r.stars > 0).length >= 3) want.push('challenger')
   return Array.from(new Set(want)).filter((id) => !earned.has(id))
 }

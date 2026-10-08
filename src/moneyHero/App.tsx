@@ -10,6 +10,7 @@ import { LevelPage } from './pages/LevelPage'
 import { StagePage } from './pages/StagePage'
 import { StarRoadPage } from './pages/StarRoadPage'
 import { PlanPage } from './pages/PlanPage'
+import { AlbumPage } from './pages/AlbumPage'
 import { PlanPrintPage } from './plan/PlanPrint'
 import { DuelPage } from './pages/DuelPage'
 import { TestPage } from './pages/TestPage'
@@ -78,6 +79,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <StagePage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/album"
+              element={
+                <NeedPlayer>
+                  <AlbumPage />
                 </NeedPlayer>
               }
             />

@@ -50,6 +50,7 @@ const speech = load('utils/speech.js')
 const road = load('engine/starRoad.js')
 const budget = load('engine/budget.js')
 const duel = load('engine/duel.js')
+const album = load('engine/album.js')
 
 let passed = 0
 const failures = []
@@ -1445,6 +1446,44 @@ test('ดวลสองคน: โจทย์เลือกตอบครบ
   eq(duel.duelWinner(s), 1, 'ฝั่ง 1 นำ')
   s = duel.nextDuel(duel.tapDuel(s, 0, 'a', 'a'))
   eq(duel.duelWinner(s), 'tie', 'เสมอ')
+})
+
+test('สมุดสะสมเงินไทย: การ์ดครบ 11 ชนิด คำถามลองแลกถูกต้อง และสติกเกอร์ได้ครั้งเดียว', () => {
+  const den = load('data/denominations.js')
+  eq(album.ALBUM.length, 11, 'การ์ดครบ 11 ชนิด')
+  eq(new Set(album.ALBUM.map((c) => c.id)).size, 11, 'การ์ดไม่ซ้ำ')
+  for (const c of album.ALBUM) {
+    assert(c.facts.length >= 2, `${c.id}: ต้องมีเรื่องน่ารู้`)
+    assert(c.swaps.length >= 2, `${c.id}: ต้องมีคำถามลองแลกอย่างน้อย 2 ข้อ`)
+    c.swaps.forEach(([from, to], i) => {
+      const a = den.denom(from).value
+      const b = den.denom(to).value
+      assert(a > b && a % b === 0, `${c.id}: แลก ${from} → ${to} ต้องได้จำนวนเต็ม`)
+      assert(from === c.id || to === c.id, `${c.id}: คำถามต้องเกี่ยวกับเงินบนการ์ด`)
+      for (let k = 0; k < 20; k += 1) {
+        const q = album.albumQuestion(c.id, i)
+        eq(q.answer, a / b, `${c.id}: คำตอบ`)
+        eq(new Set(q.options).size, 3, `${c.id}: ตัวเลือก 3 ตัวไม่ซ้ำ`)
+        assert(q.options.includes(q.answer) && q.options.every((n) => n > 0 && Number.isInteger(n)), `${c.id}: ตัวเลือกต้องมีคำตอบและเป็นจำนวนเต็มบวก`)
+        assert(q.text.includes(den.denom(from).name) && q.text.includes(den.denom(to).name), `${c.id}: โจทย์ต้องบอกชื่อเงิน`)
+      }
+    })
+  }
+  eq(album.albumQuestion('s25', 0).text, 'เหรียญ 1 บาท 1 เหรียญ แลกเป็นเหรียญ 25 สตางค์ได้กี่เหรียญ?', 'ตัวอย่างโจทย์')
+  eq(album.albumQuestion('b20', 0).answer, 2, 'ธนบัตร 20 แลกเหรียญ 10 ได้ 2 เหรียญ')
+  let p = progress.newPlayer('สะสม', 'hero')
+  const c0 = p.coins
+  p = album.addSticker(p, 'b100')
+  eq(p.coins, c0 + album.STICKER_COINS, 'สติกเกอร์แรกได้เหรียญ')
+  eq(album.addSticker(p, 'b100'), p, 'สติกเกอร์ซ้ำไม่ได้อะไรเพิ่ม')
+  assert(!album.albumComplete(p), 'ยังไม่ครบ')
+  for (const c of album.ALBUM) p = album.addSticker(p, c.id)
+  assert(album.albumComplete(p), 'ครบ 11 ชนิด')
+  assert(progress.newBadges(p).includes('collector'), 'ได้ตรานักสะสมเงินไทย')
+  const old = { ...progress.newPlayer('เก่า', 'hero') }
+  delete old.album
+  const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
+  eq(JSON.stringify(save.players[old.id].album), '[]', 'บันทึกเก่าได้ album ว่าง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
