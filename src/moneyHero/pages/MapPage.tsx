@@ -811,6 +811,9 @@ export function MapPage() {
         <Link to="/stats" className="mh-menu-tile">
           <span aria-hidden="true">📊</span>สถิติ
         </Link>
+        <Link to="/album" className="mh-menu-tile mh-menu-album" data-testid="mh-menu-album">
+          <span aria-hidden="true">📒</span>สมุดสะสมเงิน
+        </Link>
         <Link to="/sandbox" className="mh-menu-tile mh-menu-sandbox" data-testid="mh-menu-sandbox">
           <span aria-hidden="true">🧮</span>โต๊ะนับเงิน
         </Link>

@@ -9389,3 +9389,126 @@ a.mh-stage-chip:hover {
     display: flex;
   }
 }
+
+/* ================================================================== */
+/* สมุดสะสมเงินไทย (#/album)                                           */
+/* ================================================================== */
+
+.mh-album-count {
+  margin-left: auto;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 3px solid #ffd43b;
+  background: #fff;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mh-album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.mh-album-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 170px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  border: 3px dashed #ced4da;
+}
+
+.mh-album-card:hover {
+  background: #fff9db;
+}
+
+.mh-album-card.is-got {
+  border-style: solid;
+  border-color: #fab005;
+  background: linear-gradient(180deg, #fff9db, #fff);
+}
+
+.mh-album-color {
+  font-size: 0.85em;
+  opacity: 0.75;
+}
+
+.mh-album-sticker {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: #f1f3f5;
+  font-size: 0.82em;
+  font-weight: 700;
+}
+
+.mh-album-sticker.is-got {
+  background: #ffe066;
+}
+
+.mh-album-detail {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.mh-album-big {
+  display: grid;
+  place-items: center;
+  max-width: 100%;
+}
+
+.mh-album-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.mh-album-quiz {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #e7f5ff;
+  border: 3px solid #74c0fc;
+  text-align: center;
+}
+
+.mh-album-opts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.mh-album-opts .mh-choice {
+  min-width: 72px;
+}
+
+.mh-album-opts .mh-choice.is-answer {
+  border-color: #40c057;
+  background: #ebfbee;
+}
+
+.mh-album-got {
+  margin: 0;
+  font-weight: 800;
+  color: #2b8a3e;
+}

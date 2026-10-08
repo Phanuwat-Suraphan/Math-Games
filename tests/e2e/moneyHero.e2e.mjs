@@ -839,6 +839,31 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] สมุดสะสมเงินไทย: แตะการ์ด ตอบผิดเห็นคำใบ้ ตอบถูกได้สติกเกอร์ครั้งเดียว`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-album').click()
+    await page.waitForURL(/#\/album/)
+    await page.getByTestId('mh-album-count').getByText('สติกเกอร์ 0/11').waitFor()
+    await page.getByTestId('mh-album-card-b20').click()
+    await page.getByTestId('mh-album-detail').waitFor()
+    const right = await page.evaluate(() => window.__MH_ALBUM.answer)
+    const wrong = await page.locator('[data-testid^="mh-album-opt-"]').evaluateAll((els, r) => els.map((e) => Number(e.dataset.testid.split('-').pop())).find((n) => n !== r), right)
+    await page.getByTestId(`mh-album-opt-${wrong}`).click()
+    await page.getByText('ลองนับเพิ่มทีละ').waitFor()
+    await page.getByTestId(`mh-album-opt-${right}`).click()
+    await page.getByTestId('mh-album-got').getByText('ได้สติกเกอร์แล้ว').waitFor()
+    await snap(page, `${name}-album-card`)
+    // ลองอีกข้อ: ถูกอีกครั้งไม่ได้สติกเกอร์ซ้ำ
+    await page.getByTestId('mh-album-more').click()
+    await page.getByTestId(`mh-album-opt-${await page.evaluate(() => window.__MH_ALBUM.answer)}`).click()
+    await page.getByTestId('mh-album-got').getByText('มีสติกเกอร์นี้แล้ว').waitFor()
+    await page.getByTestId('mh-album-close').click()
+    await page.getByTestId('mh-album-count').getByText('สติกเกอร์ 1/11').waitFor()
+    await noSideScroll(page, 'สมุดสะสมเงิน')
+    const p = await savedPlayer(page)
+    if (JSON.stringify(p.album) !== '["b20"]') throw new Error(`สติกเกอร์ไม่ถูกบันทึก: ${JSON.stringify(p.album)}`)
+  })
+
   await step(`[${name}] ดวลสองคน: ใครถูกก่อนได้ดาว แตะผิดรอข้อต่อไป ครบ 10 ข้อแล้วประกาศผู้ชนะ`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-duel').click()
