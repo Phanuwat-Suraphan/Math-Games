@@ -839,6 +839,45 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] ดวลสองคน: ใครถูกก่อนได้ดาว แตะผิดรอข้อต่อไป ครบ 10 ข้อแล้วประกาศผู้ชนะ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-duel').click()
+    await page.waitForURL(/#\/duel/)
+    await page.getByTestId('mh-duel-name-0').fill('แดงจ๋า')
+    await page.getByTestId('mh-duel-name-1').fill('ฟ้าใส')
+    if (name === 'desktop') await page.getByRole('radio', { name: /นั่งข้างกัน/ }).click()
+    await page.getByTestId('mh-duel-start').click()
+    const answer = () => page.evaluate(() => window.__MH_DUEL.answer)
+    const wrongOf = async (side, right) => {
+      const ids = await page.locator(`[data-testid^="mh-duel-opt-${side}-"]`).evaluateAll((els) => els.map((e) => e.dataset.testid.split('-').slice(4).join('-')))
+      return ids.find((id) => id !== right)
+    }
+    for (let i = 0; i < 10; i += 1) {
+      await page.getByTestId('mh-duel-round').getByText(`ข้อ ${i + 1}/10`).waitFor()
+      const right = await answer()
+      if (i === 0) {
+        // ฝั่งฟ้า (กลับหัวเมื่อนั่งตรงข้าม) ตอบถูกก่อน
+        await page.getByTestId(`mh-duel-opt-1-${right}`).click()
+      } else if (i === 1) {
+        // ผิดทั้งคู่: ไม่มีใครได้ดาว
+        await page.getByTestId(`mh-duel-opt-0-${await wrongOf(0, right)}`).click()
+        await page.getByTestId('mh-duel-zone-0').getByText('ข้อนี้รอเพื่อนนะ').waitFor()
+        await page.getByTestId(`mh-duel-opt-1-${await wrongOf(1, right)}`).click()
+        await page.getByText('ยังไม่มีใครถูก').waitFor()
+      } else {
+        await page.getByTestId(`mh-duel-opt-0-${right}`).click()
+      }
+      if (i === 2) await snap(page, `${name}-duel`)
+      await page.getByTestId('mh-duel-next').click()
+    }
+    await page.getByTestId('mh-duel-result').waitFor()
+    await page.getByText('แดงจ๋า ชนะ!').waitFor()
+    const a = await page.getByTestId('mh-duel-result').innerText()
+    if (!a.includes('⭐ 8') || !a.includes('⭐ 1')) throw new Error(`คะแนนดวลผิด: ${a}`)
+    await snap(page, `${name}-duel-result`)
+    await noSideScroll(page, 'ดวลสองคน')
+  })
+
   await step(`[${name}] ร้านทอนไว (โหมดฝึก): ทอนผิดต้องบอกว่าเกิน แล้วทอนถูกครบ 8 ลูกค้า`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-change').click()
@@ -892,6 +931,8 @@ for (const [name, viewport] of [
         if (cell !== '★★★') throw new Error(`ดาวด่านย่อย 3-${n} ในแผงคุณครูผิด: ${cell}`)
       }
     }
+    // เล่นวางแผนใช้เงินมาแล้วหนึ่งงาน
+    await page.getByTestId('mh-student-plan').getByText('จัดงานสำเร็จ 1/4 งาน').waitFor()
     await snap(page, `${name}-teacher`)
     await noSideScroll(page, 'แผงคุณครู')
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv').click()])
@@ -938,6 +979,27 @@ for (const [name, viewport] of [
         const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
         if (pages !== n) throw new Error(`พิมพ์ชุด ${id} ได้ ${pages} หน้า ควรได้ ${n}`)
       }
+    }
+  })
+
+  await step(`[${name}] ใบงานวางแผนใช้เงิน: 4 แผ่นไม่ล้นกระดาษ เปิดเฉลยได้ และพิมพ์ได้แผ่นละหนึ่งหน้า A4`, async () => {
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-plan').click()
+    await page.getByTestId('pp-page').waitFor()
+    if ((await page.locator('.kad-sheet').count()) !== 4) throw new Error('ใบงานต้องมี 4 แผ่น')
+    await page.getByTestId('pp-key-toggle').check()
+    await page.getByTestId('pp-key').waitFor()
+    if ((await page.locator('.kad-sheet').count()) !== 5) throw new Error('เปิดเฉลยแล้วต้องมี 5 แผ่น')
+    await noSideScroll(page, 'ใบงานวางแผนใช้เงิน')
+    if (name === 'desktop') {
+      const spill = await page.evaluate(() =>
+        [...document.querySelectorAll('.kad-sheet-in')].map((el, i) => (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2 ? i + 1 : 0)).filter(Boolean),
+      )
+      if (spill.length > 0) throw new Error(`ใบงานแผ่นที่ ${spill.join(', ')} เนื้อหาล้นกระดาษ`)
+      await page.locator('.kad-sheet').nth(2).screenshot({ path: path.join(SHOTS, 'money-hero-plan-sheet.png') })
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== 5) throw new Error(`พิมพ์ใบงานได้ ${pages} หน้า ควรได้ 5`)
     }
   })
 

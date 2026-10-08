@@ -49,6 +49,7 @@ const stages = load('engine/stages.js')
 const speech = load('utils/speech.js')
 const road = load('engine/starRoad.js')
 const budget = load('engine/budget.js')
+const duel = load('engine/duel.js')
 
 let passed = 0
 const failures = []
@@ -599,6 +600,12 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   }
   const csv2 = report.buildCsv([d]).slice(1).split('\r\n')
   assert(csv2[1].includes(',4,1,6,1,'), `ด่านย่อย 4 ดาว · ท้าทาย 1 ด่าน · ดาวรวม 6 · หีบ 1: ${csv2[1]}`)
+  // วางแผนใช้เงิน: จัดสำเร็จ 2 งาน ดาวรวม 5
+  const planner = { ...d, plan: { best: { 'rabbit-party': 2, 'fox-picnic': 3 }, done: 3 } }
+  const csv3 = report.buildCsv([planner]).slice(1).split('\r\n')
+  assert(csv3[0].includes('วางแผนใช้เงิน: งานที่จัดสำเร็จ (จาก 4)'), 'CSV มีหัวคอลัมน์วางแผนใช้เงิน')
+  assert(csv3[1].includes(',4,1,6,1,2,5,'), `ผลวางแผนใช้เงินใน CSV: ${csv3[1]}`)
+  eq(report.planStarsTotal(planner), 5, 'ดาวรวมวางแผนใช้เงิน')
   const sum2 = report.classSummary([a, d])
   eq(sum2.stagePlayers, 1, 'คนที่เล่นด่านย่อย')
   eq(sum2.challengePlayers, 1, 'คนที่ผ่านด่านท้าทาย')
@@ -1368,6 +1375,8 @@ test('วางแผนใช้เงิน: ทุกงานจัดได
       priciest += e.items.filter((i) => i.cat === cat).map((i) => i.price).sort((a, b) => b - a).slice(0, n).reduce((a, b) => a + b, 0)
     }
     assert(priciest > e.budget, `${e.id}: เลือกของแพงสุดต้องเกินงบ (${priciest} / ${e.budget})`)
+    eq(budget.cartTotal(e, budget.priciestPlan(e)), priciest, `${e.id}: แผนแพงสุดในใบงานตรงกับที่คิด`)
+    assert(budget.needsMet(e, budget.priciestPlan(e)), `${e.id}: แผนแพงสุดครบรายการ`)
   }
   const party = budget.planEvent('rabbit-party')
   eq(JSON.stringify(budget.missingNeeds(party, ['cookie'])), JSON.stringify({ cake: 1, snack: 1, deco: 1 }), 'บอกหมวดที่ยังขาด')
@@ -1400,6 +1409,42 @@ test('วางแผนใช้เงิน: ทุกงานจัดได
   delete old.plan
   const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
   eq(save.players[old.id].plan.done, 0, 'บันทึกเก่าได้ plan ว่าง')
+})
+
+test('ดวลสองคน: โจทย์เลือกตอบครบ 10 ข้อ ใครถูกก่อนได้แต้ม แตะผิดรอข้อต่อไป', () => {
+  for (let i = 0; i < 40; i += 1) {
+    const qs = duel.buildDuel()
+    eq(qs.length, duel.DUEL_ROUNDS, 'ได้ 10 ข้อ')
+    for (const q of qs) {
+      eq(q.kind, 'choice', 'ต้องเป็นโจทย์เลือกตอบ')
+      assert(q.options.some((o) => o.id === q.answer), `${q.gen}: คำตอบต้องอยู่ในตัวเลือก`)
+      assert(q.options.length >= 2, `${q.gen}: ต้องมีตัวเลือกอย่างน้อย 2`)
+    }
+    // ง่ายก่อนแล้วค่อยยาก
+    assert(qs.slice(0, 5).every((q) => q.difficulty === 1), 'ห้าข้อแรกเป็นระดับง่าย')
+  }
+  let s = duel.startDuel()
+  // ฝั่ง 1 ถูกก่อน
+  s = duel.tapDuel(s, 1, 'a', 'a')
+  eq(s.scores.join(), '0,1', 'ฝั่ง 1 ได้แต้ม')
+  eq(s.winner, 1, 'ข้อนี้ฝั่ง 1 ชนะ')
+  eq(duel.tapDuel(s, 0, 'a', 'a'), s, 'ข้อจบแล้วแตะไม่ได้')
+  s = duel.nextDuel(s)
+  eq(s.index, 1, 'ไปข้อถัดไป')
+  // ฝั่ง 0 ผิด → ล็อก ฝั่ง 1 ยังตอบได้
+  s = duel.tapDuel(s, 0, 'b', 'a')
+  eq(s.locked.join(), 'true,false', 'ฝั่ง 0 ถูกล็อก')
+  eq(s.winner, null, 'ข้อยังไม่จบ')
+  eq(duel.tapDuel(s, 0, 'a', 'a'), s, 'ฝั่งที่ล็อกแตะไม่ได้')
+  eq(duel.nextDuel(s), s, 'ข้อยังไม่จบไปต่อไม่ได้')
+  s = duel.tapDuel(s, 1, 'c', 'a')
+  eq(s.winner, 'none', 'ผิดทั้งคู่ไม่มีใครได้แต้ม')
+  eq(s.scores.join(), '0,1', 'แต้มไม่เปลี่ยน')
+  s = duel.nextDuel(s)
+  eq(s.locked.join(), 'false,false', 'ข้อใหม่ปลดล็อก')
+  eq(duel.duelWinner(s), 1, 'ฝั่ง 1 นำ')
+  s = duel.nextDuel(duel.tapDuel(s, 0, 'a', 'a'))
+  eq(duel.duelWinner(s), 'tie', 'เสมอ')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

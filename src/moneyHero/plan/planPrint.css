@@ -1,0 +1,194 @@
+/* ใบงานวางแผนใช้เงิน: ใช้แผ่น A4 ของชุดกาดรักษ์โลก (kad.css) ขนาดเป็น cqw ของความกว้างแผ่น */
+
+.pp-head {
+  border-bottom-color: #ffd8a8;
+}
+
+.pp-head h2 {
+  color: #d9480f;
+}
+
+.pp-logo {
+  color: #e8590c;
+}
+
+.pp-story {
+  display: flex;
+  align-items: center;
+  gap: 2cqw;
+  padding: 1.6cqw 2cqw;
+  border-radius: 2cqw;
+  background: #fff9db;
+  border: 0.4cqw solid #ffe066;
+}
+
+.pp-story svg,
+.pp-story img {
+  width: 11cqw !important;
+  height: 11cqw !important;
+  flex: none;
+}
+
+.pp-story-text {
+  flex: 1;
+  font-size: 1.05em;
+}
+
+.pp-budget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1cqw 2cqw;
+  border-radius: 2cqw;
+  background: #ebfbee;
+  border: 0.5cqw solid #40c057;
+  white-space: nowrap;
+}
+
+.pp-budget b {
+  font-size: 1.4em;
+  color: #2b8a3e;
+}
+
+.pp-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1cqw 2cqw;
+  align-items: center;
+}
+
+.pp-need {
+  padding: 0.3cqw 1.6cqw;
+  border-radius: 999px;
+  border: 0.3cqw dashed #adb5bd;
+  font-weight: 700;
+}
+
+.pp-shelf {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1cqw;
+}
+
+.pp-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.8cqw;
+  border-radius: 1.6cqw;
+  border: 0.3cqw solid #dee2e6;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.pp-item-icon {
+  font-size: 1.7em;
+  line-height: 1.1;
+}
+
+.pp-item-name {
+  font-weight: 700;
+  font-size: 0.8em;
+}
+
+.pp-item-cat {
+  font-size: 0.65em;
+  opacity: 0.65;
+}
+
+.pp-price {
+  margin-top: 0.3cqw;
+  padding: 0 0.8cqw;
+  border-radius: 999px;
+  border: 0.3cqw solid #ffa94d;
+  background: #fff4e6;
+  font-weight: 800;
+  font-size: 0.7em;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.pp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95em;
+}
+
+.pp-table th,
+.pp-table td {
+  border: 0.25cqw solid #868e96;
+  padding: 0 1.2cqw;
+  height: 2.1em;
+  text-align: left;
+}
+
+.pp-table th {
+  background: #fff4e6;
+  height: auto;
+  padding: 0.6cqw 1.2cqw;
+}
+
+.pp-table th:nth-child(1) {
+  width: 46%;
+}
+
+.pp-table th:nth-child(2) {
+  width: 22%;
+}
+
+.pp-money {
+  text-align: right !important;
+  color: #868e96;
+  white-space: nowrap;
+}
+
+.pp-total td {
+  font-weight: 800;
+  background: #f8f9fa;
+}
+
+.pp-calc {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqw;
+  padding: 1.2cqw 2cqw;
+  border-radius: 1.6cqw;
+  border: 0.3cqw solid #74c0fc;
+  background: #e7f5ff;
+}
+
+.pp-challenge {
+  padding: 1.2cqw 2cqw;
+  border-radius: 1.6cqw;
+  border: 0.3cqw dashed #fab005;
+}
+
+/* เฉลย */
+.pp-key .kad-sheet-in {
+  font-size: 2cqw;
+  gap: 1.4cqw;
+}
+
+.pp-key-row {
+  padding: 1.2cqw 2cqw;
+  border-radius: 1.6cqw;
+  border: 0.3cqw solid #dee2e6;
+}
+
+.pp-key-row h3 {
+  margin: 0 0 0.5cqw;
+  font-size: 1.1em;
+  color: #d9480f;
+}
+
+.pp-key-row p {
+  margin: 0.2cqw 0;
+}
+
+.pp-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-weight: 700;
+}

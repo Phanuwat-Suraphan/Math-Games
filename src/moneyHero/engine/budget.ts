@@ -175,6 +175,21 @@ export function cheapestPlan(event: PlanEvent): string[] {
   return out
 }
 
+/** แผนที่แพงที่สุดตามจำนวนที่ต้องซื้อ (ใช้ในคำถามท้าทายของใบงาน และตรวจว่าเกินงบได้จริง) */
+export function priciestPlan(event: PlanEvent): string[] {
+  const out: string[] = []
+  for (const [cat, n] of Object.entries(event.needs)) {
+    out.push(
+      ...event.items
+        .filter((i) => i.cat === cat)
+        .sort((a, b) => b.price - a.price)
+        .slice(0, n)
+        .map((i) => i.id),
+    )
+  }
+  return out
+}
+
 /** วิธีคิดยอดรวม และเงินที่เหลือ (แสดงเมื่อตอบผิดครบ 2 ครั้ง) */
 export function explainTotal(event: PlanEvent, cart: readonly string[]): string[] {
   const items = cartItems(event, cart)

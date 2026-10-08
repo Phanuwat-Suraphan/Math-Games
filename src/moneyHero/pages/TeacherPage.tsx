@@ -6,7 +6,8 @@ import { useGame } from '../hooks/useMoneyGame'
 import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
 import { lessonsPassed, overallAccuracy, pendingMistakes, totalStars, weakSkills, type Player } from '../engine/progress'
-import { buildCsv, classSummary, improvement, minutes, percent, skillPercent, stageTable, testPercent } from '../engine/report'
+import { buildCsv, classSummary, improvement, minutes, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
+import { PLAN_EVENTS, plannedEvents } from '../engine/budget'
 import { challengesCleared, stageStars } from '../engine/stages'
 import { allStars, CHESTS, MAX_STARS } from '../engine/starRoad'
 import { AvatarArt, CharacterArt } from '../components/Art'
@@ -54,6 +55,12 @@ export function TeacherPage() {
         <div className="mh-teacher-actions">
           <Link to="/kad" className="mh-btn mh-btn-go" data-testid="mh-teacher-kad">
             🌱 กาดรักษ์โลก (สื่อพิมพ์)
+          </Link>
+          <Link to="/plan/print" className="mh-btn mh-btn-go" data-testid="mh-teacher-plan">
+            🎉 ใบงานวางแผนใช้เงิน
+          </Link>
+          <Link to="/duel" className="mh-btn mh-btn-soft" data-testid="mh-teacher-duel">
+            ⚔️ ดวลสองคน
           </Link>
           <Link to="/sandbox" className="mh-btn mh-btn-soft">
             🧮 โต๊ะนับเงิน (สาธิต)
@@ -198,6 +205,12 @@ function StudentDetail({ p }: { p: Player }) {
           ) : (
             <p className="mh-soft">ยังไม่ได้เล่นกาดรักษ์โลก</p>
           )}
+          <h4 className="mh-card-title">🎉 วางแผนใช้เงิน</h4>
+          <p className="mh-soft" data-testid="mh-student-plan">
+            {plannedEvents(p) > 0
+              ? `จัดงานสำเร็จ ${plannedEvents(p)}/${PLAN_EVENTS.length} งาน · ดาว ${planStarsTotal(p)}/${PLAN_EVENTS.length * 3} · เล่นทั้งหมด ${p.plan?.done ?? 0} ครั้ง`
+              : 'ยังไม่ได้เล่นวางแผนใช้เงิน'}
+          </p>
           <h4 className="mh-card-title">🧰 ถนนดาว</h4>
           <p className="mh-soft">
             ดาวรวม {allStars(p)}/{MAX_STARS} · เปิดหีบสมบัติ {(p.chests ?? []).length}/{CHESTS.length} หีบ

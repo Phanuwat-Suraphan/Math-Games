@@ -99,7 +99,9 @@ export function PlanPage() {
 
         {phase === 'choose' && (
           <>
-            <p className="mh-help-line">เพื่อน ๆ ขอให้ช่วยจัดงาน เลือกซื้อของให้ครบ แต่ห้ามเกินงบนะ!</p>
+            <p className="mh-help-line">
+              เพื่อน ๆ ขอให้ช่วยจัดงาน เลือกซื้อของให้ครบ แต่ห้ามเกินงบนะ! · <Link to="/plan/print">🖨️ ใบงานสำหรับพิมพ์</Link>
+            </p>
             <div className="mh-plan-events">
               {PLAN_EVENTS.map((e) => (
                 <button key={e.id} type="button" className="mh-card mh-plan-event" data-testid={`mh-plan-event-${e.id}`} onClick={() => start(e)}>
