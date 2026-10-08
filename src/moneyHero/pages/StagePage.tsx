@@ -18,6 +18,7 @@ import { Confetti } from '../components/Effects'
 import { PracticeRange } from '../components/PracticeRange'
 import { BossArena } from '../components/BossArena'
 import { StageChips } from '../components/StageChips'
+import { ChestNotice } from '../components/ChestNotice'
 import { advanceBalloons, type Balloon } from '../data/practice'
 import { bossHp, bossOf } from '../data/bosses'
 import { playSound } from '../utils/sound'
@@ -134,6 +135,7 @@ function StageRun({ levelId, n }: { levelId: number; n: 2 | 3 }) {
             <p className="mh-soft">ไม่เป็นไรนะ ลองทบทวนด่านผจญภัยแล้วกลับมาใหม่!</p>
           </>
         )}
+        {result.passed && <ChestNotice player={player} />}
         <div className="mh-row-buttons">
           <button type="button" className="mh-btn mh-btn-soft" onClick={again} data-testid="mh-stage-again">
             🔄 เล่นอีกครั้ง

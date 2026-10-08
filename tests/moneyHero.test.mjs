@@ -47,6 +47,7 @@ const missions = load('data/missions.js')
 const practice = load('data/practice.js')
 const stages = load('engine/stages.js')
 const speech = load('utils/speech.js')
+const road = load('engine/starRoad.js')
 
 let passed = 0
 const failures = []
@@ -1276,6 +1277,60 @@ test('ทุกประโยคที่ตัวละครพูด อ่�
   }
   const bad = lines.filter((line) => /[A-Za-z]/.test(sp(line)))
   eq(bad.length, 0, `มีคำอังกฤษหลุด: ${bad.slice(0, 3).map(sp).join(' | ')}`)
+})
+
+test('ถนนดาว: ดาวรวมเปิดหีบสมบัติ ได้เหรียญและของฟรี เปิดซ้ำไม่ได้', () => {
+  const shop = load('data/shop.js')
+  // หีบเรียงจากน้อยไปมาก หีบสุดท้ายคือดาวเต็ม ของฟรีมีอยู่จริงในร้าน
+  for (let i = 1; i < road.CHESTS.length; i += 1) assert(road.CHESTS[i].at > road.CHESTS[i - 1].at, 'หีบต้องเรียงตามดาว')
+  eq(road.CHESTS[road.CHESTS.length - 1].at, road.MAX_STARS, 'หีบสุดท้ายที่ดาวเต็ม')
+  eq(road.MAX_STARS, 13 * 3 + 13 * 2 * 3, 'ดาวเต็ม = ด่านหลัก + ด่านย่อย')
+  for (const c of road.CHESTS) if (c.gift) assert(shop.shopItem(c.gift), `ไม่มีของ ${c.gift} ในร้าน`)
+
+  let p = progress.newPlayer('สมบัติ', 'hero')
+  eq(road.allStars(p), 0, 'เริ่มที่ 0 ดาว')
+  eq(road.readyChests(p).length, 0, 'ยังไม่มีหีบให้เปิด')
+  eq(road.openChest(p, 3), null, 'หีบล็อกเปิดไม่ได้')
+  eq(road.nextChest(p).need, 3, 'อีก 3 ดาวถึงหีบแรก')
+
+  // ดาวด่านหลัก 3 + ด่านย่อย 6 = 9 ดาว → เปิดได้ 2 หีบ (3, 8)
+  p = { ...p, levels: { 0: { ...progress.emptyLevel(), stepDone: 4, bestStars: 3 } }, stages: { '0-2': { stars: 3, plays: 1, bestAccuracy: 1 }, '0-3': { stars: 3, plays: 1, bestAccuracy: 1 } } }
+  eq(road.allStars(p), 9, 'รวมดาวด่านหลักและด่านย่อย')
+  eq(road.readyChests(p).map((c) => c.at).join(), '3,8', 'หีบที่เปิดได้')
+  eq(road.nextChest(p).need, 6, 'อีก 6 ดาวถึงหีบ 15')
+
+  const c0 = p.coins
+  const first = road.openChest(p, 3)
+  eq(first.reward.coins, 15, 'หีบแรกได้ 15 เหรียญ')
+  p = first.player
+  eq(p.coins, c0 + 15, 'เหรียญเพิ่มจริง')
+  assert(p.ledger.some((e) => e.label === 'หีบสมบัติดาว 3 ดวง'), 'ลงสมุดบัญชี')
+  eq(road.openChest(p, 3), null, 'เปิดหีบเดิมซ้ำไม่ได้')
+  eq(road.chestState(p, road.CHESTS[0]), 'opened', 'หีบแรกเปิดแล้ว')
+
+  // หีบมีของฟรี: ได้ของ สวมให้ถ้าช่องว่าง และไม่ต้องออมต่อถ้าเป็นเป้าหมาย
+  p = { ...p, goal: 'face-round' }
+  const second = road.openChest(p, 8)
+  eq(second.reward.item, 'face-round', 'ได้แว่นฟรี')
+  assert(second.player.owned.includes('face-round'), 'ของอยู่ในกระเป๋า')
+  eq(second.player.wear.face, 'face-round', 'สวมให้เลย')
+  eq(second.player.goal, undefined, 'เลิกเป้าหมายการออมของชิ้นนั้น')
+
+  // มีของชิ้นนั้นแล้ว: ได้เหรียญชดเชยครึ่งราคาแทน
+  const rich = { ...progress.newPlayer('มีแล้ว', 'hero'), owned: ['face-round'], wear: { face: 'face-round' }, levels: { 0: { ...progress.emptyLevel(), stepDone: 4, bestStars: 3 } }, stages: { '0-2': { stars: 3, plays: 1, bestAccuracy: 1 }, '0-3': { stars: 3, plays: 1, bestAccuracy: 1 } } }
+  const dup = road.openChest(rich, 8)
+  eq(dup.reward.item, undefined, 'ไม่ได้ของซ้ำ')
+  eq(dup.reward.bonus, Math.round(shop.shopItem('face-round').price / 2), 'ได้เหรียญครึ่งราคาแทน')
+  eq(dup.player.owned.filter((x) => x === 'face-round').length, 1, 'ของไม่ซ้ำในกระเป๋า')
+
+  // ตรานักล่าสมบัติ: เปิดครบ 5 หีบ
+  assert(!progress.newBadges({ ...p, chests: [3, 8, 15, 24] }).includes('treasure'), '4 หีบยังไม่ได้ตรา')
+  assert(progress.newBadges({ ...p, chests: [3, 8, 15, 24, 36] }).includes('treasure'), '5 หีบได้ตรา')
+  // บันทึกเก่าที่ไม่มีช่อง chests ยังโหลดได้
+  const old = { ...progress.newPlayer('เก่า', 'hero') }
+  delete old.chests
+  const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
+  eq(JSON.stringify(save.players[old.id].chests), '[]', 'บันทึกเก่าได้ chests ว่าง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

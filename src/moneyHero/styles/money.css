@@ -8734,3 +8734,199 @@ a.mh-stage-chip:hover {
   padding-left: 20px;
   font-size: 0.92em;
 }
+
+/* ================================================================== */
+/* ถนนดาว และหีบสมบัติ                                                 */
+/* ================================================================== */
+
+.mh-star-total {
+  text-align: center;
+}
+
+.mh-star-total-big {
+  font-family: var(--mh-display);
+  font-size: 1.6em;
+}
+
+.mh-star-total-big b {
+  font-size: 1.4em;
+  color: #f08c00;
+}
+
+.mh-star-total-bar {
+  margin: 6px 0;
+}
+
+.mh-star-total-parts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  font-weight: 700;
+}
+
+.mh-star-road {
+  position: relative;
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ถนนลายจุดกลางจอ */
+.mh-star-road::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 20px;
+  bottom: 20px;
+  width: 12px;
+  margin-left: -6px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(180deg, #ffe066 0 14px, #fff3bf 14px 26px);
+  border: 3px solid #fab005;
+}
+
+.mh-road-stop {
+  --card: 300px;
+  position: relative;
+  display: flex;
+}
+
+.mh-road-stop.is-left {
+  justify-content: flex-start;
+}
+
+.mh-road-stop.is-right {
+  justify-content: flex-end;
+}
+
+.mh-road-stop.is-end {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  z-index: 1;
+}
+
+.mh-road-card {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(100%, var(--card));
+  padding: 10px 12px;
+}
+
+.mh-road-stop.is-ready .mh-road-card {
+  border-color: #fab005;
+  background: linear-gradient(180deg, #fff9db, #fff);
+  box-shadow: 0 0 0 4px rgba(250, 176, 5, 0.25), 0 6px 0 rgba(230, 119, 0, 0.25);
+}
+
+.mh-road-stop.is-locked .mh-road-card {
+  opacity: 0.75;
+}
+
+.mh-road-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.mh-road-need {
+  font-family: var(--mh-display);
+  font-size: 1.2em;
+}
+
+.mh-road-done {
+  color: #2f9e44;
+  font-weight: 800;
+}
+
+.mh-road-hero {
+  position: absolute;
+  top: 50%;
+  z-index: 2;
+  margin-top: -30px;
+  margin-left: -29px;
+  animation: mh-piggy-bob 1.6s ease-in-out infinite;
+}
+
+/* ฮีโร่ยืนในที่ว่างข้างการ์ด ไม่บังตัวหนังสือ */
+.mh-road-stop.is-right .mh-road-hero {
+  left: calc((100% - min(100%, var(--card))) / 2);
+}
+
+.mh-road-stop.is-left .mh-road-hero {
+  left: calc(100% - (100% - min(100%, var(--card))) / 2);
+}
+
+.mh-road-stop.is-end .mh-road-hero {
+  position: static;
+  margin: 0;
+}
+
+.mh-chest-art {
+  flex: none;
+  overflow: visible;
+}
+
+.mh-chest-art.is-locked {
+  filter: grayscale(0.85);
+  opacity: 0.8;
+}
+
+.mh-chest-art.is-ready {
+  animation: mh-jelly 1.6s ease-in-out infinite;
+}
+
+.mh-chest-glow {
+  transform-origin: 50px 44px;
+  animation: mh-pop-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.mh-chest-reward {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.mh-chest-notice {
+  display: block;
+  margin: 8px auto 0;
+  padding: 8px 14px;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  border: 3px dashed #fab005;
+  background: #fff9db;
+  color: #8a5100;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.mh-chest-notice.is-ready {
+  border-style: solid;
+  background: linear-gradient(180deg, #ffe066, #fab005);
+  color: #5c3317;
+  animation: mh-jelly 1.8s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+  .mh-road-stop {
+    --card: 236px;
+  }
+  .mh-road-card {
+    gap: 6px;
+    padding: 8px;
+  }
+}
