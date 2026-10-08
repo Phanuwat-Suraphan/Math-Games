@@ -8962,3 +8962,209 @@ a.mh-stage-chip:hover {
 .mh-student-left {
   min-width: 0;
 }
+
+/* ================================================================== */
+/* วางแผนใช้เงิน (#/plan)                                              */
+/* ================================================================== */
+
+.mh-plan-events {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 10px;
+}
+
+.mh-plan-event {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mh-plan-event:hover {
+  background: #fff9db;
+}
+
+.mh-plan-event-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mh-plan-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mh-plan-head .mh-bubble {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.mh-plan-wallet {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 3px solid #69db7c;
+  background: #ebfbee;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.mh-plan-needs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.mh-plan-need {
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 2px dashed #ced4da;
+  background: #fff;
+  font-weight: 700;
+}
+
+.mh-plan-need.is-ok {
+  border-style: solid;
+  border-color: #40c057;
+  background: #ebfbee;
+}
+
+.mh-plan-shelf {
+  margin-bottom: 10px;
+}
+
+.mh-plan-shelf-title {
+  margin: 0 0 6px;
+  font-family: var(--mh-display);
+  font-size: 1.05em;
+}
+
+.mh-plan-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 8px;
+}
+
+.mh-plan-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px 8px;
+  border-radius: 18px;
+  border: 3px solid #e9ecef;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.08);
+}
+
+.mh-plan-item:hover {
+  background: #f8f9fa;
+}
+
+.mh-plan-item.is-on {
+  border-color: #fab005;
+  background: #fff9db;
+}
+
+.mh-plan-item-icon {
+  font-size: 2em;
+  line-height: 1.1;
+}
+
+.mh-plan-item-name {
+  font-weight: 700;
+  font-size: 0.9em;
+  text-align: center;
+}
+
+.mh-plan-price {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #fff4e6;
+  border: 2px solid #ffa94d;
+  font-weight: 800;
+  font-size: 0.85em;
+  white-space: nowrap;
+}
+
+.mh-plan-tick {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  color: #2f9e44;
+  font-weight: 900;
+}
+
+.mh-plan-cart {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  justify-content: space-between;
+}
+
+.mh-plan-ask {
+  margin-top: 10px;
+}
+
+.mh-plan-receipt {
+  list-style: none;
+  margin: 0 auto 10px;
+  padding: 10px 14px;
+  max-width: 360px;
+  border-radius: 8px;
+  background: #fff;
+  border: 2px dashed #ced4da;
+  font-family: ui-monospace, monospace;
+}
+
+.mh-plan-receipt li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.mh-plan-receipt-total {
+  margin-top: 4px;
+  padding-top: 6px !important;
+  border-top: 2px solid #495057;
+  font-size: 1.1em;
+}
+
+.mh-plan-done {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.mh-plan-table {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 16px 4px;
+  border-radius: 18px 18px 6px 6px;
+  background: linear-gradient(180deg, #fff 0 70%, #ffc9c9 70%);
+  border-bottom: 8px solid #e8590c;
+}
+
+.mh-plan-table-item {
+  font-size: 2.2em;
+  animation: mh-pop-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
