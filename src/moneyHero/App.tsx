@@ -11,6 +11,7 @@ import { StagePage } from './pages/StagePage'
 import { StarRoadPage } from './pages/StarRoadPage'
 import { PlanPage } from './pages/PlanPage'
 import { PlanPrintPage } from './plan/PlanPrint'
+import { DuelPage } from './pages/DuelPage'
 import { TestPage } from './pages/TestPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -190,6 +191,7 @@ export default function App() {
             <Route path="/teacher" element={<TeacherPage />} />
             <Route path="/kad" element={<KadPage />} />
             <Route path="/plan/print" element={<PlanPrintPage />} />
+            <Route path="/duel" element={<DuelPage />} />
             <Route path="/kad/class" element={<KadClassPage />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>

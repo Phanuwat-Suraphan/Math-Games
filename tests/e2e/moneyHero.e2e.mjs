@@ -839,6 +839,45 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] ดวลสองคน: ใครถูกก่อนได้ดาว แตะผิดรอข้อต่อไป ครบ 10 ข้อแล้วประกาศผู้ชนะ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-duel').click()
+    await page.waitForURL(/#\/duel/)
+    await page.getByTestId('mh-duel-name-0').fill('แดงจ๋า')
+    await page.getByTestId('mh-duel-name-1').fill('ฟ้าใส')
+    if (name === 'desktop') await page.getByRole('radio', { name: /นั่งข้างกัน/ }).click()
+    await page.getByTestId('mh-duel-start').click()
+    const answer = () => page.evaluate(() => window.__MH_DUEL.answer)
+    const wrongOf = async (side, right) => {
+      const ids = await page.locator(`[data-testid^="mh-duel-opt-${side}-"]`).evaluateAll((els) => els.map((e) => e.dataset.testid.split('-').slice(4).join('-')))
+      return ids.find((id) => id !== right)
+    }
+    for (let i = 0; i < 10; i += 1) {
+      await page.getByTestId('mh-duel-round').getByText(`ข้อ ${i + 1}/10`).waitFor()
+      const right = await answer()
+      if (i === 0) {
+        // ฝั่งฟ้า (กลับหัวเมื่อนั่งตรงข้าม) ตอบถูกก่อน
+        await page.getByTestId(`mh-duel-opt-1-${right}`).click()
+      } else if (i === 1) {
+        // ผิดทั้งคู่: ไม่มีใครได้ดาว
+        await page.getByTestId(`mh-duel-opt-0-${await wrongOf(0, right)}`).click()
+        await page.getByTestId('mh-duel-zone-0').getByText('ข้อนี้รอเพื่อนนะ').waitFor()
+        await page.getByTestId(`mh-duel-opt-1-${await wrongOf(1, right)}`).click()
+        await page.getByText('ยังไม่มีใครถูก').waitFor()
+      } else {
+        await page.getByTestId(`mh-duel-opt-0-${right}`).click()
+      }
+      if (i === 2) await snap(page, `${name}-duel`)
+      await page.getByTestId('mh-duel-next').click()
+    }
+    await page.getByTestId('mh-duel-result').waitFor()
+    await page.getByText('แดงจ๋า ชนะ!').waitFor()
+    const a = await page.getByTestId('mh-duel-result').innerText()
+    if (!a.includes('⭐ 8') || !a.includes('⭐ 1')) throw new Error(`คะแนนดวลผิด: ${a}`)
+    await snap(page, `${name}-duel-result`)
+    await noSideScroll(page, 'ดวลสองคน')
+  })
+
   await step(`[${name}] ร้านทอนไว (โหมดฝึก): ทอนผิดต้องบอกว่าเกิน แล้วทอนถูกครบ 8 ลูกค้า`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-change').click()

@@ -59,6 +59,9 @@ export function TeacherPage() {
           <Link to="/plan/print" className="mh-btn mh-btn-go" data-testid="mh-teacher-plan">
             🎉 ใบงานวางแผนใช้เงิน
           </Link>
+          <Link to="/duel" className="mh-btn mh-btn-soft" data-testid="mh-teacher-duel">
+            ⚔️ ดวลสองคน
+          </Link>
           <Link to="/sandbox" className="mh-btn mh-btn-soft">
             🧮 โต๊ะนับเงิน (สาธิต)
           </Link>
