@@ -48,6 +48,7 @@ const practice = load('data/practice.js')
 const stages = load('engine/stages.js')
 const speech = load('utils/speech.js')
 const road = load('engine/starRoad.js')
+const budget = load('engine/budget.js')
 
 let passed = 0
 const failures = []
@@ -1349,6 +1350,56 @@ test('ถนนดาว: ดาวรวมเปิดหีบสมบัต
   delete old.chests
   const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
   eq(JSON.stringify(save.players[old.id].chests), '[]', 'บันทึกเก่าได้ chests ว่าง')
+})
+
+test('วางแผนใช้เงิน: ทุกงานจัดได้ในงบ และเลือกของแพงก็เกินงบได้จริง', () => {
+  eq(budget.PLAN_EVENTS.length, 4, 'มี 4 งาน')
+  for (const e of budget.PLAN_EVENTS) {
+    assert(e.items.every((i) => i.price > 0 && e.needs[i.cat] !== undefined), `${e.id}: ของต้องมีราคาและอยู่ในหมวดที่ต้องซื้อ`)
+    for (const [cat, n] of Object.entries(e.needs)) assert(e.items.filter((i) => i.cat === cat).length > n, `${e.id}: หมวด ${cat} ต้องมีของให้เลือกมากกว่าที่ต้องซื้อ`)
+    if (!e.satang) assert(e.items.every((i) => i.price % 100 === 0), `${e.id}: งานบาทล้วนต้องไม่มีสตางค์`)
+    else assert(e.items.some((i) => i.price % 100 !== 0), `${e.id}: งานที่มีสตางค์ต้องมีราคามีสตางค์`)
+    const cheap = budget.cheapestPlan(e)
+    assert(budget.needsMet(e, cheap), `${e.id}: แผนถูกที่สุดต้องครบรายการ`)
+    assert(budget.cartTotal(e, cheap) <= e.budget, `${e.id}: แผนถูกที่สุดต้องไม่เกินงบ`)
+    // เลือกของแพงสุดตามจำนวนที่ต้องซื้อ ต้องเกินงบ (เด็กต้องคิดจริง ไม่ใช่เลือกอะไรก็ได้)
+    let priciest = 0
+    for (const [cat, n] of Object.entries(e.needs)) {
+      priciest += e.items.filter((i) => i.cat === cat).map((i) => i.price).sort((a, b) => b - a).slice(0, n).reduce((a, b) => a + b, 0)
+    }
+    assert(priciest > e.budget, `${e.id}: เลือกของแพงสุดต้องเกินงบ (${priciest} / ${e.budget})`)
+  }
+  const party = budget.planEvent('rabbit-party')
+  eq(JSON.stringify(budget.missingNeeds(party, ['cookie'])), JSON.stringify({ cake: 1, snack: 1, deco: 1 }), 'บอกหมวดที่ยังขาด')
+  const cart = ['cake-fruit', 'donut', 'cookie', 'hats']
+  eq(budget.cartTotal(party, cart), 10700, 'รวม 107 บาท')
+  assert(budget.explainTotal(party, cart).some((l) => l.includes('= 107 บาท')), 'วิธีคิดยอดรวม')
+  const trip = budget.planEvent('bear-trip')
+  const tripCart = ['bento', 'tea', 'bread', 'notebook']
+  eq(budget.cartTotal(trip, tripCart), 7550, '35.50 + 15.50 + 9.50 + 15 = 75.50')
+  assert(budget.explainLeft(trip, 7550).some((l) => l.includes('เหลือ 24 บาท 50 สตางค์')), 'วิธีคิดเงินเหลือ')
+  // ดาว
+  eq(budget.planStars(0, 0), 3, 'ไม่พลาดเลย 3 ดาว')
+  eq(budget.planStars(1, 1), 2, 'พลาด 2 ครั้ง 2 ดาว')
+  eq(budget.planStars(3, 0), 1, 'พลาดมาก 1 ดาว')
+  // บันทึกผล
+  let p = progress.newPlayer('วางแผน', 'hero')
+  const c0 = p.coins
+  p = budget.recordPlan(p, 'rabbit-party', 2)
+  eq(p.coins, c0 + budget.planReward(2, true), 'ได้เหรียญรางวัล')
+  assert(p.ledger.some((e) => e.label === 'จัดงาน: ปาร์ตี้วันเกิดน้องกระต่าย'), 'ลงสมุดบัญชี')
+  p = budget.recordPlan(p, 'rabbit-party', 1)
+  eq(p.plan.best['rabbit-party'], 2, 'เก็บดาวที่ดีที่สุด')
+  eq(p.plan.done, 2, 'นับครั้งที่จัด')
+  eq(budget.plannedEvents(p), 1, 'จัดแล้ว 1 งาน')
+  assert(!progress.newBadges(p).includes('planner'), 'ยังไม่ได้ตรา')
+  p = budget.recordPlan(budget.recordPlan(p, 'fox-picnic', 3), 'owl-books', 1)
+  assert(progress.newBadges(p).includes('planner'), 'จัด 3 งานได้ตรานักวางแผน')
+  // บันทึกเก่าที่ไม่มีช่อง plan ยังโหลดได้
+  const old = { ...progress.newPlayer('เก่า', 'hero') }
+  delete old.plan
+  const save = progress.parseSave(JSON.stringify({ version: 1, players: { [old.id]: old }, activeId: old.id }))
+  eq(save.players[old.id].plan.done, 0, 'บันทึกเก่าได้ plan ว่าง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

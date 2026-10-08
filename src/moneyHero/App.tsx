@@ -9,6 +9,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { LevelPage } from './pages/LevelPage'
 import { StagePage } from './pages/StagePage'
 import { StarRoadPage } from './pages/StarRoadPage'
+import { PlanPage } from './pages/PlanPage'
 import { TestPage } from './pages/TestPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -75,6 +76,14 @@ export default function App() {
               element={
                 <NeedPlayer>
                   <StagePage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/plan"
+              element={
+                <NeedPlayer>
+                  <PlanPage />
                 </NeedPlayer>
               }
             />

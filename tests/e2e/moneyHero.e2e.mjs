@@ -791,6 +791,54 @@ for (const [name, viewport] of [
     if (sum !== p.coins) throw new Error(`สมุดบัญชีไม่ครบหลังเล่นกาด: ${sum} ≠ ${p.coins}`)
   })
 
+  await step(`[${name}] วางแผนใช้เงิน: เลือกของให้ครบ คิดยอดรวม เกินงบต้องกลับไปเปลี่ยน แล้วคิดเงินที่เหลือ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-plan').click()
+    await page.waitForURL(/#\/plan/)
+    const answer = async (value) => {
+      const baht = Math.floor(value / 100)
+      const satang = value % 100
+      await page.getByTestId('mh-plan-baht').fill(String(baht))
+      if (await page.getByTestId('mh-plan-satang').count()) await page.getByTestId('mh-plan-satang').fill(satang ? String(satang) : '')
+      await page.getByTestId('mh-plan-submit').click()
+    }
+    const plan = () => page.evaluate(() => window.__MH_PLAN)
+    if (name === 'desktop') {
+      // ปาร์ตี้วันเกิด: เลือกของแพงจนเกินงบก่อน แล้วกลับไปเปลี่ยน
+      await page.getByTestId('mh-plan-event-rabbit-party').click()
+      for (const id of ['cake-fruit', 'donut', 'cookie', 'hats']) await page.getByTestId(`mh-plan-item-${id}`).click()
+      await snap(page, `${name}-plan-pick`)
+      await page.getByTestId('mh-plan-checkout').click()
+      await answer(10700)
+      await page.getByTestId('mh-plan-over').waitFor()
+      await page.getByTestId('mh-plan-back').click()
+      await page.getByTestId('mh-plan-item-hats').click()
+      await page.getByTestId('mh-plan-item-balloon').click()
+      await page.getByTestId('mh-plan-checkout').click()
+      await answer((await plan()).total)
+      await answer((await plan()).left)
+      await page.getByTestId('mh-plan-done').waitFor()
+      await snap(page, `${name}-plan-done`)
+      const p = await savedPlayer(page)
+      if (p.plan.best['rabbit-party'] !== 2) throw new Error(`เกินงบ 1 ครั้งต้องได้ 2 ดาว: ${JSON.stringify(p.plan)}`)
+    } else {
+      // ทัศนศึกษา: ราคามีสตางค์ ตอบผิด 2 ครั้งต้องเห็นวิธีคิด
+      await page.getByTestId('mh-plan-event-bear-trip').click()
+      for (const id of (await plan()).cheapest) await page.getByTestId(`mh-plan-item-${id}`).click()
+      await page.getByTestId('mh-plan-checkout').click()
+      await answer(100)
+      await answer(200)
+      await page.getByTestId('mh-plan-reveal').waitFor()
+      await page.getByTestId('mh-plan-next').click()
+      await answer((await plan()).left)
+      await page.getByTestId('mh-plan-done').waitFor()
+      await snap(page, `${name}-plan-done`)
+      await noSideScroll(page, 'วางแผนใช้เงิน')
+      const p = await savedPlayer(page)
+      if (p.plan.best['bear-trip'] !== 2) throw new Error(`ตอบผิด 2 ครั้งต้องได้ 2 ดาว: ${JSON.stringify(p.plan)}`)
+    }
+  })
+
   await step(`[${name}] ร้านทอนไว (โหมดฝึก): ทอนผิดต้องบอกว่าเกิน แล้วทอนถูกครบ 8 ลูกค้า`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-change').click()
