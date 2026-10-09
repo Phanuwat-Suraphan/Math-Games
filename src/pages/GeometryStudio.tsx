@@ -173,6 +173,7 @@ import {
   polygonName,
   rubLine,
   projectOnSegment,
+  snapAlongGuide,
   regularPolygon,
   snapDeg,
   softSnapDeg,
@@ -671,7 +672,11 @@ export function GeometryStudio() {
     }
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
-    return guide ? projectOnSegment(end, guide.a, guide.b) : end
+    if (!guide) return end
+
+    /* จุดที่ดูดเข้าของเดิมได้แล้ว ไม่ต้องปัดความยาวซ้ำ ปลายเส้นต้องชนจุดนั้นพอดี */
+    if (!snapOn || target) return projectOnSegment(end, guide.a, guide.b)
+    return snapAlongGuide(start, end, guide.a, guide.b, PX_PER_CM / 2)
   }
 
   /* ------------------------------------------------------------------ */
@@ -1282,11 +1287,17 @@ export function GeometryStudio() {
       case 'compass-draw': {
         /* รัศมีถูกล็อกไว้เหมือนวงเวียนจริงที่ขันน็อตแล้ว มีแต่มุมที่เปลี่ยน */
         const now = angleOf(compass.center, raw)
+        const turned = accumulateSweep(drag.sweep, drag.last, now)
         setCompass({ ...compass, angle: now })
         setDrag({
           kind: 'compass-draw',
           start: drag.start,
-          sweep: accumulateSweep(drag.sweep, drag.last, now),
+          /*
+           * เปิดแม่เหล็กแล้วองศาที่กวาดขยับทีละห้าองศา
+           * โจทย์สั่ง "วาดส่วนโค้ง 60 องศา" ซึ่งหมุนด้วยมือให้ได้ 60.0 พอดีเป็นไปไม่ได้
+           * ปัดทีละก้อนแบบนี้ยังหมุนได้ทุกทิศ แค่หยุดที่เลขที่จดลงสมุดได้
+           */
+          sweep: snapOn ? Math.round(turned / 5) * 5 : turned,
           last: now,
         })
         return
@@ -1614,6 +1625,18 @@ export function GeometryStudio() {
     playSfx('click')
   }
 
+  /** ย้ายรูปที่เลือกไปอยู่บนสุดหรือล่างสุดของกอง */
+  function sortSelected(where: 'top' | 'bottom') {
+    if (!selected) return
+    const rest = board.shapes.filter((shape) => shape.id !== selected.id)
+    dispatch({ type: 'mark' })
+    dispatch({
+      type: 'live',
+      shapes: where === 'top' ? [...rest, selected] : [selected, ...rest],
+    })
+    playSfx('click')
+  }
+
   function removeSelected() {
     if (!selected) return
     dispatch({ type: 'remove', id: selected.id })
@@ -1933,6 +1956,7 @@ export function GeometryStudio() {
     setColor(saved.prefs.color)
     setFillColor(saved.prefs.fillColor)
     setDashed(saved.prefs.dashed)
+    setToolFade(saved.prefs.toolFade)
     setWidth(saved.prefs.width)
     setThemeId(saved.prefs.themeId)
     setShowGrid(saved.prefs.showGrid)
@@ -1966,6 +1990,7 @@ export function GeometryStudio() {
           color,
           fillColor,
           dashed,
+          toolFade,
           width,
           showGrid,
           snapOn,
@@ -1983,6 +2008,7 @@ export function GeometryStudio() {
     color,
     fillColor,
     dashed,
+    toolFade,
     width,
     showGrid,
     snapOn,
@@ -3830,6 +3856,54 @@ export function GeometryStudio() {
                 </div>
               ) : null}
 
+              {/*
+                เปลี่ยนสีและความหนาของรูปที่วาดไปแล้ว
+                เดิมเลือกได้แค่ก่อนวาด พอวาดไปแล้วอยากให้เส้นคำตอบเด่นกว่าเส้นร่าง
+                ต้องลบแล้ววาดใหม่ทั้งเส้น ทั้งที่เส้นนั้นวางถูกที่อยู่แล้วทุกอย่าง
+              */}
+              {selected && selected.kind !== 'photo' ? (
+                <div className="mt-3 rounded-2xl bg-white/70 p-3">
+                  <p className="text-xs font-bold text-slate-600">สีและความหนาของรูปนี้</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {PENCIL_COLORS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => {
+                          editSelected({ ...selected, color: item.value })
+                          playSfx('click')
+                        }}
+                        aria-label={`เปลี่ยนเป็นสี${item.label}`}
+                        title={item.label}
+                        style={{ backgroundColor: item.value }}
+                        className={`h-7 w-7 rounded-full border-[3px] transition ${
+                          selected.color === item.value
+                            ? 'border-white shadow-lg scale-110'
+                            : 'border-white/60'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    {PENCIL_WIDTHS.map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => {
+                          editSelected({ ...selected, width: item.value })
+                          playSfx('click')
+                        }}
+                        className={`geo-chip flex-1 ${
+                          selected.width === item.value ? 'geo-chip-strong' : ''
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {/* สลับเส้นร่างกับเส้นคำตอบของรูปที่วาดไปแล้ว */}
               {selected && canDash(selected) ? (
                 <button
@@ -4011,6 +4085,28 @@ export function GeometryStudio() {
                   </div>
                 </div>
               ) : null}
+
+              {/*
+                สลับว่ารูปไหนอยู่บนรูปไหน
+                รูปที่ระบายสีแล้วบังเส้นที่อยู่ข้างใต้ ซึ่งเป็นเส้นที่ต้องใช้วัดต่อ
+                เดิมแก้ได้ทางเดียวคือลบแล้ววาดใหม่ตามลำดับที่อยากได้
+              */}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => sortSelected('top')}
+                  className="geo-chip flex-1"
+                >
+                  ⬆️ ไว้ข้างบน
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sortSelected('bottom')}
+                  className="geo-chip flex-1"
+                >
+                  ⬇️ ไว้ข้างล่าง
+                </button>
+              </div>
 
               <button type="button" onClick={removeSelected} className="geo-chip mt-3 w-full">
                 🗑️ ลบรูปนี้
