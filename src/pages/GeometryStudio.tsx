@@ -316,6 +316,7 @@ export function GeometryStudio() {
   /* ตัวจำว่าเลือกรูปไหนอยู่ ไว้ให้ปุ่มลัดบนคีย์บอร์ดอ่าน ซึ่งผูกไว้ครั้งเดียวตอนเปิดหน้า */
   const selectedRef = useRef<string | null>(null)
   const shapesRef = useRef<Shape[]>([])
+  const draftRef = useRef<Point[]>([])
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -456,6 +457,7 @@ export function GeometryStudio() {
   const selected = board.shapes.find((shape) => shape.id === selectedId) ?? null
   selectedRef.current = selected ? selected.id : null
   shapesRef.current = board.shapes
+  draftRef.current = draft
 
   /* เก็บกวาดตัวจับเวลาตอนออกจากหน้า ไม่งั้น React จะเตือนว่าอัปเดตของที่ถูกถอดไปแล้ว */
   useEffect(() => {
@@ -653,7 +655,20 @@ export function GeometryStudio() {
   }
 
   /** ปลายเส้นระหว่างลาก ดูดเข้าจุดเดิม จุดตัด มุมที่ลงตัว หรือขอบไม้บรรทัด */
-  function penEnd(start: Point, raw: Point, guide: { a: Point; b: Point } | null): Point {
+  function penEnd(
+    start: Point,
+    raw: Point,
+    guide: { a: Point; b: Point } | null,
+    locked = false,
+  ): Point {
+    /*
+     * กด Shift ค้างคือล็อกแนว ได้เฉพาะแนวนอน แนวตั้ง และทแยง 45 องศา
+     * เส้นแนวนอนกับแนวตั้งเป๊ะ ๆ คือสิ่งที่โจทย์สั่งบ่อยที่สุด (ฐานของรูป เส้นตั้งฉาก)
+     * และเป็นสิ่งที่ลากด้วยมือให้ตรงไม่ได้เลย ต่อให้เปิดแม่เหล็กไว้ก็ยังพลาดได้หนึ่งองศา
+     */
+    if (locked) {
+      return pointAt(start, distance(start, raw), snapDeg(angleOf(start, raw), 45))
+    }
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
     return guide ? projectOnSegment(end, guide.a, guide.b) : end
@@ -1181,7 +1196,7 @@ export function GeometryStudio() {
 
     switch (drag.kind) {
       case 'pen':
-        setDrag({ ...drag, end: penEnd(drag.start, raw, drag.guide) })
+        setDrag({ ...drag, end: penEnd(drag.start, raw, drag.guide, event.shiftKey) })
         return
 
       case 'regular':
@@ -1405,7 +1420,7 @@ export function GeometryStudio() {
       }
 
       case 'pen': {
-        const end = penEnd(drag.start, raw, drag.guide)
+        const end = penEnd(drag.start, raw, drag.guide, event.shiftKey)
         if (distance(drag.start, end) >= 6) {
           addShape({ kind: 'segment', id: makeId(), color, width, a: drag.start, b: end })
         }
@@ -2106,6 +2121,18 @@ export function GeometryStudio() {
         setCalibrate(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
         setDrag({ kind: 'none' })
+        return
+      }
+
+      /*
+       * ถอยจุดล่าสุดของรูปหลายเหลี่ยมที่กำลังต่ออยู่
+       * เดิมมีแต่ Esc ซึ่งล้างทิ้งทั้งรูป จิ้มพลาดจุดเดียวตอนจุดที่หก
+       * แปลว่าต้องเริ่มใหม่ทั้งรูป ทั้งที่ผิดแค่จุดเดียว
+       */
+      if (!typing && event.key === 'Backspace' && draftRef.current.length > 0) {
+        event.preventDefault()
+        setDraft(draftRef.current.slice(0, -1))
+        playSfx('click')
         return
       }
 
@@ -3943,6 +3970,45 @@ export function GeometryStudio() {
                       </button>
                     </>
                   )}
+                </div>
+              ) : null}
+
+              {/*
+                ตั้งชื่อจุดเอง
+                โปรแกรมตั้งให้อัตโนมัติเป็น A B C ตามลำดับที่ปัก แต่โจทย์ในหนังสือ
+                เรียกจุดด้วยตัวอักษรของมันเอง เช่น มุม PQR ถ้าเปลี่ยนชื่อไม่ได้
+                เด็กจะต้องแปลงชื่อในหัวตลอดเวลาที่ทำโจทย์นั้น
+              */}
+              {selected && selected.kind === 'dot' ? (
+                <div className="mt-3 rounded-2xl bg-violet-50 p-3">
+                  <p className="text-xs font-bold text-violet-800">ชื่อจุดนี้</p>
+                  <div className="geo-field mt-1">
+                    <span className="flex-1">ตัวอักษร</span>
+                    <input
+                      type="text"
+                      value={selected.label}
+                      maxLength={3}
+                      onChange={(event) =>
+                        editSelected({ ...selected, label: event.target.value.slice(0, 3) })
+                      }
+                      aria-label="ชื่อจุด"
+                    />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {['A', 'B', 'C', 'D', 'P', 'Q', 'R', 'O'].map((letter) => (
+                      <button
+                        key={letter}
+                        type="button"
+                        onClick={() => {
+                          editSelected({ ...selected, label: letter })
+                          playSfx('click')
+                        }}
+                        className={`geo-chip ${selected.label === letter ? 'geo-chip-strong' : ''}`}
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ) : null}
 
