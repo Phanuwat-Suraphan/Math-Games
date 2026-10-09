@@ -171,6 +171,7 @@ import {
   pointAt,
   pointLabel,
   polygonName,
+  rubLine,
   projectOnSegment,
   regularPolygon,
   snapDeg,
@@ -191,6 +192,9 @@ const GRID_STEP = PX_PER_CM / 2
 const ANCHOR_RADIUS = 16
 /** ระยะจากขอบไม้บรรทัดที่ถือว่ากำลังลากดินสอตามไม้บรรทัด */
 const RULER_GUIDE_RANGE = 30
+
+/** รัศมีของยางลบตอนลบเฉพาะที่ถู หน่วยเป็นพิกเซลของผืนวาด */
+const RUB_RADIUS = 16
 
 /**
  * วงเวียนที่วางค้างอยู่บนกระดาษ
@@ -265,6 +269,12 @@ export function GeometryStudio() {
    * ถ้าทุกเส้นหน้าตาเหมือนกันหมด งานที่เสร็จแล้วจะอ่านไม่ออกว่าอะไรคือคำตอบ
    */
   const [dashed, setDashed] = useState(false)
+  /*
+   * ยางลบลบทั้งชิ้น หรือลบเฉพาะตรงที่ถู
+   * ของจริงลบเฉพาะตรงที่ถู แต่บนจอการลบทั้งชิ้นเร็วกว่ามากเวลาจะล้างของที่วาดผิด
+   * จึงมีทั้งสองแบบ และตั้งต้นที่ลบทั้งชิ้นซึ่งเป็นสิ่งที่เด็กคาดหวังจากการจิ้มหนึ่งครั้ง
+   */
+  const [eraseWhole, setEraseWhole] = useState(true)
 
   /*
    * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
@@ -305,6 +315,7 @@ export function GeometryStudio() {
   const pasteRef = useRef<(file: File) => void>(() => {})
   /* ตัวจำว่าเลือกรูปไหนอยู่ ไว้ให้ปุ่มลัดบนคีย์บอร์ดอ่าน ซึ่งผูกไว้ครั้งเดียวตอนเปิดหน้า */
   const selectedRef = useRef<string | null>(null)
+  const shapesRef = useRef<Shape[]>([])
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -444,6 +455,7 @@ export function GeometryStudio() {
   const mission = MISSIONS[missionIndex]
   const selected = board.shapes.find((shape) => shape.id === selectedId) ?? null
   selectedRef.current = selected ? selected.id : null
+  shapesRef.current = board.shapes
 
   /* เก็บกวาดตัวจับเวลาตอนออกจากหน้า ไม่งั้น React จะเตือนว่าอัปเดตของที่ถูกถอดไปแล้ว */
   useEffect(() => {
@@ -883,6 +895,30 @@ export function GeometryStudio() {
   function rubOut(at: Point, marked: boolean): boolean {
     const found = findShapeAt(board.shapes, at, hitRange)
     if (!found) return marked
+
+    /*
+     * ลบเฉพาะที่ถู ใช้ได้กับเส้นตรง ซึ่งเป็นของที่ต้องลบบางส่วนจริง ๆ
+     * เส้นร่างในการสร้างรูปมักยาวเลยรูปออกไป แล้วต้องลบเฉพาะส่วนที่เกิน
+     * ถ้าลบได้แต่ทั้งเส้น เด็กต้องลบแล้ววาดใหม่ให้สั้นลง ซึ่งไม่ใช่สิ่งที่ทำบนกระดาษจริง
+     */
+    if (!eraseWhole && found.kind === 'segment') {
+      const pieces = rubLine(found.a, found.b, at, RUB_RADIUS)
+      /* ยางลบผ่านแต่ไม่ได้กินเนื้อเส้นเลย ไม่ต้องจดประวัติและไม่ต้องเปลี่ยนอะไร */
+      if (pieces.length === 1 && distance(pieces[0].b, found.b) < 0.001) return marked
+      if (!marked) dispatch({ type: 'mark' })
+      dispatch({
+        type: 'live',
+        shapes: board.shapes.flatMap((shape) =>
+          shape.id === found.id
+            ? pieces.map((piece) => ({ ...found, id: makeId(), a: piece.a, b: piece.b }))
+            : [shape],
+        ),
+      })
+      if (selectedId === found.id) setSelectedId(null)
+      playSfx('click')
+      return true
+    }
+
     if (!marked) dispatch({ type: 'mark' })
     dispatch({ type: 'live', shapes: board.shapes.filter((shape) => shape.id !== found.id) })
     if (selectedId === found.id) setSelectedId(null)
@@ -2074,6 +2110,28 @@ export function GeometryStudio() {
       }
 
       /*
+       * ลูกศรเลื่อนรูปที่เลือกทีละพิกเซล กด Shift ด้วยเลื่อนทีละสิบ
+       * นิ้วกับเมาส์ขยับให้ตรงระดับพิกเซลไม่ได้ แต่การวางรูปให้ชนกันพอดีต้องการความละเอียดนั้น
+       */
+      if (!typing && event.key.startsWith('Arrow')) {
+        const id = selectedRef.current
+        if (id === null) return
+        const step = event.shiftKey ? 10 : 1
+        const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
+        const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
+        if (dx === 0 && dy === 0) return
+        event.preventDefault()
+        dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: shapesRef.current.map((shape) =>
+            shape.id === id ? translateShape(shape, dx, dy) : shape,
+          ),
+        })
+        return
+      }
+
+      /*
        * ปุ่มลบของคีย์บอร์ดลบรูปที่เลือกอยู่ เหมือนโปรแกรมวาดรูปทุกตัว
        * ต้องไม่ทำงานตอนกำลังพิมพ์ ไม่งั้นการลบตัวเลขในช่องตั้งค่าจะลบรูปทิ้งไปด้วย
        */
@@ -2468,6 +2526,34 @@ export function GeometryStudio() {
                   </button>
                 ))}
               </div>
+            </div>
+          ) : null}
+
+          {tool === 'eraser' ? (
+            <div className="mt-3 rounded-2xl bg-white/70 p-3">
+              <p className="text-sm font-bold text-slate-600">แบบของยางลบ</p>
+              <div className="mt-2 flex gap-2">
+                {[
+                  { whole: true, label: '🧽 ลบทั้งชิ้น' },
+                  { whole: false, label: '✂️ ลบเฉพาะที่ถู' },
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      setEraseWhole(item.whole)
+                      playSfx('click')
+                    }}
+                    className={`geo-chip flex-1 ${eraseWhole === item.whole ? 'geo-chip-strong' : ''}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-500">
+                ลบเฉพาะที่ถูใช้กับเส้นตรง ถูตรงกลางเส้นแล้วเส้นจะขาดเป็นสองท่อน
+                เหมาะกับการลบเส้นร่างส่วนที่ยาวเลยรูปออกไป
+              </p>
             </div>
           ) : null}
 
@@ -3299,6 +3385,21 @@ export function GeometryStudio() {
                     ))}
                   </g>
                 ))}
+
+                {/* วงยางลบ ให้เห็นว่าถูครั้งนี้กินเนื้อเส้นกว้างแค่ไหน */}
+                {tool === 'eraser' && !eraseWhole && cursor ? (
+                  <circle
+                    cx={cursor.point.x}
+                    cy={cursor.point.y}
+                    r={RUB_RADIUS}
+                    fill="rgba(251, 146, 60, 0.18)"
+                    stroke="#fb923c"
+                    strokeWidth={2 / view.scale}
+                    strokeDasharray={`${6 / view.scale} ${4 / view.scale}`}
+                    pointerEvents="none"
+                    className="geo-no-export"
+                  />
+                ) : null}
 
                 {/* ป้ายค่าลอยติดปลายดินสอ สายตาทุกคู่อยู่ตรงนี้ ไม่ใช่ที่แถบล่างสุดของหน้าจอ */}
                 {workingNow && cursor ? (

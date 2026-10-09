@@ -280,6 +280,49 @@ export function lineIntersection(a1: Point, a2: Point, b1: Point, b2: Point): Po
   return { x: a1.x + t * d1.x, y: a1.y + t * d1.y }
 }
 
+/**
+ * ถูยางลบผ่านเส้นตรง คืนชิ้นที่ยังเหลืออยู่
+ *
+ * ยางลบจริงลบเฉพาะตรงที่ถูโดน ไม่ได้ลบทั้งเส้น
+ * ในการสร้างรูปด้วยวงเวียน เส้นร่างมักยาวเลยรูปออกไป แล้วต้องลบเฉพาะส่วนที่เกิน
+ * ถ้าลบได้แต่ทั้งเส้น เด็กต้องลบแล้ววาดใหม่ให้สั้นลง ซึ่งไม่ใช่สิ่งที่ทำกันบนกระดาษจริง
+ *
+ * คืนได้ศูนย์ ชิ้นเดียว หรือสองชิ้น (ตอนถูตรงกลางเส้นจนขาดเป็นสองท่อน)
+ * ชิ้นที่สั้นกว่า keep ถูกทิ้งไป เศษเส้นยาวสองพิกเซลไม่มีใครตั้งใจเก็บไว้
+ */
+export function rubLine(
+  a: Point,
+  b: Point,
+  at: Point,
+  radius: number,
+  keep = 6,
+): { a: Point; b: Point }[] {
+  const dx = b.x - a.x
+  const dy = b.y - a.y
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared === 0) return []
+
+  const fx = a.x - at.x
+  const fy = a.y - at.y
+  const half = (fx * dx + fy * dy) / lengthSquared
+  const outside = (fx * fx + fy * fy - radius * radius) / lengthSquared
+  const inside = half * half - outside
+  /* ยางลบไม่แตะเส้นนี้เลย เส้นจึงอยู่ครบเหมือนเดิม */
+  if (inside <= 0) return [{ a: { ...a }, b: { ...b } }]
+
+  const spread = Math.sqrt(inside)
+  const from = Math.max(0, -half - spread)
+  const to = Math.min(1, -half + spread)
+  if (to <= 0 || from >= 1 || to <= from) return [{ a: { ...a }, b: { ...b } }]
+
+  const along = (t: number): Point => ({ x: a.x + t * dx, y: a.y + t * dy })
+  const length = Math.sqrt(lengthSquared)
+  const pieces: { a: Point; b: Point }[] = []
+  if (from * length > keep) pieces.push({ a: { ...a }, b: along(from) })
+  if ((1 - to) * length > keep) pieces.push({ a: along(to), b: { ...b } })
+  return pieces
+}
+
 /** ระยะจากจุดถึงส่วนของเส้นตรง (ไม่ใช่เส้นตรงยาวไม่สิ้นสุด) */
 export function distanceToSegment(p: Point, a: Point, b: Point): number {
   const dx = b.x - a.x
