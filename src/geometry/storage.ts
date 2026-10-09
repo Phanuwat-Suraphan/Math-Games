@@ -34,6 +34,8 @@ export interface SavedPrefs {
   fillColor: string
   /** ดินสอกำลังวาดเส้นประอยู่หรือไม่ */
   dashed: boolean
+  /** ความทึบของอุปกรณ์ที่วางทับกระดาษ 0.25 ถึง 1 */
+  toolFade: number
   width: number
   showGrid: boolean
   snapOn: boolean
@@ -54,6 +56,7 @@ export const DEFAULT_PREFS: SavedPrefs = {
   color: PENCIL_COLORS[0].value,
   fillColor: FILL_COLORS[0].value,
   dashed: false,
+  toolFade: 0.8,
   width: PENCIL_WIDTHS[1].value,
   showGrid: true,
   snapOn: true,
@@ -203,6 +206,7 @@ function sanitizePrefs(value: unknown): SavedPrefs {
   const themeId = text(value.themeId, DEFAULT_PREFS.themeId)
   const color = text(value.color, DEFAULT_PREFS.color)
   const fillColor = text(value.fillColor, DEFAULT_PREFS.fillColor)
+  const fade = num(value.toolFade)
   const width = num(value.width)
   return {
     /* ธีมหรือสีที่ไม่รู้จัก ให้กลับไปใช้ค่าตั้งต้น ไม่ใช่ปล่อยให้กระดาษกลายเป็นสีแปลก ๆ */
@@ -220,6 +224,9 @@ function sanitizePrefs(value: unknown): SavedPrefs {
     showAngles: bool(value.showAngles, DEFAULT_PREFS.showAngles),
     showFaces: bool(value.showFaces, DEFAULT_PREFS.showFaces),
     dashed: bool(value.dashed, DEFAULT_PREFS.dashed),
+    /* ค่านอกช่วงที่แถบเลื่อนให้เลือกได้ แปลว่าไฟล์ถูกแก้มือมา ให้กลับไปใช้ค่าตั้งต้น */
+    toolFade:
+      fade !== null && fade >= 0.25 && fade <= 1 ? fade : DEFAULT_PREFS.toolFade,
   }
 }
 

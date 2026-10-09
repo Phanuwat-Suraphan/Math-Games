@@ -2340,6 +2340,22 @@ check('ยางลบแบบถู ต้องลบเฉพาะตรง
   )
 })
 
+check('ค่าที่ครูตั้งไว้เรื่องอุปกรณ์ต้องถูกจำ และค่าที่ถูกแก้มือต้องถูกปัดทิ้ง', () => {
+  /*
+   * ครูที่ชอบให้อุปกรณ์จาง ๆ ไม่ควรต้องเลื่อนแถบใหม่ทุกครั้งที่เปิดห้องเรขาคณิต
+   * แต่ค่าที่อ่านกลับมาจากเครื่องถูกแก้มือได้ ถ้ารับค่าอะไรก็ได้
+   * ความทึบ 0 จะทำให้อุปกรณ์หายไปทั้งชิ้นโดยที่ไม่มีปุ่มไหนเอากลับมาได้
+   */
+  const back = D.decodeBoard(D.encodeBoard([], {}, { ...SAMPLE_PREFS, toolFade: 0.35 }))
+  close(back.prefs.toolFade, 0.35, 0.0001, 'ความทึบที่ตั้งไว้ไม่ถูกจำ')
+
+  const broken = D.decodeBoard(D.encodeBoard([], {}, { ...SAMPLE_PREFS, toolFade: 0 }))
+  close(broken.prefs.toolFade, D.DEFAULT_PREFS.toolFade, 0.0001, 'ความทึบศูนย์ต้องถูกปัดทิ้ง')
+
+  const tooMuch = D.decodeBoard(D.encodeBoard([], {}, { ...SAMPLE_PREFS, toolFade: 9 }))
+  close(tooMuch.prefs.toolFade, D.DEFAULT_PREFS.toolFade, 0.0001, 'ค่านอกช่วงต้องถูกปัดทิ้ง')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
