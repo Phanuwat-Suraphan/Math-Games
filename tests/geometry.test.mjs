@@ -2356,6 +2356,46 @@ check('ค่าที่ครูตั้งไว้เรื่องอุ�
   close(tooMuch.prefs.toolFade, D.DEFAULT_PREFS.toolFade, 0.0001, 'ค่านอกช่วงต้องถูกปัดทิ้ง')
 })
 
+check('ลากตามขอบอุปกรณ์ ความยาวต้องลงตัวครึ่งเซนติเมตร', () => {
+  /*
+   * เดิมดูดความยาวก่อนแล้วค่อยทาบขอบ ความยาวที่ลงตัวจึงเพี้ยนไปตอนทาบ
+   * เด็กเล็งขีด 4 ซม. บนไม้บรรทัดแล้วได้เส้นยาว 3.9 ซม.
+   * ซึ่งผิดตรงจุดที่ตั้งใจที่สุดของการใช้ไม้บรรทัด
+   */
+  const start = { x: 100, y: 300 }
+  const a = { x: 100, y: 300 }
+  const b = { x: 100 + 20 * G.PX_PER_CM, y: 300 }
+  const step = G.PX_PER_CM / 2
+
+  /* นิ้วอยู่เหนือไม้และเลยขีด 4 ซม. มานิดเดียว ต้องได้ 4.0 พอดี */
+  const near4 = G.snapAlongGuide(start, { x: 100 + 4.1 * G.PX_PER_CM, y: 262 }, a, b, step)
+  close(G.distance(start, near4), 4 * G.PX_PER_CM, 0.0001, 'ไม่ได้ปัดเป็น 4.0 ซม.')
+  close(near4.y, 300, 0.0001, 'ปลายเส้นหลุดออกจากขอบไม้บรรทัด')
+
+  /* ครึ่งเซนติเมตรก็ลงตัวได้ ไม่ใช่ปัดเป็นเซนติเมตรเต็มอย่างเดียว */
+  const near35 = G.snapAlongGuide(start, { x: 100 + 3.6 * G.PX_PER_CM, y: 320 }, a, b, step)
+  close(G.distance(start, near35), 3.5 * G.PX_PER_CM, 0.0001, 'ไม่ได้ปัดเป็น 3.5 ซม.')
+
+  /* ไม้บรรทัดที่วางเอียงก็ต้องได้ความยาวลงตัวเหมือนกัน */
+  const tiltedEnd = G.pointAt(start, 20 * G.PX_PER_CM, 37)
+  const tilted = G.snapAlongGuide(
+    start,
+    G.pointAt(start, 6.2 * G.PX_PER_CM, 37),
+    start,
+    tiltedEnd,
+    step,
+  )
+  close(G.distance(start, tilted), 6 * G.PX_PER_CM, 0.0001, 'ไม้ที่วางเอียงปัดความยาวเพี้ยน')
+
+  /* ลากเลยปลายไม้ไป ต้องหยุดที่ปลายไม้ ไม่ใช่วิ่งต่อไปตามแนวเส้น */
+  const past = G.snapAlongGuide(start, { x: 100 + 90 * G.PX_PER_CM, y: 300 }, a, b, step)
+  close(G.distance(start, past), 20 * G.PX_PER_CM, 0.0001, 'ลากเลยปลายไม้แล้วไม่หยุดที่ปลาย')
+
+  /* ขยับนิดเดียวจนเกือบเป็นศูนย์ ต้องได้ความยาวขั้นต่ำหนึ่งขั้น ไม่ใช่เส้นยาวศูนย์ */
+  const tiny = G.snapAlongGuide(start, { x: 102, y: 300 }, a, b, step)
+  close(G.distance(start, tiny), step, 0.0001, 'ลากสั้นมากแล้วได้เส้นยาวศูนย์')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

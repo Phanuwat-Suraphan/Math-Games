@@ -281,6 +281,28 @@ export function lineIntersection(a1: Point, a2: Point, b1: Point, b2: Point): Po
 }
 
 /**
+ * ปลายเส้นที่ลากตามขอบอุปกรณ์ โดยความยาวลงตัวตามขั้นที่กำหนด
+ *
+ * ต้องทาบขอบก่อนแล้วค่อยปัดความยาว ไม่ใช่ปัดความยาวแล้วค่อยทาบ
+ * ลำดับหลังทำให้ความยาวที่ปัดไว้เพี้ยนไปตอนทาบ เด็กเล็งขีด 4 ซม. บนไม้บรรทัด
+ * แล้วได้เส้นยาว 3.9 ซม. ซึ่งผิดตรงจุดที่ตั้งใจที่สุดของการใช้ไม้บรรทัด
+ */
+export function snapAlongGuide(
+  start: Point,
+  wanted: Point,
+  a: Point,
+  b: Point,
+  step: number,
+): Point {
+  const on = projectOnSegment(wanted, a, b)
+  if (step <= 0) return on
+  const away = distance(start, on)
+  if (away < 1e-9) return on
+  const along = Math.max(step, Math.round(away / step) * step)
+  return projectOnSegment(pointAt(start, along, angleOf(start, on)), a, b)
+}
+
+/**
  * ถูยางลบผ่านเส้นตรง คืนชิ้นที่ยังเหลืออยู่
  *
  * ยางลบจริงลบเฉพาะตรงที่ถูโดน ไม่ได้ลบทั้งเส้น

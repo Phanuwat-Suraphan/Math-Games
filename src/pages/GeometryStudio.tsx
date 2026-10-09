@@ -173,6 +173,7 @@ import {
   polygonName,
   rubLine,
   projectOnSegment,
+  snapAlongGuide,
   regularPolygon,
   snapDeg,
   softSnapDeg,
@@ -671,7 +672,11 @@ export function GeometryStudio() {
     }
     const target = nearestSnapPoint(board.shapes, raw, anchorRange)
     const end = target ?? (snapOn ? snapEnd(start, raw, 15, 0.5) : raw)
-    return guide ? projectOnSegment(end, guide.a, guide.b) : end
+    if (!guide) return end
+
+    /* จุดที่ดูดเข้าของเดิมได้แล้ว ไม่ต้องปัดความยาวซ้ำ ปลายเส้นต้องชนจุดนั้นพอดี */
+    if (!snapOn || target) return projectOnSegment(end, guide.a, guide.b)
+    return snapAlongGuide(start, end, guide.a, guide.b, PX_PER_CM / 2)
   }
 
   /* ------------------------------------------------------------------ */
@@ -1617,6 +1622,18 @@ export function GeometryStudio() {
     setAngleLine(null)
     setPolygonAsk(null)
     /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
+    playSfx('click')
+  }
+
+  /** ย้ายรูปที่เลือกไปอยู่บนสุดหรือล่างสุดของกอง */
+  function sortSelected(where: 'top' | 'bottom') {
+    if (!selected) return
+    const rest = board.shapes.filter((shape) => shape.id !== selected.id)
+    dispatch({ type: 'mark' })
+    dispatch({
+      type: 'live',
+      shapes: where === 'top' ? [...rest, selected] : [selected, ...rest],
+    })
     playSfx('click')
   }
 
@@ -4068,6 +4085,28 @@ export function GeometryStudio() {
                   </div>
                 </div>
               ) : null}
+
+              {/*
+                สลับว่ารูปไหนอยู่บนรูปไหน
+                รูปที่ระบายสีแล้วบังเส้นที่อยู่ข้างใต้ ซึ่งเป็นเส้นที่ต้องใช้วัดต่อ
+                เดิมแก้ได้ทางเดียวคือลบแล้ววาดใหม่ตามลำดับที่อยากได้
+              */}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => sortSelected('top')}
+                  className="geo-chip flex-1"
+                >
+                  ⬆️ ไว้ข้างบน
+                </button>
+                <button
+                  type="button"
+                  onClick={() => sortSelected('bottom')}
+                  className="geo-chip flex-1"
+                >
+                  ⬇️ ไว้ข้างล่าง
+                </button>
+              </div>
 
               <button type="button" onClick={removeSelected} className="geo-chip mt-3 w-full">
                 🗑️ ลบรูปนี้
