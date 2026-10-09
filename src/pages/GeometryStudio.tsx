@@ -254,6 +254,8 @@ type Drag =
   | { kind: 'erase'; marked: boolean }
   /** ลากกรอบเพื่อลบทุกชิ้นที่อยู่ในกรอบทั้งชิ้น */
   | { kind: 'erase-box'; start: Point; end: Point }
+  /** ลากกรอบเพื่อเลือกหลายชิ้นพร้อมกัน */
+  | { kind: 'select-box'; start: Point; end: Point }
   | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
@@ -324,6 +326,7 @@ export function GeometryStudio() {
   const selectedRef = useRef<string | null>(null)
   const shapesRef = useRef<Shape[]>([])
   const draftRef = useRef<Point[]>([])
+  const groupRef = useRef<string[]>([])
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -367,6 +370,13 @@ export function GeometryStudio() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Point[]>([])
+  /*
+   * รูปที่เลือกไว้เป็นกลุ่มด้วยการลากกรอบ
+   * แยกจากรูปที่เลือกทีละชิ้น เพราะแผงแก้ค่าทั้งหมดทำงานกับชิ้นเดียวอยู่แล้ว
+   * และการเลือกกลุ่มมีไว้ทำอย่างเดียวคือย้าย ทำสำเนา หรือลบทั้งก้อน
+   */
+  const [groupIds, setGroupIds] = useState<string[]>([])
+
   const [anglePicks, setAnglePicks] = useState<Point[]>([])
   /* เส้นแรกที่จิ้มไว้ในการวัดมุมแบบ "เส้นสองเส้นทำมุมกันเท่าไร" */
   const [angleLine, setAngleLine] = useState<SegmentShape | null>(null)
@@ -465,6 +475,7 @@ export function GeometryStudio() {
   selectedRef.current = selected ? selected.id : null
   shapesRef.current = board.shapes
   draftRef.current = draft
+  groupRef.current = groupIds
 
   /* เก็บกวาดตัวจับเวลาตอนออกจากหน้า ไม่งั้น React จะเตือนว่าอัปเดตของที่ถูกถอดไปแล้ว */
   useEffect(() => {
@@ -1003,7 +1014,13 @@ export function GeometryStudio() {
     switch (tool) {
       case 'select': {
         const found = findShapeAt(board.shapes, raw, hitRange)
-        setSelectedId(found ? found.id : null)
+        if (!found) {
+          /* จิ้มที่ว่างแล้วลาก คือการล้อมเลือกหลายชิ้น จิ้มเฉย ๆ คือการเลิกเลือก */
+          setSelectedId(null)
+          setDrag({ kind: 'select-box', start: raw, end: raw })
+          return
+        }
+        setSelectedId(found.id)
         /*
          * ยังไม่จดประวัติตรงนี้ รอจนกว่านิ้วจะขยับจริง
          * เพราะการจิ้มเพื่อ "ดู" ว่ารูปนี้ยาวเท่าไร เป็นสิ่งที่เด็กทำบ่อยมาก
@@ -1352,6 +1369,7 @@ export function GeometryStudio() {
         return
 
       case 'erase-box':
+      case 'select-box':
         setDrag({ ...drag, end: raw })
         return
 
@@ -1460,6 +1478,17 @@ export function GeometryStudio() {
         if (selectedId && doomed.some((shape) => shape.id === selectedId)) setSelectedId(null)
         playSfx('click')
         say(`ลบไป ${doomed.length} ชิ้น กดย้อนกลับได้ถ้าเปลี่ยนใจ`)
+        break
+      }
+
+      case 'select-box': {
+        const box = boxFrom(drag.start, raw)
+        const picked = board.shapes.filter((shape) => insideBox(shape, box))
+        setGroupIds(picked.map((shape) => shape.id))
+        if (picked.length > 0) {
+          playSfx('click')
+          say(`เลือกไว้ ${picked.length} ชิ้น ใช้ลูกศรเลื่อน หรือทำสำเนา หรือลบทั้งก้อนได้`)
+        }
         break
       }
 
@@ -1653,6 +1682,7 @@ export function GeometryStudio() {
     setDraft([])
     setAnglePicks([])
     setAngleLine(null)
+    setGroupIds([])
     setPolygonAsk(null)
     /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
     playSfx('click')
@@ -2176,6 +2206,7 @@ export function GeometryStudio() {
         setDraft([])
         setAnglePicks([])
         setAngleLine(null)
+        setGroupIds([])
         setPolygonAsk(null)
         setCalibrate(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
@@ -2200,8 +2231,14 @@ export function GeometryStudio() {
        * นิ้วกับเมาส์ขยับให้ตรงระดับพิกเซลไม่ได้ แต่การวางรูปให้ชนกันพอดีต้องการความละเอียดนั้น
        */
       if (!typing && event.key.startsWith('Arrow')) {
-        const id = selectedRef.current
-        if (id === null) return
+        /* เลือกไว้เป็นกลุ่มก็เลื่อนทั้งกลุ่ม ไม่งั้นเลื่อนชิ้นที่เลือกไว้ชิ้นเดียว */
+        const moving =
+          groupRef.current.length > 0
+            ? groupRef.current
+            : selectedRef.current !== null
+              ? [selectedRef.current]
+              : []
+        if (moving.length === 0) return
         const step = event.shiftKey ? 10 : 1
         const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
         const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
@@ -2211,7 +2248,7 @@ export function GeometryStudio() {
         dispatch({
           type: 'live',
           shapes: shapesRef.current.map((shape) =>
-            shape.id === id ? translateShape(shape, dx, dy) : shape,
+            moving.includes(shape.id) ? translateShape(shape, dx, dy) : shape,
           ),
         })
         return
@@ -2302,6 +2339,10 @@ export function GeometryStudio() {
      */
     if (anglePicks.length === 2 && pointer) {
       return `มุมนี้ ${formatDeg(angleBetween(anglePicks[0], anglePicks[1], pointer))}`
+    }
+    if (drag.kind === 'select-box') {
+      const box = boxFrom(drag.start, drag.end)
+      return `เลือก ${board.shapes.filter((shape) => insideBox(shape, box)).length} ชิ้น`
     }
     if (drag.kind === 'erase-box') {
       const box = boxFrom(drag.start, drag.end)
@@ -3480,6 +3521,50 @@ export function GeometryStudio() {
                   </g>
                 ))}
 
+                {/* กรอบเลือก และกรอบรอบชิ้นที่เลือกไว้เป็นกลุ่ม */}
+                {drag.kind === 'select-box' || groupIds.length > 0 ? (
+                  <g pointerEvents="none" className="geo-no-export">
+                    {(drag.kind === 'select-box'
+                      ? board.shapes.filter((shape) =>
+                          insideBox(shape, boxFrom(drag.start, drag.end)),
+                        )
+                      : board.shapes.filter((shape) => groupIds.includes(shape.id))
+                    ).map((shape) => {
+                      const own = shapeBounds(shape)
+                      return (
+                        <rect
+                          key={`pick-${shape.id}`}
+                          x={own.minX - 4}
+                          y={own.minY - 4}
+                          width={own.maxX - own.minX + 8}
+                          height={own.maxY - own.minY + 8}
+                          rx={8}
+                          fill="rgba(139, 92, 246, 0.12)"
+                          stroke="#8b5cf6"
+                          strokeWidth={2 / view.scale}
+                        />
+                      )
+                    })}
+                    {drag.kind === 'select-box'
+                      ? (() => {
+                          const box = boxFrom(drag.start, drag.end)
+                          return (
+                            <rect
+                              x={box.minX}
+                              y={box.minY}
+                              width={box.maxX - box.minX}
+                              height={box.maxY - box.minY}
+                              fill="rgba(139, 92, 246, 0.07)"
+                              stroke="#7c3aed"
+                              strokeWidth={2.5 / view.scale}
+                              strokeDasharray={`${8 / view.scale} ${6 / view.scale}`}
+                            />
+                          )
+                        })()
+                      : null}
+                  </g>
+                ) : null}
+
                 {/* กรอบลบ พร้อมไฮไลต์ชิ้นที่จะหายไป เด็กจึงเห็นก่อนปล่อยมือว่ากำลังจะลบอะไร */}
                 {drag.kind === 'erase-box'
                   ? (() => {
@@ -4203,6 +4288,63 @@ export function GeometryStudio() {
               </p>
             </div>
           )}
+
+          {/*
+            การ์ดของกลุ่มที่ล้อมเลือกไว้
+            มีแค่สามอย่างที่ทำกับทั้งก้อน ย้าย ทำสำเนา และลบ
+            ส่วนการแก้ค่าอย่างสีหรือขนาดยังทำทีละชิ้นเหมือนเดิม
+            เพราะการแก้ทั้งก้อนพร้อมกันคือสิ่งที่พลาดแล้วกู้คืนยากที่สุด
+          */}
+          {groupIds.length > 0 ? (
+            <div className="mt-4 rounded-2xl bg-violet-100/70 p-3">
+              <p className="text-sm font-extrabold text-violet-800">
+                ✦ เลือกไว้ {groupIds.length} ชิ้น
+              </p>
+              <p className="mt-1 text-xs font-semibold text-violet-700">
+                กดลูกศรเลื่อนทั้งก้อนทีละพิกเซล กด Shift ด้วยเลื่อนทีละสิบ
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const picked = board.shapes.filter((shape) => groupIds.includes(shape.id))
+                    placeShapes(picked.map((shape) => duplicateShape(shape, makeId(), 24, 24)))
+                    say(`ทำสำเนา ${picked.length} ชิ้นแล้ว`)
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ⧉ ทำสำเนา
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'mark' })
+                    dispatch({
+                      type: 'live',
+                      shapes: board.shapes.filter((shape) => !groupIds.includes(shape.id)),
+                    })
+                    say(`ลบไป ${groupIds.length} ชิ้น กดย้อนกลับได้ถ้าเปลี่ยนใจ`)
+                    setGroupIds([])
+                    setSelectedId(null)
+                    playSfx('click')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  🗑️ ลบทั้งก้อน
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setGroupIds([])
+                  playSfx('click')
+                }}
+                className="geo-chip mt-2 w-full"
+              >
+                ✖️ เลิกเลือก
+              </button>
+            </div>
+          ) : null}
 
           <h2 className="geo-heading mt-4">📐 ฝึกวัดมุม</h2>
           <div className="rounded-2xl bg-white/80 p-3">
