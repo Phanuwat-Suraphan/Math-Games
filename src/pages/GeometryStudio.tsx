@@ -28,6 +28,7 @@ import type { RulerPart } from '../geometry/RulerOverlay'
 import { SetSquareOverlay } from '../geometry/SetSquareOverlay'
 import type { SetSquarePart } from '../geometry/SetSquareOverlay'
 import type { SetSquareKind } from '../geometry/instruments'
+import { LiveTag } from '../geometry/LiveTag'
 import { PointerCursor } from '../geometry/PointerCursor'
 import { ShapesLayer } from '../geometry/ShapesLayer'
 import {
@@ -2128,23 +2129,63 @@ export function GeometryStudio() {
     return rulerReading(ruler.origin, ruler.rotation, ruler.lengthCm, pointer)?.cm ?? null
   })()
 
-  const liveReadout = (() => {
+  /**
+   * ตัวเลขของสิ่งที่กำลังทำอยู่ตอนนี้
+   *
+   * ใช้ที่เดียวกันทั้งแถบใต้กระดาษและป้ายที่ลอยติดปลายดินสอ
+   * ถ้าเขียนแยกกันสองที่ สองที่นั้นจะค่อย ๆ ไม่ตรงกันเองโดยไม่มีใครรู้
+   */
+  const workingNow = (() => {
     if (drag.kind === 'pen') {
-      return `ยาว ${formatCm(distance(drag.start, drag.end))} · ทำมุม ${formatDeg(
+      return `${formatCm(distance(drag.start, drag.end))} · ${formatDeg(
         angleOf(drag.start, drag.end),
-      )}${drag.guide ? ' · แนบขอบอุปกรณ์' : ''}`
+      )}${drag.guide ? ' · แนบขอบ' : ''}`
     }
     if (drag.kind === 'regular') {
       const radius = snappedRadius(drag.center, drag.edge)
       const points = regularPolygon(drag.center, radius, sides, regularRotation(drag.center, drag.edge))
-      return `${polygonName(sides)}ด้านเท่า · ด้านละ ${formatCm(distance(points[0], points[1]))}`
+      return `${polygonName(sides)} · ด้านละ ${formatCm(distance(points[0], points[1]))}`
     }
     if (drag.kind === 'compass-spread') {
       return `กางวงเวียน ${formatCm(compass.radius)}`
     }
     if (drag.kind === 'compass-draw') {
-      return `รัศมี ${formatCm(compass.radius)} · หมุนไปแล้ว ${formatDeg(Math.abs(drag.sweep))}`
+      return `รัศมี ${formatCm(compass.radius)} · กวาด ${formatDeg(Math.abs(drag.sweep))}`
     }
+    /*
+     * ระหว่างเลือกจุดที่สามของการวัดมุม บอกไปเลยว่าตอนนี้กางอยู่กี่องศา
+     * เด็กจึงขยับให้ได้มุมที่โจทย์สั่งก่อนจะจิ้มวาง แทนที่จะจิ้มแล้วค่อยมาแก้
+     */
+    if (anglePicks.length === 2 && pointer) {
+      return `มุมนี้ ${formatDeg(angleBetween(anglePicks[0], anglePicks[1], pointer))}`
+    }
+    if (drag.kind === 'rotate-shape' && pointer) {
+      return `หมุนไป ${formatDeg(Math.abs(normalizeDeg(angleOf(drag.origin, pointer) - drag.startAngle)))}`
+    }
+    /* ตอนลากย่อขยาย บอกขนาดจริงของรูป ไม่ใช่บอกว่าขยายกี่เท่า ซึ่งเป็นเลขที่เอาไปจดไม่ได้ */
+    if (drag.kind === 'scale-shape') {
+      const live = board.shapes.find((shape) => shape.id === drag.id)
+      const field = live ? editableFields(live)[0] : undefined
+      if (field) return `${field.label} ${field.value} ${field.unit}`
+    }
+    /*
+     * ระหว่างต่อรูปหลายเหลี่ยม บอกทั้งด้านที่กำลังลากและมุมที่จุดก่อนหน้า
+     * มุมภายในคือสิ่งที่บทเรียนนี้สอน ถ้าเห็นมันเปลี่ยนตามมือตอนวาด
+     * เด็กจะเดาได้เองว่าต้องขยับไปทางไหนถึงจะได้มุมที่โจทย์สั่ง
+     */
+    if (draft.length > 0 && pointer) {
+      const last = draft[draft.length - 1]
+      const side = `ด้านนี้ ${formatCm(distance(last, pointer))}`
+      if (draft.length < 2) return side
+      return `${side} · มุมก่อนหน้า ${formatDeg(
+        angleBetween(draft[draft.length - 2], last, pointer),
+      )}`
+    }
+    return null
+  })()
+
+  const liveReadout = (() => {
+    if (workingNow) return workingNow
     if (drag.kind === 'compass-move') {
       return 'ย้ายเข็มวงเวียน ปล่อยตรงที่จะปัก'
     }
@@ -2152,7 +2193,7 @@ export function GeometryStudio() {
       return `วงเวียนกางอยู่ ${formatCm(compass.radius)} · จับหัวหรือปลายดินสอแล้วหมุนเพื่อวาด`
     }
     if (draft.length > 0) {
-      return `กำลังวาดรูปหลายเหลี่ยม มี ${draft.length} จุดแล้ว · จิ้มจุดแรกเพื่อปิดรูป`
+      return `มี ${draft.length} จุดแล้ว · จิ้มจุดแรกเพื่อปิดรูป`
     }
     if (angleLine) {
       return 'เลือกเส้นแรกแล้ว จิ้มอีกเส้นเพื่อดูว่าสองเส้นทำมุมกันเท่าไร'
@@ -2180,7 +2221,7 @@ export function GeometryStudio() {
   return (
     <div className={`geo-page min-h-screen pb-10 ${stage ? 'geo-stage' : ''}`}>
       <header className="geo-hide-on-stage sticky top-0 z-30 border-b border-white/50 bg-white/80 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-3 px-4 py-3">
           <button
             type="button"
             onClick={() => {
@@ -3258,6 +3299,11 @@ export function GeometryStudio() {
                     ))}
                   </g>
                 ))}
+
+                {/* ป้ายค่าลอยติดปลายดินสอ สายตาทุกคู่อยู่ตรงนี้ ไม่ใช่ที่แถบล่างสุดของหน้าจอ */}
+                {workingNow && cursor ? (
+                  <LiveTag at={cursor.point} text={workingNow} scale={view.scale} />
+                ) : null}
 
                 {/* วงแหวนเคอร์เซอร์อยู่บนสุดเสมอ ไม่งั้นไม้บรรทัดจะบังจุดที่กำลังเล็งอยู่ */}
                 {cursor ? (
