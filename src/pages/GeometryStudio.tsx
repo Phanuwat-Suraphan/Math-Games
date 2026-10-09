@@ -140,7 +140,10 @@ import {
   HIT_TOLERANCE,
   angleFromLines,
   applyField,
+  boxFrom,
   canDash,
+  insideBox,
+  shapeBounds,
   describeBoard,
   describeShape,
   editableFields,
@@ -249,6 +252,10 @@ type Drag =
   /** ลากทาบของที่รู้ความยาวในรูปแบบฝึก เพื่อตั้งมาตราส่วนของรูปนั้น */
   /** ถูยางลบไปบนกระดาษ ลบทุกอย่างที่ผ่าน โดยนับเป็นการลบครั้งเดียว */
   | { kind: 'erase'; marked: boolean }
+  /** ลากกรอบเพื่อลบทุกชิ้นที่อยู่ในกรอบทั้งชิ้น */
+  | { kind: 'erase-box'; start: Point; end: Point }
+  /** ลากกรอบเพื่อเลือกหลายชิ้นพร้อมกัน */
+  | { kind: 'select-box'; start: Point; end: Point }
   | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
@@ -271,11 +278,20 @@ export function GeometryStudio() {
    */
   const [dashed, setDashed] = useState(false)
   /*
-   * ยางลบลบทั้งชิ้น หรือลบเฉพาะตรงที่ถู
+   * ยางลบสามแบบ ลบทั้งชิ้น ลบเฉพาะตรงที่ถู และลบด้วยกรอบ
    * ของจริงลบเฉพาะตรงที่ถู แต่บนจอการลบทั้งชิ้นเร็วกว่ามากเวลาจะล้างของที่วาดผิด
-   * จึงมีทั้งสองแบบ และตั้งต้นที่ลบทั้งชิ้นซึ่งเป็นสิ่งที่เด็กคาดหวังจากการจิ้มหนึ่งครั้ง
+   * และการลากกรอบคือวิธีเดียวที่เก็บเส้นร่างสิบกว่าเส้นทิ้งได้ในครั้งเดียว
+   * ตั้งต้นที่ลบทั้งชิ้น ซึ่งเป็นสิ่งที่เด็กคาดหวังจากการจิ้มหนึ่งครั้ง
    */
-  const [eraseWhole, setEraseWhole] = useState(true)
+  const [eraseMode, setEraseMode] = useState<'whole' | 'part' | 'box'>('whole')
+
+  /*
+   * ล็อกระยะกางวงเวียน
+   * การสร้างรูปหลายแบบใช้ระยะกางเดิมตลอดทั้งชุด เช่น หกเหลี่ยมจากวงกลมวงเดียว
+   * ซึ่งต้องปักเข็มย้ายที่หกครั้งโดยห้ามให้ขากางเปลี่ยนแม้แต่นิดเดียว
+   * เผลอลากโดนปุ่มกางครั้งเดียว งานที่ทำมาห้าขั้นก่อนหน้าก็ใช้ไม่ได้ทั้งชุด
+   */
+  const [compassLocked, setCompassLocked] = useState(false)
 
   /*
    * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
@@ -318,6 +334,7 @@ export function GeometryStudio() {
   const selectedRef = useRef<string | null>(null)
   const shapesRef = useRef<Shape[]>([])
   const draftRef = useRef<Point[]>([])
+  const groupRef = useRef<string[]>([])
 
   const [showGrid, setShowGrid] = useState(true)
   const [snapOn, setSnapOn] = useState(true)
@@ -361,6 +378,13 @@ export function GeometryStudio() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<Point[]>([])
+  /*
+   * รูปที่เลือกไว้เป็นกลุ่มด้วยการลากกรอบ
+   * แยกจากรูปที่เลือกทีละชิ้น เพราะแผงแก้ค่าทั้งหมดทำงานกับชิ้นเดียวอยู่แล้ว
+   * และการเลือกกลุ่มมีไว้ทำอย่างเดียวคือย้าย ทำสำเนา หรือลบทั้งก้อน
+   */
+  const [groupIds, setGroupIds] = useState<string[]>([])
+
   const [anglePicks, setAnglePicks] = useState<Point[]>([])
   /* เส้นแรกที่จิ้มไว้ในการวัดมุมแบบ "เส้นสองเส้นทำมุมกันเท่าไร" */
   const [angleLine, setAngleLine] = useState<SegmentShape | null>(null)
@@ -459,6 +483,7 @@ export function GeometryStudio() {
   selectedRef.current = selected ? selected.id : null
   shapesRef.current = board.shapes
   draftRef.current = draft
+  groupRef.current = groupIds
 
   /* เก็บกวาดตัวจับเวลาตอนออกจากหน้า ไม่งั้น React จะเตือนว่าอัปเดตของที่ถูกถอดไปแล้ว */
   useEffect(() => {
@@ -921,7 +946,7 @@ export function GeometryStudio() {
      * เส้นร่างในการสร้างรูปมักยาวเลยรูปออกไป แล้วต้องลบเฉพาะส่วนที่เกิน
      * ถ้าลบได้แต่ทั้งเส้น เด็กต้องลบแล้ววาดใหม่ให้สั้นลง ซึ่งไม่ใช่สิ่งที่ทำบนกระดาษจริง
      */
-    if (!eraseWhole && found.kind === 'segment') {
+    if (eraseMode === 'part' && found.kind === 'segment') {
       const pieces = rubLine(found.a, found.b, at, RUB_RADIUS)
       /* ยางลบผ่านแต่ไม่ได้กินเนื้อเส้นเลย ไม่ต้องจดประวัติและไม่ต้องเปลี่ยนอะไร */
       if (pieces.length === 1 && distance(pieces[0].b, found.b) < 0.001) return marked
@@ -997,7 +1022,13 @@ export function GeometryStudio() {
     switch (tool) {
       case 'select': {
         const found = findShapeAt(board.shapes, raw, hitRange)
-        setSelectedId(found ? found.id : null)
+        if (!found) {
+          /* จิ้มที่ว่างแล้วลาก คือการล้อมเลือกหลายชิ้น จิ้มเฉย ๆ คือการเลิกเลือก */
+          setSelectedId(null)
+          setDrag({ kind: 'select-box', start: raw, end: raw })
+          return
+        }
+        setSelectedId(found.id)
         /*
          * ยังไม่จดประวัติตรงนี้ รอจนกว่านิ้วจะขยับจริง
          * เพราะการจิ้มเพื่อ "ดู" ว่ารูปนี้ยาวเท่าไร เป็นสิ่งที่เด็กทำบ่อยมาก
@@ -1160,6 +1191,10 @@ export function GeometryStudio() {
       }
 
       case 'eraser': {
+        if (eraseMode === 'box') {
+          setDrag({ kind: 'erase-box', start: raw, end: raw })
+          return
+        }
         /* กดค้างแล้วถูไปเรื่อย ๆ ได้เหมือนยางลบจริง ไม่ใช่ต้องจิ้มทีละชิ้น */
         setDrag({ kind: 'erase', marked: rubOut(raw, false) })
         return
@@ -1273,6 +1308,7 @@ export function GeometryStudio() {
         return
 
       case 'compass-spread':
+        if (compassLocked) return
         /*
          * กางหรือหุบขา ระยะเปลี่ยน ทิศของปลายดินสอเดินตามนิ้วไปด้วย แต่ยังไม่วาดอะไร
          * กางได้มากที่สุดเท่าที่วงเวียนในกล่องเรขาคณิตจริงกางได้ ไม่ใช่ลากจนเต็มกระดาษ
@@ -1339,6 +1375,11 @@ export function GeometryStudio() {
 
       case 'erase':
         setDrag({ kind: 'erase', marked: rubOut(raw, drag.marked) })
+        return
+
+      case 'erase-box':
+      case 'select-box':
+        setDrag({ ...drag, end: raw })
         return
 
       case 'calibrate':
@@ -1430,6 +1471,36 @@ export function GeometryStudio() {
         break
       }
 
+      case 'erase-box': {
+        const box = boxFrom(drag.start, raw)
+        const doomed = board.shapes.filter((shape) => insideBox(shape, box))
+        if (doomed.length === 0) {
+          say('ไม่มีชิ้นไหนอยู่ในกรอบทั้งชิ้น ลองลากกรอบให้คลุมมากกว่านี้นะ')
+          break
+        }
+        /* ลากกรอบหนึ่งครั้งคือการลบครั้งเดียว กดย้อนกลับครั้งเดียวได้คืนทั้งหมด */
+        dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: board.shapes.filter((shape) => !insideBox(shape, box)),
+        })
+        if (selectedId && doomed.some((shape) => shape.id === selectedId)) setSelectedId(null)
+        playSfx('click')
+        say(`ลบไป ${doomed.length} ชิ้น กดย้อนกลับได้ถ้าเปลี่ยนใจ`)
+        break
+      }
+
+      case 'select-box': {
+        const box = boxFrom(drag.start, raw)
+        const picked = board.shapes.filter((shape) => insideBox(shape, box))
+        setGroupIds(picked.map((shape) => shape.id))
+        if (picked.length > 0) {
+          playSfx('click')
+          say(`เลือกไว้ ${picked.length} ชิ้น ใช้ลูกศรเลื่อน หรือทำสำเนา หรือลบทั้งก้อนได้`)
+        }
+        break
+      }
+
       case 'pen': {
         const end = penEnd(drag.start, raw, drag.guide, event.shiftKey)
         if (distance(drag.start, end) >= 6) {
@@ -1513,6 +1584,10 @@ export function GeometryStudio() {
     }
 
     if (part === 'spread') {
+      if (compassLocked) {
+        say('ระยะกางถูกล็อกอยู่ ปลดล็อกที่แผงซ้ายก่อนถ้าจะเปลี่ยน')
+        return
+      }
       setDrag({ kind: 'compass-spread' })
       return
     }
@@ -1620,6 +1695,7 @@ export function GeometryStudio() {
     setDraft([])
     setAnglePicks([])
     setAngleLine(null)
+    setGroupIds([])
     setPolygonAsk(null)
     /* วงเวียนไม่ถูกเก็บทิ้ง มันรอเราอยู่ที่เดิมด้วยระยะกางเดิมเมื่อกลับมาใช้ */
     playSfx('click')
@@ -2143,6 +2219,7 @@ export function GeometryStudio() {
         setDraft([])
         setAnglePicks([])
         setAngleLine(null)
+        setGroupIds([])
         setPolygonAsk(null)
         setCalibrate(null)
         /* ยกเลิกการหมุนที่ค้างอยู่ ส่วนโค้งที่กวาดไว้จะไม่ถูกวางลงกระดาษ */
@@ -2167,8 +2244,14 @@ export function GeometryStudio() {
        * นิ้วกับเมาส์ขยับให้ตรงระดับพิกเซลไม่ได้ แต่การวางรูปให้ชนกันพอดีต้องการความละเอียดนั้น
        */
       if (!typing && event.key.startsWith('Arrow')) {
-        const id = selectedRef.current
-        if (id === null) return
+        /* เลือกไว้เป็นกลุ่มก็เลื่อนทั้งกลุ่ม ไม่งั้นเลื่อนชิ้นที่เลือกไว้ชิ้นเดียว */
+        const moving =
+          groupRef.current.length > 0
+            ? groupRef.current
+            : selectedRef.current !== null
+              ? [selectedRef.current]
+              : []
+        if (moving.length === 0) return
         const step = event.shiftKey ? 10 : 1
         const dx = event.key === 'ArrowLeft' ? -step : event.key === 'ArrowRight' ? step : 0
         const dy = event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0
@@ -2178,7 +2261,7 @@ export function GeometryStudio() {
         dispatch({
           type: 'live',
           shapes: shapesRef.current.map((shape) =>
-            shape.id === id ? translateShape(shape, dx, dy) : shape,
+            moving.includes(shape.id) ? translateShape(shape, dx, dy) : shape,
           ),
         })
         return
@@ -2269,6 +2352,14 @@ export function GeometryStudio() {
      */
     if (anglePicks.length === 2 && pointer) {
       return `มุมนี้ ${formatDeg(angleBetween(anglePicks[0], anglePicks[1], pointer))}`
+    }
+    if (drag.kind === 'select-box') {
+      const box = boxFrom(drag.start, drag.end)
+      return `เลือก ${board.shapes.filter((shape) => insideBox(shape, box)).length} ชิ้น`
+    }
+    if (drag.kind === 'erase-box') {
+      const box = boxFrom(drag.start, drag.end)
+      return `จะลบ ${board.shapes.filter((shape) => insideBox(shape, box)).length} ชิ้น`
     }
     if (drag.kind === 'rotate-shape' && pointer) {
       return `หมุนไป ${formatDeg(Math.abs(normalizeDeg(angleOf(drag.origin, pointer) - drag.startAngle)))}`
@@ -2585,19 +2676,20 @@ export function GeometryStudio() {
           {tool === 'eraser' ? (
             <div className="mt-3 rounded-2xl bg-white/70 p-3">
               <p className="text-sm font-bold text-slate-600">แบบของยางลบ</p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-col gap-1.5">
                 {[
-                  { whole: true, label: '🧽 ลบทั้งชิ้น' },
-                  { whole: false, label: '✂️ ลบเฉพาะที่ถู' },
+                  { mode: 'whole' as const, label: '🧽 ลบทั้งชิ้น' },
+                  { mode: 'part' as const, label: '✂️ ลบเฉพาะที่ถู' },
+                  { mode: 'box' as const, label: '⬚ ลากกรอบลบหลายชิ้น' },
                 ].map((item) => (
                   <button
-                    key={item.label}
+                    key={item.mode}
                     type="button"
                     onClick={() => {
-                      setEraseWhole(item.whole)
+                      setEraseMode(item.mode)
                       playSfx('click')
                     }}
-                    className={`geo-chip flex-1 ${eraseWhole === item.whole ? 'geo-chip-strong' : ''}`}
+                    className={`geo-chip ${eraseMode === item.mode ? 'geo-chip-strong' : ''}`}
                   >
                     {item.label}
                   </button>
@@ -2606,6 +2698,9 @@ export function GeometryStudio() {
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 ลบเฉพาะที่ถูใช้กับเส้นตรง ถูตรงกลางเส้นแล้วเส้นจะขาดเป็นสองท่อน
                 เหมาะกับการลบเส้นร่างส่วนที่ยาวเลยรูปออกไป
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                ลากกรอบจะลบเฉพาะชิ้นที่อยู่ในกรอบทั้งชิ้น เส้นที่พาดเลยกรอบออกไปจึงไม่หายไปด้วย
               </p>
             </div>
           ) : null}
@@ -2662,6 +2757,7 @@ export function GeometryStudio() {
                 max={8}
                 step={0.5}
                 value={Math.round(toCm(compass.radius) * 2) / 2}
+                disabled={compassLocked}
                 onChange={(event) =>
                   setCompass({ ...compass, radius: Number(event.target.value) * PX_PER_CM })
                 }
@@ -2680,6 +2776,7 @@ export function GeometryStudio() {
                   min={0.5}
                   max={8}
                   step={0.1}
+                  disabled={compassLocked}
                   onChange={(event) =>
                     setCompass({
                       ...compass,
@@ -2689,6 +2786,55 @@ export function GeometryStudio() {
                   aria-label="ระยะกางวงเวียนเป็นเซนติเมตร"
                 />
                 <span className="w-8 text-left">ซม.</span>
+              </div>
+
+              {/*
+                ล็อกระยะกาง
+                การสร้างรูปหลายแบบใช้ระยะกางเดิมตลอดทั้งชุด เช่น หกเหลี่ยมจากวงกลมวงเดียว
+                เผลอลากโดนปุ่มกางครั้งเดียว งานที่ทำมาห้าขั้นก่อนหน้าก็ใช้ไม่ได้ทั้งชุด
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCompassLocked(!compassLocked)
+                  playSfx('click')
+                  say(
+                    compassLocked
+                      ? 'ปลดล็อกแล้ว กางวงเวียนได้ตามใจ'
+                      : `ล็อกระยะกางไว้ที่ ${formatCm(compass.radius)} แล้ว ปักเข็มย้ายที่ได้โดยระยะไม่เปลี่ยน`,
+                  )
+                }}
+                className={`geo-chip mt-2 w-full ${compassLocked ? 'geo-chip-strong' : ''}`}
+              >
+                {compassLocked ? '🔒 ล็อกระยะกางอยู่' : '🔓 ล็อกระยะกาง'}
+              </button>
+
+              {/*
+                ส่วนโค้งที่ใช้บ่อย
+                หมุนมือให้ได้ 90 องศาพอดีทำได้ตั้งแต่มีแม่เหล็กแล้ว แต่ยังต้องหมุนอยู่ดี
+                สองปุ่มนี้คือทางลัดของขั้นตอนที่ทำซ้ำทุกคาบ
+              */}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    commitSweep(compass.angle, 90)
+                    say('วาดส่วนโค้ง 90° แล้ว')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ◔ โค้ง 90°
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    commitSweep(compass.angle, 180)
+                    say('วาดส่วนโค้ง 180° แล้ว')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ◑ โค้ง 180°
+                </button>
               </div>
 
               <button
@@ -2976,8 +3122,24 @@ export function GeometryStudio() {
                 }
                 className="mt-1 w-full accent-amber-500"
               />
-              <p className="text-[11px] font-semibold text-slate-500">
+              <div className="mt-1 flex gap-1.5">
+                {[10, 15, 20, 30].map((cm) => (
+                  <button
+                    key={cm}
+                    type="button"
+                    onClick={() => {
+                      setRuler({ ...ruler, lengthCm: clampRulerLength(cm) })
+                      playSfx('click')
+                    }}
+                    className={`geo-chip flex-1 ${ruler.lengthCm === cm ? 'geo-chip-strong' : ''}`}
+                  >
+                    {cm}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
                 ยืดแล้วได้ขีดเพิ่ม ไม่ใช่ขีดห่างขึ้น หนึ่งเซนติเมตรบนไม้บรรทัดเท่ากับหนึ่งเซนติเมตรบนกระดาษเสมอ
+                ปุ่มด้านบนคือความยาวของไม้บรรทัดจริงที่มีขายทั่วไป
               </p>
             </div>
           ) : null}
@@ -3439,8 +3601,90 @@ export function GeometryStudio() {
                   </g>
                 ))}
 
+                {/* กรอบเลือก และกรอบรอบชิ้นที่เลือกไว้เป็นกลุ่ม */}
+                {drag.kind === 'select-box' || groupIds.length > 0 ? (
+                  <g pointerEvents="none" className="geo-no-export">
+                    {(drag.kind === 'select-box'
+                      ? board.shapes.filter((shape) =>
+                          insideBox(shape, boxFrom(drag.start, drag.end)),
+                        )
+                      : board.shapes.filter((shape) => groupIds.includes(shape.id))
+                    ).map((shape) => {
+                      const own = shapeBounds(shape)
+                      return (
+                        <rect
+                          key={`pick-${shape.id}`}
+                          x={own.minX - 4}
+                          y={own.minY - 4}
+                          width={own.maxX - own.minX + 8}
+                          height={own.maxY - own.minY + 8}
+                          rx={8}
+                          fill="rgba(139, 92, 246, 0.12)"
+                          stroke="#8b5cf6"
+                          strokeWidth={2 / view.scale}
+                        />
+                      )
+                    })}
+                    {drag.kind === 'select-box'
+                      ? (() => {
+                          const box = boxFrom(drag.start, drag.end)
+                          return (
+                            <rect
+                              x={box.minX}
+                              y={box.minY}
+                              width={box.maxX - box.minX}
+                              height={box.maxY - box.minY}
+                              fill="rgba(139, 92, 246, 0.07)"
+                              stroke="#7c3aed"
+                              strokeWidth={2.5 / view.scale}
+                              strokeDasharray={`${8 / view.scale} ${6 / view.scale}`}
+                            />
+                          )
+                        })()
+                      : null}
+                  </g>
+                ) : null}
+
+                {/* กรอบลบ พร้อมไฮไลต์ชิ้นที่จะหายไป เด็กจึงเห็นก่อนปล่อยมือว่ากำลังจะลบอะไร */}
+                {drag.kind === 'erase-box'
+                  ? (() => {
+                      const box = boxFrom(drag.start, drag.end)
+                      const doomed = board.shapes.filter((shape) => insideBox(shape, box))
+                      return (
+                        <g pointerEvents="none" className="geo-no-export">
+                          {doomed.map((shape) => {
+                            const own = shapeBounds(shape)
+                            return (
+                              <rect
+                                key={shape.id}
+                                x={own.minX - 4}
+                                y={own.minY - 4}
+                                width={own.maxX - own.minX + 8}
+                                height={own.maxY - own.minY + 8}
+                                rx={8}
+                                fill="rgba(251, 146, 60, 0.18)"
+                                stroke="#fb923c"
+                                strokeWidth={2 / view.scale}
+                              />
+                            )
+                          })}
+                          <rect
+                            x={box.minX}
+                            y={box.minY}
+                            width={box.maxX - box.minX}
+                            height={box.maxY - box.minY}
+                            fill="rgba(251, 146, 60, 0.08)"
+                            stroke="#ea580c"
+                            strokeWidth={2.5 / view.scale}
+                            strokeDasharray={`${8 / view.scale} ${6 / view.scale}`}
+                          />
+                        </g>
+                      )
+                    })()
+                  : null}
+
                 {/* วงยางลบ ให้เห็นว่าถูครั้งนี้กินเนื้อเส้นกว้างแค่ไหน */}
-                {tool === 'eraser' && !eraseWhole && cursor ? (
+                {tool === 'eraser' && eraseMode === 'part' && cursor ? (
                   <circle
                     cx={cursor.point.x}
                     cy={cursor.point.y}
@@ -4124,6 +4368,63 @@ export function GeometryStudio() {
               </p>
             </div>
           )}
+
+          {/*
+            การ์ดของกลุ่มที่ล้อมเลือกไว้
+            มีแค่สามอย่างที่ทำกับทั้งก้อน ย้าย ทำสำเนา และลบ
+            ส่วนการแก้ค่าอย่างสีหรือขนาดยังทำทีละชิ้นเหมือนเดิม
+            เพราะการแก้ทั้งก้อนพร้อมกันคือสิ่งที่พลาดแล้วกู้คืนยากที่สุด
+          */}
+          {groupIds.length > 0 ? (
+            <div className="mt-4 rounded-2xl bg-violet-100/70 p-3">
+              <p className="text-sm font-extrabold text-violet-800">
+                ✦ เลือกไว้ {groupIds.length} ชิ้น
+              </p>
+              <p className="mt-1 text-xs font-semibold text-violet-700">
+                กดลูกศรเลื่อนทั้งก้อนทีละพิกเซล กด Shift ด้วยเลื่อนทีละสิบ
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const picked = board.shapes.filter((shape) => groupIds.includes(shape.id))
+                    placeShapes(picked.map((shape) => duplicateShape(shape, makeId(), 24, 24)))
+                    say(`ทำสำเนา ${picked.length} ชิ้นแล้ว`)
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ⧉ ทำสำเนา
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'mark' })
+                    dispatch({
+                      type: 'live',
+                      shapes: board.shapes.filter((shape) => !groupIds.includes(shape.id)),
+                    })
+                    say(`ลบไป ${groupIds.length} ชิ้น กดย้อนกลับได้ถ้าเปลี่ยนใจ`)
+                    setGroupIds([])
+                    setSelectedId(null)
+                    playSfx('click')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  🗑️ ลบทั้งก้อน
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setGroupIds([])
+                  playSfx('click')
+                }}
+                className="geo-chip mt-2 w-full"
+              >
+                ✖️ เลิกเลือก
+              </button>
+            </div>
+          ) : null}
 
           <h2 className="geo-heading mt-4">📐 ฝึกวัดมุม</h2>
           <div className="rounded-2xl bg-white/80 p-3">
