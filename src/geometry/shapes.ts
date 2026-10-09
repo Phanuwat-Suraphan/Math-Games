@@ -1107,3 +1107,85 @@ export function angleFromLines(
   if (distance(vertex, a) < 1 || distance(vertex, b) < 1) return null
   return { vertex, a, b }
 }
+
+
+/** กรอบสี่เหลี่ยมที่พอดีตัวรูป ใช้ตัดสินว่ารูปอยู่ในกรอบที่ลากไหม */
+export interface Bounds {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+function boundsOfPoints(points: Point[], pad = 0): Bounds {
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  return {
+    minX: Math.min(...xs) - pad,
+    minY: Math.min(...ys) - pad,
+    maxX: Math.max(...xs) + pad,
+    maxY: Math.max(...ys) + pad,
+  }
+}
+
+/**
+ * กรอบที่พอดีตัวรูป
+ *
+ * ส่วนโค้งคิดเป็นวงกลมเต็มวงโดยตั้งใจ
+ * การคิดกรอบของส่วนโค้งจริง ๆ ต้องไล่ดูว่าโค้งผ่านทิศไหนบ้าง ซึ่งพลาดได้ง่าย
+ * และถ้าพลาดฝั่งเล็กลง กรอบจะเล็กกว่าของจริงแล้วส่วนโค้งจะถูกลบทั้งที่ยังโผล่พ้นกรอบ
+ * คิดเผื่อไว้แบบนี้ผลที่แย่ที่สุดคือต้องลากกรอบให้ใหญ่ขึ้นอีกนิด ซึ่งไม่ทำให้งานหาย
+ */
+export function shapeBounds(shape: Shape): Bounds {
+  switch (shape.kind) {
+    case 'segment':
+      return boundsOfPoints([shape.a, shape.b], shape.width / 2)
+    case 'circle':
+    case 'arc':
+      return boundsOfPoints([shape.center], shape.radius + shape.width / 2)
+    case 'polygon':
+      return boundsOfPoints(shape.points, shape.width / 2)
+    case 'dot':
+      return boundsOfPoints([shape.at], 8)
+    case 'angle':
+      return boundsOfPoints([shape.vertex, shape.a, shape.b], shape.width / 2)
+    case 'sticker':
+      return boundsOfPoints([shape.at], shape.size * 0.6)
+    case 'photo':
+      return {
+        minX: shape.at.x - shape.imageWidth / 2,
+        minY: shape.at.y - shape.imageHeight / 2,
+        maxX: shape.at.x + shape.imageWidth / 2,
+        maxY: shape.at.y + shape.imageHeight / 2,
+      }
+    default:
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0 }
+  }
+}
+
+/**
+ * รูปอยู่ในกรอบทั้งชิ้นหรือไม่
+ *
+ * ต้องคลุมทั้งชิ้นถึงจะนับ ไม่ใช่แค่แตะ
+ * เส้นร่างเส้นเดียวมักพาดยาวข้ามกระดาษ ถ้านับแค่แตะกรอบ
+ * การลากกรอบลบมุมเล็ก ๆ หนึ่งมุมจะลบเส้นยาวที่พาดผ่านไปด้วยโดยไม่ได้ตั้งใจ
+ */
+export function insideBox(shape: Shape, box: Bounds): boolean {
+  const own = shapeBounds(shape)
+  return (
+    own.minX >= Math.min(box.minX, box.maxX) &&
+    own.maxX <= Math.max(box.minX, box.maxX) &&
+    own.minY >= Math.min(box.minY, box.maxY) &&
+    own.maxY <= Math.max(box.minY, box.maxY)
+  )
+}
+
+/** กรอบจากสองมุมที่ลาก เรียงให้ซ้ายบนมาก่อนเสมอ */
+export function boxFrom(from: Point, to: Point): Bounds {
+  return {
+    minX: Math.min(from.x, to.x),
+    minY: Math.min(from.y, to.y),
+    maxX: Math.max(from.x, to.x),
+    maxY: Math.max(from.y, to.y),
+  }
+}

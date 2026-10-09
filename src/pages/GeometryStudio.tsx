@@ -140,7 +140,10 @@ import {
   HIT_TOLERANCE,
   angleFromLines,
   applyField,
+  boxFrom,
   canDash,
+  insideBox,
+  shapeBounds,
   describeBoard,
   describeShape,
   editableFields,
@@ -249,6 +252,8 @@ type Drag =
   /** ลากทาบของที่รู้ความยาวในรูปแบบฝึก เพื่อตั้งมาตราส่วนของรูปนั้น */
   /** ถูยางลบไปบนกระดาษ ลบทุกอย่างที่ผ่าน โดยนับเป็นการลบครั้งเดียว */
   | { kind: 'erase'; marked: boolean }
+  /** ลากกรอบเพื่อลบทุกชิ้นที่อยู่ในกรอบทั้งชิ้น */
+  | { kind: 'erase-box'; start: Point; end: Point }
   | { kind: 'calibrate'; start: Point; end: Point }
   | { kind: 'protractor'; part: ProtractorPart; grab: Point }
   | { kind: 'ruler'; part: RulerPart; grab: Point }
@@ -271,11 +276,12 @@ export function GeometryStudio() {
    */
   const [dashed, setDashed] = useState(false)
   /*
-   * ยางลบลบทั้งชิ้น หรือลบเฉพาะตรงที่ถู
+   * ยางลบสามแบบ ลบทั้งชิ้น ลบเฉพาะตรงที่ถู และลบด้วยกรอบ
    * ของจริงลบเฉพาะตรงที่ถู แต่บนจอการลบทั้งชิ้นเร็วกว่ามากเวลาจะล้างของที่วาดผิด
-   * จึงมีทั้งสองแบบ และตั้งต้นที่ลบทั้งชิ้นซึ่งเป็นสิ่งที่เด็กคาดหวังจากการจิ้มหนึ่งครั้ง
+   * และการลากกรอบคือวิธีเดียวที่เก็บเส้นร่างสิบกว่าเส้นทิ้งได้ในครั้งเดียว
+   * ตั้งต้นที่ลบทั้งชิ้น ซึ่งเป็นสิ่งที่เด็กคาดหวังจากการจิ้มหนึ่งครั้ง
    */
-  const [eraseWhole, setEraseWhole] = useState(true)
+  const [eraseMode, setEraseMode] = useState<'whole' | 'part' | 'box'>('whole')
 
   /*
    * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
@@ -921,7 +927,7 @@ export function GeometryStudio() {
      * เส้นร่างในการสร้างรูปมักยาวเลยรูปออกไป แล้วต้องลบเฉพาะส่วนที่เกิน
      * ถ้าลบได้แต่ทั้งเส้น เด็กต้องลบแล้ววาดใหม่ให้สั้นลง ซึ่งไม่ใช่สิ่งที่ทำบนกระดาษจริง
      */
-    if (!eraseWhole && found.kind === 'segment') {
+    if (eraseMode === 'part' && found.kind === 'segment') {
       const pieces = rubLine(found.a, found.b, at, RUB_RADIUS)
       /* ยางลบผ่านแต่ไม่ได้กินเนื้อเส้นเลย ไม่ต้องจดประวัติและไม่ต้องเปลี่ยนอะไร */
       if (pieces.length === 1 && distance(pieces[0].b, found.b) < 0.001) return marked
@@ -1160,6 +1166,10 @@ export function GeometryStudio() {
       }
 
       case 'eraser': {
+        if (eraseMode === 'box') {
+          setDrag({ kind: 'erase-box', start: raw, end: raw })
+          return
+        }
         /* กดค้างแล้วถูไปเรื่อย ๆ ได้เหมือนยางลบจริง ไม่ใช่ต้องจิ้มทีละชิ้น */
         setDrag({ kind: 'erase', marked: rubOut(raw, false) })
         return
@@ -1341,6 +1351,10 @@ export function GeometryStudio() {
         setDrag({ kind: 'erase', marked: rubOut(raw, drag.marked) })
         return
 
+      case 'erase-box':
+        setDrag({ ...drag, end: raw })
+        return
+
       case 'calibrate':
         setDrag({ ...drag, end: raw })
         return
@@ -1427,6 +1441,25 @@ export function GeometryStudio() {
         } else {
           say('ลากทาบให้ยาวกว่านี้หน่อยนะ')
         }
+        break
+      }
+
+      case 'erase-box': {
+        const box = boxFrom(drag.start, raw)
+        const doomed = board.shapes.filter((shape) => insideBox(shape, box))
+        if (doomed.length === 0) {
+          say('ไม่มีชิ้นไหนอยู่ในกรอบทั้งชิ้น ลองลากกรอบให้คลุมมากกว่านี้นะ')
+          break
+        }
+        /* ลากกรอบหนึ่งครั้งคือการลบครั้งเดียว กดย้อนกลับครั้งเดียวได้คืนทั้งหมด */
+        dispatch({ type: 'mark' })
+        dispatch({
+          type: 'live',
+          shapes: board.shapes.filter((shape) => !insideBox(shape, box)),
+        })
+        if (selectedId && doomed.some((shape) => shape.id === selectedId)) setSelectedId(null)
+        playSfx('click')
+        say(`ลบไป ${doomed.length} ชิ้น กดย้อนกลับได้ถ้าเปลี่ยนใจ`)
         break
       }
 
@@ -2270,6 +2303,10 @@ export function GeometryStudio() {
     if (anglePicks.length === 2 && pointer) {
       return `มุมนี้ ${formatDeg(angleBetween(anglePicks[0], anglePicks[1], pointer))}`
     }
+    if (drag.kind === 'erase-box') {
+      const box = boxFrom(drag.start, drag.end)
+      return `จะลบ ${board.shapes.filter((shape) => insideBox(shape, box)).length} ชิ้น`
+    }
     if (drag.kind === 'rotate-shape' && pointer) {
       return `หมุนไป ${formatDeg(Math.abs(normalizeDeg(angleOf(drag.origin, pointer) - drag.startAngle)))}`
     }
@@ -2585,19 +2622,20 @@ export function GeometryStudio() {
           {tool === 'eraser' ? (
             <div className="mt-3 rounded-2xl bg-white/70 p-3">
               <p className="text-sm font-bold text-slate-600">แบบของยางลบ</p>
-              <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex flex-col gap-1.5">
                 {[
-                  { whole: true, label: '🧽 ลบทั้งชิ้น' },
-                  { whole: false, label: '✂️ ลบเฉพาะที่ถู' },
+                  { mode: 'whole' as const, label: '🧽 ลบทั้งชิ้น' },
+                  { mode: 'part' as const, label: '✂️ ลบเฉพาะที่ถู' },
+                  { mode: 'box' as const, label: '⬚ ลากกรอบลบหลายชิ้น' },
                 ].map((item) => (
                   <button
-                    key={item.label}
+                    key={item.mode}
                     type="button"
                     onClick={() => {
-                      setEraseWhole(item.whole)
+                      setEraseMode(item.mode)
                       playSfx('click')
                     }}
-                    className={`geo-chip flex-1 ${eraseWhole === item.whole ? 'geo-chip-strong' : ''}`}
+                    className={`geo-chip ${eraseMode === item.mode ? 'geo-chip-strong' : ''}`}
                   >
                     {item.label}
                   </button>
@@ -2606,6 +2644,9 @@ export function GeometryStudio() {
               <p className="mt-2 text-xs font-semibold text-slate-500">
                 ลบเฉพาะที่ถูใช้กับเส้นตรง ถูตรงกลางเส้นแล้วเส้นจะขาดเป็นสองท่อน
                 เหมาะกับการลบเส้นร่างส่วนที่ยาวเลยรูปออกไป
+              </p>
+              <p className="mt-1 text-xs font-semibold text-slate-500">
+                ลากกรอบจะลบเฉพาะชิ้นที่อยู่ในกรอบทั้งชิ้น เส้นที่พาดเลยกรอบออกไปจึงไม่หายไปด้วย
               </p>
             </div>
           ) : null}
@@ -3439,8 +3480,46 @@ export function GeometryStudio() {
                   </g>
                 ))}
 
+                {/* กรอบลบ พร้อมไฮไลต์ชิ้นที่จะหายไป เด็กจึงเห็นก่อนปล่อยมือว่ากำลังจะลบอะไร */}
+                {drag.kind === 'erase-box'
+                  ? (() => {
+                      const box = boxFrom(drag.start, drag.end)
+                      const doomed = board.shapes.filter((shape) => insideBox(shape, box))
+                      return (
+                        <g pointerEvents="none" className="geo-no-export">
+                          {doomed.map((shape) => {
+                            const own = shapeBounds(shape)
+                            return (
+                              <rect
+                                key={shape.id}
+                                x={own.minX - 4}
+                                y={own.minY - 4}
+                                width={own.maxX - own.minX + 8}
+                                height={own.maxY - own.minY + 8}
+                                rx={8}
+                                fill="rgba(251, 146, 60, 0.18)"
+                                stroke="#fb923c"
+                                strokeWidth={2 / view.scale}
+                              />
+                            )
+                          })}
+                          <rect
+                            x={box.minX}
+                            y={box.minY}
+                            width={box.maxX - box.minX}
+                            height={box.maxY - box.minY}
+                            fill="rgba(251, 146, 60, 0.08)"
+                            stroke="#ea580c"
+                            strokeWidth={2.5 / view.scale}
+                            strokeDasharray={`${8 / view.scale} ${6 / view.scale}`}
+                          />
+                        </g>
+                      )
+                    })()
+                  : null}
+
                 {/* วงยางลบ ให้เห็นว่าถูครั้งนี้กินเนื้อเส้นกว้างแค่ไหน */}
-                {tool === 'eraser' && !eraseWhole && cursor ? (
+                {tool === 'eraser' && eraseMode === 'part' && cursor ? (
                   <circle
                     cx={cursor.point.x}
                     cy={cursor.point.y}

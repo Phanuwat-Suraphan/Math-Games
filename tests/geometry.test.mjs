@@ -2396,6 +2396,54 @@ check('ลากตามขอบอุปกรณ์ ความยาวต
   close(G.distance(start, tiny), step, 0.0001, 'ลากสั้นมากแล้วได้เส้นยาวศูนย์')
 })
 
+check('ลากกรอบลบ ต้องลบเฉพาะชิ้นที่อยู่ในกรอบทั้งชิ้น', () => {
+  /*
+   * ต้องคลุมทั้งชิ้นถึงจะนับ ไม่ใช่แค่แตะ
+   * เส้นร่างเส้นเดียวมักพาดยาวข้ามกระดาษ ถ้านับแค่แตะกรอบ
+   * การลากกรอบลบมุมเล็ก ๆ หนึ่งมุมจะลบเส้นยาวที่พาดผ่านไปด้วยโดยไม่ได้ตั้งใจ
+   */
+  const small = {
+    id: 'small',
+    kind: 'segment',
+    color: '#000',
+    width: 3,
+    a: { x: 120, y: 120 },
+    b: { x: 180, y: 160 },
+  }
+  const long = {
+    id: 'long',
+    kind: 'segment',
+    color: '#000',
+    width: 3,
+    a: { x: 20, y: 140 },
+    b: { x: 900, y: 140 },
+  }
+  const far = { id: 'far', kind: 'dot', color: '#000', width: 3, at: { x: 700, y: 600 }, label: 'A' }
+  const box = S.boxFrom({ x: 100, y: 100 }, { x: 220, y: 220 })
+
+  assert(S.insideBox(small, box), 'ชิ้นที่อยู่ในกรอบทั้งชิ้นต้องถูกลบ')
+  assert(!S.insideBox(long, box), 'เส้นยาวที่พาดผ่านกรอบต้องไม่ถูกลบ')
+  assert(!S.insideBox(far, box), 'ชิ้นที่อยู่นอกกรอบต้องไม่ถูกลบ')
+
+  /* ลากกรอบจากมุมไหนไปมุมไหนก็ต้องได้ผลเหมือนกัน */
+  const backwards = S.boxFrom({ x: 220, y: 220 }, { x: 100, y: 100 })
+  assert(S.insideBox(small, backwards), 'ลากกรอบย้อนทางแล้วผลไม่เหมือนกัน')
+
+  /* กรอบของวงกลมต้องเผื่อรัศมี ไม่ใช่คิดแค่จุดศูนย์กลาง */
+  const circle = {
+    id: 'c',
+    kind: 'circle',
+    color: '#000',
+    width: 3,
+    center: { x: 160, y: 160 },
+    radius: 300,
+    fill: 'none',
+  }
+  assert(!S.insideBox(circle, box), 'วงกลมที่ใหญ่กว่ากรอบต้องไม่ถูกลบ')
+  const bounds = S.shapeBounds(circle)
+  close(bounds.minX, 160 - 300 - 1.5, 0.0001, 'กรอบของวงกลมไม่ได้เผื่อรัศมี')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)
