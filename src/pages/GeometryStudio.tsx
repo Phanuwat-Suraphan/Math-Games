@@ -57,6 +57,7 @@ import {
 import type { View } from '../geometry/view'
 import { EMPTY_BOARD, boardReducer, canRedo, canUndo } from '../geometry/board'
 import { MISSIONS, nextMissionIndex } from '../geometry/missions'
+import { PAPER_SIZES, findPaperSize } from '../geometry/paper'
 import {
   PRACTICE_LEVELS,
   armEnds,
@@ -187,8 +188,11 @@ import {
 import type { Point } from '../geometry/geo'
 
 /** ขนาดกระดาษในระบบพิกัดของ SVG เท่ากับ 25 x 17 เซนติเมตร */
-const VIEW_WIDTH = 1000
-const VIEW_HEIGHT = 680
+/*
+ * ขนาดกระดาษตั้งต้น ใช้เป็นค่าสำรองของตัวจำที่ปุ่มลัดบนคีย์บอร์ดอ่าน
+ * ขนาดจริงที่ใช้วาดมาจากสถานะ paper ซึ่งครูเปลี่ยนได้
+ */
+const DEFAULT_PAPER = findPaperSize('wide')
 
 /** แม่เหล็กดูดเข้าเส้นตารางทีละครึ่งเซนติเมตร */
 const GRID_STEP = PX_PER_CM / 2
@@ -270,6 +274,16 @@ export function GeometryStudio() {
   const [color, setColor] = useState(PENCIL_COLORS[0].value)
   const [width, setWidth] = useState(PENCIL_WIDTHS[1].value)
   const [sides, setSides] = useState(6)
+
+  /*
+   * ขนาดกระดาษ
+   * งานที่ต้องวาดเส้นร่างหลายเส้นอย่างการแบ่งครึ่งมุมหรือสร้างรูปหลายเหลี่ยม
+   * เต็มกระดาษขนาดเดิมตั้งแต่ยังไม่เสร็จ ครูจึงเลือกแผ่นที่ใหญ่ขึ้นได้
+   */
+  const [paperId, setPaperId] = useState(DEFAULT_PAPER.id)
+  const paper = findPaperSize(paperId)
+  const paperRef = useRef(DEFAULT_PAPER)
+  paperRef.current = paper
   const [fillColor, setFillColor] = useState(FILL_COLORS[0].value)
   /*
    * ดินสอวาดเส้นประหรือเส้นทึบ
@@ -581,8 +595,8 @@ export function GeometryStudio() {
       viewRef.current,
       (event.clientX - rect.left) / rect.width,
       (event.clientY - rect.top) / rect.height,
-      VIEW_WIDTH,
-      VIEW_HEIGHT,
+      paper.width,
+      paper.height,
     )
   }
 
@@ -598,12 +612,13 @@ export function GeometryStudio() {
 
   /** จุดกระดาษที่อยู่กลางจอตอนนี้ ใช้เป็นจุดตรึงตอนซูมด้วยปุ่ม */
   function centerOfView(): Point {
-    return screenToPaper(viewRef.current, 0.5, 0.5, VIEW_WIDTH, VIEW_HEIGHT)
+    /* ผ่านตัวจำเช่นกัน ฟังก์ชันนี้ถูกเรียกจากตัวรับคีย์บอร์ดที่ผูกไว้ครั้งเดียวด้วย */
+    return screenToPaper(viewRef.current, 0.5, 0.5, paperRef.current.width, paperRef.current.height)
   }
 
   /** ซูมโดยตรึงจุดที่เล็งอยู่ไว้กับที่ */
   function zoomBy(factor: number) {
-    setView(zoomAt(viewRef.current, factor, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+    setView(zoomAt(viewRef.current, factor, centerOfView(), paper.width, paper.height))
     playSfx('click')
   }
 
@@ -784,8 +799,8 @@ export function GeometryStudio() {
         viewRef.current,
         (event.clientX - rect.left) / rect.width,
         (event.clientY - rect.top) / rect.height,
-        VIEW_WIDTH,
-        VIEW_HEIGHT,
+        paper.width,
+        paper.height,
       )
       setDrag({
         kind: 'label',
@@ -903,8 +918,8 @@ export function GeometryStudio() {
         viewRef.current,
         (span.middle.x - rect.left) / rect.width,
         (span.middle.y - rect.top) / rect.height,
-        VIEW_WIDTH,
-        VIEW_HEIGHT,
+        paper.width,
+        paper.height,
       ),
     }
     setDrag({ kind: 'none' })
@@ -925,8 +940,8 @@ export function GeometryStudio() {
         pinch.startPaper,
         (span.middle.x - rect.left) / rect.width,
         (span.middle.y - rect.top) / rect.height,
-        VIEW_WIDTH,
-        VIEW_HEIGHT,
+        paper.width,
+        paper.height,
       ),
     )
   }
@@ -1287,14 +1302,14 @@ export function GeometryStudio() {
         const rect = svg.getBoundingClientRect()
         if (rect.width === 0) return
         /* หนึ่งพิกเซลบนจอ เท่ากับกี่หน่วยบนกระดาษ ขึ้นกับกำลังขยายตอนเริ่มลาก */
-        const perPixel = VIEW_WIDTH / drag.startView.scale / rect.width
+        const perPixel = paper.width / drag.startView.scale / rect.width
         setView(
           panBy(
             drag.startView,
             -(event.clientX - drag.startClient.x) * perPixel,
             -(event.clientY - drag.startClient.y) * perPixel,
-            VIEW_WIDTH,
-            VIEW_HEIGHT,
+            paper.width,
+            paper.height,
           ),
         )
         return
@@ -1810,7 +1825,7 @@ export function GeometryStudio() {
       context.drawImage(image, 0, 0, canvas.width, canvas.height)
 
       const src = canvas.toDataURL('image/jpeg', PHOTO_QUALITY)
-      const box = fitOnPaper(small.width, small.height, VIEW_WIDTH, VIEW_HEIGHT)
+      const box = fitOnPaper(small.width, small.height, paper.width, paper.height)
 
       addShape({
         kind: 'photo',
@@ -1974,13 +1989,13 @@ export function GeometryStudio() {
     const svg = svgRef.current
     if (!svg) return
     const clone = svg.cloneNode(true) as SVGSVGElement
-    clone.setAttribute('width', String(VIEW_WIDTH))
-    clone.setAttribute('height', String(VIEW_HEIGHT))
+    clone.setAttribute('width', String(paper.width))
+    clone.setAttribute('height', String(paper.height))
     /*
      * ภาพที่บันทึกต้องเป็นกระดาษทั้งแผ่นเสมอ ไม่ใช่เฉพาะส่วนที่ซูมค้างไว้ตอนกดปุ่ม
      * ไม่งั้นเด็กที่ซูมดูมุมหนึ่งอยู่ จะได้ไฟล์ที่มีแต่มุมนั้นโดยไม่รู้ตัว
      */
-    clone.setAttribute('viewBox', `0 0 ${VIEW_WIDTH} ${VIEW_HEIGHT}`)
+    clone.setAttribute('viewBox', `0 0 ${paper.width} ${paper.height}`)
     for (const node of Array.from(clone.querySelectorAll('.geo-no-export'))) {
       node.remove()
     }
@@ -1991,8 +2006,8 @@ export function GeometryStudio() {
 
     image.onload = () => {
       const canvas = document.createElement('canvas')
-      canvas.width = VIEW_WIDTH * 2
-      canvas.height = VIEW_HEIGHT * 2
+      canvas.width = paper.width * 2
+      canvas.height = paper.height * 2
       const context = canvas.getContext('2d')
       URL.revokeObjectURL(url)
       if (!context) {
@@ -2033,6 +2048,7 @@ export function GeometryStudio() {
     setFillColor(saved.prefs.fillColor)
     setDashed(saved.prefs.dashed)
     setToolFade(saved.prefs.toolFade)
+    setPaperId(saved.prefs.paperId)
     setWidth(saved.prefs.width)
     setThemeId(saved.prefs.themeId)
     setShowGrid(saved.prefs.showGrid)
@@ -2067,6 +2083,7 @@ export function GeometryStudio() {
           fillColor,
           dashed,
           toolFade,
+          paperId,
           width,
           showGrid,
           snapOn,
@@ -2085,6 +2102,7 @@ export function GeometryStudio() {
     fillColor,
     dashed,
     toolFade,
+    paperId,
     width,
     showGrid,
     snapOn,
@@ -2132,14 +2150,16 @@ export function GeometryStudio() {
       event.preventDefault()
       const rect = svg.getBoundingClientRect()
       if (rect.width === 0 || rect.height === 0) return
+      /* อ่านขนาดกระดาษผ่านตัวจำ ตัวรับล้อถูกผูกครั้งเดียวตอนเปิดหน้า ค่าที่จับไว้ตอนนั้นจะค้าง */
+      const sheet = paperRef.current
       const focus = screenToPaper(
         viewRef.current,
         (event.clientX - rect.left) / rect.width,
         (event.clientY - rect.top) / rect.height,
-        VIEW_WIDTH,
-        VIEW_HEIGHT,
+        sheet.width,
+        sheet.height,
       )
-      setView(zoomAt(viewRef.current, event.deltaY < 0 ? 1.15 : 1 / 1.15, focus, VIEW_WIDTH, VIEW_HEIGHT))
+      setView(zoomAt(viewRef.current, event.deltaY < 0 ? 1.15 : 1 / 1.15, focus, sheet.width, sheet.height))
     }
 
     svg.addEventListener('wheel', onWheel, { passive: false })
@@ -2288,10 +2308,26 @@ export function GeometryStudio() {
       if (event.ctrlKey || event.metaKey) {
         if (event.key === '+' || event.key === '=') {
           event.preventDefault()
-          setView(zoomAt(viewRef.current, 1.25, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+          setView(
+            zoomAt(
+              viewRef.current,
+              1.25,
+              centerOfView(),
+              paperRef.current.width,
+              paperRef.current.height,
+            ),
+          )
         } else if (event.key === '-') {
           event.preventDefault()
-          setView(zoomAt(viewRef.current, 1 / 1.25, centerOfView(), VIEW_WIDTH, VIEW_HEIGHT))
+          setView(
+            zoomAt(
+              viewRef.current,
+              1 / 1.25,
+              centerOfView(),
+              paperRef.current.width,
+              paperRef.current.height,
+            ),
+          )
         } else if (event.key === '0') {
           event.preventDefault()
           setView(DEFAULT_VIEW)
@@ -2637,7 +2673,7 @@ export function GeometryStudio() {
                 type="button"
                 onClick={() =>
                   placeShapes(
-                    buildShapes(recipe, recipeValues, screenToPaper(viewRef.current, 0.5, 0.5, VIEW_WIDTH, VIEW_HEIGHT), {
+                    buildShapes(recipe, recipeValues, screenToPaper(viewRef.current, 0.5, 0.5, paper.width, paper.height), {
                       color,
                       width,
                     }),
@@ -2941,6 +2977,31 @@ export function GeometryStudio() {
             open={openSections.paper}
             onToggle={() => setOpenSections({ ...openSections, paper: !openSections.paper })}
           >
+          <p className="text-xs font-bold text-slate-500">ขนาดกระดาษ</p>
+          <div className="mt-1 grid grid-cols-2 gap-1.5">
+            {PAPER_SIZES.map((size) => (
+              <button
+                key={size.id}
+                type="button"
+                onClick={() => {
+                  setPaperId(size.id)
+                  setView(DEFAULT_VIEW)
+                  playSfx('click')
+                  say(`เปลี่ยนเป็นกระดาษ${size.label} ${size.cm} แล้ว`)
+                }}
+                className={`geo-chip ${paperId === size.id ? 'geo-chip-strong' : ''}`}
+                title={size.cm}
+              >
+                {size.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 mb-2 text-xs font-semibold text-slate-500">
+            แผ่นใหญ่ขึ้นคือมีที่วาดมากขึ้นจริง หนึ่งเซนติเมตรยังเท่าเดิมทุกแผ่น
+            ของที่วาดไว้แล้วไม่ขยับ ถ้าเปลี่ยนเป็นแผ่นเล็กลงแล้วของบางชิ้นอยู่นอกกระดาษ
+            เปลี่ยนกลับเป็นแผ่นใหญ่ก็เห็นเหมือนเดิม
+          </p>
+
           <div className="grid grid-cols-2 gap-2">
             {PAPER_THEMES.map((item) => (
               <button
@@ -3160,7 +3221,7 @@ export function GeometryStudio() {
             */}
             <svg
               ref={svgRef}
-              viewBox={viewBoxOf(view, VIEW_WIDTH, VIEW_HEIGHT)}
+              viewBox={viewBoxOf(view, paper.width, paper.height)}
               className="geo-canvas w-full"
               role="application"
               aria-label="กระดาษวาดรูปเรขาคณิต"
@@ -3201,11 +3262,11 @@ export function GeometryStudio() {
                 </pattern>
               </defs>
 
-              <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill={theme.paper} />
+              <rect x={0} y={0} width={paper.width} height={paper.height} fill={theme.paper} />
               {showGrid ? (
                 <g pointerEvents="none">
-                  <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#geo-grid-small)" />
-                  <rect x={0} y={0} width={VIEW_WIDTH} height={VIEW_HEIGHT} fill="url(#geo-grid-big)" />
+                  <rect x={0} y={0} width={paper.width} height={paper.height} fill="url(#geo-grid-small)" />
+                  <rect x={0} y={0} width={paper.width} height={paper.height} fill="url(#geo-grid-big)" />
                 </g>
               ) : null}
 
@@ -3884,7 +3945,7 @@ export function GeometryStudio() {
                 <div
                   className="geo-ask"
                   style={(() => {
-                    const size = visibleSize(view, VIEW_WIDTH, VIEW_HEIGHT)
+                    const size = visibleSize(view, paper.width, paper.height)
                     const x = ((polygonAsk.x - view.x) / size.width) * 100
                     const y = ((polygonAsk.y - view.y) / size.height) * 100
                     return {

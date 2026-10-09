@@ -18,6 +18,7 @@
 
 import { PENCIL_COLORS, PENCIL_WIDTHS } from './tools'
 import { PAPER_THEMES } from './cute'
+import { PAPER_SIZES } from './paper'
 import { FILL_COLORS, NO_FILL } from './paint'
 import { clampLeash } from './labels'
 import type { LabelOffsets } from './labels'
@@ -36,6 +37,8 @@ export interface SavedPrefs {
   dashed: boolean
   /** ความทึบของอุปกรณ์ที่วางทับกระดาษ 0.25 ถึง 1 */
   toolFade: number
+  /** ขนาดกระดาษที่ใช้อยู่ ต้องถูกจำไปกับงาน ไม่งั้นงานที่วาดบนแผ่นใหญ่จะหลุดขอบตอนเปิดใหม่ */
+  paperId: string
   width: number
   showGrid: boolean
   snapOn: boolean
@@ -57,6 +60,7 @@ export const DEFAULT_PREFS: SavedPrefs = {
   fillColor: FILL_COLORS[0].value,
   dashed: false,
   toolFade: 0.8,
+  paperId: PAPER_SIZES[0].id,
   width: PENCIL_WIDTHS[1].value,
   showGrid: true,
   snapOn: true,
@@ -207,6 +211,7 @@ function sanitizePrefs(value: unknown): SavedPrefs {
   const color = text(value.color, DEFAULT_PREFS.color)
   const fillColor = text(value.fillColor, DEFAULT_PREFS.fillColor)
   const fade = num(value.toolFade)
+  const paperId = text(value.paperId, DEFAULT_PREFS.paperId)
   const width = num(value.width)
   return {
     /* ธีมหรือสีที่ไม่รู้จัก ให้กลับไปใช้ค่าตั้งต้น ไม่ใช่ปล่อยให้กระดาษกลายเป็นสีแปลก ๆ */
@@ -227,6 +232,8 @@ function sanitizePrefs(value: unknown): SavedPrefs {
     /* ค่านอกช่วงที่แถบเลื่อนให้เลือกได้ แปลว่าไฟล์ถูกแก้มือมา ให้กลับไปใช้ค่าตั้งต้น */
     toolFade:
       fade !== null && fade >= 0.25 && fade <= 1 ? fade : DEFAULT_PREFS.toolFade,
+    /* ขนาดที่ไม่รู้จัก ให้กลับไปใช้แผ่นมาตรฐาน ไม่ใช่ปล่อยให้กระดาษกว้างศูนย์ */
+    paperId: PAPER_SIZES.some((size) => size.id === paperId) ? paperId : DEFAULT_PREFS.paperId,
   }
 }
 
