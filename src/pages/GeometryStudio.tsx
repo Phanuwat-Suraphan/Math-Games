@@ -286,6 +286,14 @@ export function GeometryStudio() {
   const [eraseMode, setEraseMode] = useState<'whole' | 'part' | 'box'>('whole')
 
   /*
+   * ล็อกระยะกางวงเวียน
+   * การสร้างรูปหลายแบบใช้ระยะกางเดิมตลอดทั้งชุด เช่น หกเหลี่ยมจากวงกลมวงเดียว
+   * ซึ่งต้องปักเข็มย้ายที่หกครั้งโดยห้ามให้ขากางเปลี่ยนแม้แต่นิดเดียว
+   * เผลอลากโดนปุ่มกางครั้งเดียว งานที่ทำมาห้าขั้นก่อนหน้าก็ใช้ไม่ได้ทั้งชุด
+   */
+  const [compassLocked, setCompassLocked] = useState(false)
+
+  /*
    * โหมดฝึกวัดมุม เก็บแยกจากกระดาษโดยตั้งใจ
    * โจทย์ไม่ใช่รูปที่เด็กวาด จึงต้องลบด้วยยางลบไม่ได้ ย้อนกลับไม่โดน และไม่ถูกบันทึกทับงาน
    */
@@ -1300,6 +1308,7 @@ export function GeometryStudio() {
         return
 
       case 'compass-spread':
+        if (compassLocked) return
         /*
          * กางหรือหุบขา ระยะเปลี่ยน ทิศของปลายดินสอเดินตามนิ้วไปด้วย แต่ยังไม่วาดอะไร
          * กางได้มากที่สุดเท่าที่วงเวียนในกล่องเรขาคณิตจริงกางได้ ไม่ใช่ลากจนเต็มกระดาษ
@@ -1575,6 +1584,10 @@ export function GeometryStudio() {
     }
 
     if (part === 'spread') {
+      if (compassLocked) {
+        say('ระยะกางถูกล็อกอยู่ ปลดล็อกที่แผงซ้ายก่อนถ้าจะเปลี่ยน')
+        return
+      }
       setDrag({ kind: 'compass-spread' })
       return
     }
@@ -2744,6 +2757,7 @@ export function GeometryStudio() {
                 max={8}
                 step={0.5}
                 value={Math.round(toCm(compass.radius) * 2) / 2}
+                disabled={compassLocked}
                 onChange={(event) =>
                   setCompass({ ...compass, radius: Number(event.target.value) * PX_PER_CM })
                 }
@@ -2762,6 +2776,7 @@ export function GeometryStudio() {
                   min={0.5}
                   max={8}
                   step={0.1}
+                  disabled={compassLocked}
                   onChange={(event) =>
                     setCompass({
                       ...compass,
@@ -2771,6 +2786,55 @@ export function GeometryStudio() {
                   aria-label="ระยะกางวงเวียนเป็นเซนติเมตร"
                 />
                 <span className="w-8 text-left">ซม.</span>
+              </div>
+
+              {/*
+                ล็อกระยะกาง
+                การสร้างรูปหลายแบบใช้ระยะกางเดิมตลอดทั้งชุด เช่น หกเหลี่ยมจากวงกลมวงเดียว
+                เผลอลากโดนปุ่มกางครั้งเดียว งานที่ทำมาห้าขั้นก่อนหน้าก็ใช้ไม่ได้ทั้งชุด
+              */}
+              <button
+                type="button"
+                onClick={() => {
+                  setCompassLocked(!compassLocked)
+                  playSfx('click')
+                  say(
+                    compassLocked
+                      ? 'ปลดล็อกแล้ว กางวงเวียนได้ตามใจ'
+                      : `ล็อกระยะกางไว้ที่ ${formatCm(compass.radius)} แล้ว ปักเข็มย้ายที่ได้โดยระยะไม่เปลี่ยน`,
+                  )
+                }}
+                className={`geo-chip mt-2 w-full ${compassLocked ? 'geo-chip-strong' : ''}`}
+              >
+                {compassLocked ? '🔒 ล็อกระยะกางอยู่' : '🔓 ล็อกระยะกาง'}
+              </button>
+
+              {/*
+                ส่วนโค้งที่ใช้บ่อย
+                หมุนมือให้ได้ 90 องศาพอดีทำได้ตั้งแต่มีแม่เหล็กแล้ว แต่ยังต้องหมุนอยู่ดี
+                สองปุ่มนี้คือทางลัดของขั้นตอนที่ทำซ้ำทุกคาบ
+              */}
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    commitSweep(compass.angle, 90)
+                    say('วาดส่วนโค้ง 90° แล้ว')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ◔ โค้ง 90°
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    commitSweep(compass.angle, 180)
+                    say('วาดส่วนโค้ง 180° แล้ว')
+                  }}
+                  className="geo-chip flex-1"
+                >
+                  ◑ โค้ง 180°
+                </button>
               </div>
 
               <button
@@ -3058,8 +3122,24 @@ export function GeometryStudio() {
                 }
                 className="mt-1 w-full accent-amber-500"
               />
-              <p className="text-[11px] font-semibold text-slate-500">
+              <div className="mt-1 flex gap-1.5">
+                {[10, 15, 20, 30].map((cm) => (
+                  <button
+                    key={cm}
+                    type="button"
+                    onClick={() => {
+                      setRuler({ ...ruler, lengthCm: clampRulerLength(cm) })
+                      playSfx('click')
+                    }}
+                    className={`geo-chip flex-1 ${ruler.lengthCm === cm ? 'geo-chip-strong' : ''}`}
+                  >
+                    {cm}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
                 ยืดแล้วได้ขีดเพิ่ม ไม่ใช่ขีดห่างขึ้น หนึ่งเซนติเมตรบนไม้บรรทัดเท่ากับหนึ่งเซนติเมตรบนกระดาษเสมอ
+                ปุ่มด้านบนคือความยาวของไม้บรรทัดจริงที่มีขายทั่วไป
               </p>
             </div>
           ) : null}
