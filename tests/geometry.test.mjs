@@ -49,6 +49,7 @@ const D = load('geometry/storage')
 const P = load('geometry/paint')
 const Q = load('geometry/practice')
 const SH = load('geometry/worksheet')
+const PP = load('geometry/paper')
 const PH = load('geometry/photos')
 
 let passed = 0
@@ -2442,6 +2443,31 @@ check('ลากกรอบลบ ต้องลบเฉพาะชิ้น
   assert(!S.insideBox(circle, box), 'วงกลมที่ใหญ่กว่ากรอบต้องไม่ถูกลบ')
   const bounds = S.shapeBounds(circle)
   close(bounds.minX, 160 - 300 - 1.5, 0.0001, 'กรอบของวงกลมไม่ได้เผื่อรัศมี')
+})
+
+check('ขนาดกระดาษต้องตรงกับเซนติเมตรจริง และถูกจำไปกับงาน', () => {
+  /*
+   * แผ่นที่ใหญ่ขึ้นต้องแปลว่ามีที่วาดมากขึ้นจริง ไม่ใช่ขยายภาพให้ทุกอย่างโตตาม
+   * หนึ่งเซนติเมตรบนกระดาษต้องเท่ากันทุกแผ่น ไม่งั้นไม้บรรทัดจะโกหกทันทีที่เปลี่ยนแผ่น
+   */
+  const a4 = PP.findPaperSize('a4')
+  close(a4.width / G.PX_PER_CM, 29.7, 0.03, 'A4 แนวนอนกว้างไม่ตรงกับของจริง')
+  close(a4.height / G.PX_PER_CM, 21, 0.03, 'A4 แนวนอนสูงไม่ตรงกับของจริง')
+
+  const tall = PP.findPaperSize('a4tall')
+  close(tall.width, a4.height, 0.0001, 'แนวตั้งกับแนวนอนต้องเป็นแผ่นเดียวกันแค่หมุน')
+  close(tall.height, a4.width, 0.0001, 'แนวตั้งกับแนวนอนต้องเป็นแผ่นเดียวกันแค่หมุน')
+
+  /* ขนาดตั้งต้นต้องเป็นขนาดเดิม งานที่บันทึกไว้ก่อนหน้านี้ทุกชิ้นวางอยู่บนขนาดนี้ */
+  close(PP.PAPER_SIZES[0].width, 1000, 0.0001, 'ขนาดตั้งต้นเปลี่ยนไป งานเก่าจะอยู่ผิดที่')
+  close(PP.PAPER_SIZES[0].height, 680, 0.0001, 'ขนาดตั้งต้นเปลี่ยนไป งานเก่าจะอยู่ผิดที่')
+  assert(PP.findPaperSize('ไม่มีขนาดนี้').id === PP.PAPER_SIZES[0].id, 'ขนาดที่ไม่รู้จักต้องกลับไปใช้แผ่นมาตรฐาน')
+
+  /* ขนาดต้องถูกจำไปกับงาน ไม่งั้นงานที่วาดบนแผ่นใหญ่จะหลุดขอบตอนเปิดใหม่ */
+  const back = D.decodeBoard(D.encodeBoard([], {}, { ...SAMPLE_PREFS, paperId: 'huge' }))
+  assert(back.prefs.paperId === 'huge', 'ขนาดกระดาษไม่ถูกจำ')
+  const broken = D.decodeBoard(D.encodeBoard([], {}, { ...SAMPLE_PREFS, paperId: 'พัง' }))
+  assert(broken.prefs.paperId === D.DEFAULT_PREFS.paperId, 'ขนาดที่พังต้องถูกปัดทิ้ง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
