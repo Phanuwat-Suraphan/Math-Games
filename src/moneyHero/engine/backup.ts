@@ -145,7 +145,20 @@ export function mergePlayer(a: Player, b: Player): Player {
     chests: union(a.chests, b.chests).sort((x, y) => x - y),
     plan: { best: planBest, done: Math.max(a.plan?.done ?? 0, b.plan?.done ?? 0) },
     album: union(a.album, b.album),
+    tests: a.tests || b.tests ? unionBy(a.tests, b.tests, (t) => t.id).sort((x, y) => x.startedAt - y.startedAt) : undefined,
+    retake: mergeRetake(a.retake, b.retake),
   }
+}
+
+/** ครูให้ทำใหม่: ใช้เวลาที่กดล่าสุดของแต่ละแบบทดสอบ */
+function mergeRetake(a: Player['retake'], b: Player['retake']): Player['retake'] {
+  if (!a && !b) return undefined
+  const out: NonNullable<Player['retake']> = { ...(a ?? {}) }
+  for (const k of ['pre', 'post'] as const) {
+    const v = Math.max(a?.[k] ?? 0, b?.[k] ?? 0)
+    if (v > 0) out[k] = v
+  }
+  return out
 }
 
 export interface MergeResult {
@@ -185,7 +198,9 @@ export function mergeSaves(local: SaveData, incoming: SaveData): MergeResult {
     }
   }
   const classroom = classroomConfigured(local.classroom) ? local.classroom : incoming.classroom
-  return { save: { ...local, players, classroom }, added, merged }
+  // คลังข้อสอบ: ใช้ฉบับที่ครูแก้ล่าสุด (ครูแจกข้อสอบที่แก้แล้วให้แท็บเล็ตทุกเครื่องผ่านไฟล์สำรองได้)
+  const bank = incoming.bank.updatedAt > local.bank.updatedAt ? incoming.bank : local.bank
+  return { save: { ...local, players, classroom, bank }, added, merged }
 }
 
 /* ------------------------------------------------------------------ */

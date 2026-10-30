@@ -6,9 +6,12 @@ import { useGame } from '../hooks/useMoneyGame'
 import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
 import { lessonsPassed, overallAccuracy, pendingMistakes, totalStars, weakSkills, type Player } from '../engine/progress'
-import { buildCsv, classProgress, classSummary, fixed2, improvement, minutes, passLabel, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
+import { buildCsv, classProgress, classSummary, dateText, fixed2, improvement, minutes, passLabel, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
 import { compareStudents, teacherName } from '../engine/classroom'
 import { participation, PARTICIPATION_LABEL } from '../engine/roster'
+import { attemptsOf, grantRetake, retakeOpen } from '../engine/exam'
+import { KIND_NAME } from '../engine/testBank'
+import type { TestKind } from '../engine/progress'
 import { PLAN_EVENTS, plannedEvents } from '../engine/budget'
 import { challengesCleared, stageStars } from '../engine/stages'
 import { allStars, CHESTS, MAX_STARS } from '../engine/starRoad'
@@ -63,6 +66,9 @@ export function TeacherPage() {
           </Link>
           <Link to="/teacher/settings" className="mh-btn mh-btn-gold" data-testid="mh-teacher-settings">
             <Settings size={20} /> ตั้งค่าห้องเรียน
+          </Link>
+          <Link to="/teacher/tests" className="mh-btn mh-btn-gold" data-testid="mh-teacher-tests">
+            📝 คลังข้อสอบ
           </Link>
           <Link to="/teacher/print/roster" className="mh-btn mh-btn-soft" data-testid="mh-teacher-print-roster">
             <Printer size={20} /> รายชื่อ (A4)
@@ -253,6 +259,7 @@ function StudentDetail({ p }: { p: Player }) {
         </div>
         <div>
           {p.preTest || p.postTest ? <BeforeAfter pre={p.preTest} post={p.postTest} /> : <p className="mh-soft">ยังไม่ได้ทำแบบทดสอบ</p>}
+          <TestHistory p={p} />
           <h4 className="mh-card-title">🌱 กาดรักษ์โลก</h4>
           {p.eco.days > 0 ? (
             <p className="mh-soft" data-testid="mh-student-eco">
@@ -320,6 +327,55 @@ function StageStars({ p }: { p: Player }) {
         </tbody>
       </table>
       </div>
+    </div>
+  )
+}
+
+/** ประวัติการทำแบบทดสอบทุกครั้ง และปุ่มให้ทำใหม่ (กรณีจำเป็น เช่น ขาดเรียน แท็บเล็ตดับ) */
+function TestHistory({ p }: { p: Player }) {
+  const { updateSave, pushToast } = useGame()
+  const grant = (kind: TestKind) => {
+    updateSave((s) => (s.players[p.id] ? { ...s, players: { ...s.players, [p.id]: grantRetake(s.players[p.id], kind) } } : s))
+    pushToast('🔁', `ให้ ${p.name} ทำ${KIND_NAME[kind]}ใหม่ได้แล้ว`)
+  }
+  return (
+    <div className="mh-student-tests" data-testid="mh-student-tests">
+      <h4 className="mh-card-title">📝 ประวัติการทำแบบทดสอบ</h4>
+      {(['pre', 'post'] as TestKind[]).map((kind) => {
+        const list = attemptsOf(p, kind)
+        const legacy = list.length === 0 && (kind === 'pre' ? p.preTest : p.postTest)
+        return (
+          <div key={kind}>
+            <b>{KIND_NAME[kind]}</b>
+            <ul className="mh-attempts">
+              {list.map((a, i) => (
+                <li key={a.id}>
+                  ครั้งที่ {i + 1}: {dateText(a.at)} · {a.score}/{a.total} คะแนน · ถูก {a.correct}/{a.count} ข้อ · {Math.max(1, Math.round(a.timeMs / 60000))} นาที
+                  {a.timedOut ? ' · หมดเวลา' : ''}
+                  {i === list.length - 1 ? ' (ใช้ในรายงาน)' : ''}
+                </li>
+              ))}
+              {legacy && (
+                <li>
+                  {dateText(legacy.at)} · {legacy.score}/{legacy.total} (แบบทดสอบรุ่นเดิม)
+                </li>
+              )}
+              {list.length === 0 && !legacy && <li className="mh-soft">ยังไม่ได้ทำ</li>}
+            </ul>
+            {(list.length > 0 || legacy) && (
+              <div className="mh-attempt-actions">
+                {retakeOpen(p, kind) ? (
+                  <span className="mh-soft">✅ เปิดให้ทำใหม่แล้ว (รอนักเรียนทำ)</span>
+                ) : (
+                  <button type="button" className="mh-chip" onClick={() => grant(kind)} data-testid={`mh-retake-${kind}`}>
+                    🔁 ให้ทำ{kind === 'pre' ? 'ก่อนเรียน' : 'หลังเรียน'}ใหม่
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

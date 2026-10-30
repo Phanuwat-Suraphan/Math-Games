@@ -4,7 +4,8 @@ import { ArrowLeft, Pencil } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import { AVATARS } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
-import { canTakePostTest, lessonsPassed, overallAccuracy, totalStars } from '../engine/progress'
+import { lessonsPassed, overallAccuracy, totalStars } from '../engine/progress'
+import { testState } from '../engine/exam'
 import { minutes, percent, testPercent } from '../engine/report'
 import { playerLevel } from '../engine/scoring'
 import { TopBar } from '../components/TopBar'
@@ -17,7 +18,7 @@ import { playSound } from '../utils/sound'
  * เส้นทาง #/profile
  */
 export function ProfilePage() {
-  const { player, updatePlayer } = useGame()
+  const { player, updatePlayer, save } = useGame()
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(player?.name ?? '')
   if (!player) return null
@@ -109,14 +110,16 @@ export function ProfilePage() {
                 <div>
                   <span className="mh-soft">ก่อนเรียน</span>
                   <b>{pre === null ? 'ยังไม่ได้ทำ' : `${pre}%`}</b>
-                  <Link to="/test/pre" className="mh-btn mh-btn-soft mh-btn-sm">
-                    {pre === null ? 'ทำเลย' : 'ทำอีกครั้ง'}
-                  </Link>
+                  {testState(player, save.bank.pre) === 'ready' && (
+                    <Link to="/test/pre" className="mh-btn mh-btn-soft mh-btn-sm">
+                      {pre === null ? 'ทำเลย' : 'ทำอีกครั้ง'}
+                    </Link>
+                  )}
                 </div>
                 <div>
                   <span className="mh-soft">หลังเรียน</span>
-                  <b>{post === null ? (canTakePostTest(player) ? 'พร้อมทำแล้ว' : '🔒 ผ่านด่าน 12 ก่อน') : `${post}%`}</b>
-                  {canTakePostTest(player) && (
+                  <b>{post === null ? (testState(player, save.bank.post) === 'ready' ? 'พร้อมทำแล้ว' : '🔒 รอคุณครูเปิด หรือผ่านด่าน 12') : `${post}%`}</b>
+                  {testState(player, save.bank.post) === 'ready' && (
                     <Link to="/test/post" className="mh-btn mh-btn-soft mh-btn-sm">
                       {post === null ? 'ทำเลย' : 'ทำอีกครั้ง'}
                     </Link>

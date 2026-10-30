@@ -222,3 +222,71 @@
     font-size: 10.5pt;
   }
 }
+
+/* แบบทดสอบฉบับกระดาษ */
+.mh-doc-fill {
+  margin: 6px 0 8px;
+}
+
+.mh-doc-box {
+  border: 1px solid #000;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+}
+
+.mh-doc-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mh-doc-item {
+  break-inside: avoid;
+  margin-bottom: 8px;
+}
+
+.mh-doc-q {
+  margin: 0 0 2px;
+}
+
+.mh-doc-money {
+  margin: 2px 0 4px 18px;
+  justify-content: flex-start;
+}
+
+.mh-doc-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 16px;
+}
+
+.mh-doc-choices.is-long {
+  grid-template-columns: 1fr;
+}
+
+.mh-doc-blank {
+  margin: 4px 0 0 18px;
+}
+
+.mh-doc-sheet td {
+  height: 9mm;
+}
+
+.mh-doc-bubbles {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.mh-doc-bubbles span {
+  display: inline-grid;
+  place-items: center;
+  width: 7mm;
+  height: 7mm;
+  border: 1px solid #000;
+  border-radius: 50%;
+  font-size: 9.5pt;
+}
