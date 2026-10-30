@@ -1,24 +1,34 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import { AVATARS } from '../data/characters'
 import { AvatarArt, CharacterArt } from '../components/Art'
 import { Sky } from '../components/Sky'
 import { playSound } from '../utils/sound'
+import { hasRoster } from '../engine/roster'
 
-/** สร้างผู้เล่น: ชื่อเล่น + Avatar ไม่ต้องสมัครสมาชิก */
+/**
+ * สร้างผู้เล่น: ชื่อเล่น + Avatar ไม่ต้องสมัครสมาชิก
+ * ?for=me = นักเรียนในทะเบียนเข้าเกมครั้งแรก เลือกตัวละครและชื่อเล่นของตัวเอง (คะแนนผูกกับชื่อในทะเบียน)
+ */
 export function CreatePlayerPage() {
-  const { createPlayer } = useGame()
+  const { createPlayer, player, save, updatePlayer } = useGame()
   const navigate = useNavigate()
-  const [name, setName] = useState('')
-  const [avatar, setAvatar] = useState(AVATARS[0].id)
+  const [params] = useSearchParams()
+  const claim = params.get('for') === 'me' && player?.student ? player : null
+  const [name, setName] = useState(claim?.name ?? '')
+  const [avatar, setAvatar] = useState(claim && !claim.needsAvatar ? claim.avatar : AVATARS[0].id)
   const ok = name.trim().length > 0
+
+  // ครูตั้งให้เลือกชื่อจากทะเบียนเท่านั้น: สร้างผู้เล่นเองไม่ได้
+  if (!claim && save.classroom.rosterOnly && hasRoster(save.players)) return <Navigate to="/players" replace />
 
   const submit = () => {
     if (!ok) return
     playSound('complete')
-    createPlayer(name, avatar)
+    if (claim) updatePlayer((p) => ({ ...p, name: name.trim().slice(0, 20), avatar, needsAvatar: undefined }))
+    else createPlayer(name, avatar)
     navigate('/map', { replace: true })
   }
 
@@ -26,10 +36,10 @@ export function CreatePlayerPage() {
     <div className="mh-page mh-page-narrow">
       <Sky city={false} />
       <div className="mh-page-head">
-        <Link to="/start" className="mh-icon-btn" aria-label="กลับ">
+        <Link to={claim ? '/players' : '/start'} className="mh-icon-btn" aria-label="กลับ">
           <ArrowLeft size={24} />
         </Link>
-        <h1 className="mh-title">สร้างฮีโร่ของหนู</h1>
+        <h1 className="mh-title">{claim ? `สวัสดี ${claim.student!.first}! เลือกฮีโร่ของหนู` : 'สร้างฮีโร่ของหนู'}</h1>
       </div>
 
       <div className="mh-card mh-create">

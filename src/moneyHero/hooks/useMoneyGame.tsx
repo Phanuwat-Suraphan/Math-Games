@@ -9,6 +9,7 @@ import {
   type Settings,
 } from '../engine/progress'
 import { badgeById } from '../data/badges'
+import { recoveryMatches, type Classroom } from '../engine/classroom'
 import { setSoundEnabled } from '../utils/sound'
 import { setMusicEnabled, wantMusic } from '../utils/music'
 import { setSpeechEnabled } from '../utils/speech'
@@ -34,6 +35,15 @@ interface GameApi {
   /** แก้ไขผู้เล่นปัจจุบัน แล้วตรวจตราใหม่ให้อัตโนมัติ */
   updatePlayer: (fn: (p: Player) => Player, extraBadges?: string[]) => void
   updateSettings: (patch: Partial<Settings>) => void
+  /** แก้ข้อมูลทั้งก้อน (ทะเบียนนักเรียน นำเข้าไฟล์สำรอง) */
+  updateSave: (fn: (s: SaveData) => SaveData) => void
+  updateClassroom: (patch: Partial<Classroom>) => void
+  /** ปลดล็อกหน้าครูแล้วหรือยัง (ไม่ได้ตั้งรหัสครู = เปิดเสมอ) */
+  teacherOk: boolean
+  unlockTeacher: (pin: string) => boolean
+  unlockWithRecovery: (code: string) => boolean
+  lockTeacher: () => void
+  /** ลบผู้เล่นทุกคน (การตั้งค่าและข้อมูลห้องเรียนยังอยู่) */
   resetAll: () => void
   toasts: Toast[]
   pushToast: (icon: string, text: string) => void
@@ -41,14 +51,28 @@ interface GameApi {
 
 const GameContext = createContext<GameApi | null>(null)
 
+/** ปลดล็อกหน้าครูค้างไว้ในแท็บนี้ (ปิดแท็บแล้วต้องใส่รหัสใหม่) */
+const TEACHER_FLAG = 'moneyHero.teacher'
+
+function readTeacherFlag(): boolean {
+  try {
+    return globalThis.sessionStorage?.getItem(TEACHER_FLAG) === '1'
+  } catch {
+    return false
+  }
+}
+
 export function GameProvider({ children }: { children?: ReactNode }) {
   const [save, setSave] = useState<SaveData>(() => loadSave())
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastId = useRef(0)
+  const [unlocked, setUnlocked] = useState(() => readTeacherFlag())
+  const warnedFull = useRef(false)
 
+  // ขอให้เบราว์เซอร์เก็บข้อมูลของเกมไว้ถาวร (ไม่ลบเองเมื่อเครื่องเหลือพื้นที่น้อย)
   useEffect(() => {
-    writeSave(save)
-  }, [save])
+    void navigator.storage?.persist?.().catch(() => false)
+  }, [])
 
   useEffect(() => {
     setSoundEnabled(save.settings.sound)
@@ -64,6 +88,18 @@ export function GameProvider({ children }: { children?: ReactNode }) {
     setToasts((list) => [...list.slice(-2), { id, icon, text }])
     window.setTimeout(() => setToasts((list) => list.filter((t) => t.id !== id)), 3200)
   }, [])
+
+  useEffect(() => {
+    if (writeSave(save)) {
+      warnedFull.current = false
+      return
+    }
+    // บันทึกไม่ได้ (พื้นที่เต็ม หรือเบราว์เซอร์ปิดการเก็บข้อมูล) เตือนครั้งเดียว
+    if (!warnedFull.current) {
+      warnedFull.current = true
+      pushToast('⚠️', 'บันทึกข้อมูลในเครื่องไม่ได้ ให้คุณครูดาวน์โหลดไฟล์สำรองไว้ก่อน')
+    }
+  }, [save])
 
   const createPlayer = useCallback((name: string, avatar: string) => {
     const p = newPlayer(name, avatar)
@@ -112,8 +148,56 @@ export function GameProvider({ children }: { children?: ReactNode }) {
   }, [])
 
   const resetAll = useCallback(() => {
-    setSave((s) => ({ version: 1, players: {}, activeId: null, settings: s.settings }))
+    setSave((s) => ({ version: 1, players: {}, activeId: null, settings: s.settings, classroom: s.classroom }))
   }, [])
+
+  const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {
+    setSave((s) => {
+      const next = fn(s)
+      return next.activeId && !next.players[next.activeId] ? { ...next, activeId: null } : next
+    })
+  }, [])
+
+  const setTeacher = useCallback((on: boolean) => {
+    setUnlocked(on)
+    try {
+      if (on) globalThis.sessionStorage?.setItem(TEACHER_FLAG, '1')
+      else globalThis.sessionStorage?.removeItem(TEACHER_FLAG)
+    } catch {
+      // เปิดแบบไม่ให้เก็บข้อมูล: จำไว้เฉพาะในหน้านี้
+    }
+  }, [])
+
+  const updateClassroom = useCallback(
+    (patch: Partial<Classroom>) => {
+      setSave((s) => ({ ...s, classroom: { ...s.classroom, ...patch } }))
+      // ครูเพิ่งตั้งรหัสจากหน้าครู: ยังอยู่ในหน้าครูต่อได้ ไม่ต้องใส่รหัสซ้ำทันที
+      if (patch.pin) setTeacher(true)
+    },
+    [setTeacher],
+  )
+
+  const unlockTeacher = useCallback(
+    (pin: string) => {
+      const ok = pin === save.classroom.pin
+      if (ok) setTeacher(true)
+      return ok
+    },
+    [save.classroom.pin, setTeacher],
+  )
+
+  const unlockWithRecovery = useCallback(
+    (code: string) => {
+      if (!recoveryMatches(save.classroom, code)) return false
+      setSave((s) => ({ ...s, classroom: { ...s.classroom, pin: '', recovery: '' } }))
+      setTeacher(true)
+      return true
+    },
+    [save.classroom, setTeacher],
+  )
+
+  const lockTeacher = useCallback(() => setTeacher(false), [setTeacher])
+  const teacherOk = save.classroom.pin === '' || unlocked
 
   const api = useMemo<GameApi>(
     () => ({
@@ -125,11 +209,33 @@ export function GameProvider({ children }: { children?: ReactNode }) {
       deletePlayer,
       updatePlayer,
       updateSettings,
+      updateSave,
+      updateClassroom,
+      teacherOk,
+      unlockTeacher,
+      unlockWithRecovery,
+      lockTeacher,
       resetAll,
       toasts,
       pushToast,
     }),
-    [save, createPlayer, selectPlayer, deletePlayer, updatePlayer, updateSettings, resetAll, toasts, pushToast],
+    [
+      save,
+      createPlayer,
+      selectPlayer,
+      deletePlayer,
+      updatePlayer,
+      updateSettings,
+      updateSave,
+      updateClassroom,
+      teacherOk,
+      unlockTeacher,
+      unlockWithRecovery,
+      lockTeacher,
+      resetAll,
+      toasts,
+      pushToast,
+    ],
   )
 
   return <GameContext.Provider value={api}>{children}</GameContext.Provider>

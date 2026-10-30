@@ -28,11 +28,16 @@ import { EcoPage } from './pages/EcoPage'
 import { ChangePage } from './pages/ChangePage'
 import { KadPage } from './kad/KadPage'
 import { KadClassPage } from './kad/KadClassPage'
+import { RosterPage } from './pages/RosterPage'
+import { ClassSettingsPage } from './pages/ClassSettingsPage'
+import { RosterPrintPage } from './report/RosterPrint'
+import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
-/** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม */
+/** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
 function NeedPlayer({ children }: { children: JSX.Element }) {
   const { player } = useGame()
-  return player ? children : <Navigate to="/start" replace />
+  if (!player) return <Navigate to="/start" replace />
+  return player.needsAvatar ? <Navigate to="/create?for=me" replace /> : children
 }
 
 function Toasts() {
@@ -197,7 +202,38 @@ export default function App() {
               }
             />
             <Route path="/sandbox" element={<SandboxPage />} />
-            <Route path="/teacher" element={<TeacherPage />} />
+            <Route
+              path="/teacher"
+              element={
+                <TeacherGate>
+                  <TeacherPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/students"
+              element={
+                <TeacherGate>
+                  <RosterPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/settings"
+              element={
+                <TeacherGate>
+                  <ClassSettingsPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/roster"
+              element={
+                <TeacherGate>
+                  <RosterPrintPage />
+                </TeacherGate>
+              }
+            />
             <Route path="/kad" element={<KadPage />} />
             <Route path="/plan/print" element={<PlanPrintPage />} />
             <Route path="/duel" element={<DuelPage />} />
@@ -205,6 +241,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>
           <Toasts />
+          <TeacherAutoLock />
         </div>
       </HashRouter>
     </GameProvider>

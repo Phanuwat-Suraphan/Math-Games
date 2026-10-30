@@ -51,6 +51,9 @@ const road = load('engine/starRoad.js')
 const budget = load('engine/budget.js')
 const duel = load('engine/duel.js')
 const album = load('engine/album.js')
+const classroom = load('engine/classroom.js')
+const roster = load('engine/roster.js')
+const backup = load('engine/backup.js')
 
 let passed = 0
 const failures = []
@@ -586,7 +589,9 @@ test('แผงคุณครู: ค่าเฉลี่ยทั้งห้
   assert(csv.charCodeAt(0) === 0xfeff, 'CSV ต้องขึ้นต้นด้วย BOM ให้ Excel อ่านภาษาไทยได้')
   const lines = csv.slice(1).split('\r\n')
   eq(lines.length, 4, 'จำนวนบรรทัด CSV')
-  assert(lines[1].startsWith('"เอ, ""ก"""'), `ชื่อที่มีจุลภาคและอัญประกาศต้องถูกครอบ: ${lines[1].slice(0, 20)}`)
+  assert(lines[1].startsWith(',,"เอ, ""ก""",,"เอ, ""ก""",'), `ชื่อที่มีจุลภาคและอัญประกาศต้องถูกครอบ: ${lines[1].slice(0, 30)}`)
+  assert(lines[0].startsWith('เลขที่,เลขประจำตัว,ชื่อ - สกุล,ห้อง,ชื่อในเกม,สถานะการเข้าร่วม,'), `CSV ขึ้นต้นด้วยข้อมูลทะเบียน: ${lines[0].slice(0, 60)}`)
+  assert(lines[0].includes('ผลการประเมิน (เกณฑ์ร้อยละ 70)') && lines[1].includes(',ผ่าน,'), 'CSV มีผลการประเมินตามเกณฑ์ (เอได้ 18/20 = 90% ผ่าน)')
   const cols = lines[0].split(',').length
   for (const l of lines.slice(2)) eq(l.split(',').length, cols, 'จำนวนคอลัมน์ต้องเท่ากันทุกแถว')
   assert(lines[0].includes('กาดรักษ์โลก: ยอดขายสะสม (บาท)'), 'CSV ต้องมีผลกาดรักษ์โลก')
@@ -1510,6 +1515,212 @@ test('หลักสูตร ป.3: คูณ หารเงินเป็�
   // วิธีคิดของการคูณ หาร บาทล้วน ไม่พูดถึงสตางค์
   assert(!gens.generate('multiply', 3)[0].explain.join(' ').includes('สตางค์'), 'วิธีคิดการคูณไม่ต้องมีสตางค์')
   assert(!gens.generate('divide', 3)[0].explain.join(' ').includes('สตางค์'), 'วิธีคิดการหารไม่ต้องมีสตางค์')
+})
+
+/* ------------------------------------------------------------------ */
+/* ห้องเรียน: ทะเบียนนักเรียน เกณฑ์ รหัสครู ไฟล์สำรอง                     */
+/* ------------------------------------------------------------------ */
+
+test('ทะเบียนนักเรียน: อ่านรายชื่อจาก Excel (แท็บ) และ CSV (มีหัวตาราง/อัญประกาศ/ชื่อ-สกุลช่องเดียว)', () => {
+  // วางจาก Excel: คั่นด้วยแท็บ มีหัวตาราง
+  const tsv = 'เลขที่\tเลขประจำตัว\tคำนำหน้า\tชื่อ\tนามสกุล\tชื่อเล่น\n1\t10231\tด.ช.\tสมชาย\tใจดี\tต้นกล้า\n2\t10232\tด.ญ.\tมะลิ\tรักเรียน\t\n'
+  const a = roster.readRoster(tsv, 'ป.3/1')
+  eq(a.errors.length, 0, `ไม่มีข้อผิดพลาด ${a.errors}`)
+  eq(a.rows.length, 2, 'สองคน')
+  eq(a.rows[0].first, 'สมชาย', 'ชื่อ')
+  eq(a.rows[0].last, 'ใจดี', 'นามสกุล')
+  eq(a.rows[0].prefix, 'ด.ช.', 'คำนำหน้า')
+  eq(a.rows[0].code, '10231', 'เลขประจำตัว')
+  eq(a.rows[0].no, 1, 'เลขที่')
+  eq(a.rows[0].nick, 'ต้นกล้า', 'ชื่อเล่น')
+  eq(a.rows[1].room, 'ป.3/1', 'ไม่มีคอลัมน์ห้อง ใช้ห้องเริ่มต้น')
+  // CSV จาก Excel ภาษาไทย: มี BOM, ชื่อ-สกุลช่องเดียว, ช่องมีจุลภาคในอัญประกาศ, CRLF
+  const csv = '﻿ที่,ชื่อ - สกุล,ห้อง,หมายเหตุ\r\n3,เด็กหญิงพลอย ใสสะอาด,ป.3/2,"ย้ายมา, เทอม 2"\r\n4,"ด.ช.ภูมิ แสงทอง",ป.3/2,\r\n'
+  const b = roster.readRoster(csv, 'ป.3/1')
+  eq(b.rows.length, 2, 'CSV สองคน')
+  eq(b.rows[0].prefix, 'ด.ญ.', '"เด็กหญิง" ย่อเป็น ด.ญ.')
+  eq(b.rows[0].first, 'พลอย', 'แยกชื่อจากชื่อ-สกุล')
+  eq(b.rows[0].last, 'ใสสะอาด', 'แยกนามสกุล')
+  eq(b.rows[0].room, 'ป.3/2', 'ใช้ห้องในไฟล์')
+  eq(b.rows[1].first, 'ภูมิ', 'ช่องในอัญประกาศ')
+  eq(b.rows[1].no, 4, 'เลขที่จากคอลัมน์ "ที่"')
+  // ไม่มีหัวตาราง: เลขที่ | ชื่อ-สกุล
+  const c = roster.readRoster('5\tด.ช.กล้า หาญ\n6\tด.ญ.ฝน ชุ่มฉ่ำ', 'ป.3/1')
+  eq(c.rows.length, 2, 'ไม่มีหัวตารางก็อ่านได้')
+  eq(c.rows[1].first, 'ฝน', 'ชื่อแถวที่สอง')
+  eq(c.rows[1].no, 6, 'เลขที่แถวที่สอง')
+  // ข้อผิดพลาด: แถวไม่มีชื่อ และเลขประจำตัวซ้ำ
+  const d = roster.readRoster('เลขที่,เลขประจำตัว,ชื่อ\n1,111,ก้อง\n2,,\n3,111,ก้องซ้ำ', 'ป.3/1')
+  eq(d.rows.length, 1, 'คนซ้ำนับเป็นคนเดียว')
+  eq(d.rows[0].first, 'ก้องซ้ำ', 'ซ้ำ: ใช้แถวหลัง')
+  assert(d.errors.some((e) => e.includes('แถว 4') && e.includes('ซ้ำ')), `แจ้งแถวซ้ำ: ${d.errors}`)
+  // ไม่มีคอลัมน์ชื่อ
+  eq(roster.readRoster('เลขที่,ห้อง\n1,ป.3/1', 'ป.3/1').rows.length, 0, 'ไม่มีคอลัมน์ชื่อ อ่านไม่ได้')
+  // แบบฟอร์มที่ดาวน์โหลดไป อ่านกลับได้
+  const t = roster.readRoster(roster.rosterTemplate('ป.3/1'), 'ป.3/1')
+  eq(t.rows.length, 2, 'แบบฟอร์มอ่านกลับได้')
+  eq(t.errors.length, 0, 'แบบฟอร์มไม่มีข้อผิดพลาด')
+})
+
+test('ทะเบียนนักเรียน: นำเข้าซ้ำไม่สร้างคนซ้ำ คะแนนเดิมไม่หาย และรหัสผู้เล่นเหมือนกันทุกเครื่อง', () => {
+  const rows = roster.readRoster('เลขที่,เลขประจำตัว,ชื่อ,นามสกุล,ชื่อเล่น\n1,10231,สมชาย,ใจดี,ต้นกล้า\n2,10232,มะลิ,รักเรียน,', 'ป.3/1').rows
+  const first = roster.applyRoster({}, rows, 1000)
+  eq(first.added, 2, 'เพิ่มสองคน')
+  const ids = Object.keys(first.players).sort()
+  eq(ids.join(), 'st-c_10231,st-c_10232', 'รหัสผู้เล่นมาจากเลขประจำตัว')
+  const tonkla = first.players['st-c_10231']
+  eq(tonkla.name, 'ต้นกล้า', 'ชื่อในเกมใช้ชื่อเล่น')
+  eq(first.players['st-c_10232'].name, 'มะลิ', 'ไม่มีชื่อเล่นใช้ชื่อจริง')
+  assert(tonkla.needsAvatar === true, 'ยังไม่ได้เลือกตัวละคร')
+  // นักเรียนเล่นไปแล้ว แล้วครูนำเข้ารายชื่อชุดใหม่ (แก้นามสกุล)
+  const played = { ...first.players, 'st-c_10231': { ...tonkla, exp: 99, preTest: { score: 9, total: 18, timeMs: 1, at: 5, skills: progress.emptyTestSkills() } } }
+  const rows2 = roster.readRoster('เลขที่,เลขประจำตัว,ชื่อ,นามสกุล\n1,10231,สมชาย,ใจงาม\n3,10233,ฟ้า,ใส', 'ป.3/1').rows
+  const second = roster.applyRoster(played, rows2, 2000)
+  eq(second.added, 1, 'เพิ่มเฉพาะคนใหม่')
+  eq(second.updated, 1, 'ปรับข้อมูลคนเดิม')
+  eq(Object.keys(second.players).length, 3, 'รวมสามคน')
+  eq(second.players['st-c_10231'].student.last, 'ใจงาม', 'นามสกุลใหม่')
+  eq(second.players['st-c_10231'].exp, 99, 'คะแนนเดิมอยู่ครบ')
+  eq(second.players['st-c_10231'].preTest.score, 9, 'ผลก่อนเรียนเดิมอยู่ครบ')
+  eq(second.players['st-c_10231'].name, 'ต้นกล้า', 'ชื่อเล่นเดิมไม่หาย')
+  // เครื่องอื่นนำเข้าไฟล์เดียวกัน ได้รหัสผู้เล่นเดียวกัน
+  const other = roster.applyRoster({}, rows, 5555)
+  eq(Object.keys(other.players).sort().join(), ids.join(), 'รหัสเหมือนกันทุกเครื่อง')
+  // ไม่มีเลขประจำตัว: ใช้ห้อง+เลขที่
+  const noCode = roster.applyRoster({}, roster.readRoster('เลขที่,ชื่อ\n7,ข้าว', 'ป.3/1').rows)
+  eq(Object.keys(noCode.players)[0], 'st-r_ป_3_1_7', 'รหัสจากห้องและเลขที่')
+  // เรียงตามเลขที่ และชื่อบนจอนักเรียนไม่แสดงนามสกุล/เลขประจำตัว
+  const list = roster.rosterList(second.players)
+  eq(list.map((p) => p.student.no).join(), '1,2,3', 'เรียงตามเลขที่')
+  eq(classroom.publicName(list[0]), 'เลขที่ 1 · ต้นกล้า', 'ชื่อที่เพื่อนเห็น')
+  assert(!classroom.publicName(list[0]).includes('ใจงาม') && !classroom.publicName(list[0]).includes('10231'), 'ไม่แสดงนามสกุลและเลขประจำตัวต่อเพื่อน')
+  eq(classroom.teacherName(list[0]), 'สมชาย ใจงาม', 'ชื่อเต็มสำหรับครู')
+})
+
+test('สถานะการเข้าร่วม และเกณฑ์ผ่าน/เป้าหมายที่ครูตั้งเอง (คำนวณแบบจำนวนเต็ม ไม่คลาดเคลื่อน)', () => {
+  const mk = (pre, post, played) => {
+    const p = progress.newPlayer('x', 'hero', 1)
+    if (pre !== null) p.preTest = { score: pre, total: 20, timeMs: 1, at: 1, skills: progress.emptyTestSkills() }
+    if (post !== null) p.postTest = { score: post, total: 20, timeMs: 1, at: 2, skills: progress.emptyTestSkills() }
+    if (played) p.answered = 5
+    return p
+  }
+  const none = mk(null, null, false)
+  eq(roster.participation(none), 'none', 'ยังไม่เริ่ม')
+  eq(roster.participation(mk(8, null, false)), 'pre', 'ทำก่อนเรียนแล้ว')
+  eq(roster.participation(mk(8, null, true)), 'game', 'กำลังเล่นภารกิจ')
+  eq(roster.participation(mk(8, 15, true)), 'post', 'ทำหลังเรียนแล้ว')
+  // 14/20 = 70% พอดีต้องผ่านเกณฑ์ 70
+  eq(report.passedPost(mk(8, 14, true), 70), true, '14/20 ผ่านเกณฑ์ 70% พอดี')
+  eq(report.passedPost(mk(8, 13, true), 70), false, '13/20 ไม่ผ่าน')
+  eq(report.passedPost(mk(8, null, true), 70), null, 'ยังไม่ทำหลังเรียน')
+  eq(report.passedPost(mk(8, 15, true), 80), false, 'ครูตั้งเกณฑ์ 80%: 15/20 ไม่ผ่าน')
+  // ห้อง 7 คน ผ่าน 6 คน = 85.71% ≥ 80 บรรลุเป้าหมาย
+  const room = [mk(5, 20, true), mk(5, 18, true), mk(5, 16, true), mk(5, 14, true), mk(5, 15, true), mk(5, 17, true), mk(5, 10, true)]
+  const prog = report.classProgress(room, { passPercent: 70, targetPercent: 80 })
+  eq(prog.total, 7, 'นักเรียนทั้งหมด')
+  eq(prog.passed, 6, 'ผ่านเกณฑ์')
+  eq(prog.passRate, 85.71, 'ร้อยละที่ผ่าน (ทศนิยม 2 ตำแหน่ง)')
+  eq(report.fixed2(prog.passRate), '85.71', 'แสดงทศนิยม 2 ตำแหน่ง')
+  eq(prog.targetMet, true, 'บรรลุเป้าหมาย 80%')
+  eq(report.classProgress(room, { passPercent: 70, targetPercent: 90 }).targetMet, false, 'เป้าหมาย 90% ยังไม่บรรลุ')
+  // ยังไม่มีใครทำหลังเรียน: ยังสรุปเป้าหมายไม่ได้
+  const early = report.classProgress([mk(5, null, true), none], { passPercent: 70, targetPercent: 80 })
+  eq(early.targetMet, null, 'ยังไม่มีผลหลังเรียน')
+  eq(early.preDone, 1, 'ทำก่อนเรียน 1 คน')
+  eq(early.played, 1, 'เล่นเกม 1 คน')
+  eq(report.classProgress([], { passPercent: 70, targetPercent: 80 }).passRate, null, 'ห้องว่าง')
+})
+
+test('ตั้งค่าห้องเรียน: ค่าเริ่มต้น 70/80 ซ่อมค่าผิดรูป รหัสครู และรหัสสำรอง', () => {
+  const d = classroom.repairClassroom(undefined)
+  eq(d.passPercent, 70, 'เกณฑ์ผ่านเริ่มต้น')
+  eq(d.targetPercent, 80, 'เป้าหมายเริ่มต้น')
+  eq(d.pin, '', 'ยังไม่มีรหัสครู')
+  const bad = classroom.repairClassroom({ passPercent: 140, targetPercent: 'x', pin: '12', school: '  โรงเรียนบ้านดอน  ' })
+  eq(bad.passPercent, 70, 'เกิน 100 ใช้ค่าเริ่มต้น')
+  eq(bad.targetPercent, 80, 'ไม่ใช่ตัวเลขใช้ค่าเริ่มต้น')
+  eq(bad.pin, '', 'รหัสสั้นเกินไม่รับ')
+  eq(bad.school, 'โรงเรียนบ้านดอน', 'ตัดช่องว่าง')
+  eq(classroom.repairClassroom({ passPercent: 60, pin: '2468', recovery: 'ABCD-EFGH' }).passPercent, 60, 'รับค่าที่ครูตั้ง')
+  assert(classroom.validPin('2468') && classroom.validPin('135790') && !classroom.validPin('12a4') && !classroom.validPin('123'), 'รหัสครูเป็นตัวเลข 4–6 หลัก')
+  const code = classroom.newRecoveryCode(() => 0.5)
+  assert(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code), `รูปแบบรหัสสำรอง ${code}`)
+  const c = { ...d, pin: '2468', recovery: code }
+  assert(classroom.recoveryMatches(c, code.toLowerCase().replace('-', ' ')), 'รหัสสำรองพิมพ์เล็ก/เว้นวรรคก็ได้')
+  assert(!classroom.recoveryMatches(c, 'WRONG-CODE'), 'รหัสสำรองผิด')
+  assert(!classroom.recoveryMatches({ ...d, recovery: '' }, ''), 'ไม่มีรหัสสำรองใช้ไม่ได้')
+  eq(classroom.termLine({ ...d, term: '2', year: '2569' }), 'ภาคเรียนที่ 2 ปีการศึกษา 2569', 'บรรทัดภาคเรียน')
+  eq(classroom.thaiDate(new Date(2026, 9, 30, 12).getTime()), '30 ตุลาคม พ.ศ. 2569', 'วันที่แบบไทย')
+  // ข้อมูลเก่า (ไม่มีห้องเรียน/ทะเบียน) เปิดได้ และได้ค่าเริ่มต้น
+  const old = progress.parseSave(JSON.stringify({ version: 1, players: { a: { id: 'a', name: 'เก่า' } }, activeId: 'a', settings: {} }))
+  eq(old.classroom.passPercent, 70, 'ไฟล์เก่าได้เกณฑ์เริ่มต้น')
+  eq(old.players.a.student, undefined, 'ผู้เล่นเก่าไม่มีทะเบียน')
+  eq(old.activeId, 'a', 'ผู้เล่นเก่ายังเล่นต่อได้')
+  // ข้อมูลทะเบียนเสียบางส่วน
+  const broken = progress.parseSave(JSON.stringify({ version: 1, players: { b: { id: 'b', name: 'บี', student: { first: '', no: 'x' } }, c: { id: 'c', name: 'ซี', student: { first: 'ซี', no: '12', room: 'ป.3/1' } } } }))
+  eq(broken.players.b.student, undefined, 'ทะเบียนไม่มีชื่อ ไม่รับ')
+  eq(broken.players.c.student.no, 12, 'เลขที่จากข้อความ')
+})
+
+test('ไฟล์สำรอง: บันทึกแล้วอ่านกลับได้ครบ รวมสองเครื่องได้ผลถูก และนำเข้าไฟล์เดิมซ้ำคะแนนไม่เพิ่มซ้ำ', () => {
+  const rows = roster.readRoster('เลขที่,เลขประจำตัว,ชื่อ\n1,501,ก้อง\n2,502,ข้าว', 'ป.3/1').rows
+  const base = progress.emptySave()
+  base.classroom = { ...base.classroom, school: 'โรงเรียนทดสอบ', pin: '2468', recovery: 'ABCD-EFGH' }
+  base.players = roster.applyRoster({}, rows, 100).players
+  // อ่านกลับ
+  const text = backup.buildBackup(base, 12345)
+  const read = backup.readBackup(text)
+  assert(read, 'อ่านไฟล์สำรองได้')
+  eq(read.exportedAt, 12345, 'เวลาที่บันทึก')
+  eq(Object.keys(read.save.players).length, 2, 'นักเรียนครบ')
+  eq(read.save.classroom.school, 'โรงเรียนทดสอบ', 'ข้อมูลห้องเรียนครบ')
+  eq(backup.readBackup('{"hello":1}'), null, 'ไฟล์อื่นไม่รับ')
+  eq(backup.readBackup('ไม่ใช่ JSON'), null, 'ไฟล์เสียไม่รับ')
+  assert(backup.readBackup(JSON.stringify(base)), 'รับข้อมูลดิบจากที่เก็บในเครื่องได้')
+  // เครื่อง A: ก้องเล่นด่าน 0–1 ทำก่อนเรียน · เครื่อง B: ก้องเล่นด่าน 2 ทำหลังเรียน ข้าวเล่นด่าน 0
+  const kong = base.players['st-c_501']
+  const lv = (stepDone, bestStars, plays) => ({ ...progress.emptyLevel(), stepDone, bestStars, plays })
+  const pre = { score: 9, total: 20, timeMs: 1, at: 1000, skills: progress.emptyTestSkills() }
+  const post = { score: 18, total: 20, timeMs: 1, at: 9000, skills: progress.emptyTestSkills() }
+  const A = { ...base, players: { ...base.players, 'st-c_501': { ...kong, needsAvatar: undefined, avatar: 'wizard', lastPlayed: 2000, exp: 50, answered: 20, badges: ['pretest'], preTest: pre, levels: { 0: lv(4, 3, 1), 1: lv(4, 2, 2) }, skills: { ...kong.skills, count: { attempts: 10, correct: 8, timeMs: 5 } }, mistakes: [{ at: 1500, levelId: 1, gen: 'g1', difficulty: 1, skill: 'count', title: 't' }] } } }
+  const B0 = progress.emptySave()
+  const kongB = { ...kong, needsAvatar: undefined, avatar: 'wizard', lastPlayed: 9000, exp: 80, answered: 15, badges: ['posttest'], postTest: post, levels: { 1: lv(4, 3, 1), 2: lv(2, 0, 1) }, skills: { ...kong.skills, count: { attempts: 6, correct: 6, timeMs: 3 } }, mistakes: [{ at: 8000, levelId: 2, gen: 'g2', difficulty: 1, skill: 'count', title: 't' }] }
+  const khao = { ...base.players['st-c_502'], needsAvatar: undefined, avatar: 'ninja', lastPlayed: 7000, answered: 4, levels: { 0: lv(4, 1, 1) } }
+  const B = { ...B0, players: { 'st-c_501': kongB, 'st-c_502': khao } }
+  const m = backup.mergeSaves(A, backup.readBackup(backup.buildBackup(B)).save)
+  eq(m.added, 0, 'ไม่มีคนใหม่ (ทั้งสองคนอยู่ในทะเบียนแล้ว)')
+  eq(m.merged, 2, 'รวมผลสองคน')
+  const k = m.save.players['st-c_501']
+  eq(k.preTest.score, 9, 'ผลก่อนเรียนจากเครื่อง A')
+  eq(k.postTest.score, 18, 'ผลหลังเรียนจากเครื่อง B')
+  eq(Object.keys(k.levels).sort().join(), '0,1,2', 'ด่านจากทั้งสองเครื่อง')
+  eq(k.levels[1].bestStars, 3, 'ดาวที่ดีที่สุดของด่าน 1')
+  eq(k.levels[1].plays, 2, 'จำนวนครั้งที่เล่น (ค่าสูงสุด)')
+  eq(k.exp, 80, 'EXP สูงสุด')
+  eq(k.skills.count.attempts, 10, 'สถิติทักษะใช้ชุดที่ทำมากกว่า')
+  eq(k.skills.count.correct, 8, 'ถูก/ทั้งหมดมาจากชุดเดียวกัน')
+  eq(k.badges.sort().join(), 'posttest,pretest', 'ตรารวมกัน')
+  eq(k.mistakes.length, 2, 'ข้อที่เคยผิดรวมกัน')
+  eq(k.lastPlayed, 9000, 'เล่นล่าสุด')
+  eq(m.save.players['st-c_502'].avatar, 'ninja', 'ข้าวได้ตัวละครที่เลือกบนเครื่อง B')
+  eq(m.save.players['st-c_502'].needsAvatar, undefined, 'ข้าวเลือกตัวละครแล้ว')
+  eq(m.save.classroom.pin, '2468', 'เครื่องครูตั้งค่าแล้ว ใช้ของเครื่องครู')
+  // นำเข้าไฟล์เดิมซ้ำ: ผลเหมือนเดิม
+  const again = backup.mergeSaves(m.save, B)
+  eq(JSON.stringify(again.save.players), JSON.stringify(m.save.players), 'นำเข้าซ้ำ คะแนนไม่เพิ่มซ้ำ')
+  // เครื่องใหม่ที่ยังไม่ได้ตั้งค่า รับการตั้งค่าห้องเรียนจากไฟล์
+  const fresh = backup.mergeSaves(progress.emptySave(), A)
+  eq(fresh.added, 2, 'เครื่องใหม่ได้นักเรียนครบ')
+  eq(fresh.save.classroom.school, 'โรงเรียนทดสอบ', 'รับการตั้งค่าห้องเรียนจากไฟล์')
+  // ผู้เล่นที่สร้างเองชื่อซ้ำกันคนละเครื่อง (รหัสต่างกัน) ไม่ถูกรวมเป็นคนเดียว
+  const x1 = progress.newPlayer('มิว', 'hero', 1)
+  const x2 = { ...progress.newPlayer('มิว', 'hero', 2), id: x1.id + 'b' }
+  const mm = backup.mergeSaves({ ...progress.emptySave(), players: { [x1.id]: x1 } }, { ...progress.emptySave(), players: { [x2.id]: x2 } })
+  eq(mm.added, 1, 'คนละคน ไม่รวมกัน')
+  // ชื่อไฟล์
+  const name = backup.backupFileName(base, new Date(2026, 9, 30, 9, 5))
+  eq(name, 'money-hero-สำรอง-ป.3-2026-10-30-0905.json', 'ชื่อไฟล์สำรอง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

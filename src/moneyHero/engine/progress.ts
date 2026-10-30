@@ -7,6 +7,7 @@ import { emptyDaily, type DailyRecord } from './daily'
 import { earn, type LedgerEntry } from './ledger'
 import { ecoStage, emptyEco, type EcoRecord } from './eco'
 import { emptyPlan, type PlanRecord } from './budget'
+import { DEFAULT_CLASSROOM, repairClassroom, repairStudent, type Classroom, type StudentInfo } from './classroom'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -101,6 +102,10 @@ export interface Player {
   plan: PlanRecord
   /** สมุดสะสมเงินไทย: สติกเกอร์ของเงินแต่ละชนิดที่ได้แล้ว */
   album: DenomId[]
+  /** ข้อมูลทะเบียนนักเรียน (ครูนำเข้า) ไม่มี = ผู้เล่นที่สร้างเองในเครื่อง */
+  student?: StudentInfo
+  /** นักเรียนในทะเบียนที่ยังไม่ได้เลือกตัวละคร (เลือกตอนเข้าเกมครั้งแรก) */
+  needsAvatar?: boolean
   mapX?: number
   mapY?: number
 }
@@ -121,6 +126,8 @@ export interface SaveData {
   players: Record<string, Player>
   activeId: string | null
   settings: Settings
+  /** ข้อมูลห้องเรียนของครู: โรงเรียน เกณฑ์ผ่าน รหัสครู */
+  classroom: Classroom
 }
 
 export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, readAloud: false, reduceMotion: false, bigText: false }
@@ -178,7 +185,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
 }
 
 export function emptySave(): SaveData {
-  return { version: 1, players: {}, activeId: null, settings: { ...DEFAULT_SETTINGS } }
+  return { version: 1, players: {}, activeId: null, settings: { ...DEFAULT_SETTINGS }, classroom: { ...DEFAULT_CLASSROOM } }
 }
 
 /** ซ่อมข้อมูลที่ขาดหาย (เช่นบันทึกจากเวอร์ชันเก่า) ให้ใช้งานต่อได้ */
@@ -189,7 +196,18 @@ function repairPlayer(raw: Partial<Player>): Player | null {
   for (const s of SKILLS) if (raw.skills?.[s]) skills[s] = { ...skills[s], ...raw.skills[s] }
   const levels: Record<number, LevelRecord> = {}
   for (const [k, v] of Object.entries(raw.levels ?? {})) levels[Number(k)] = { ...emptyLevel(), ...v }
-  return { ...base, ...raw, id: raw.id, skills, levels, eco: { ...emptyEco(), ...(raw.eco ?? {}) }, plan: { ...emptyPlan(), ...(raw.plan ?? {}) } } as Player
+  const student = repairStudent(raw.student)
+  return {
+    ...base,
+    ...raw,
+    id: raw.id,
+    skills,
+    levels,
+    eco: { ...emptyEco(), ...(raw.eco ?? {}) },
+    plan: { ...emptyPlan(), ...(raw.plan ?? {}) },
+    student,
+    needsAvatar: raw.needsAvatar === true ? true : undefined,
+  } as Player
 }
 
 export function parseSave(text: string | null): SaveData {
@@ -198,6 +216,7 @@ export function parseSave(text: string | null): SaveData {
     const data = JSON.parse(text) as Partial<SaveData>
     const save = emptySave()
     save.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) }
+    save.classroom = repairClassroom(data.classroom)
     for (const raw of Object.values(data.players ?? {})) {
       const p = repairPlayer(raw as Partial<Player>)
       if (p) save.players[p.id] = p

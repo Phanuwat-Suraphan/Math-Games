@@ -14,6 +14,8 @@ import { challengesCleared, stageRecord, stageStars, type StageNo } from './stag
 import { allStars, CHESTS, MAX_STARS } from './starRoad'
 import { PLAN_EVENTS, plannedEvents } from './budget'
 import { LEVELS } from '../data/levels'
+import { teacherName, type Classroom } from './classroom'
+import { participation, PARTICIPATION_LABEL, hasPlayed } from './roster'
 
 /**
  * รายงานสำหรับคุณครู และไฟล์ CSV
@@ -55,9 +57,14 @@ function csvCell(value: string | number | null): string {
 }
 
 /** สร้างไฟล์ CSV (มี BOM ให้ Excel อ่านภาษาไทยได้) */
-export function buildCsv(players: Player[]): string {
+export function buildCsv(players: Player[], passPercent = 70): string {
   const header = [
-    'ชื่อ',
+    'เลขที่',
+    'เลขประจำตัว',
+    'ชื่อ - สกุล',
+    'ห้อง',
+    'ชื่อในเกม',
+    'สถานะการเข้าร่วม',
     'คะแนนรวม (EXP)',
     'เหรียญ',
     'ดาว',
@@ -68,6 +75,7 @@ export function buildCsv(players: Player[]): string {
     'Pre-test (%)',
     'Post-test (%)',
     'พัฒนาการ (%)',
+    `ผลการประเมิน (เกณฑ์ร้อยละ ${passPercent})`,
     'เวลา Pre-test (นาที)',
     'เวลา Post-test (นาที)',
     ...SKILLS.map((s) => `${SKILL_NAMES[s]} (%)`),
@@ -87,7 +95,12 @@ export function buildCsv(players: Player[]): string {
     'เล่นล่าสุด',
   ]
   const rows = players.map((p) => [
+    p.student?.no ?? null,
+    p.student?.code ?? null,
+    teacherName(p),
+    p.student?.room ?? null,
     p.name,
+    PARTICIPATION_LABEL[participation(p)],
     p.exp,
     p.coins,
     totalStars(p),
@@ -98,6 +111,7 @@ export function buildCsv(players: Player[]): string {
     testPercent(p.preTest),
     testPercent(p.postTest),
     improvement(p),
+    passLabel(p, passPercent),
     p.preTest ? minutes(p.preTest.timeMs) : null,
     p.postTest ? minutes(p.postTest.timeMs) : null,
     ...SKILLS.map((s) => skillPercent(p, s)),
@@ -195,4 +209,56 @@ export function stageTable(p: Player): StageRow[] {
 /** ดาวรวมของเกมวางแผนใช้เงิน (ดาวที่ดีที่สุดของแต่ละงาน) */
 export function planStarsTotal(p: Player): number {
   return Object.values(p.plan?.best ?? {}).reduce((a, b) => a + b, 0)
+}
+
+/* ------------------------------------------------------------------ */
+/* เกณฑ์ผ่านและเป้าหมายของห้อง (ครูตั้งค่าได้)                             */
+/* ------------------------------------------------------------------ */
+
+/** ผ่านเกณฑ์หรือไม่ (ดูจากแบบทดสอบหลังเรียน) null = ยังไม่ได้ทำ */
+export function passedPost(p: Player, passPercent: number): boolean | null {
+  if (!p.postTest) return null
+  // เทียบแบบจำนวนเต็ม (14/20 กับ 70% ต้องผ่านพอดี ไม่ให้ทศนิยมคลาดเคลื่อน)
+  return p.postTest.score * 100 >= passPercent * Math.max(1, p.postTest.total)
+}
+
+export function passLabel(p: Player, passPercent: number): string {
+  const r = passedPost(p, passPercent)
+  return r === null ? '' : r ? 'ผ่าน' : 'ไม่ผ่าน'
+}
+
+export interface ClassProgress {
+  /** นักเรียนทั้งหมด */
+  total: number
+  preDone: number
+  played: number
+  postDone: number
+  /** ผ่านเกณฑ์หลังเรียน */
+  passed: number
+  /** ร้อยละของนักเรียนทั้งห้องที่ผ่านเกณฑ์ (ทศนิยม 2 ตำแหน่ง) */
+  passRate: number | null
+  /** บรรลุเป้าหมายของห้องหรือยัง (null = ยังไม่มีใครทำหลังเรียน) */
+  targetMet: boolean | null
+}
+
+/** สรุปการเข้าร่วมและการผ่านเกณฑ์ของทั้งห้อง ตามเกณฑ์ที่ครูตั้ง */
+export function classProgress(players: Player[], c: Pick<Classroom, 'passPercent' | 'targetPercent'>): ClassProgress {
+  const total = players.length
+  const passed = players.filter((p) => passedPost(p, c.passPercent) === true).length
+  const postDone = players.filter((p) => p.postTest).length
+  const passRate = total === 0 ? null : Math.round((passed / total) * 10000) / 100
+  return {
+    total,
+    preDone: players.filter((p) => p.preTest).length,
+    played: players.filter(hasPlayed).length,
+    postDone,
+    passed,
+    passRate,
+    targetMet: postDone === 0 || passRate === null ? null : passRate >= c.targetPercent,
+  }
+}
+
+/** ตัวเลขทศนิยม 2 ตำแหน่งแบบรายงาน เช่น 85.71 */
+export function fixed2(v: number | null): string {
+  return v === null ? '–' : v.toFixed(2)
 }

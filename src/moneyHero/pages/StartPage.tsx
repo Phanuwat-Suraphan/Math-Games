@@ -7,6 +7,7 @@ import { LogoLetters } from '../components/LogoLetters'
 import { lessonsPassed, totalStars } from '../engine/progress'
 import { TOTAL_LESSONS } from '../data/levels'
 import { playSound } from '../utils/sound'
+import { hasRoster } from '../engine/roster'
 
 /**
  * หน้าเริ่มเกม
@@ -19,10 +20,13 @@ export function StartPage() {
   const navigate = useNavigate()
   // มีผู้เล่นในเครื่องแล้ว ให้เปลี่ยนหรือลบผู้เล่นได้เสมอ
   const hasOthers = Object.keys(save.players).length > 0
+  const roster = hasRoster(save.players)
+  // ครูตั้งให้เลือกชื่อจากทะเบียนเท่านั้น: ซ่อนปุ่มผู้เล่นใหม่
+  const canCreate = !(save.classroom.rosterOnly && roster)
 
   const start = () => {
     playSound('click')
-    navigate(player ? '/map' : '/create')
+    navigate(player ? (player.needsAvatar ? '/create?for=me' : '/map') : roster ? '/players' : '/create')
   }
 
   return (
@@ -56,9 +60,9 @@ export function StartPage() {
       </div>
 
       <div className="mh-start-stage">
-        <h1 className="mh-logo" aria-label="MONEY HERO ปฏิบัติการเมืองเงินทอง">
+        <h1 className="mh-logo" aria-label="MONEY HERO เกมเศรษฐี ตะลุยเมืองเงิน">
           <LogoLetters text="MONEY HERO" />
-          <span className="mh-logo-ribbon">ปฏิบัติการเมืองเงินทอง</span>
+          <span className="mh-logo-ribbon">เกมเศรษฐี ตะลุยเมืองเงิน</span>
         </h1>
 
         <div className="mh-start-cast">
@@ -84,15 +88,17 @@ export function StartPage() {
           <button type="button" className="mh-btn mh-btn-gold mh-btn-xl" onClick={start} data-testid="mh-start">
             ▶ {player ? 'เล่นต่อ' : 'เริ่มเกม'}
           </button>
-          <div className={`mh-start-links ${hasOthers ? '' : 'mh-start-links-one'}`}>
+          <div className={`mh-start-links ${hasOthers && canCreate ? '' : 'mh-start-links-one'}`}>
             {hasOthers && (
-              <Link to="/players" className="mh-btn mh-btn-soft">
-                <Users size={22} /> เปลี่ยนผู้เล่น
+              <Link to="/players" className="mh-btn mh-btn-soft" data-testid="mh-change-player">
+                <Users size={22} /> {roster ? 'เลือกชื่อ / เปลี่ยนคน' : 'เปลี่ยนผู้เล่น'}
               </Link>
             )}
-            <Link to="/create" className="mh-btn mh-btn-soft" data-testid="mh-new-player">
-              <UserPlus size={22} /> ผู้เล่นใหม่
-            </Link>
+            {canCreate && (
+              <Link to="/create" className="mh-btn mh-btn-soft" data-testid="mh-new-player">
+                <UserPlus size={22} /> ผู้เล่นใหม่
+              </Link>
+            )}
           </div>
           <Link to="/teacher" className="mh-btn mh-btn-soft mh-btn-block">
             <GraduationCap size={22} /> โหมดคุณครู

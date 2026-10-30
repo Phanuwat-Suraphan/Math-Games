@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { ArrowLeft, Download, Printer } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Download, Lock, Printer, Settings, Users } from 'lucide-react'
 import type { Skill } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
 import { lessonsPassed, overallAccuracy, pendingMistakes, totalStars, weakSkills, type Player } from '../engine/progress'
-import { buildCsv, classSummary, improvement, minutes, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
+import { buildCsv, classProgress, classSummary, fixed2, improvement, minutes, passLabel, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
+import { compareStudents, teacherName } from '../engine/classroom'
+import { participation, PARTICIPATION_LABEL } from '../engine/roster'
 import { PLAN_EVENTS, plannedEvents } from '../engine/budget'
 import { challengesCleared, stageStars } from '../engine/stages'
 import { allStars, CHESTS, MAX_STARS } from '../engine/starRoad'
@@ -24,8 +26,8 @@ function fmt(v: number | null, suffix = '%'): string {
   return v === null ? '–' : `${v}${suffix}`
 }
 
-function downloadCsv(players: Player[]) {
-  const blob = new Blob([buildCsv(players)], { type: 'text/csv;charset=utf-8' })
+function downloadCsv(players: Player[], passPercent: number) {
+  const blob = new Blob([buildCsv(players, passPercent)], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   const d = new Date()
@@ -38,10 +40,13 @@ function downloadCsv(players: Player[]) {
 }
 
 export function TeacherPage() {
-  const { save } = useGame()
-  const players = useMemo(() => Object.values(save.players).sort((a, b) => a.name.localeCompare(b.name, 'th')), [save.players])
+  const { save, lockTeacher } = useGame()
+  const navigate = useNavigate()
+  const c = save.classroom
+  const players = useMemo(() => Object.values(save.players).sort(compareStudents), [save.players])
   const [openId, setOpenId] = useState<string | null>(null)
   const sum = useMemo(() => classSummary(players), [players])
+  const prog = useMemo(() => classProgress(players, c), [players, c])
   const open = players.find((p) => p.id === openId) ?? null
 
   return (
@@ -53,6 +58,15 @@ export function TeacherPage() {
         </Link>
         <h1 className="mh-title">🍎 แผงคุณครู</h1>
         <div className="mh-teacher-actions">
+          <Link to="/teacher/students" className="mh-btn mh-btn-gold" data-testid="mh-teacher-roster">
+            <Users size={20} /> ทะเบียนนักเรียน
+          </Link>
+          <Link to="/teacher/settings" className="mh-btn mh-btn-gold" data-testid="mh-teacher-settings">
+            <Settings size={20} /> ตั้งค่าห้องเรียน
+          </Link>
+          <Link to="/teacher/print/roster" className="mh-btn mh-btn-soft" data-testid="mh-teacher-print-roster">
+            <Printer size={20} /> รายชื่อ (A4)
+          </Link>
           <Link to="/kad" className="mh-btn mh-btn-go" data-testid="mh-teacher-kad">
             🌱 กาดรักษ์โลก (สื่อพิมพ์)
           </Link>
@@ -68,24 +82,57 @@ export function TeacherPage() {
           <button type="button" className="mh-btn mh-btn-soft" onClick={() => window.print()} disabled={players.length === 0}>
             <Printer size={20} /> พิมพ์
           </button>
-          <button type="button" className="mh-btn mh-btn-gold" onClick={() => downloadCsv(players)} disabled={players.length === 0} data-testid="mh-csv">
+          <button type="button" className="mh-btn mh-btn-gold" onClick={() => downloadCsv(players, c.passPercent)} disabled={players.length === 0} data-testid="mh-csv">
             <Download size={20} /> ดาวน์โหลด CSV
           </button>
+          {c.pin && (
+            <button
+              type="button"
+              className="mh-btn mh-btn-soft"
+              data-testid="mh-teacher-lock"
+              onClick={() => {
+                lockTeacher()
+                navigate('/start')
+              }}
+            >
+              <Lock size={20} /> ออกจากโหมดครู
+            </button>
+          )}
         </div>
       </div>
+
+      {!c.pin && (
+        <div className="mh-card mh-teacher-warn" data-testid="mh-teacher-nopin">
+          ⚠️ ยังไม่ได้ตั้งรหัสครู นักเรียนเปิดหน้านี้และเห็นคะแนนของเพื่อนได้{' '}
+          <Link to="/teacher/settings" className="mh-chip">
+            🔒 ตั้งรหัสครู
+          </Link>
+        </div>
+      )}
 
       {players.length === 0 ? (
         <div className="mh-card mh-center">
           <CharacterArt id="owl" size={110} />
-          <p>ยังไม่มีนักเรียนเล่นบนเครื่องนี้ ให้นักเรียนสร้างตัวละครแล้วเริ่มเล่นได้เลย</p>
-          <Link to="/create" className="mh-btn mh-btn-gold">
-            + สร้างผู้เล่น
-          </Link>
+          <p>ยังไม่มีนักเรียนในเครื่องนี้ นำเข้ารายชื่อนักเรียนจาก Excel หรือให้นักเรียนสร้างตัวละครเอง</p>
+          <div className="mh-row-buttons">
+            <Link to="/teacher/students" className="mh-btn mh-btn-gold">
+              👧 นำเข้ารายชื่อนักเรียน
+            </Link>
+            <Link to="/create" className="mh-btn mh-btn-soft">
+              + สร้างผู้เล่น
+            </Link>
+          </div>
         </div>
       ) : (
         <>
           <div className="mh-stat-tiles mh-teacher-tiles">
             <StatTile icon="👧" label="นักเรียน" value={sum.players} />
+            <StatTile
+              icon="🏅"
+              label={`ผ่านเกณฑ์ ${c.passPercent}% (เป้าหมาย ${c.targetPercent}% ของห้อง)`}
+              value={prog.postDone === 0 ? '–' : `${prog.passed} คน · ${fixed2(prog.passRate)}%`}
+            />
+            <StatTile icon="📝" label="ทำแบบทดสอบ ก่อน / หลังเรียน" value={`${prog.preDone} / ${prog.postDone} คน`} />
             <StatTile icon="🎯" label="ตอบถูกเฉลี่ย" value={fmt(sum.accuracy)} />
             <StatTile icon="🧭" label="ก่อนเรียนเฉลี่ย" value={fmt(sum.pre)} />
             <StatTile icon="🎓" label="หลังเรียนเฉลี่ย" value={fmt(sum.post)} />
@@ -120,6 +167,7 @@ export function TeacherPage() {
               <thead>
                 <tr>
                   <th>ชื่อ</th>
+                  <th>สถานะ</th>
                   <th>ด่านที่ผ่าน</th>
                   <th>ดาว</th>
                   <th>ด่านย่อย</th>
@@ -140,9 +188,12 @@ export function TeacherPage() {
                       <td>
                         <button type="button" className="mh-table-name" onClick={() => setOpenId(openId === p.id ? null : p.id)} aria-expanded={openId === p.id}>
                           <AvatarArt avatar={p.avatar} size={32} portrait />
-                          {p.name}
+                          {p.student?.no ? `${p.student.no}. ` : ''}
+                          {teacherName(p)}
+                          {p.student && p.name !== p.student.first && <span className="mh-soft"> ({p.name})</span>}
                         </button>
                       </td>
+                      <td className="mh-table-status">{PARTICIPATION_LABEL[participation(p)]}</td>
                       <td>
                         {lessonsPassed(p)}/{TOTAL_LESSONS}
                       </td>
@@ -151,7 +202,10 @@ export function TeacherPage() {
                       <td>{p.answered ? `${percent(overallAccuracy(p))}%` : '–'}</td>
                       <td>{fmt(testPercent(p.preTest))}</td>
                       <td>{fmt(testPercent(p.postTest))}</td>
-                      <td>{imp === null ? '–' : <span className={imp > 0 ? 'mh-up' : imp < 0 ? 'mh-down' : ''}>{`${imp > 0 ? '▲ +' : imp < 0 ? '▼ ' : ''}${imp}%`}</span>}</td>
+                      <td>
+                        {imp === null ? '–' : <span className={imp > 0 ? 'mh-up' : imp < 0 ? 'mh-down' : ''}>{`${imp > 0 ? '▲ +' : imp < 0 ? '▼ ' : ''}${imp}%`}</span>}
+                        {passLabel(p, c.passPercent) && <span className={`mh-pass-tag ${passLabel(p, c.passPercent) === 'ผ่าน' ? 'is-pass' : 'is-fail'}`}>{passLabel(p, c.passPercent)}</span>}
+                      </td>
                       <td>{minutes(p.totalTimeMs)} น.</td>
                       <td className="mh-table-weak">{weakSkills(p).map((s) => SKILL_ICONS[s]).join(' ') || '–'}</td>
                       <td>{p.eco.days > 0 ? `${p.eco.days} วัน · ${p.eco.sales / 100} ฿` : '–'}</td>
@@ -183,7 +237,10 @@ function StudentDetail({ p }: { p: Player }) {
       <div className="mh-student-head">
         <AvatarArt avatar={p.avatar} size={64} />
         <div>
-          <h3 className="mh-card-title">{p.name}</h3>
+          <h3 className="mh-card-title">
+            {teacherName(p)}
+            {p.student && <span className="mh-soft"> · ชื่อในเกม {p.name}{p.student.code ? ` · เลขประจำตัว ${p.student.code}` : ''}</span>}
+          </h3>
           <span className="mh-soft">
             ทำโจทย์ {p.answered} ข้อ · ใช้ตัวช่วย {p.hintsUsed} ครั้ง · ถูกติดกันสูงสุด {p.bestStreak} ข้อ · เล่นล่าสุด {new Date(p.lastPlayed).toLocaleString('th-TH')}
           </span>
