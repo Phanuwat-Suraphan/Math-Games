@@ -1307,7 +1307,8 @@ for (const [name, viewport] of [
     // ครูให้นักเรียน (เลขที่ 4) ทำก่อนเรียนใหม่ แล้วป้ายบนแผนที่ของนักเรียนกลับมา
     await page.goto(`${BASE}#/teacher`)
     await page.getByTestId('mh-teacher-table').getByText('ทดสอบ เก่งมาก').click()
-    await page.getByTestId('mh-student-tests').getByText('ครั้งที่ 1', { exact: false }).waitFor()
+    // เครื่องคอมทำทั้งก่อนและหลังเรียน จึงมี "ครั้งที่ 1" สองบรรทัด
+    await page.getByTestId('mh-student-tests').getByText('ครั้งที่ 1', { exact: false }).first().waitFor()
     await page.getByTestId('mh-retake-pre').click()
     await page.getByTestId('mh-student-tests').getByText('เปิดให้ทำใหม่แล้ว', { exact: false }).waitFor()
     await page.goto(`${BASE}#/players`)
