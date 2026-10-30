@@ -76,6 +76,9 @@ export function TeacherPage() {
           <Link to="/kad" className="mh-btn mh-btn-go" data-testid="mh-teacher-kad">
             🌱 กาดรักษ์โลก (สื่อพิมพ์)
           </Link>
+          <Link to="/board" className="mh-btn mh-btn-go" data-testid="mh-teacher-board">
+            🎲 เกมกระดาน (สื่อพิมพ์)
+          </Link>
           <Link to="/plan/print" className="mh-btn mh-btn-go" data-testid="mh-teacher-plan">
             🎉 ใบงานวางแผนใช้เงิน
           </Link>

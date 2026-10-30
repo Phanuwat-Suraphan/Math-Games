@@ -56,6 +56,7 @@ const roster = load('engine/roster.js')
 const backup = load('engine/backup.js')
 const testBank = load('engine/testBank.js')
 const exam = load('engine/exam.js')
+const board = load('board/boardData.js')
 
 let passed = 0
 const failures = []
@@ -1943,6 +1944,120 @@ test('แบบทดสอบของนักเรียน: ทำได้
   eq(m.save.players[p.id].tests.length, 2, 'ประวัติรวมไม่ซ้ำ')
   eq(m.save.bank.updatedAt, 99, 'ใช้คลังข้อสอบที่ใหม่กว่า')
   eq(backup.mergeSaves(devB, devA).save.bank.updatedAt, 99, 'คลังที่ใหม่กว่าไม่ถูกทับ')
+})
+
+/* ------------------------------------------------------------------ */
+/* เกมกระดาน ตะลุยเมืองเงิน (ฉบับพิมพ์)                                    */
+/* ------------------------------------------------------------------ */
+
+test('เกมกระดาน: ถนน 40 ช่องเริ่มบ้านจบธนาคาร ช่องไม่ทับกัน และไม่มีช่องไหนถูกตัดตรงรอยต่อกระดานสองแผ่น', () => {
+  const spaces = board.BOARD_SPACES
+  eq(spaces.length, 40, 'จำนวนช่อง')
+  eq(spaces[0].kind, 'home', 'ช่องแรกคือบ้าน')
+  eq(spaces[39].kind, 'bank', 'ช่องสุดท้ายคือธนาคาร')
+  const count = (k) => spaces.filter((s) => s.kind === k).length
+  eq(count('quest'), 10, 'ช่องภารกิจ')
+  eq(count('shop'), 12, 'ช่องร้านค้า')
+  eq(count('luck'), 7, 'ช่องโชคดี')
+  for (const shop of board.BOARD_SHOPS) eq(spaces.filter((s) => s.shop === shop.id).length, 2, `ร้าน ${shop.name} มี 2 ช่อง`)
+  // ร้านแต่ละร้านมีอย่างน้อยหนึ่งช่องในครึ่งแรกของถนน (ซื้อได้ตั้งแต่รอบแรก)
+  for (const shop of board.BOARD_SHOPS) assert(spaces.slice(0, 20).some((s) => s.shop === shop.id), `ร้าน ${shop.name} อยู่ครึ่งแรก`)
+  spaces.forEach((s, i) => {
+    eq(s.no, i + 1, 'เลขช่อง')
+    const p = board.spaceCenter(i)
+    const half = s.kind === 'home' || s.kind === 'bank' ? 63 : 55
+    assert(p.x - half > 0 && p.x + half < board.BOARD_W && p.y - half > 120 && p.y + half < 910, `ช่อง ${s.no} อยู่ในกระดาน`)
+    assert(p.x + half < board.BOARD_SEAM || p.x - half > board.BOARD_SEAM, `ช่อง ${s.no} ไม่ถูกตัดตรงรอยต่อ`)
+    if (i > 0) {
+      const q = board.spaceCenter(i - 1)
+      const d = Math.abs(p.x - q.x) + Math.abs(p.y - q.y)
+      assert(d === 130 || (d === 210 && p.x === q.x), `ช่อง ${s.no} อยู่ติดช่องก่อนหน้า (${d})`)
+    }
+  })
+  assert(Object.values(board.SPACE_INFO).every((i) => i.short.length <= 26), 'คำอธิบายสั้นบนกระดานไม่ยาวเกิน')
+})
+
+test('เกมกระดาน: ราคาจ่ายได้ด้วยเงินจำลอง บัตรรายการรวมราคาถูกต้อง และเงินตั้งต้นพอซื้อได้', () => {
+  eq(board.startTotal(), 10000, 'เงินตั้งต้น 100 บาท')
+  for (const shop of board.BOARD_SHOPS) {
+    eq(shop.items.length, 4, `${shop.name} มี 4 อย่าง`)
+    for (const it of shop.items) assert(it.price > 0 && it.price % 50 === 0, `${it.name} ราคาจ่ายได้ด้วยเหรียญ 50 สตางค์ขึ้นไป`)
+  }
+  const ids = board.BOARD_SHOPS.flatMap((s) => s.items.map((i) => i.id))
+  eq(new Set(ids).size, ids.length, 'รหัสสินค้าไม่ซ้ำ')
+  // ราคารวมคำนวณใหม่ด้วยมือ (บาท)
+  const expected = [12 + 20 + 15 * 2, 18 * 2 + 6 * 2 + 12, 60 + 25 + 12.5, 5 * 4 + 8 * 2 + 12.5 * 2, 45 + 20 * 2 + 20, 35 + 5 + 17.5 * 2, 40 + 10 * 2 + 15 * 2, 39 + 2.5 * 4 + 30]
+  eq(board.SHOPPING_LISTS.length, 8, '8 ใบ')
+  board.SHOPPING_LISTS.forEach((l, i) => {
+    eq(board.listTotal(l), Math.round(expected[i] * 100), `บัตร ${l.no} ${l.title}`)
+    const shops = new Set(l.lines.map((x) => board.boardItem(x.item).shop.id))
+    assert(shops.size >= 2, `บัตร ${l.no} ต้องไปมากกว่าหนึ่งร้าน`)
+    assert(board.listTotal(l) >= 4000 && board.listTotal(l) <= 12000, `บัตร ${l.no} ยอดพอเหมาะ (${board.listTotal(l)})`)
+  })
+  eq(board.moneyStars(9950), 9, 'เงินเหลือ 99.50 บาท ได้ 9 ดาว')
+  eq(board.moneyStars(10000), 10, '100 บาท ได้ 10 ดาว')
+  eq(board.moneyStars(-5), 0, 'ติดลบไม่ได้ดาว')
+  eq(board.LUCK_CARDS.length, 16, 'การ์ดโชคดี 16 ใบ')
+  for (const c of board.LUCK_CARDS) {
+    assert(c.text.length > 5 && c.money % 50 === 0, `การ์ดโชคดี ${c.no}`)
+    assert(Math.abs(c.money) <= 5000, `การ์ดโชคดี ${c.no} เงินไม่มากเกิน`)
+  }
+})
+
+test('เกมกระดาน: การ์ดภารกิจ 32 ใบ เฉลยถูกทุกใบ (คำนวณใหม่แยกจากตัวสร้าง) และคูณหารตามหลักสูตร ป.3', () => {
+  const cards = board.buildQuestCards()
+  eq(cards.length, 32, '32 ใบ')
+  eq(cards.map((c) => c.no).join(), Array.from({ length: 32 }, (_, i) => i + 1).join(), 'เลขการ์ด 1–32')
+  eq(JSON.stringify(board.buildQuestCards()), JSON.stringify(cards), 'สร้างกี่ครั้งก็ได้ชุดเดิม (เฉลยตรงกับที่พิมพ์)')
+  const kinds = {}
+  for (const c of cards) kinds[c.kind] = (kinds[c.kind] ?? 0) + 1
+  for (const k of ['count', 'change', 'add', 'compare', 'exchange', 'muldiv', 'dot', 'ledger']) eq(kinds[k], 4, `ชนิด ${k} 4 ใบ`)
+  for (let i = 1; i < cards.length; i += 1) assert(cards[i].kind !== cards[i - 1].kind, 'การ์ดชนิดเดียวกันไม่เรียงติดกัน')
+  for (const c of cards) {
+    const d = c.data
+    let want
+    switch (c.kind) {
+      case 'count': {
+        let total = 0
+        for (let i = 0; i < d.length; i += 2) total += d[i] * d[i + 1]
+        want = money.formatBS(total)
+        break
+      }
+      case 'change':
+        assert(d[1] > d[0], `การ์ด ${c.no} จ่ายมากกว่าราคา`)
+        want = money.formatBS(d[1] - d[0])
+        break
+      case 'add':
+        want = money.formatBS(d[0] + d[1])
+        break
+      case 'compare':
+        assert(d[0] !== d[1], 'เงินสองคนไม่เท่ากัน')
+        want = `${d[0] > d[1] ? c.text.split('มีเงิน')[0] : c.text.split(' บาท ')[1].split('มีเงิน')[0]} มากกว่า ${Math.abs(d[0] - d[1])} บาท`
+        break
+      case 'exchange':
+        assert(d[0] % d[1] === 0, 'แลกได้ลงตัว')
+        want = `${d[0] / d[1]} ${d[1] > 1000 ? 'ใบ' : 'เหรียญ'}`
+        break
+      case 'muldiv':
+        if (c.text.startsWith('ซื้อ')) {
+          assert(d[0] % 100 === 0 && d[1] >= 2 && d[1] <= 9, `การ์ด ${c.no} คูณบาทล้วน ตัวคูณหลักเดียว`)
+          want = money.formatBS(d[0] * d[1])
+        } else {
+          assert(d[0] % (d[1] * 100) === 0 && d[1] >= 2 && d[1] <= 9, `การ์ด ${c.no} หารลงตัวเป็นบาท ตัวหารหลักเดียว`)
+          want = `${d[0] / 100 / d[1]} บาท`
+        }
+        break
+      case 'dot':
+        want = d[1] === 0 ? money.formatDot(d[0]) : money.formatBS(d[0])
+        break
+      case 'ledger':
+        want = money.formatBS(d[0] + d[1] - d[2])
+        break
+    }
+    eq(c.answer, want, `การ์ด ${c.no} (${c.kind}) ${c.text}`)
+    assert(c.reward === 500 || c.reward === 1000, `การ์ด ${c.no} รางวัล 5 หรือ 10 บาท`)
+    assert(!c.text.includes('undefined') && !c.answer.includes('NaN'), `การ์ด ${c.no} ข้อความสมบูรณ์`)
+  }
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

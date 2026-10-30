@@ -16,7 +16,7 @@ export function TeacherGate({ children }: { children: JSX.Element }) {
 }
 
 /** หน้าที่ครูเปิดต่อจากหน้าครูได้โดยไม่ล็อก (สื่อการสอน ไม่มีข้อมูลนักเรียน) */
-const TEACHER_TOOLS = ['/kad', '/plan/print', '/duel', '/sandbox']
+const TEACHER_TOOLS = ['/kad', '/board', '/plan/print', '/duel', '/sandbox']
 
 /** ออกจากหน้าครูไปหน้าของนักเรียนเมื่อไร ล็อกหน้าครูทันที (ส่งแท็บเล็ตต่อให้นักเรียนได้อย่างปลอดภัย) */
 export function TeacherAutoLock() {
