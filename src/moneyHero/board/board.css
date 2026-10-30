@@ -1,0 +1,407 @@
+/* เกมกระดาน ตะลุยเมืองเงิน: ใช้แผ่น A4 ของชุดกาดรักษ์โลก (kad.css) ขนาดเป็น cqw ของความกว้างแผ่น */
+
+.bd-head {
+  border-bottom-color: #ffd8a8;
+}
+
+.bd-head h2 {
+  color: #d9480f;
+}
+
+.bd-logo {
+  color: #e8590c;
+}
+
+.bd-size {
+  margin: 0 0 6px;
+}
+
+/* กระดาน: เต็มแผ่น เว้นขอบให้เครื่องพิมพ์ */
+.bd-board-in {
+  position: absolute;
+  inset: 0;
+  padding: 3.5cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kad-landscape .bd-board-in {
+  padding: 2.4cqw;
+}
+
+.bd-board {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* กติกา */
+.bd-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2cqw;
+  font-size: 0.86em;
+}
+
+.bd-rules section h3 {
+  margin: 0 0 0.4cqw;
+  font-size: 1.12em;
+  color: #d9480f;
+}
+
+.bd-rules p,
+.bd-rules ol,
+.bd-rules ul {
+  margin: 0;
+}
+
+.bd-rules ol,
+.bd-rules ul {
+  padding-left: 1.4em;
+}
+
+.bd-rules li {
+  margin: 0.2cqw 0;
+}
+
+.bd-rules .kad-form td,
+.bd-rules .kad-form th {
+  height: auto;
+  padding: 0.35cqw 0.8cqw;
+}
+
+.bd-legend-icon {
+  width: 7%;
+  text-align: center !important;
+  font-size: 1.3em;
+}
+
+.bd-legend td:nth-child(2) {
+  width: 20%;
+}
+
+.bd-score-list {
+  list-style: none;
+  padding-left: 0 !important;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2cqw 2cqw;
+  margin-top: 0.6cqw !important;
+}
+
+/* ป้ายราคาร้าน */
+.bd-shops {
+  flex: 1;
+  display: grid;
+  grid-template-rows: repeat(3, 1fr);
+  gap: 1.6cqw;
+  min-height: 0;
+}
+
+.bd-shop {
+  border: 0.6cqw solid;
+  border-radius: 2.4cqw;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.bd-shop-head {
+  color: #fff;
+  font-family: var(--mh-display, inherit);
+  font-weight: 700;
+  font-size: 1.35em;
+  padding: 0.6cqw 2cqw;
+}
+
+.bd-shop-items {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1.2cqw 2cqw;
+  padding: 1.4cqw 2cqw;
+  font-size: 1.22em;
+  min-height: 0;
+}
+
+.bd-shop-item {
+  display: flex;
+  align-items: center;
+  gap: 1.4cqw;
+  background: #fff;
+  border-radius: 1.6cqw;
+  padding: 0.6cqw 1.4cqw;
+}
+
+.bd-shop-emoji {
+  font-size: 2.4em;
+  line-height: 1;
+}
+
+.bd-shop-name {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.bd-shop-name small,
+.bd-shop-price small {
+  font-weight: 400;
+  font-size: 0.72em;
+  color: #495057;
+}
+
+.bd-shop-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.bd-shop-price b {
+  font-size: 1.05em;
+  color: #c92a2a;
+}
+
+/* การ์ด 8 ใบต่อแผ่น */
+.bd-cards {
+  grid-template-rows: repeat(4, 1fr);
+}
+
+.bd-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8cqw;
+  padding: 1.6cqw 2.4cqw;
+  text-align: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.bd-card-top {
+  position: absolute;
+  top: 1.2cqw;
+  left: 1.8cqw;
+  right: 1.8cqw;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: #868e96;
+}
+
+.bd-tag {
+  padding: 0.1cqw 1.2cqw;
+  border-radius: 99px;
+  background: #fff3bf;
+  color: #8a5a00;
+}
+
+.bd-tag.is-in {
+  background: #d3f9d8;
+  color: #2b8a3e;
+}
+
+.bd-tag.is-out {
+  background: #ffe3e3;
+  color: #c92a2a;
+}
+
+.bd-quest {
+  background: linear-gradient(180deg, #fffbe6, #fff);
+}
+
+.bd-quest-text {
+  margin: 1.6cqw 0 0;
+  font-size: 0.98em;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.bd-reward {
+  padding: 0.3cqw 1.6cqw;
+  border-radius: 99px;
+  background: #ffd43b;
+  font-weight: 700;
+  font-size: 0.82em;
+}
+
+/* เฉลยกลับหัว: เด็กที่ตอบอ่านไม่ถนัด นายธนาคารหมุนการ์ดดูได้ */
+.bd-answer-flip {
+  position: absolute;
+  bottom: 0.8cqw;
+  left: 0;
+  right: 0;
+  transform: rotate(180deg);
+  font-size: 0.62em;
+  color: #868e96;
+}
+
+.bd-luck {
+  background: linear-gradient(180deg, #fff0f6, #fff);
+}
+
+.bd-luck-icon {
+  font-size: 2.6em;
+  line-height: 1;
+  margin-top: 1.4cqw;
+}
+
+.bd-luck-text {
+  margin: 0;
+  font-weight: 600;
+  font-size: 0.92em;
+  line-height: 1.35;
+}
+
+.bd-star {
+  font-size: 0.78em;
+  font-weight: 700;
+  color: #e67700;
+}
+
+.bd-list {
+  background: linear-gradient(180deg, #e7f5ff, #fff);
+  align-items: stretch;
+  text-align: left;
+}
+
+.bd-list-title {
+  margin-top: 1.6cqw;
+  font-family: var(--mh-display, inherit);
+  font-size: 1.08em;
+  text-align: center;
+}
+
+.bd-list ul {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 0.86em;
+  line-height: 1.5;
+}
+
+.bd-list ul small {
+  color: #495057;
+}
+
+.bd-list-sum {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.82em;
+}
+
+.bd-key td,
+.bd-key th {
+  height: auto !important;
+  padding: 0.25cqw 1cqw !important;
+  font-size: 0.86em;
+}
+
+/* สมุดบัญชีและใบสรุป */
+.bd-fill {
+  margin: 0;
+  font-size: 0.9em;
+}
+
+.bd-ledger {
+  flex: 1;
+}
+
+.bd-ledger td,
+.bd-ledger th {
+  height: 1.9em;
+  text-align: center;
+}
+
+.bd-ledger td:nth-child(2) {
+  text-align: left;
+}
+
+.bd-check p {
+  margin: 0.4cqw 0;
+  font-size: 0.9em;
+}
+
+.bd-score th {
+  font-size: 0.8em;
+  vertical-align: top;
+  text-align: center;
+}
+
+.bd-score th small {
+  display: block;
+  font-weight: 400;
+  font-size: 0.8em;
+  line-height: 1.25;
+}
+
+.bd-score td {
+  height: 3.2em;
+}
+
+.bd-reflect h3 {
+  margin: 1.2cqw 0 0.4cqw;
+  font-size: 1em;
+  color: #d9480f;
+}
+
+.bd-reflect p {
+  margin: 0.9cqw 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* หมากและลูกเต๋า */
+.bd-pawns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.bd-pawn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1cqw;
+}
+
+.bd-pawn-face {
+  width: 100%;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.bd-pawn-face + .bd-pawn-face {
+  border-top: 0.3cqw dashed #868e96;
+}
+
+.bd-pawn-face svg {
+  width: 85%;
+  height: 85%;
+}
+
+.bd-pawn-flip {
+  transform: rotate(180deg);
+}
+
+.bd-dice {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4cqw;
+  align-items: center;
+  padding: 0 2cqw;
+}
+
+.bd-die {
+  width: 100%;
+}

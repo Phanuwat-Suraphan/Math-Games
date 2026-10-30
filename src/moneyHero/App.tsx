@@ -33,6 +33,7 @@ import { ClassSettingsPage } from './pages/ClassSettingsPage'
 import { RosterPrintPage } from './report/RosterPrint'
 import { TestBankPage } from './pages/TestBankPage'
 import { TestPrintPage } from './report/TestPrint'
+import { BoardPage } from './board/BoardPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
@@ -255,6 +256,7 @@ export default function App() {
             <Route path="/kad" element={<KadPage />} />
             <Route path="/plan/print" element={<PlanPrintPage />} />
             <Route path="/duel" element={<DuelPage />} />
+            <Route path="/board" element={<BoardPage />} />
             <Route path="/kad/class" element={<KadClassPage />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>

@@ -1317,6 +1317,45 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-pretest-banner').waitFor()
   })
 
+  await step(`[${name}] เกมกระดานตะลุยเมืองเงิน (พิมพ์เล่นจริง): ครบ 9 ชุด ไม่ล้นแผ่น กระดานพิมพ์ได้ 2 แผ่นต่อกันหรือแผ่นเดียว`, async () => {
+    await page.goto(`${BASE}#/start`)
+    await page.getByTestId('mh-start-board').click()
+    await page.getByTestId('bd-page').waitFor()
+    const expected = { rules: 2, board: 2, prices: 2, lists: 1, quests: 5, luck: 2, ledger: 2, pieces: 1, money: 4 }
+    for (const [id, n] of Object.entries(expected)) {
+      await page.getByTestId(`bd-tab-${id}`).click()
+      const count = await page.getByTestId('bd-sheets').locator('.kad-sheet').count()
+      if (count !== n) throw new Error(`ชุด ${id} มี ${count} แผ่น ควรมี ${n}`)
+      await noSideScroll(page, `เกมกระดาน ${id}`)
+      if (name !== 'desktop') continue
+      const spill = await page.evaluate(() =>
+        [...document.querySelectorAll('[data-testid="bd-sheets"] .kad-sheet-in')].map((el, i) => (el.scrollHeight > el.clientHeight + 2 || el.scrollWidth > el.clientWidth + 2 ? i + 1 : 0)).filter(Boolean),
+      )
+      if (spill.length > 0) throw new Error(`ชุด ${id} แผ่นที่ ${spill.join(', ')} เนื้อหาล้นกระดาษ`)
+      await page.getByTestId('bd-sheets').locator('.kad-sheet').first().screenshot({ path: path.join(SHOTS, `money-hero-board-${id}.png`) })
+    }
+    // กระดานแบบ 2 แผ่น: ทุกช่องครบ 40 ช่อง แผ่นละครึ่ง
+    await page.getByTestId('bd-tab-board').click()
+    const spaces = await page.locator('.bd-board-left [data-space]').count()
+    if (spaces !== 40) throw new Error(`กระดานต้องมี 40 ช่อง แต่มี ${spaces}`)
+    await page.getByTestId('bd-size-a4').click()
+    if ((await page.getByTestId('bd-sheets').locator('.kad-sheet').count()) !== 1) throw new Error('กระดานแผ่นเดียวต้องมี 1 แผ่น')
+    await page.getByTestId('bd-sheets').getByText('ภารกิจคณิต').first().waitFor()
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== 1) throw new Error(`พิมพ์กระดานแผ่นเดียวได้ ${pages} หน้า ควรได้ 1`)
+      await page.getByTestId('bd-size-a3').click()
+      const pdf2 = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages2 = (pdf2.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages2 !== 2) throw new Error(`พิมพ์กระดานสองแผ่นได้ ${pages2} หน้า ควรได้ 2`)
+      await page.getByTestId('bd-tab-quests').click()
+      const pdf3 = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages3 = (pdf3.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages3 !== 5) throw new Error(`พิมพ์การ์ดภารกิจได้ ${pages3} หน้า ควรได้ 5`)
+    }
+  })
+
   await page.context().close()
 }
 

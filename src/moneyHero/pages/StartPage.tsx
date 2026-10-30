@@ -106,6 +106,9 @@ export function StartPage() {
           <Link to="/kad" className="mh-btn mh-btn-go mh-btn-block" data-testid="mh-start-kad">
             🌱 กาดรักษ์โลก ป.3 (สื่อพิมพ์เล่นจริง)
           </Link>
+          <Link to="/board" className="mh-btn mh-btn-go mh-btn-block" data-testid="mh-start-board">
+            🎲 เกมกระดาน ตะลุยเมืองเงิน (พิมพ์เล่นจริง)
+          </Link>
         </div>
         <p className="mh-foot-note mh-pill">ไม่ต้องสมัครสมาชิก · ความก้าวหน้าบันทึกไว้ในเครื่องนี้</p>
       </div>
