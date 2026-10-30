@@ -16,7 +16,7 @@ const OPTIONS: { key: keyof Settings; icon: string; label: string; note: string 
 ]
 
 export function SettingsPage() {
-  const { settings, updateSettings, resetAll, player } = useGame()
+  const { settings, updateSettings, resetAll, player, save } = useGame()
   const navigate = useNavigate()
   const [confirm, setConfirm] = useState(false)
   const [thai, setThai] = useState(hasThaiVoice())
@@ -77,8 +77,12 @@ export function SettingsPage() {
 
       <div className="mh-card mh-settings">
         <b>ล้างข้อมูลทั้งหมดในเครื่องนี้</b>
-        <p className="mh-sub">ผู้เล่นทุกคนและคะแนนทั้งหมดจะหายไป (คุณครูควร Export CSV ก่อน)</p>
-        {confirm ? (
+        {save.classroom.pin ? (
+          <p className="mh-sub">คุณครูตั้งรหัสไว้แล้ว ล้างข้อมูลได้ที่ โหมดคุณครู → ตั้งค่าห้องเรียน</p>
+        ) : (
+          <p className="mh-sub">ผู้เล่นทุกคนและคะแนนทั้งหมดจะหายไป (คุณครูควรดาวน์โหลดไฟล์สำรองที่ โหมดคุณครู → ตั้งค่าห้องเรียน ก่อน)</p>
+        )}
+        {save.classroom.pin ? null : confirm ? (
           <div className="mh-row-buttons">
             <button
               type="button"

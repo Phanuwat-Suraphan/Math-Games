@@ -17,9 +17,9 @@ export function SplashPage() {
     <div className="mh-splash" onClick={() => navigate('/start', { replace: true })} data-testid="mh-splash">
       <Sky city={false} />
       <CharacterArt id="hero" size={140} className="mh-splash-hero" />
-      <h1 className="mh-logo" aria-label="MONEY HERO ปฏิบัติการเมืองเงินทอง">
+      <h1 className="mh-logo" aria-label="MONEY HERO เกมเศรษฐี ตะลุยเมืองเงิน">
         <LogoLetters text="MONEY HERO" />
-        <span className="mh-logo-ribbon">ปฏิบัติการเมืองเงินทอง</span>
+        <span className="mh-logo-ribbon">เกมเศรษฐี ตะลุยเมืองเงิน</span>
       </h1>
       <div className="mh-loading-bar" aria-hidden="true">
         <div />
