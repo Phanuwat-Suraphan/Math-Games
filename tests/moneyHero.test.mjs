@@ -1486,6 +1486,32 @@ test('สมุดสะสมเงินไทย: การ์ดครบ 11
   eq(JSON.stringify(save.players[old.id].album), '[]', 'บันทึกเก่าได้ album ว่าง')
 })
 
+test('หลักสูตร ป.3: คูณ หารเงินเป็นบาทล้วน ตัวคูณ/ตัวหารหลักเดียว ทุกระดับความยาก', () => {
+  const whole = (v) => v % 100 === 0
+  for (const gen of ['multiply', 'divide', 'wordMulDiv', 'wordAll', 'wordQuick']) {
+    for (const d of [1, 2, 3]) {
+      for (let i = 0; i < 300; i += 1) {
+        for (const q of gens.generate(gen, d)) {
+          if (q.kind === 'amount') {
+            assert(whole(q.answer), `${gen} d${d}: คำตอบมีสตางค์ (${q.answer}) ${q.story}`)
+            for (const r of q.visual?.rows ?? []) {
+              if (r.plain) assert(r.value >= 2 && r.value <= 9, `${gen} d${d}: ตัวคูณ/ตัวหารต้องเป็นหลักเดียว (${r.value})`)
+              else assert(whole(r.value), `${gen} d${d}: จำนวนเงินในโจทย์มีสตางค์ (${r.value})`)
+            }
+            assert(q.answer <= 1000000, `${gen} d${d}: จำนวนเงินเกิน 10,000 บาท`)
+          } else if (q.kind === 'word' && (q.op === '×' || q.op === '÷')) {
+            assert(whole(q.a) && whole(q.answer), `${gen} d${d}: โจทย์ปัญหาคูณหารมีสตางค์ (${q.story})`)
+            assert(q.b >= 2 && q.b <= 9, `${gen} d${d}: ตัวคูณ/ตัวหารต้องเป็นหลักเดียว (${q.b})`)
+          }
+        }
+      }
+    }
+  }
+  // วิธีคิดของการคูณ หาร บาทล้วน ไม่พูดถึงสตางค์
+  assert(!gens.generate('multiply', 3)[0].explain.join(' ').includes('สตางค์'), 'วิธีคิดการคูณไม่ต้องมีสตางค์')
+  assert(!gens.generate('divide', 3)[0].explain.join(' ').includes('สตางค์'), 'วิธีคิดการหารไม่ต้องมีสตางค์')
+})
+
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {
   console.log(`\nไม่ผ่าน ${failures.length} ข้อ`)

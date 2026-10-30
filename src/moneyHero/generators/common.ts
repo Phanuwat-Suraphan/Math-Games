@@ -130,6 +130,9 @@ export function explainMul(a: number, n: number): string[] {
   const A = splitSatang(a)
   const satangProduct = A.satang * n
   const carry = Math.floor(satangProduct / 100)
+  if (A.satang === 0) {
+    return [`เงินจำนวนเท่ากัน ${n} ครั้ง ใช้การคูณ`, `${commas(A.baht)} × ${n} = ${commas(A.baht * n)}`, `คำตอบ: ${formatBS(a * n)}`]
+  }
   const lines = [`คูณทีละส่วน บาทคูณ ${n} และสตางค์คูณ ${n}`]
   lines.push(`บาท: ${commas(A.baht)} × ${n} = ${commas(A.baht * n)} บาท`)
   if (A.satang > 0) {
@@ -148,6 +151,14 @@ export function explainDiv(a: number, n: number): string[] {
   const A = splitSatang(a)
   const q = Math.floor(A.baht / n)
   const r = A.baht % n
+  if (A.satang === 0 && A.baht % n === 0) {
+    return [
+      `แบ่ง ${formatBS(a)} ออกเป็น ${n} ส่วนเท่า ๆ กัน ใช้การหาร`,
+      `${commas(A.baht)} ÷ ${n} = ${commas(A.baht / n)}`,
+      `คำตอบ: ${formatBS(a / n)}`,
+      `ตรวจ: ${formatBS(a / n)} × ${n} = ${formatBS(a)} ✔`,
+    ]
+  }
   const lines = [`แบ่ง ${formatBS(a)} ออกเป็น ${n} ส่วนเท่า ๆ กัน แบ่งบาทก่อน`]
   lines.push(`บาท: ${commas(A.baht)} ÷ ${n} = ${commas(q)}${r > 0 ? ` เหลือเศษ ${r} บาท` : ' ลงตัว'}`)
   if (r > 0 || A.satang > 0) {

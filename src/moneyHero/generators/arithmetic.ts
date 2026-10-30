@@ -156,9 +156,8 @@ export function generateShopQuestion(d: Difficulty): ShopQ {
 export function generateMultiplyMoneyQuestion(d: Difficulty): AmountQ {
   const product = pick(PRODUCTS.filter((p) => p.max <= (d === 1 ? 50 : d === 2 ? 99 : 300)))
   const n = d === 1 ? int(2, 5) : d === 2 ? int(2, 6) : int(3, 9)
-  let price = priceOf(product, d)
-  if (d === 1) price = toSatang(splitSatang(price).baht)
-  if (d >= 2 && splitSatang(price).satang === 0) price += pick([25, 50, 75])
+  // หลักสูตร ป.3: คูณเงินเป็นบาทล้วน (คูณจำนวนเงินที่มีสตางค์คือการคูณทศนิยม เรียนชั้นสูงกว่า)
+  const price = toSatang(splitSatang(priceOf(product, d)).baht)
   const total = price * n
 
   return {
@@ -174,7 +173,7 @@ export function generateMultiplyMoneyQuestion(d: Difficulty): AmountQ {
     answer: total,
     npc: 'bear',
     hint: hint(
-      `ราคาต่อชิ้น × จำนวนชิ้น คูณบาทกับสตางค์แยกกัน`,
+      `ราคาต่อชิ้น × จำนวนชิ้น`,
       `เหมือนบวกราคาเดิม ${n} ครั้ง`,
       explainMul(price, n).slice(0, 2),
       {
@@ -192,10 +191,8 @@ export function generateMultiplyMoneyQuestion(d: Difficulty): AmountQ {
 /** หารจำนวนเงิน: แบ่งเงินเท่า ๆ กัน */
 export function generateDivideMoneyQuestion(d: Difficulty): AmountQ {
   const n = d === 1 ? int(2, 5) : d === 2 ? pick([2, 4]) : int(2, 6)
-  let each: number
-  if (d === 1) each = toSatang(int(5, 50))
-  else if (d === 2) each = toSatang(int(20, 250), 50)
-  else each = toSatang(int(20, 400), pick([25, 50, 75]))
+  // หลักสูตร ป.3: หารเงินเป็นบาทล้วนและหารลงตัว (ตัวหารหลักเดียว)
+  const each = toSatang(d === 1 ? int(5, 50) : d === 2 ? int(20, 250) : int(20, 400))
   const total = each * n
   const scene = pick([
     { story: `แบ่งเงิน ${formatBS(total)} ให้เด็ก ${n} คน เท่า ๆ กัน`, ask: 'ได้คนละเท่าไร?' },
@@ -216,7 +213,7 @@ export function generateDivideMoneyQuestion(d: Difficulty): AmountQ {
     answer: each,
     npc: 'bear',
     hint: hint(
-      'แบ่งบาทก่อน ถ้าเหลือเศษบาท ให้เปลี่ยนเป็นสตางค์ (1 บาท = 100 สตางค์) แล้วแบ่งต่อ',
+      'หารจำนวนบาทด้วยจำนวนส่วน แล้วตรวจคำตอบด้วยการคูณ',
       `แบ่งเป็น ${n} ส่วนเท่า ๆ กัน`,
       explainDiv(total, n).slice(0, 2),
       {
