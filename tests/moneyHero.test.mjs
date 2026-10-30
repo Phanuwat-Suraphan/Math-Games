@@ -54,6 +54,8 @@ const album = load('engine/album.js')
 const classroom = load('engine/classroom.js')
 const roster = load('engine/roster.js')
 const backup = load('engine/backup.js')
+const testBank = load('engine/testBank.js')
+const exam = load('engine/exam.js')
 
 let passed = 0
 const failures = []
@@ -1721,6 +1723,226 @@ test('ไฟล์สำรอง: บันทึกแล้วอ่านก
   // ชื่อไฟล์
   const name = backup.backupFileName(base, new Date(2026, 9, 30, 9, 5))
   eq(name, 'money-hero-สำรอง-ป.3-2026-10-30-0905.json', 'ชื่อไฟล์สำรอง')
+})
+
+/* ------------------------------------------------------------------ */
+/* คลังข้อสอบก่อน/หลังเรียน                                             */
+/* ------------------------------------------------------------------ */
+
+test('คลังข้อสอบตั้งต้น: ก่อน/หลังเรียนเป็นฉบับคู่ขนาน 20 ข้อ 20 คะแนน และเฉลยทุกข้อถูกต้อง (คำนวณใหม่แยกจากคลัง)', () => {
+  const bank = testBank.defaultBank()
+  const baht = (satang) => {
+    const b = Math.floor(satang / 100)
+    const s = satang % 100
+    return s === 0 ? `${b} บาท` : `${b} บาท ${s} สตางค์`
+  }
+  const expect = {
+    pre: [
+      'เหรียญ 10 บาท',
+      '100 บาท',
+      `${100 + 20 + 20 + 10 + 5} บาท`,
+      baht(3 * 1000 + 2 * 50),
+      50 + 20 + 10 + 10 + 2,
+      '45.50 บาท',
+      'สามสิบบาทยี่สิบห้าสตางค์',
+      baht(Math.max(7500, 750, 5750, 7525)),
+      `ต้น มากกว่า ${85 - 58} บาท`,
+      `${100 / 20} ใบ`,
+      (6 * 50) / 100,
+      `${456 + 287} บาท`,
+      baht(5075 + 2450),
+      500 - 365,
+      `${15 * 4} บาท`,
+      `${96 / 4} บาท`,
+      `${100 - 68} บาท`,
+      120 - 25 - 18,
+      `${500 - 159 - 235} บาท`,
+      `${40 - 25 + (40 - 30)} บาท`,
+    ],
+    post: [
+      'ธนบัตร 20 บาท',
+      '500 บาท',
+      `${100 + 50 + 20 + 5 + 1} บาท`,
+      baht(4 * 500 + 4 * 25),
+      100 + 20 + 5 + 5 + 2 + 1,
+      '128.75 บาท',
+      'สิบหกบาทห้าสิบสตางค์',
+      '12.50 บาท',
+      `โอ๊ต มากกว่า ${92 - 64} บาท`,
+      `${50 / 5} เหรียญ`,
+      (8 * 25) / 100,
+      `${378 + 465} บาท`,
+      baht(3650 + 4875),
+      700 - 438,
+      `${12 * 6} บาท`,
+      `${84 / 3} บาท`,
+      `${500 - 145} บาท`,
+      150 - 36 - 27,
+      `${500 - 289 - 175} บาท`,
+      `${50 - 35 + (50 - 28)} บาท`,
+    ],
+  }
+  for (const kind of ['pre', 'post']) {
+    const form = bank[kind]
+    eq(form.items.length, 20, `${kind}: 20 ข้อ`)
+    eq(testBank.fullScore(form), 20, `${kind}: คะแนนเต็ม 20`)
+    eq(new Set(form.items.map((i) => i.id)).size, 20, `${kind}: รหัสข้อไม่ซ้ำ`)
+    form.items.forEach((item, i) => {
+      const problems = testBank.itemProblems(item)
+      eq(problems.length, 0, `${kind} ข้อ ${i + 1} ใช้ได้ (${problems})`)
+      const want = expect[kind][i]
+      if (item.type === 'choice') eq(item.choices[item.answer], want, `${kind} ข้อ ${i + 1} เฉลย`)
+      else eq(item.answer, want, `${kind} ข้อ ${i + 1} เฉลยตัวเลข`)
+    })
+    eq(form.items.filter((i) => i.type === 'number').length, 4, `${kind}: ข้อเติมตัวเลข 4 ข้อ`)
+  }
+  eq(testBank.parallelProblems(bank.pre, bank.post).length, 0, 'ฉบับคู่ขนาน')
+  // จุดประสงค์เดียวกันข้อต่อข้อ แต่โจทย์ไม่ซ้ำกัน
+  bank.pre.items.forEach((it, i) => {
+    eq(it.skill, bank.post.items[i].skill, `ข้อ ${i + 1} วัดจุดประสงค์เดียวกัน`)
+    eq(it.type, bank.post.items[i].type, `ข้อ ${i + 1} ชนิดเดียวกัน`)
+    assert(it.text !== bank.post.items[i].text || it.money.join() !== bank.post.items[i].money.join(), `ข้อ ${i + 1} ก่อน/หลังเรียนต้องต่างกัน`)
+  })
+  // ครอบคลุมทุกจุดประสงค์
+  const counts = testBank.skillCounts(bank.pre)
+  for (const s of ['notes', 'count', 'dot', 'compare', 'exchange', 'addsub', 'muldiv', 'word', 'ledger']) assert(counts[s] > 0, `มีข้อสอบจุดประสงค์ ${s}`)
+  // คูณหารตามหลักสูตร ป.3: ตัวคูณ/ตัวหารหลักเดียว ผลเป็นบาทล้วน
+  assert(!JSON.stringify(bank).includes('NaN'), 'ไม่มีค่าเสีย')
+  eq(bank.pre.minutes, 30, 'เวลาเริ่มต้น 30 นาที')
+  eq(bank.pre.open, true, 'ก่อนเรียนเปิดไว้')
+  eq(bank.post.open, false, 'หลังเรียนปิดไว้จนครูเปิดหรือผ่านด่าน 12')
+})
+
+test('คลังข้อสอบ: ตรวจคะแนน (คะแนนรายข้อ ตัวเลขที่พิมพ์หลายแบบ ข้อที่ไม่ตอบ) และสุ่มข้อ/ตัวเลือกถูกต้อง', () => {
+  const form = testBank.defaultBank().pre
+  // ตอบถูกทุกข้อ
+  const all = {}
+  for (const i of form.items) all[i.id] = i.type === 'choice' ? i.answer : String(i.answer)
+  const full = testBank.gradeAttempt(form, all, { startedAt: 1000, at: 61000, bankAt: 0, timedOut: false })
+  eq(full.score, 20, 'ถูกทุกข้อได้ 20')
+  eq(full.correct, 20, 'ถูก 20 ข้อ')
+  eq(full.timeMs, 60000, 'เวลาที่ใช้')
+  eq(full.id, 'pre-1000', 'รหัสการทำ')
+  // ไม่ตอบเลย
+  eq(testBank.gradeAttempt(form, {}, { startedAt: 1, at: 2, bankAt: 0, timedOut: true }).score, 0, 'ไม่ตอบได้ 0')
+  eq(testBank.unanswered(form, {}), 20, 'ยังไม่ตอบ 20 ข้อ')
+  eq(testBank.unanswered(form, all), 0, 'ตอบครบ')
+  // ตัวเลขที่พิมพ์
+  const num = { ...form.items.find((i) => i.type === 'number'), answer: 1250 }
+  assert(testBank.isCorrect(num, '1,250') && testBank.isCorrect(num, '1250') && testBank.isCorrect(num, ' 1250 '), 'รับตัวเลขมีจุลภาค/ช่องว่าง')
+  assert(!testBank.isCorrect(num, '125') && !testBank.isCorrect(num, '') && !testBank.isCorrect(num, 'abc') && !testBank.isCorrect(num, null), 'ตัวเลขผิด/ว่าง')
+  const dec = { ...num, answer: 12.5 }
+  assert(testBank.isCorrect(dec, '12.50') && testBank.isCorrect(dec, '12.5'), '12.50 = 12.5')
+  assert(!testBank.isCorrect(dec, '12.05') && !testBank.isCorrect(dec, '12.505'), 'ทศนิยมผิด')
+  eq(testBank.parseNumber('3.333'), null, 'ทศนิยมเกิน 2 ตำแหน่งไม่รับ')
+  // คะแนนรายข้อไม่เท่ากัน
+  const weighted = { ...form, items: form.items.map((i, n) => (n === 0 ? { ...i, points: 3 } : i)) }
+  eq(testBank.fullScore(weighted), 22, 'คะแนนเต็มรวมคะแนนรายข้อ')
+  const onlyFirst = testBank.gradeAttempt(weighted, { [form.items[0].id]: form.items[0].answer }, { startedAt: 1, at: 2, bankAt: 0, timedOut: false })
+  eq(onlyFirst.score, 3, 'ถูกข้อ 3 คะแนนได้ 3')
+  eq(onlyFirst.total, 22, 'คะแนนเต็ม 22')
+  // สุ่มข้อและตัวเลือก: ครบทุกข้อ ตัวเลือกเป็นการสลับ 0–3
+  for (let k = 0; k < 50; k += 1) {
+    const paper = testBank.makePaper(form)
+    eq([...paper.order].sort().join(), form.items.map((i) => i.id).sort().join(), 'สุ่มแล้วข้อครบ')
+    for (const i of form.items.filter((x) => x.type === 'choice')) eq([...paper.choiceOrder[i.id]].sort().join(), '0,1,2,3', 'ตัวเลือกครบ 4')
+  }
+  const fixed = testBank.makePaper({ ...form, shuffleItems: false, shuffleChoices: false })
+  eq(fixed.order.join(), form.items.map((i) => i.id).join(), 'ไม่สุ่มข้อ')
+  eq(fixed.choiceOrder[form.items[0].id].join(), '0,1,2,3', 'ไม่สุ่มตัวเลือก')
+  // เวลา
+  eq(testBank.secondsLeft(form, 0, 60000), 29 * 60, 'เหลือ 29 นาที')
+  eq(testBank.secondsLeft(form, 0, 31 * 60000), 0, 'หมดเวลา')
+  eq(testBank.secondsLeft({ ...form, minutes: 0 }, 0, 9e9), null, 'ไม่จำกัดเวลา')
+  eq(testBank.clockText(125), '2:05', 'นาฬิกา')
+  eq(testBank.answerText(form.items[0]), 'ค. เหรียญ 10 บาท', 'ข้อความเฉลยปรนัย')
+  eq(testBank.answerText({ ...num, answer: 1250, unit: 'บาท' }), '1,250 บาท', 'ข้อความเฉลยตัวเลข')
+})
+
+test('คลังข้อสอบ: ตรวจข้อที่ครูเขียน ซ่อมไฟล์ที่เสีย และบอกเมื่อไม่เป็นฉบับคู่ขนาน', () => {
+  const ok = { ...testBank.blankItem('pre', 1), text: 'โจทย์', choices: ['1', '2', '3', '4'], answer: 2 }
+  eq(testBank.itemProblems(ok).length, 0, 'ข้อที่ถูกต้อง')
+  assert(testBank.itemProblems({ ...ok, text: ' ' }).includes('ยังไม่มีโจทย์'), 'ไม่มีโจทย์')
+  assert(testBank.itemProblems({ ...ok, choices: ['1', '1', '3', '4'] }).includes('ตัวเลือกซ้ำกัน'), 'ตัวเลือกซ้ำ')
+  assert(testBank.itemProblems({ ...ok, choices: ['1', '', '3', '4'] }).includes('ต้องมีตัวเลือกครบ 4 ข้อ'), 'ตัวเลือกไม่ครบ')
+  assert(testBank.itemProblems({ ...ok, answer: 4 }).includes('ยังไม่ได้เลือกคำตอบที่ถูก'), 'ไม่มีคำตอบ')
+  assert(testBank.itemProblems({ ...ok, points: 0 }).length > 0, 'คะแนน 0 ไม่ได้')
+  const n = { ...ok, type: 'number', choices: [], answer: 12.345 }
+  assert(testBank.itemProblems(n).some((p) => p.includes('2 ตำแหน่ง')), 'ทศนิยม 3 ตำแหน่งไม่ได้')
+  eq(testBank.itemProblems({ ...n, answer: 12.5 }).length, 0, 'ทศนิยม 2 ตำแหน่งได้')
+  // ซ่อมไฟล์: ข้อเสียถูกตัดทิ้ง ข้อดีอยู่ครบ รหัสซ้ำถูกแก้
+  const raw = { pre: { items: [ok, { ...ok }, { text: '' }, 'x'], minutes: 999 }, post: null, updatedAt: 5 }
+  const fixed = testBank.repairBank(raw)
+  eq(fixed.pre.items.length, 2, 'เก็บเฉพาะข้อที่ใช้ได้')
+  assert(fixed.pre.items[0].id !== fixed.pre.items[1].id, 'รหัสซ้ำถูกแก้')
+  eq(fixed.pre.minutes, 30, 'เวลาผิดใช้ค่าเริ่มต้น')
+  eq(fixed.post.items.length, 20, 'ฉบับที่หายใช้ชุดตั้งต้น')
+  eq(fixed.updatedAt, 5, 'เวลาแก้ล่าสุด')
+  eq(testBank.repairBank('garbage').pre.items.length, 20, 'ไฟล์เสียทั้งก้อนใช้ชุดตั้งต้น')
+  // ไม่เป็นฉบับคู่ขนาน
+  const bank = testBank.defaultBank()
+  const shorter = { ...bank.post, items: bank.post.items.slice(1) }
+  const problems = testBank.parallelProblems(bank.pre, shorter)
+  assert(problems.some((p) => p.includes('จำนวนข้อ')) && problems.some((p) => p.includes('คะแนนเต็ม')), `เตือนเมื่อไม่คู่ขนาน: ${problems}`)
+  // ข้อมูลเก่าที่ไม่มีคลังข้อสอบ เปิดได้และได้ชุดตั้งต้น
+  const old = progress.parseSave(JSON.stringify({ version: 1, players: {}, activeId: null, settings: {} }))
+  eq(old.bank.pre.items.length, 20, 'ไฟล์เก่าได้คลังข้อสอบตั้งต้น')
+})
+
+test('แบบทดสอบของนักเรียน: ทำได้ครั้งเดียว ส่งซ้ำไม่บันทึกซ้ำ ครูให้ทำใหม่ได้ หลังเรียนเปิดเมื่อครูเปิดหรือผ่านด่าน 12', () => {
+  const bank = testBank.defaultBank()
+  let p = progress.newPlayer('ทดสอบ', 'hero', 1)
+  eq(exam.testState(p, bank.pre), 'ready', 'ก่อนเรียนพร้อมทำ')
+  eq(exam.testState(p, bank.post), 'locked', 'หลังเรียนยังล็อก')
+  eq(exam.testState(p, { ...bank.pre, open: false }), 'closed', 'ครูปิดก่อนเรียน')
+  const answers = {}
+  bank.pre.items.forEach((i, n) => {
+    if (n < 15) answers[i.id] = i.type === 'choice' ? i.answer : String(i.answer)
+  })
+  const a1 = testBank.gradeAttempt(bank.pre, answers, { startedAt: 100, at: 200, bankAt: 0, timedOut: false })
+  p = exam.recordAttempt(p, a1)
+  eq(p.preTest.score, 15, 'ผลก่อนเรียน 15')
+  eq(p.preTest.total, 20, 'คะแนนเต็ม 20')
+  eq(p.coins, progress.TEST_REWARD.pre.coins, 'ได้รางวัลครั้งแรก')
+  const skillTotal = Object.values(p.preTest.skills).reduce((s, v) => s + v.total, 0)
+  eq(skillTotal, 20, 'ผลรายจุดประสงค์ครบ 20 ข้อ')
+  // ส่งซ้ำ (กดสองครั้ง / StrictMode)
+  const again = exam.recordAttempt(p, a1)
+  eq(again, p, 'ส่งซ้ำไม่บันทึกซ้ำ')
+  eq(p.tests.length, 1, 'ประวัติ 1 ครั้ง')
+  eq(exam.testState(p, bank.pre), 'done', 'ทำแล้วทำซ้ำไม่ได้')
+  eq(exam.testState(p, { ...bank.pre, oneAttempt: false }), 'ready', 'ครูตั้งให้ทำซ้ำได้')
+  // ครูให้ทำใหม่
+  p = exam.grantRetake(p, 'pre', 300)
+  eq(exam.testState(p, bank.pre), 'ready', 'ครูให้ทำใหม่')
+  assert(exam.retakeOpen(p, 'pre'), 'เปิดให้ทำใหม่')
+  const a2 = testBank.gradeAttempt(bank.pre, {}, { startedAt: 400, at: 500, bankAt: 0, timedOut: true })
+  p = exam.recordAttempt(p, a2)
+  eq(p.preTest.score, 0, 'ผลล่าสุดใช้ในรายงาน')
+  eq(p.tests.length, 2, 'ประวัติเก็บครบ 2 ครั้ง')
+  eq(p.coins, progress.TEST_REWARD.pre.coins, 'ทำใหม่ไม่ได้รางวัลซ้ำ')
+  eq(exam.testState(p, bank.pre), 'done', 'ทำใหม่แล้วกลับเป็นทำแล้ว')
+  eq(exam.latestAttempt(p, 'pre').id, 'pre-400', 'ครั้งล่าสุด')
+  // หลังเรียน: ครูเปิด หรือผ่านด่าน 12
+  eq(exam.testState(p, { ...bank.post, open: true }), 'ready', 'ครูเปิดหลังเรียน')
+  const passed12 = { ...p, levels: { 12: { ...progress.emptyLevel(), stepDone: 4 } } }
+  eq(exam.testState(passed12, bank.post), 'ready', 'ผ่านด่าน 12 ทำได้')
+  // วิเคราะห์รายข้อ
+  const q = progress.newPlayer('คิว', 'hero', 2)
+  const qa = testBank.gradeAttempt(bank.pre, answers, { startedAt: 10, at: 20, bankAt: 0, timedOut: false })
+  const st = exam.itemStats([p, exam.recordAttempt(q, qa)], bank.pre)
+  const first = st[bank.pre.items[0].id]
+  eq(first.n, 2, 'ทำข้อแรก 2 คน')
+  eq(first.right, 1, 'ถูก 1 คน (อีกคนครั้งล่าสุดไม่ได้ตอบ)')
+  eq(first.p, 0.5, 'ค่าความยาก 0.50')
+  eq(exam.takenCount([p, q], 'pre'), 1, 'นับคนที่ทำแล้ว')
+  // รวมข้อมูลสองเครื่อง: ประวัติรวมกัน คลังข้อสอบใช้ฉบับที่ครูแก้ล่าสุด
+  const devA = { ...progress.emptySave(), players: { [p.id]: { ...p, tests: [a1] } } }
+  const devB = { ...progress.emptySave(), players: { [p.id]: { ...p, tests: [a1, a2] } }, bank: { ...bank, updatedAt: 99 } }
+  const m = backup.mergeSaves(devA, devB)
+  eq(m.save.players[p.id].tests.length, 2, 'ประวัติรวมไม่ซ้ำ')
+  eq(m.save.bank.updatedAt, 99, 'ใช้คลังข้อสอบที่ใหม่กว่า')
+  eq(backup.mergeSaves(devB, devA).save.bank.updatedAt, 99, 'คลังที่ใหม่กว่าไม่ถูกทับ')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

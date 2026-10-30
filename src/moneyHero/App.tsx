@@ -31,6 +31,8 @@ import { KadClassPage } from './kad/KadClassPage'
 import { RosterPage } from './pages/RosterPage'
 import { ClassSettingsPage } from './pages/ClassSettingsPage'
 import { RosterPrintPage } from './report/RosterPrint'
+import { TestBankPage } from './pages/TestBankPage'
+import { TestPrintPage } from './report/TestPrint'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
@@ -223,6 +225,22 @@ export default function App() {
               element={
                 <TeacherGate>
                   <ClassSettingsPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/tests"
+              element={
+                <TeacherGate>
+                  <TestBankPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/test/:kind"
+              element={
+                <TeacherGate>
+                  <TestPrintPage />
                 </TeacherGate>
               }
             />

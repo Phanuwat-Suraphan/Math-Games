@@ -148,7 +148,7 @@ export function GameProvider({ children }: { children?: ReactNode }) {
   }, [])
 
   const resetAll = useCallback(() => {
-    setSave((s) => ({ version: 1, players: {}, activeId: null, settings: s.settings, classroom: s.classroom }))
+    setSave((s) => ({ version: 1, players: {}, activeId: null, settings: s.settings, classroom: s.classroom, bank: s.bank }))
   }, [])
 
   const updateSave = useCallback((fn: (s: SaveData) => SaveData) => {

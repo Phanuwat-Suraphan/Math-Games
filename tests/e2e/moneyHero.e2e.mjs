@@ -236,19 +236,28 @@ async function playUntil(page, doneTestId, { makeMistake = false } = {}) {
   throw new Error(`เล่นเกิน 90 ข้อแล้วยังไม่จบ (${doneTestId})`)
 }
 
-/** ทำแบบทดสอบ (ไม่มีการบอกถูกผิด ตอบแล้วไปข้อต่อไปทันที) ตอบผิด wrongFirst ข้อแรก */
-async function playTest(page, wrongFirst = 0) {
-  for (let i = 0; i < 40; i += 1) {
-    if (await page.getByTestId('mh-test-result').isVisible().catch(() => false)) return
-    const q = await currentQuestion(page)
-    if (!q) {
-      await page.waitForTimeout(150)
+/** ทำแบบทดสอบจากคลังข้อสอบ: ตอบตามเฉลย (ตอบผิดข้อที่ลำดับน้อยกว่า wrong) แล้วส่งคำตอบ */
+async function playExam(page, wrong = 0) {
+  for (let i = 0; i < 80; i += 1) {
+    const t = await page.evaluate(() => window.__MH_TEST ?? null)
+    if (!t) {
+      await page.waitForTimeout(100)
       continue
     }
-    await answer(page, q, { wrong: i < wrongFirst && q.kind !== 'pay' })
-    await page.waitForFunction((id) => window.__MH_DEBUG?.question?.id !== id, q.id, { timeout: 5000 }).catch(() => undefined)
+    const bad = t.index < wrong
+    if (t.type === 'choice') await page.getByTestId(`mh-tchoice-${bad ? (t.answerPos + 1) % 4 : t.answerPos}`).click()
+    else await page.getByTestId('mh-tnumber').fill(String(bad ? t.answer + 1 : t.answer))
+    if (t.index === t.total - 1) {
+      await page.getByTestId('mh-tsubmit').click()
+      await page.getByTestId('mh-tconfirm').waitFor()
+      await page.getByTestId('mh-tsubmit-confirm').click()
+      await page.getByTestId('mh-test-result').waitFor()
+      return
+    }
+    await page.getByTestId('mh-tnext').click()
+    await page.waitForFunction((n) => window.__MH_TEST?.index === n, t.index + 1, { timeout: 5000 })
   }
-  throw new Error('ทำแบบทดสอบเกิน 40 ข้อแล้วยังไม่จบ')
+  throw new Error('ทำแบบทดสอบเกิน 80 รอบแล้วยังไม่จบ')
 }
 
 async function savedPlayer(page) {
@@ -408,7 +417,7 @@ for (const [name, viewport] of [
     await noSideScroll(page, 'หน้าเริ่มเกม (ผู้เล่นเดิม)')
   })
 
-  await step(`[${name}] แบบทดสอบก่อนเรียน: ป้ายบนแผนที่ → ทำครบ 18 ข้อ → เห็นคะแนนรายทักษะ`, async () => {
+  await step(`[${name}] แบบทดสอบก่อนเรียน (คลังข้อสอบ): ป้ายบนแผนที่ → รีเฟรชกลางคันแล้วทำต่อได้ → ส่งคำตอบ 20 ข้อ → ทำซ้ำไม่ได้`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-pretest-banner').click()
     await page.waitForURL(/#\/test\/pre/)
@@ -416,20 +425,38 @@ for (const [name, viewport] of [
     await snap(page, `${name}-pretest-intro`)
     await noSideScroll(page, 'หน้าแบบทดสอบ')
     await page.getByTestId('mh-test-start').click()
-    await page.getByTestId('mh-question').waitFor()
-    // ระหว่างทำต้องไม่มีปุ่มตัวช่วย
+    await page.getByTestId('mh-exam').waitFor()
+    // ระหว่างทำต้องไม่มีปุ่มตัวช่วย และไม่บอกถูกผิด
     if (await page.getByTestId('mh-hint-btn').isVisible().catch(() => false)) throw new Error('แบบทดสอบมีปุ่มตัวช่วย')
-    await playTest(page, 6)
+    await page.getByTestId('mh-exam-clock').waitFor()
+    await snap(page, `${name}-pretest-item`)
+    await noSideScroll(page, 'หน้าทำแบบทดสอบ')
+    // ตอบข้อแรกผิด แล้วรีเฟรช: กลับมาทำต่อที่ข้อ 2 คำตอบเดิมยังอยู่
+    const t0 = await page.evaluate(() => window.__MH_TEST)
+    if (t0.type === 'choice') await page.getByTestId(`mh-tchoice-${(t0.answerPos + 1) % 4}`).click()
+    else await page.getByTestId('mh-tnumber').fill(String(t0.answer + 1))
+    await page.getByTestId('mh-tnext').click()
+    await page.reload()
+    await page.getByTestId('mh-exam').waitFor()
+    await page.getByText('ตอบแล้ว 1 ข้อ').waitFor()
+    await page.waitForFunction(() => window.__MH_TEST?.index === 1)
+    await playExam(page, 6)
     await page.getByTestId('mh-skill-bars').waitFor()
     await snap(page, `${name}-pretest-result`)
     await noSideScroll(page, 'ผลแบบทดสอบ')
     const p = await savedPlayer(page)
-    if (!p.preTest || p.preTest.total !== 18) throw new Error(`ผลก่อนเรียนไม่ถูกบันทึก: ${JSON.stringify(p.preTest)?.slice(0, 120)}`)
-    if (!(p.preTest.score <= 12)) throw new Error(`ตอบผิด 6 ข้อแต่ได้ ${p.preTest.score}`)
+    if (!p.preTest || p.preTest.total !== 20) throw new Error(`ผลก่อนเรียนไม่ถูกบันทึก: ${JSON.stringify(p.preTest)?.slice(0, 120)}`)
+    if (p.preTest.score !== 14) throw new Error(`ตอบผิด 6 ข้อ ควรได้ 14 แต่ได้ ${p.preTest.score}`)
+    if (p.tests?.length !== 1 || p.tests[0].answers.length !== 20) throw new Error('ไม่ได้บันทึกคำตอบรายข้อ')
     if (!p.badges.includes('pretest')) throw new Error('ไม่ได้ตรานักสำรวจพลัง')
+    if (await page.evaluate(() => localStorage.getItem('moneyHero.test.run'))) throw new Error('ส่งแล้วยังมีแบบทดสอบค้าง')
     await page.getByTestId('mh-test-to-map').click()
     await page.getByTestId('mh-world').waitFor()
     if (await page.getByTestId('mh-pretest-banner').isVisible().catch(() => false)) throw new Error('ทำแล้วป้ายยังอยู่')
+    // ทำได้ครั้งเดียว
+    await page.goto(`${BASE}#/test/pre`)
+    await page.getByTestId('mh-test-done').waitFor()
+    if ((await page.getByTestId('mh-test-start').count()) !== 0) throw new Error('ทำแล้วยังเริ่มทำซ้ำได้')
   })
 
   await step(`[${name}] เล่นด่าน 0 ครบ 4 ขั้น (ตอบผิดก่อนหนึ่งข้อ) ใช้ตัวช่วย และได้ดาว`, async () => {
@@ -490,7 +517,7 @@ for (const [name, viewport] of [
     await step(`[${name}] แบบทดสอบหลังเรียน: เปิดหลังผ่านด่าน 12 และเห็นกราฟก่อน → หลังเรียน`, async () => {
       await page.getByTestId('mh-posttest-banner').click()
       await page.getByTestId('mh-test-start').click()
-      await playTest(page, 0)
+      await playExam(page, 0)
       await page.getByTestId('mh-before-after').waitFor()
       await snap(page, `${name}-posttest-result`)
       const p = await savedPlayer(page)
@@ -1226,6 +1253,68 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-teacher-nopin').waitFor()
     const pinAfter = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).classroom.pin)
     if (pinAfter !== '') throw new Error('ใช้รหัสสำรองแล้วรหัสครูยังไม่ถูกล้าง')
+  })
+
+  await step(`[${name}] คลังข้อสอบ: ครูแก้ เพิ่ม ลบข้อ เห็นคำเตือนฉบับคู่ขนาน ตั้งเวลา พิมพ์ข้อสอบ A4 และให้นักเรียนทำใหม่`, async () => {
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-tests').click()
+    await page.getByTestId('mh-bank').waitFor()
+    await page.getByTestId('mh-bank-parallel').getByText('ฉบับคู่ขนาน', { exact: false }).waitFor()
+    if (!(await page.getByTestId('mh-bank-parallel').getAttribute('class')).includes('is-ok')) throw new Error('ชุดตั้งต้นต้องเป็นฉบับคู่ขนาน')
+    if ((await page.locator('[data-testid^="mh-bank-item-"]').count()) !== 20) throw new Error('ก่อนเรียนต้องมี 20 ข้อ')
+    await snap(page, `${name}-bank`)
+    await noSideScroll(page, 'คลังข้อสอบ')
+    // แก้โจทย์ข้อ 1
+    await page.getByTestId('mh-bank-edit-1').click()
+    await page.getByTestId('mh-ie-text').fill('เหรียญชนิดใดมีค่ามากที่สุด')
+    await page.getByTestId('mh-ie-save').click()
+    await page.getByTestId('mh-bank-item-1').getByText('เหรียญชนิดใดมีค่ามากที่สุด').waitFor()
+    // เพิ่มข้อใหม่: กดบันทึกทั้งที่ยังไม่กรอก ต้องเห็นข้อผิดพลาด
+    await page.getByTestId('mh-bank-add').click()
+    await page.getByTestId('mh-ie-save').click()
+    await page.getByTestId('mh-item-editor').getByText('ยังไม่มีโจทย์', { exact: false }).waitFor()
+    await page.getByTestId('mh-ie-text').fill('ธนบัตร 50 บาท 2 ใบ รวมเป็นเงินกี่บาท')
+    for (const [i, v] of ['50 บาท', '100 บาท', '52 บาท', '150 บาท'].entries()) await page.getByTestId(`mh-ie-choice-${i}`).fill(v)
+    await page.getByTestId('mh-ie-answer-1').check()
+    await page.getByTestId('mh-ie-save').click()
+    await page.getByTestId('mh-bank-item-21').waitFor()
+    if (!(await page.getByTestId('mh-bank-parallel').getAttribute('class')).includes('is-warn')) throw new Error('เพิ่มข้อแล้วต้องเตือนว่าไม่เป็นฉบับคู่ขนาน')
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).bank.pre.items.length === 21)
+    let bank = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).bank)
+    if (bank.pre.items.length !== 21 || bank.pre.items[20].answer !== 1 || !(bank.updatedAt > 0)) throw new Error('ข้อสอบที่เพิ่มไม่ถูกบันทึก')
+    // ลบข้อที่เพิ่ม กลับเป็นคู่ขนาน และตั้งเวลา 25 นาที
+    await page.getByTestId('mh-bank-del-21').click()
+    await page.getByTestId('mh-bank-del-yes-21').click()
+    await page.waitForFunction(() => document.querySelector('[data-testid="mh-bank-parallel"]')?.className.includes('is-ok'))
+    await page.getByTestId('mh-bank-minutes').fill('25')
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).bank.pre.minutes === 25)
+    bank = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).bank)
+    if (bank.pre.items.length !== 20 || bank.pre.minutes !== 25 || bank.pre.items[0].text !== 'เหรียญชนิดใดมีค่ามากที่สุด') throw new Error('การแก้คลังข้อสอบไม่ถูกบันทึก')
+    // พิมพ์ข้อสอบ A4 พร้อมกระดาษคำตอบและเฉลย
+    await page.getByTestId('mh-bank-print').click()
+    await page.getByTestId('mh-print-test-paper').waitFor()
+    if ((await page.locator('.mh-doc-item').count()) !== 20) throw new Error('ข้อสอบฉบับพิมพ์ต้องมี 20 ข้อ')
+    await page.getByTestId('mh-print-test-key').getByText('ค. เหรียญ 10 บาท').waitFor()
+    await page.getByTestId('mh-print-sheet').check()
+    await page.getByTestId('mh-print-test-sheet').waitFor()
+    await noSideScroll(page, 'ข้อสอบฉบับพิมพ์')
+    if (name === 'desktop') {
+      await page.locator('.mh-doc').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-test.png') })
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages < 3 || pages > 8) throw new Error(`พิมพ์ข้อสอบได้ ${pages} หน้า ผิดปกติ`)
+    }
+    // ครูให้นักเรียน (เลขที่ 4) ทำก่อนเรียนใหม่ แล้วป้ายบนแผนที่ของนักเรียนกลับมา
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-table').getByText('ทดสอบ เก่งมาก').click()
+    // เครื่องคอมทำทั้งก่อนและหลังเรียน จึงมี "ครั้งที่ 1" สองบรรทัด
+    await page.getByTestId('mh-student-tests').getByText('ครั้งที่ 1', { exact: false }).first().waitFor()
+    await page.getByTestId('mh-retake-pre').click()
+    await page.getByTestId('mh-student-tests').getByText('เปิดให้ทำใหม่แล้ว', { exact: false }).waitFor()
+    await page.goto(`${BASE}#/players`)
+    await page.getByTestId('mh-pick-4').click()
+    await page.waitForURL(/#\/map/)
+    await page.getByTestId('mh-pretest-banner').waitFor()
   })
 
   await page.context().close()

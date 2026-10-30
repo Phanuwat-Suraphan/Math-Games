@@ -26,7 +26,8 @@ import {
 } from '../data/town'
 import { StageChips } from '../components/StageChips'
 import { readyChests } from '../engine/starRoad'
-import { canTakePostTest, isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
+import { isLevelPassed, isLevelUnlocked, lessonsPassed, levelRecord, nextLevelId, pendingMistakes } from '../engine/progress'
+import { retakeOpen, testState } from '../engine/exam'
 import { AvatarArt, CharacterArt, PetSvg } from '../components/Art'
 import { TopBar } from '../components/TopBar'
 import { Stars } from '../components/Stars'
@@ -91,7 +92,7 @@ function startPoint(mapX?: number, mapY?: number, next = 0): Pt {
 }
 
 export function MapPage() {
-  const { player, updatePlayer } = useGame()
+  const { player, updatePlayer, save } = useGame()
   const navigate = useNavigate()
   useMusic()
   const viewRef = useRef<HTMLDivElement>(null)
@@ -776,26 +777,26 @@ export function MapPage() {
           <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
         </Link>
       )}
-      {!player.preTest && (
+      {testState(player, save.bank.pre) === 'ready' && (!player.preTest || retakeOpen(player, 'pre')) && (
         <Link to="/test/pre" className="mh-card mh-test-banner" data-testid="mh-pretest-banner">
           <span className="mh-test-banner-icon" aria-hidden="true">
             🧭
           </span>
           <span>
             <b>วัดพลังก่อนออกผจญภัย!</b>
-            <span>แบบทดสอบก่อนเรียน 18 ข้อ · ได้ตรา “นักสำรวจพลัง”</span>
+            <span>แบบทดสอบก่อนเรียน {save.bank.pre.items.length} ข้อ · ได้ตรา “นักสำรวจพลัง”</span>
           </span>
           <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
         </Link>
       )}
-      {canTakePostTest(player) && !player.postTest && (
+      {testState(player, save.bank.post) === 'ready' && (!player.postTest || retakeOpen(player, 'post')) && (
         <Link to="/test/post" className="mh-card mh-test-banner is-post" data-testid="mh-posttest-banner">
           <span className="mh-test-banner-icon" aria-hidden="true">
             🎓
           </span>
           <span>
             <b>แบบทดสอบหลังเรียนเปิดแล้ว!</b>
-            <span>20 ข้อ · ดูว่าเก่งขึ้นจากก่อนเรียนเท่าไร</span>
+            <span>{save.bank.post.items.length} ข้อ · ดูว่าเก่งขึ้นจากก่อนเรียนเท่าไร</span>
           </span>
           <span className="mh-btn mh-btn-gold mh-btn-sm">ทำเลย ▶</span>
         </Link>

@@ -9912,3 +9912,398 @@ a.mh-stage-chip:hover {
     grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* ทำแบบทดสอบจากคลังข้อสอบ                                               */
+/* ------------------------------------------------------------------ */
+
+.mh-exam {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mh-exam-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  font-weight: 700;
+}
+
+.mh-exam-count {
+  font-family: var(--mh-display);
+  font-size: 1.15em;
+}
+
+.mh-exam-done {
+  color: var(--mh-ink-soft);
+  font-size: 0.92em;
+}
+
+.mh-exam-clock {
+  margin-left: auto;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: #fff;
+  border: 3px solid #d9d2ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mh-exam-clock.is-low {
+  border-color: #ff8fa3;
+  background: #ffe3e8;
+  color: #b3123a;
+}
+
+.mh-exam-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mh-exam-dot {
+  min-width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 2px solid #d9d2ff;
+  background: #fff;
+  font-weight: 700;
+  color: var(--mh-ink-soft);
+}
+
+.mh-exam-dot.is-done {
+  background: #d3f9d8;
+  border-color: #51cf66;
+  color: #2b8a3e;
+}
+
+.mh-exam-dot.is-on {
+  outline: 3px solid var(--mh-gold-deep);
+  outline-offset: 1px;
+}
+
+.mh-exam-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mh-exam-q {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.mh-exam-no {
+  font-family: var(--mh-display);
+  font-size: 1.3em;
+  font-weight: 700;
+  color: var(--mh-purple);
+}
+
+.mh-exam-text {
+  margin: 0;
+  flex: 1;
+  font-family: var(--mh-display);
+  font-size: 1.2em;
+  line-height: 1.5;
+}
+
+.mh-exam-money {
+  display: flex;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 16px;
+  background: #f8f6ff;
+}
+
+.mh-exam-choices {
+  margin-top: 4px;
+}
+
+.mh-exam-choices .mh-choice {
+  animation: none;
+}
+
+.mh-choice.is-chosen {
+  border-color: var(--mh-purple);
+  background: #f1ecff;
+  box-shadow: 0 5px 0 #b9a5ff;
+}
+
+.mh-exam-letter {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #efeaff;
+  color: var(--mh-purple);
+  font-family: var(--mh-display);
+  font-weight: 700;
+  flex: none;
+}
+
+.mh-choice.is-chosen .mh-exam-letter {
+  background: var(--mh-purple);
+  color: #fff;
+}
+
+.mh-exam-number {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mh-display);
+  font-size: 1.1em;
+  font-weight: 600;
+}
+
+.mh-exam-number .mh-text-input {
+  max-width: 220px;
+  text-align: center;
+}
+
+.mh-exam-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.mh-exam-early {
+  align-self: center;
+}
+
+.mh-exam-confirm {
+  max-width: 460px;
+  text-align: center;
+}
+
+.mh-exam-lock {
+  pointer-events: none;
+}
+
+/* คลังข้อสอบของครู */
+.mh-bank .mh-chips {
+  margin-bottom: 12px;
+}
+
+.mh-bank section.mh-card {
+  margin-bottom: 14px;
+}
+
+.mh-bank-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 1.05em;
+}
+
+.mh-bank-parallel {
+  margin: 10px 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+.mh-bank-parallel.is-ok {
+  background: #ebfbee;
+  color: #2b8a3e;
+}
+
+.mh-bank-parallel.is-warn {
+  background: #fff8e1;
+  color: #8a5a00;
+}
+
+.mh-bank-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.mh-bank-skill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1eefc;
+  font-size: 0.88em;
+}
+
+.mh-bank-skill.is-diff {
+  background: #fff3bf;
+  outline: 2px solid #fab005;
+}
+
+.mh-bank-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mh-bank-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 2px solid #ece8ff;
+}
+
+.mh-bank-item-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mh-bank-tag {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #f1eefc;
+  font-size: 0.82em;
+}
+
+.mh-bank-tag.is-warn {
+  background: #fff3bf;
+}
+
+.mh-bank-text {
+  margin: 8px 0 6px;
+  font-weight: 600;
+}
+
+.mh-bank-money {
+  justify-content: flex-start;
+  margin-bottom: 6px;
+}
+
+.mh-bank-choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 4px 12px;
+}
+
+.mh-bank-choices li.is-answer,
+.mh-bank-answer {
+  color: #2b8a3e;
+  font-weight: 700;
+}
+
+.mh-bank-answer {
+  margin: 0;
+}
+
+.mh-bank-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mh-bank-actions .mh-chip {
+  min-height: 38px;
+  padding: 4px 12px;
+}
+
+.mh-item-editor .mh-ie-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0;
+  font-weight: 600;
+  font-size: 0.9em;
+}
+
+.mh-item-editor textarea.mh-text-input {
+  min-height: 80px;
+  font-size: 1em;
+  font-family: var(--mh-font);
+  resize: vertical;
+}
+
+.mh-item-editor select.mh-text-input {
+  font-family: var(--mh-font);
+}
+
+.mh-ie-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mh-ie-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 12px;
+}
+
+.mh-ie-choice.is-answer {
+  background: #ebfbee;
+}
+
+.mh-ie-choice input[type='radio'] {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.mh-ie-choice .mh-text-input {
+  min-height: 44px;
+  font-size: 1em;
+  padding: 6px 10px;
+  border-radius: 12px;
+}
+
+.mh-ie-money {
+  margin-top: 10px;
+}
+
+.mh-ie-denoms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mh-ie-denom {
+  display: grid;
+  place-items: center;
+  min-width: 48px;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 2px solid #e3ddff;
+  background: #fff;
+}
+
+.mh-ie-picked {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.mh-ie-picked .mh-chip {
+  min-height: 36px;
+  padding: 2px 10px;
+  font-size: 0.85em;
+}
+
+.mh-attempts {
+  margin: 6px 0 0;
+  padding-left: 1.2em;
+  font-size: 0.92em;
+}
+
+.mh-attempt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}

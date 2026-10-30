@@ -217,9 +217,12 @@ export function planStarsTotal(p: Player): number {
 
 /** ผ่านเกณฑ์หรือไม่ (ดูจากแบบทดสอบหลังเรียน) null = ยังไม่ได้ทำ */
 export function passedPost(p: Player, passPercent: number): boolean | null {
-  if (!p.postTest) return null
-  // เทียบแบบจำนวนเต็ม (14/20 กับ 70% ต้องผ่านพอดี ไม่ให้ทศนิยมคลาดเคลื่อน)
-  return p.postTest.score * 100 >= passPercent * Math.max(1, p.postTest.total)
+  return p.postTest ? passedResult(p.postTest, passPercent) : null
+}
+
+/** คะแนนถึงเกณฑ์หรือไม่ เทียบแบบจำนวนเต็ม (14/20 กับ 70% ต้องผ่านพอดี ไม่ให้ทศนิยมคลาดเคลื่อน) */
+export function passedResult(t: TestResult, passPercent: number): boolean {
+  return t.score * 100 >= passPercent * Math.max(1, t.total)
 }
 
 export function passLabel(p: Player, passPercent: number): string {

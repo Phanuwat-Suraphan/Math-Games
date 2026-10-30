@@ -8,6 +8,7 @@ import { earn, type LedgerEntry } from './ledger'
 import { ecoStage, emptyEco, type EcoRecord } from './eco'
 import { emptyPlan, type PlanRecord } from './budget'
 import { DEFAULT_CLASSROOM, repairClassroom, repairStudent, type Classroom, type StudentInfo } from './classroom'
+import { defaultBank, repairBank, type TestAttempt, type TestBank } from './testBank'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -106,6 +107,10 @@ export interface Player {
   student?: StudentInfo
   /** นักเรียนในทะเบียนที่ยังไม่ได้เลือกตัวละคร (เลือกตอนเข้าเกมครั้งแรก) */
   needsAvatar?: boolean
+  /** ประวัติการทำแบบทดสอบจากคลังข้อสอบทุกครั้ง (คำตอบรายข้อ เวลา วันที่) */
+  tests?: TestAttempt[]
+  /** ครูให้ทำแบบทดสอบใหม่ได้ (เวลาที่ครูกด) */
+  retake?: Partial<Record<TestKind, number>>
   mapX?: number
   mapY?: number
 }
@@ -128,6 +133,8 @@ export interface SaveData {
   settings: Settings
   /** ข้อมูลห้องเรียนของครู: โรงเรียน เกณฑ์ผ่าน รหัสครู */
   classroom: Classroom
+  /** คลังข้อสอบก่อน/หลังเรียนที่ครูแก้ไขได้ */
+  bank: TestBank
 }
 
 export const DEFAULT_SETTINGS: Settings = { sound: true, music: true, speech: true, readAloud: false, reduceMotion: false, bigText: false }
@@ -185,7 +192,7 @@ export function newPlayer(name: string, avatar: string, now = Date.now()): Playe
 }
 
 export function emptySave(): SaveData {
-  return { version: 1, players: {}, activeId: null, settings: { ...DEFAULT_SETTINGS }, classroom: { ...DEFAULT_CLASSROOM } }
+  return { version: 1, players: {}, activeId: null, settings: { ...DEFAULT_SETTINGS }, classroom: { ...DEFAULT_CLASSROOM }, bank: defaultBank() }
 }
 
 /** ซ่อมข้อมูลที่ขาดหาย (เช่นบันทึกจากเวอร์ชันเก่า) ให้ใช้งานต่อได้ */
@@ -207,6 +214,8 @@ function repairPlayer(raw: Partial<Player>): Player | null {
     plan: { ...emptyPlan(), ...(raw.plan ?? {}) },
     student,
     needsAvatar: raw.needsAvatar === true ? true : undefined,
+    tests: Array.isArray(raw.tests) ? raw.tests.filter((t) => t && typeof t.id === 'string' && (t.kind === 'pre' || t.kind === 'post') && Array.isArray(t.answers)) : undefined,
+    retake: raw.retake && typeof raw.retake === 'object' ? raw.retake : undefined,
   } as Player
 }
 
@@ -217,6 +226,7 @@ export function parseSave(text: string | null): SaveData {
     const save = emptySave()
     save.settings = { ...DEFAULT_SETTINGS, ...(data.settings ?? {}) }
     save.classroom = repairClassroom(data.classroom)
+    save.bank = repairBank(data.bank)
     for (const raw of Object.values(data.players ?? {})) {
       const p = repairPlayer(raw as Partial<Player>)
       if (p) save.players[p.id] = p
