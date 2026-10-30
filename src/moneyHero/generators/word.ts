@@ -168,8 +168,8 @@ function mulDivTemplates(d: Difficulty): (() => Built)[] {
   const [n1] = sample(KID_NAMES, 1)
   const item = pick(PRODUCTS.filter((p) => p.max <= (d === 1 ? 40 : 150)))
   const price = (): number => {
-    const baht = int(d === 1 ? 5 : 10, d === 1 ? 40 : d === 2 ? 99 : 250)
-    return toSatang(baht, d === 1 ? 0 : pick([0, 25, 50, 75]))
+    // หลักสูตร ป.3: โจทย์คูณ หารเงินใช้บาทล้วน
+    return toSatang(int(d === 1 ? 5 : 10, d === 1 ? 40 : d === 2 ? 99 : 250))
   }
   const count = (): number => (d === 1 ? int(2, 5) : d === 2 ? int(2, 6) : int(3, 9))
   return [
@@ -216,7 +216,7 @@ function mulDivTemplates(d: Difficulty): (() => Built)[] {
     // เงินทั้งหมดแบ่งเท่า ๆ กัน
     () => {
       const n = d === 1 ? int(2, 5) : int(2, 6)
-      const each = d === 1 ? toSatang(int(5, 50)) : toSatang(int(10, 200), pick([0, 25, 50, 75]))
+      const each = d === 1 ? toSatang(int(5, 50)) : toSatang(int(10, 200))
       const total = each * n
       return {
         story: `คุณยายมีเงิน ${formatBS(total)} แบ่งให้หลาน ${n} คน เท่า ๆ กัน`,
@@ -237,7 +237,7 @@ function mulDivTemplates(d: Difficulty): (() => Built)[] {
     // ค่าใช้จ่ายต่อคน
     () => {
       const n = d === 1 ? int(2, 4) : int(2, 6)
-      const each = d === 1 ? toSatang(int(20, 60)) : toSatang(int(25, 180), pick([0, 25, 50, 75]))
+      const each = d === 1 ? toSatang(int(20, 60)) : toSatang(int(25, 180))
       const total = each * n
       return {
         story: `เพื่อน ${n} คน ไปกินข้าวด้วยกัน ค่าอาหารรวม ${formatBS(total)} หารกันจ่ายเท่า ๆ กัน`,
@@ -258,7 +258,7 @@ function mulDivTemplates(d: Difficulty): (() => Built)[] {
     // ราคาต่อชิ้น
     () => {
       const n = d === 1 ? int(2, 5) : int(3, 8)
-      const each = d === 1 ? toSatang(int(3, 30)) : toSatang(int(5, 90), pick([0, 25, 50, 75]))
+      const each = d === 1 ? toSatang(int(3, 30)) : toSatang(int(5, 90))
       const total = each * n
       return {
         story: `${item.name} ${n} ชิ้น ราคารวม ${formatBS(total)} ทุกชิ้นราคาเท่ากัน`,
