@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import type { ChoiceQ } from '../engine/types'
@@ -9,6 +9,9 @@ import { VisualView } from '../components/Visual'
 import { Confetti } from '../components/Effects'
 import { playSound } from '../utils/sound'
 import { speak } from '../utils/speech'
+import { logActivity } from '../engine/activity'
+import { publicName } from '../engine/classroom'
+import { rosterList } from '../engine/roster'
 
 /**
  * ดวลสองคน: แตะคำตอบที่ถูกก่อนได้แต้ม เล่นบนเครื่องเดียว
@@ -79,8 +82,13 @@ function Zone({
 }
 
 export function DuelPage() {
-  const { player } = useGame()
+  const { player, save, updateSave } = useGame()
+  const people = useMemo(() => rosterList(save.players), [save.players])
+  // ผู้เล่นแต่ละฝั่ง: เลือกชื่อในเครื่อง (บันทึกผลแยกให้คนนั้น) หรือพิมพ์ชื่อเอง (ไม่บันทึก)
+  const [who, setWho] = useState<[string, string]>([player?.id ?? '', ''])
   const [names, setNames] = useState<[string, string]>([player?.name || 'ทีมแดง', 'ทีมฟ้า'])
+  const misses = useRef<[number, number]>([0, 0])
+  const startedAt = useRef(Date.now())
   const [layout, setLayout] = useState<'face' | 'side'>('face')
   const [questions, setQuestions] = useState<ChoiceQ[] | null>(null)
   const [state, setState] = useState<DuelState>(startDuel())
@@ -97,6 +105,8 @@ export function DuelPage() {
     playSound('click')
     setQuestions(buildDuel())
     setState(startDuel())
+    misses.current = [0, 0]
+    startedAt.current = Date.now()
     speak('เริ่มดวลได้ ใครแตะคำตอบที่ถูกก่อนได้แต้ม')
   }
 
@@ -110,6 +120,7 @@ export function DuelPage() {
       speak(`${names[side]} ตอบถูกก่อน`)
     } else {
       playSound('wrong')
+      misses.current[side] += 1
       if (next.winner === 'none') speak('ยังไม่มีใครถูก มาดูคำตอบกัน')
     }
   }
@@ -121,7 +132,29 @@ export function DuelPage() {
     const w = duelWinner(state)
     playSound('complete')
     speak(w === 'tie' ? 'เสมอกัน เก่งทั้งคู่เลย' : `${names[w]} ชนะ`)
-    // พูดครั้งเดียวตอนจบ
+    // บันทึกผลแยกให้ผู้เล่นแต่ละฝั่ง (ไม่ใช่คะแนนรวม)
+    const elapsed = Date.now() - startedAt.current
+    ;([0, 1] as Side[]).forEach((side) => {
+      const id = who[side]
+      if (!id || (side === 1 && who[0] === id)) return
+      updateSave((s) => {
+        const p = s.players[id]
+        if (!p) return s
+        const logged = logActivity(p, {
+          act: 'duel',
+          group: 'team',
+          label: `ดวลสองคน กับ ${names[side === 0 ? 1 : 0] || 'เพื่อน'}`,
+          correct: state.scores[side],
+          total: questions?.length ?? DUEL_ROUNDS,
+          wrong: misses.current[side],
+          timeMs: elapsed,
+          points: 0,
+          passed: w === side,
+        })
+        return { ...s, players: { ...s.players, [id]: { ...logged, lastPlayed: Date.now() } } }
+      })
+    })
+    // พูดและบันทึกครั้งเดียวตอนจบ
   }, [finished])
 
   return (
@@ -142,17 +175,44 @@ export function DuelPage() {
             {([0, 1] as Side[]).map((side) => (
               <label key={side} className={`mh-duel-name is-${COLORS[side]}`}>
                 {side === 0 ? '🔴' : '🔵'}
-                <input
-                  value={names[side]}
-                  maxLength={14}
-                  data-testid={`mh-duel-name-${side}`}
-                  aria-label={`ชื่อผู้เล่นฝั่ง${side === 0 ? 'แดง' : 'ฟ้า'}`}
-                  onChange={(e) => {
-                    const n: [string, string] = [...names]
-                    n[side] = e.target.value
-                    setNames(n)
-                  }}
-                />
+                {people.length > 0 && (
+                  <select
+                    value={who[side]}
+                    data-testid={`mh-duel-who-${side}`}
+                    aria-label={`ผู้เล่นฝั่ง${side === 0 ? 'แดง' : 'ฟ้า'}`}
+                    onChange={(e) => {
+                      const w: [string, string] = [...who]
+                      w[side] = e.target.value
+                      setWho(w)
+                      const p = save.players[e.target.value]
+                      if (p) {
+                        const n: [string, string] = [...names]
+                        n[side] = p.name
+                        setNames(n)
+                      }
+                    }}
+                  >
+                    <option value="">✏️ พิมพ์ชื่อเอง (ไม่บันทึก)</option>
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id} disabled={who[side === 0 ? 1 : 0] === p.id}>
+                        {publicName(p)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {!who[side] && (
+                  <input
+                    value={names[side]}
+                    maxLength={14}
+                    data-testid={`mh-duel-name-${side}`}
+                    aria-label={`ชื่อผู้เล่นฝั่ง${side === 0 ? 'แดง' : 'ฟ้า'}`}
+                    onChange={(e) => {
+                      const n: [string, string] = [...names]
+                      n[side] = e.target.value
+                      setNames(n)
+                    }}
+                  />
+                )}
               </label>
             ))}
           </div>

@@ -6,6 +6,7 @@ import { LEVELS, levelById, type LevelDef } from '../data/levels'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
 import { emptyLevel, isLevelUnlocked, levelRecord, type LevelRecord } from '../engine/progress'
+import { levelGroup, logActivity } from '../engine/activity'
 import { BOSS_PASS, levelReward, nextStar, STAR_LINES, starsFor } from '../engine/scoring'
 import { buildStep } from '../generators'
 import { TopBar } from '../components/TopBar'
@@ -89,10 +90,11 @@ export function LevelPage() {
   const id = Number(params.id)
   const step = params.step as StepId | 'result'
   const level = levelById(id)
-  const { player } = useGame()
+  const { player, save } = useGame()
+  const open = save.classroom.classMode
 
   if (!player || !level || Number.isNaN(id)) return <Navigate to="/map" replace />
-  if (!isLevelUnlocked(player, id) || id > PLAYABLE_MAX) return <Navigate to="/map" replace />
+  if (!isLevelUnlocked(player, id, open) || id > PLAYABLE_MAX) return <Navigate to="/map" replace />
 
   const rec = levelRecord(player, id)
   const order: StepId[] = ['learn', 'practice', 'mission', 'boss']
@@ -173,7 +175,18 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
           rec.runHints += s.hints
         }
         rec.stepDone = Math.max(rec.stepDone, n)
-        return { ...p, levels: { ...p.levels, [level.id]: rec } }
+        const next = { ...p, levels: { ...p.levels, [level.id]: rec } }
+        if (!s || (n !== 2 && n !== 3)) return next
+        return logActivity(next, {
+          act: `L${level.id}-${n === 2 ? 'practice' : 'mission'}`,
+          group: levelGroup(level.id),
+          label: `ด่าน ${level.id} ${n === 2 ? 'ฝึกฝน' : 'ภารกิจ'}`,
+          correct: s.firstTry,
+          total: s.originals,
+          wrong: s.originals - s.firstTry,
+          timeMs: s.ms,
+          points: s.coins,
+        })
       })
     },
     [updatePlayer, level.id],
@@ -182,8 +195,21 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
   const finishBoss = useCallback(
     (s: RunSummary) => {
       const passRate = s.originals === 0 ? 1 : s.within2 / s.originals
+      const bossLog = (passed: boolean, stars: number, points: number) => ({
+        act: `L${level.id}-boss`,
+        group: levelGroup(level.id),
+        label: `ด่าน ${level.id} สู้บอส`,
+        correct: s.firstTry,
+        total: s.originals,
+        wrong: s.originals - s.firstTry,
+        timeMs: s.ms,
+        points,
+        stars,
+        passed,
+      })
       if (passRate < BOSS_PASS) {
         playSound('wrong')
+        updatePlayer((p) => logActivity(p, bossLog(false, 0, s.coins)))
         setBossFail(s)
         return
       }
@@ -225,7 +251,8 @@ function StepView({ level, step }: { level: LevelDef; step: StepId }) {
             runTotal: r.total,
             runHints: prev.runHints + s.hints,
           }
-          return { ...earn(p, r.reward.coins, `รางวัลผ่านด่าน ${level.id}`, '🏆'), exp: p.exp + r.reward.exp, levels: { ...p.levels, [level.id]: rec } }
+          const paid = { ...earn(p, r.reward.coins, `รางวัลผ่านด่าน ${level.id}`, '🏆'), exp: p.exp + r.reward.exp, levels: { ...p.levels, [level.id]: rec } }
+          return logActivity(paid, bossLog(true, r.stars, s.coins + r.reward.coins))
         },
         s.hints === 0 ? ['nohint-boss'] : [],
       )

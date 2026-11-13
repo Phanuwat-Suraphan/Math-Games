@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
+import { logActivity } from '../engine/activity'
 import {
   BINS,
   ECO_REWARD,
@@ -108,6 +109,11 @@ function RecipeCard({ r, onPick }: { r: Recipe; onPick: () => void }) {
 export function EcoPage() {
   const { player, updatePlayer } = useGame()
   const [phase, setPhase] = useState<Phase>('choose')
+  // บันทึกภารกิจ: รวมผลการตอบของทั้งวัน (ขายขยะ ซื้ออุปกรณ์ ขายสินค้า)
+  const run = useRef({ correct: 0, total: 0, wrong: 0, ms: 0, at: Date.now() })
+  const addRun = (s: { firstTry: number; originals: number; ms: number }) => {
+    run.current = { ...run.current, correct: run.current.correct + s.firstTry, total: run.current.total + s.originals, wrong: run.current.wrong + s.originals - s.firstTry, ms: run.current.ms + s.ms }
+  }
   const [day, setDay] = useState<EcoDay | null>(null)
   const [sorted, setSorted] = useState<number[]>([])
   const [selected, setSelected] = useState<number | null>(null)
@@ -145,6 +151,7 @@ export function EcoPage() {
     setPrice(null)
     setAlloc(emptyAlloc())
     setReward(null)
+    run.current = { correct: 0, total: 0, wrong: 0, ms: 0, at: Date.now() }
     setPhase('sort')
     speak(`วันนี้เราจะทำ${r.name} มาคัดแยกขยะกันก่อน`)
   }
@@ -172,10 +179,23 @@ export function EcoPage() {
     const savedCoins = Math.floor(a.save / 100)
     const before = ecoStage(eco).stage
     const after = ecoStage({ ...eco, sales: eco.sales + income }).stage
+    const r = run.current
     updatePlayer((p) => {
       let next = earn(p, ECO_REWARD.coins, 'รางวัลกาดรักษ์โลก', '🌱')
       next = earn(next, savedCoins, 'ออมจากกาดรักษ์โลก', '💰')
-      return { ...next, exp: next.exp + ECO_REWARD.exp, eco: recordEcoDay(p.eco, { sales: income, profit, alloc: a }) }
+      return logActivity(
+        { ...next, exp: next.exp + ECO_REWARD.exp, eco: recordEcoDay(p.eco, { sales: income, profit, alloc: a }) },
+        {
+          act: 'eco',
+          group: 'budget',
+          label: 'กาดรักษ์โลก',
+          correct: r.correct,
+          total: r.total,
+          wrong: r.wrong,
+          timeMs: Date.now() - r.at,
+          points: ECO_REWARD.coins + savedCoins,
+        },
+      )
     })
     setReward({ coins: ECO_REWARD.coins + savedCoins, saved: savedCoins, stageUp: after > before })
     setPhase('done')
@@ -314,7 +334,10 @@ export function EcoPage() {
               </span>
               <span>🏦 ที่เหลือขายให้ธนาคารขยะ</span>
             </div>
-            <StepRunner key="sell" questions={sellQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={() => setPhase('buy')} />
+            <StepRunner key="sell" questions={sellQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={(s) => {
+                addRun(s)
+                setPhase('buy')
+              }} />
           </div>
         )}
 
@@ -327,7 +350,10 @@ export function EcoPage() {
               </span>
               <span>🛒 ไปร้านลุงหมีซื้ออุปกรณ์</span>
             </div>
-            <StepRunner key="buy" questions={buyQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={() => setPhase('make')} />
+            <StepRunner key="buy" questions={buyQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={(s) => {
+                addRun(s)
+                setPhase('make')
+              }} />
           </div>
         )}
 
@@ -443,7 +469,10 @@ export function EcoPage() {
               </div>
             </div>
             {marketQs.length > 0 ? (
-              <StepRunner key={`market-${price}`} questions={marketQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={() => setPhase('profit')} />
+              <StepRunner key={`market-${price}`} questions={marketQs} levelId={-1} mode="practice" earnLabel={EARN_LABEL} onFinish={(s) => {
+                addRun(s)
+                setPhase('profit')
+              }} />
             ) : (
               <div className="mh-card mh-center">
                 <p>วันนี้ยังขายไม่ได้เลย ราคาอาจแพงไปสำหรับลูกค้า</p>

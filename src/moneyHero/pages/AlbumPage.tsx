@@ -5,6 +5,7 @@ import type { DenomId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { denom } from '../data/denominations'
 import { addSticker, ALBUM, albumCard, albumQuestion, STICKER_COINS, type AlbumQuestion } from '../engine/album'
+import { logActivity } from '../engine/activity'
 import { TopBar } from '../components/TopBar'
 import { MoneyPiece } from '../components/Art'
 import { Confetti } from '../components/Effects'
@@ -82,18 +83,37 @@ export function AlbumPage() {
           has={album.includes(open)}
           onClose={() => setOpen(null)}
           onSticker={() => updatePlayer((p) => addSticker(p, open))}
+          onAnswered={(wrong) =>
+            updatePlayer((p) =>
+              logActivity(p, { act: 'album', group: 'read', label: 'สมุดสะสมเงิน', correct: wrong === 0 ? 1 : 0, total: 1, wrong, timeMs: 0, points: 0 }),
+            )
+          }
         />
       )}
     </div>
   )
 }
 
-function CardModal({ id, has, onClose, onSticker }: { id: DenomId; has: boolean; onClose: () => void; onSticker: () => void }) {
+function CardModal({
+  id,
+  has,
+  onClose,
+  onSticker,
+  onAnswered,
+}: {
+  id: DenomId
+  has: boolean
+  onClose: () => void
+  onSticker: () => void
+  /** ตอบถูกแล้ว (จำนวนครั้งที่ตอบผิดก่อนถูก) ใช้บันทึกภารกิจ */
+  onAnswered: (wrong: number) => void
+}) {
   const d = denom(id)
   const card = albumCard(id)
   const [q, setQ] = useState<AlbumQuestion>(() => albumQuestion(id))
   const [state, setState] = useState<'ask' | 'right' | 'wrong'>('ask')
   const [fresh, setFresh] = useState(false)
+  const [misses, setMisses] = useState(0)
 
   useEffect(() => {
     window.__MH_ALBUM = { answer: q.answer }
@@ -111,6 +131,7 @@ function CardModal({ id, has, onClose, onSticker }: { id: DenomId; has: boolean;
     if (n === q.answer) {
       playSound('star')
       setState('right')
+      onAnswered(misses)
       if (!has) {
         setFresh(true)
         onSticker()
@@ -119,6 +140,7 @@ function CardModal({ id, has, onClose, onSticker }: { id: DenomId; has: boolean;
     } else {
       playSound('wrong')
       setState('wrong')
+      setMisses((m) => m + 1)
       speak('ยังไม่ถูก ลองดูคำใบ้นะ')
     }
   }
@@ -175,6 +197,7 @@ function CardModal({ id, has, onClose, onSticker }: { id: DenomId; has: boolean;
                 setQ(albumQuestion(id))
                 setState('ask')
                 setFresh(false)
+                setMisses(0)
               }}
             >
               🔁 ลองอีกข้อ

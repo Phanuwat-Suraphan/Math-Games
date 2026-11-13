@@ -93,6 +93,7 @@ function startPoint(mapX?: number, mapY?: number, next = 0): Pt {
 
 export function MapPage() {
   const { player, updatePlayer, save } = useGame()
+  const open = save.classroom.classMode
   const navigate = useNavigate()
   useMusic()
   const viewRef = useRef<HTMLDivElement>(null)
@@ -189,7 +190,7 @@ export function MapPage() {
   const enter = useCallback(
     (level: LevelDef) => {
       if (!player) return
-      if (!isLevelUnlocked(player, level.id)) {
+      if (!isLevelUnlocked(player, level.id, open)) {
         playSound('wrong')
         setTalk({ npc: 'hero', text: `🔒 ผ่านด่าน ${level.id - 1} ก่อน ด่านนี้จึงจะเปิดนะ` })
         return
@@ -454,8 +455,8 @@ export function MapPage() {
         </div>
         <div className="mh-map-chips">
           {LEVELS.slice(1).map((l) => (
-            <span key={l.id} className={`mh-mini-chip ${isLevelPassed(player, l.id) ? 'is-done' : isLevelUnlocked(player, l.id) ? 'is-open' : ''}`}>
-              {l.id} {isLevelPassed(player, l.id) ? '✅' : isLevelUnlocked(player, l.id) ? '▶' : '🔒'}
+            <span key={l.id} className={`mh-mini-chip ${isLevelPassed(player, l.id) ? 'is-done' : isLevelUnlocked(player, l.id, open) ? 'is-open' : ''}`}>
+              {l.id} {isLevelPassed(player, l.id) ? '✅' : isLevelUnlocked(player, l.id, open) ? '▶' : '🔒'}
             </span>
           ))}
         </div>
@@ -481,7 +482,7 @@ export function MapPage() {
           ))}
 
           {LEVELS.map((l) => {
-            const unlocked = isLevelUnlocked(player, l.id)
+            const unlocked = isLevelUnlocked(player, l.id, open)
             const rec = levelRecord(player, l.id)
             const done = rec.stepDone >= 4
             const soon = l.id > PLAYABLE_MAX
@@ -705,7 +706,7 @@ export function MapPage() {
           {near && !talk && (
             <div className="mh-card mh-level-panel" data-testid="mh-level-panel">
               <div className="mh-level-panel-icon">
-                <BuildingArt level={near.id} locked={!isLevelUnlocked(player, near.id)} className="mh-thumb-bld" />
+                <BuildingArt level={near.id} locked={!isLevelUnlocked(player, near.id, open)} className="mh-thumb-bld" />
               </div>
               <div className="mh-level-panel-info">
                 <strong>
@@ -720,9 +721,9 @@ export function MapPage() {
                 className="mh-btn mh-btn-gold"
                 onClick={() => enter(near)}
                 data-testid="mh-enter"
-                disabled={!isLevelUnlocked(player, near.id)}
+                disabled={!isLevelUnlocked(player, near.id, open)}
               >
-                {isLevelUnlocked(player, near.id) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
+                {isLevelUnlocked(player, near.id, open) ? '▶ เข้าด่าน' : '🔒 ล็อก'}
               </button>
             </div>
           )}
@@ -803,6 +804,12 @@ export function MapPage() {
       )}
 
       <nav className="mh-map-menu" aria-label="เมนูฮีโร่">
+        <Link to="/real" className="mh-menu-tile mh-menu-real" data-testid="mh-menu-real">
+          <span aria-hidden="true">🧭</span>เส้นทาง REAL
+        </Link>
+        <Link to="/team" className="mh-menu-tile mh-menu-team" data-testid="mh-menu-team">
+          <span aria-hidden="true">👥</span>ภารกิจกลุ่ม
+        </Link>
         <Link to="/badges" className="mh-menu-tile">
           <span aria-hidden="true">🏆</span>ตรา
         </Link>
@@ -896,7 +903,7 @@ export function MapPage() {
       {showList && (
         <div className="mh-level-list" data-testid="mh-level-list">
           {LEVELS.map((l) => {
-            const unlocked = isLevelUnlocked(player, l.id)
+            const unlocked = isLevelUnlocked(player, l.id, open)
             const rec = levelRecord(player, l.id)
             return (
               <button

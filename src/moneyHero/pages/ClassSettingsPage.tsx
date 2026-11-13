@@ -114,6 +114,14 @@ export function ClassSettingsPage() {
           </span>
           <input type="checkbox" className="mh-switch" checked={c.rosterOnly} data-testid="mh-cs-rosteronly" onChange={(e) => updateClassroom({ rosterOnly: e.target.checked })} />
         </label>
+        <label className="mh-switch-row">
+          <span className="mh-switch-icon">🔓</span>
+          <span className="mh-switch-text">
+            <b>โหมดทบทวนในห้องเรียน: เปิดทุกด่าน</b>
+            <span>ใช้เกมทบทวนหลังเรียนจบหน่วย นักเรียนเลือกเล่นด่านไหนก็ได้ ไม่ต้องผ่านด่านก่อนหน้า (ภารกิจเดิมอยู่ครบ)</span>
+          </span>
+          <input type="checkbox" className="mh-switch" checked={c.classMode} data-testid="mh-cs-classmode" onChange={(e) => updateClassroom({ classMode: e.target.checked })} />
+        </label>
       </section>
 
       <PinSection />

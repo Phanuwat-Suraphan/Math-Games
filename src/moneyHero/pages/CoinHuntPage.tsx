@@ -4,6 +4,7 @@ import { ArrowLeft, Camera, CameraOff } from 'lucide-react'
 import type { DenomId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
+import { logActivity } from '../engine/activity'
 import { HUNT_LEVELS, HUNT_REWARD, HUNT_ROUNDS, checkHunt, makeRound, type HuntCheck, type HuntRound } from '../engine/coinHunt'
 import { formatBS } from '../utils/money'
 import { denom } from '../data/denominations'
@@ -85,6 +86,9 @@ export function CoinHuntPage() {
   const [round, setRound] = useState<HuntRound>(() => makeRound(0))
   const floaters = useMemo(() => layout(round.spawns), [round])
   const [picked, setPicked] = useState<number[]>([])
+  // บันทึกภารกิจ: เวลาเริ่ม และจำนวนครั้งที่ตรวจแล้วยังไม่พอดี
+  const startedAt = useRef(0)
+  const missRef = useRef(0)
   const [result, setResult] = useState<HuntCheck | null>(null)
   const [cleared, setCleared] = useState(0)
   const [cam, setCam] = useState<CamState>('off')
@@ -267,6 +271,7 @@ export function CoinHuntPage() {
       updatePlayer((p) => ({ ...earn(p, HUNT_REWARD.coins, 'ล่าเหรียญ AR', '📷'), exp: p.exp + HUNT_REWARD.exp }))
     } else {
       playSound('wrong')
+      missRef.current += 1
     }
     speak(r.message)
   }
@@ -278,7 +283,20 @@ export function CoinHuntPage() {
       stopCamera()
       setCam('off')
       playSound('complete')
-      updatePlayer((p) => p, cleared >= HUNT_ROUNDS ? ['ar-hunter'] : [])
+      updatePlayer(
+        (p) =>
+          logActivity(p, {
+            act: 'coinhunt',
+            group: 'change',
+            label: 'ล่าเหรียญ',
+            correct: cleared,
+            total: HUNT_ROUNDS,
+            wrong: missRef.current,
+            timeMs: startedAt.current ? Date.now() - startedAt.current : 0,
+            points: cleared * HUNT_REWARD.coins,
+          }),
+        cleared >= HUNT_ROUNDS ? ['ar-hunter'] : [],
+      )
       return
     }
     const n = roundNo + 1
@@ -294,8 +312,14 @@ export function CoinHuntPage() {
     setPicked([])
     setResult(null)
     setCleared(0)
+    startedAt.current = 0
+    missRef.current = 0
     setPhase('intro')
   }
+
+  useEffect(() => {
+    if (phase === 'play' && startedAt.current === 0) startedAt.current = Date.now()
+  }, [phase])
 
   if (!player) return null
 

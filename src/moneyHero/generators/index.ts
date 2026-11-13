@@ -272,3 +272,16 @@ export function buildTest(kind: 'pre' | 'post'): Question[] {
 export function regenerate(gen: string, d: Difficulty): Question {
   return generate(gen, d)[0]
 }
+
+/* ------------------------------------------------------------------ */
+/* ภารกิจกลุ่ม: โจทย์คละทุกกลุ่มภารกิจ (ผลัดกันตอบ)                        */
+/* ------------------------------------------------------------------ */
+
+const TEAM_GENS: string[] = ['countChoice', 'add', 'whoMore', 'shop', 'exchangeCount', 'subtract', 'wordQuick', 'multiply', 'dotChoice', 'incomeExpense', 'divide', 'compare', 'pay', 'wordQuick', 'add']
+
+/** โจทย์ภารกิจกลุ่ม count ข้อ (คนละ 3 ข้อ) ข้อละหนึ่งคำถาม ความยากระดับกลาง */
+export function buildTeam(count: number): Question[] {
+  const out: Question[] = []
+  for (let i = 0; out.length < count; i += 1) out.push(generate(TEAM_GENS[i % TEAM_GENS.length], 2)[0])
+  return out
+}

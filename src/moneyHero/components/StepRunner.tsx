@@ -4,7 +4,7 @@ import type { CheckResult, Question, Response } from '../engine/types'
 import type { LearnSlide } from '../data/levels'
 import { ENCOURAGE, PRAISE } from '../data/characters'
 import { answerText, checkAnswer } from '../engine/check'
-import { recordAnswer } from '../engine/progress'
+import { recordAnswer, type Player } from '../engine/progress'
 import { earn } from '../engine/ledger'
 import { scoreAnswer } from '../engine/scoring'
 import { regenerate } from '../generators'
@@ -63,6 +63,8 @@ export function StepRunner({
   earnLabel,
   onAnswer,
   onFinish,
+  onIndex,
+  record,
 }: {
   questions: Question[]
   levelId: number
@@ -73,8 +75,13 @@ export function StepRunner({
   /** ทุกครั้งที่ตอบ (attempt = ครั้งที่ตอบข้อนี้ · retry = ข้อฝึกซ้ำที่เพิ่มต่อท้าย) */
   onAnswer?: (q: Question, r: Response, correct: boolean, info: { attempt: number; retry: boolean }) => void
   onFinish: (s: RunSummary) => void
+  /** ทุกครั้งที่เปลี่ยนข้อ (ภารกิจกลุ่มใช้บอกว่าเป็นตาของใคร) */
+  onIndex?: (index: number, retry: boolean) => void
+  /** บันทึกผลการตอบให้ผู้เล่นคนอื่นแทนผู้เล่นปัจจุบัน (ภารกิจกลุ่ม: บันทึกให้เจ้าของตา) */
+  record?: (fn: (p: Player) => Player) => void
 }) {
-  const { updatePlayer, player, settings } = useGame()
+  const { updatePlayer: updateActive, player, settings } = useGame()
+  const updatePlayer = record ?? updateActive
   const [items, setItems] = useState<Item[]>(() => questions.map((q) => ({ q, retry: false })))
   const [index, setIndex] = useState(0)
   const [attempt, setAttempt] = useState(1)
@@ -99,6 +106,10 @@ export function StepRunner({
   useEffect(() => {
     if (q) window.__MH_DEBUG = { question: q, phase, index, total: items.length }
   }, [q, phase, index, items.length])
+
+  useEffect(() => {
+    if (item) onIndex?.(index, item.retry)
+  }, [index])
 
   useEffect(() => () => stopSpeaking(), [])
 

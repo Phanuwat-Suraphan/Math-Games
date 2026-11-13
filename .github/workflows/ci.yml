@@ -121,7 +121,8 @@ jobs:
   # ชุดทดสอบข้างบนตรวจแค่ตรรกะ ข้อนี้ตรวจว่าหน้าจอ React กดเล่นได้จริงไม่มี error
   browser:
     name: เล่นเกมอวกาศในเบราว์เซอร์จริง
-    runs-on: ubuntu-latest
+    # ล็อกรุ่นเครื่องไว้ เพราะ ubuntu-latest เปลี่ยนเป็นรุ่นที่ Playwright ยังไม่รองรับ (ติดตั้ง Chromium ไม่ได้)
+    runs-on: ubuntu-24.04
 
     steps:
       - uses: actions/checkout@v4

@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Printer, UserPlus } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import { fullName, rosterPlayerId, studentKey, type StudentInfo } from '../engine/classroom'
 import { applyRoster, findStudent, participation, PARTICIPATION_LABEL, readRoster, rosterList, rosterTemplate, type RosterRead } from '../engine/roster'
+import { abilityScore, applyTeams, autoTeams, teamList } from '../engine/teams'
 import { downloadText } from '../engine/backup'
 import { lessonsPassed, newPlayer, type Player } from '../engine/progress'
 import { TOTAL_LESSONS } from '../data/levels'
@@ -52,7 +53,8 @@ export function RosterPage() {
   }
 
   const saveForm = (id: string | 'new', v: FormValue): string | null => {
-    const student: StudentInfo = { no: v.no, code: v.code.trim(), prefix: v.prefix.trim(), first: v.first.trim(), last: v.last.trim(), room: v.room.trim() || room }
+    const team = (v.team ?? '').trim()
+    const student: StudentInfo = { no: v.no, code: v.code.trim(), prefix: v.prefix.trim(), first: v.first.trim(), last: v.last.trim(), room: v.room.trim() || room, ...(team ? { team } : {}) }
     if (!student.first) return 'ใส่ชื่อจริงก่อนนะ'
     const same = findStudent(save.players, student)
     if (same && same.id !== id) return `${student.code ? 'เลขประจำตัวนี้' : 'เลขที่นี้ในห้องนี้'}มีในทะเบียนแล้ว (${fullName(same.student!)})`
@@ -187,6 +189,8 @@ export function RosterPage() {
         )}
       </section>
 
+      {roster.length > 0 && <TeamSection roster={roster} />}
+
       <section className="mh-card">
         <div className="mh-roster-head">
           <h2 className="mh-card-title">📋 รายชื่อในทะเบียน ({roster.length} คน)</h2>
@@ -214,6 +218,7 @@ export function RosterPage() {
                   <th>ชื่อ - สกุล</th>
                   <th>ชื่อในเกม</th>
                   <th>ห้อง</th>
+                  <th>กลุ่ม</th>
                   <th>สถานะ</th>
                   <th>จัดการ</th>
                 </tr>
@@ -231,6 +236,7 @@ export function RosterPage() {
                       </span>
                     </td>
                     <td>{p.student!.room}</td>
+                    <td>{p.student!.team ?? '–'}</td>
                     <td className="mh-roster-status">{PARTICIPATION_LABEL[participation(p)]}</td>
                     <td>
                       {confirmId === p.id ? (
@@ -384,6 +390,10 @@ function StudentForm({
           ห้อง
           <input className="mh-text-input" value={v.room} maxLength={20} data-testid="mh-sf-room" onChange={(e) => set({ room: e.target.value })} />
         </label>
+        <label>
+          กลุ่ม (ไม่บังคับ)
+          <input className="mh-text-input" value={v.team ?? ''} maxLength={10} placeholder="เช่น 1" data-testid="mh-sf-team" onChange={(e) => set({ team: e.target.value })} />
+        </label>
       </div>
       {error && (
         <p className="mh-pin-error" role="alert">
@@ -399,5 +409,79 @@ function StudentForm({
         </button>
       </div>
     </form>
+  )
+}
+
+/** จัดกลุ่มทำกิจกรรม: อัตโนมัติแบบคละความสามารถ หรือกำหนดเองรายคนในแบบฟอร์ม */
+function TeamSection({ roster }: { roster: Player[] }) {
+  const { updateSave, pushToast } = useGame()
+  const [size, setSize] = useState(4)
+  const teams = teamList(roster)
+  const withPre = roster.filter((p) => p.preTest).length
+  return (
+    <section className="mh-card" data-testid="mh-roster-teams">
+      <div className="mh-roster-head">
+        <h2 className="mh-card-title">👥 กลุ่มทำกิจกรรม ({teams.length} กลุ่ม)</h2>
+        <Link to="/teacher/print/groups" className="mh-btn mh-btn-go" data-testid="mh-roster-print-groups">
+          <Printer size={18} /> แบบสังเกตพฤติกรรมกลุ่ม (A4)
+        </Link>
+      </div>
+      <p className="mh-soft">
+        จัดกลุ่มคละความสามารถ: เรียงจากคะแนนก่อนเรียน (มีคะแนน {withPre}/{roster.length} คน ที่เหลือใช้ผลการเล่นในเกม) แล้วแจกแบบงูเลื้อย ทุกกลุ่มมีทั้งคนที่เก่งและคนที่ต้องช่วย แก้กลุ่มรายคนได้ที่ปุ่ม
+        "แก้ไข"
+      </p>
+      <div className="mh-roster-tools">
+        <label className="mh-roster-room">
+          กลุ่มละ
+          <select className="mh-text-input" value={size} onChange={(e) => setSize(Number(e.target.value))} data-testid="mh-team-size">
+            {[3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n} คน
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="mh-btn mh-btn-gold"
+          data-testid="mh-team-auto"
+          onClick={() => {
+            const map = autoTeams(roster, size)
+            updateSave((s) => ({ ...s, players: applyTeams(s.players, map) }))
+            pushToast('👥', `จัดกลุ่มแล้ว ${new Set(Object.values(map)).size} กลุ่ม`)
+          }}
+        >
+          🎲 จัดกลุ่มคละความสามารถ
+        </button>
+        {teams.length > 0 && (
+          <button
+            type="button"
+            className="mh-btn mh-btn-soft"
+            onClick={() => {
+              const map: Record<string, string> = {}
+              for (const p of roster) map[p.id] = ''
+              updateSave((s) => ({ ...s, players: applyTeams(s.players, map) }))
+            }}
+          >
+            ล้างกลุ่ม
+          </button>
+        )}
+      </div>
+      {teams.length > 0 && (
+        <div className="mh-team-overview">
+          {teams.map((t) => (
+            <div key={t.team} className="mh-team-box" data-testid={`mh-team-box-${t.team}`}>
+              <b>กลุ่ม {t.team}</b>
+              <small>
+                {t.members.map((p) => `${p.student?.no ?? ''} ${p.name}`.trim()).join(' · ')}
+              </small>
+              <small className="mh-soft">
+                ความสามารถเฉลี่ย {Math.round((t.members.reduce((sum, p) => sum + abilityScore(p), 0) / t.members.length) * 100)}%
+              </small>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   )
 }
