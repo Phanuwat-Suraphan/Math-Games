@@ -59,6 +59,7 @@ const exam = load('engine/exam.js')
 const board = load('board/boardData.js')
 const activity = load('engine/activity.js')
 const teams = load('engine/teams.js')
+const stats = load('engine/stats.js')
 
 let passed = 0
 const failures = []
@@ -2184,6 +2185,114 @@ test('โหมดทบทวนในห้องเรียน: ครูเ
     for (const q of qs) assert(q.title && q.skill, `โจทย์ภารกิจกลุ่มสมบูรณ์ (${q.gen})`)
   }
 })
+
+/* ------------------------------------------------------------------ */
+/* ระยะ 4: วิเคราะห์ผลการเรียนรู้ (สถิติสำหรับ ว.PA)                       */
+/* ------------------------------------------------------------------ */
+
+test('สถิติ: ค่าเฉลี่ย S.D. ค่า p ของ t ตรงกับตาราง และ t-test แบบไม่อิสระคำนวณถูก', () => {
+  const d = stats.describe([2, 4, 4, 4, 5, 5, 7, 9])
+  eq(d.mean, 5, 'ค่าเฉลี่ย')
+  assert(Math.abs(d.sd - 2.13809) < 1e-4, `S.D. หาร n−1: ${d.sd}`)
+  eq(stats.describe([]).mean, null, 'ไม่มีข้อมูล')
+  eq(stats.describe([3]).sd, null, 'คนเดียวไม่มี S.D.')
+  // ค่าวิกฤตจากตาราง t: P(T > t) = .05 และ .01
+  for (const [t, df, p] of [[1.833, 9, 0.05], [2.821, 9, 0.01], [1.729, 19, 0.05], [2.539, 19, 0.01], [1.697, 30, 0.05], [2.0, 10, 0.03669]]) {
+    assert(Math.abs(stats.tUpper(t, df) - p) < 5e-4, `P(T>${t}, df ${df}) = ${stats.tUpper(t, df)} ควรเป็น ${p}`)
+  }
+  assert(Math.abs(stats.tUpper(-1, 5) - 0.8184) < 1e-3, 'ค่า t ติดลบ')
+  const pre = [10, 12, 9, 14, 11, 8, 13, 10]
+  const post = [14, 15, 12, 17, 13, 12, 16, 15]
+  const r = stats.pairedT(pre, post)
+  eq(r.n, 8, 'n')
+  eq(r.df, 7, 'df')
+  eq(r.meanDiff, 3.375, 'ผลต่างเฉลี่ย')
+  assert(Math.abs(r.t - 10.42) < 0.01, `t ≈ 10.42: ${r.t}`)
+  assert(r.sig01 && r.sig05, 'มีนัยสำคัญ .01')
+  eq(stats.tSummary(r), 'คะแนนหลังเรียนสูงกว่าก่อนเรียนอย่างมีนัยสำคัญทางสถิติที่ระดับ .01', 'สรุปผล')
+  // ไม่เปลี่ยนเลย: ไม่มีนัยสำคัญ
+  const same = stats.pairedT([5, 6, 7], [5, 6, 7])
+  eq(same.t, 0, 't = 0')
+  eq(same.sig05, false, 'ไม่มีนัยสำคัญ')
+  // ทุกคนเพิ่มเท่ากัน: S.D. = 0 ไม่หารศูนย์
+  const flat = stats.pairedT([5, 6, 7], [7, 8, 9])
+  eq(flat.sig01, true, 'เพิ่มเท่ากันทุกคน ถือว่าต่างชัดเจน')
+  eq(stats.pairedT([5], [9]).p, null, 'คนเดียวทดสอบไม่ได้')
+  // ร้อยละจากคะแนนดิบมีเศษทศนิยม (8/20*100 = 40.00000000000001) ทุกคนเพิ่ม 6 คะแนนเท่ากันต้องไม่ได้ค่า t มหาศาล
+  const noisy = stats.pairedT([8, 9, 10, 11].map((x) => (x / 20) * 100), [14, 15, 16, 17].map((x) => (x / 20) * 100))
+  eq(noisy.t, Infinity, 'เพิ่มเท่ากันทุกคน ถือว่า S.D. = 0')
+  eq(stats.tText(noisy.t), 'สูงมาก (ทุกคนเพิ่มเท่ากัน)', 'แสดงผลเป็นข้อความ')
+  // E.I. (คิดจากร้อยละ = คิดจากคะแนนดิบเมื่อคะแนนเต็มเท่ากัน)
+  const ei = stats.effectivenessIndex(pre.map((x) => x * 5), post.map((x) => x * 5))
+  assert(Math.abs(ei - 135 / 365) < 1e-9, `E.I. = (570−435)/(800−435): ${ei}`)
+  eq(stats.effectivenessIndex([100], [100]), null, 'เต็มตั้งแต่ก่อนเรียน คิด E.I. ไม่ได้')
+  eq(stats.pText(0.0004), '< .001', 'ค่า p น้อยมาก')
+  eq(stats.pText(0.0321), '.032', 'ค่า p สามตำแหน่ง')
+  eq(stats.scoreLevel(80).name, 'ดีเยี่ยม', 'ระดับ 80')
+  eq(stats.scoreLevel(79.9).name, 'ดี', 'ระดับ 79.9')
+  eq(stats.scoreLevel(59).name, 'ควรปรับปรุง', 'ระดับ 59')
+})
+
+test('วิเคราะห์ทั้งห้อง: การเข้าร่วม ผ่านเกณฑ์ ระดับคุณภาพ รายทักษะ รายกลุ่มภารกิจ E1/E2 และรายชื่อซ่อมเสริม', () => {
+  const skillsOf = (c, t) => {
+    const s = progress.emptyTestSkills()
+    s.addsub = { correct: c, total: t }
+    return s
+  }
+  const test = (score) => ({ score, total: 20, timeMs: 1, at: 1, skills: skillsOf(Math.min(score, 5), 5) })
+  const mk = (no, pre, post, acts) => {
+    let p = { ...progress.newPlayer(`น${no}`, 'hero', no), id: `p${no}`, student: { no, code: String(no), prefix: '', first: `น${no}`, last: '', room: 'ป.3/1' } }
+    if (pre !== null) p.preTest = test(pre)
+    if (post !== null) p.postTest = test(post)
+    for (const a of acts ?? []) p = activity.logActivity(p, { act: a.act, group: a.group, label: a.act, correct: a.c, total: a.t, wrong: a.t - a.c, timeMs: 1000, points: 0 }, no)
+    return p
+  }
+  const kids = [
+    mk(1, 10, 18, [{ act: 'L1-practice', group: 'read', c: 9, t: 10 }]),
+    mk(2, 8, 16, [{ act: 'change-practice', group: 'change', c: 8, t: 10 }]),
+    mk(3, 12, 13, [{ act: 'change-practice', group: 'change', c: 4, t: 10 }]),
+    mk(4, 6, null, [{ act: 'L1-practice', group: 'read', c: 6, t: 10 }]),
+    mk(5, null, null, [{ act: 'plan-1', group: 'budget', c: 3, t: 10 }]),
+    mk(6, null, null, null),
+  ]
+  const a = stats.analyzeClass(kids, { passPercent: 70, targetPercent: 80 })
+  eq(a.total, 6, 'ทั้งห้อง')
+  eq(a.preDone, 4, 'ทำก่อนเรียน')
+  eq(a.postDone, 3, 'ทำหลังเรียน')
+  eq(a.bothDone, 3, 'ทำครบ')
+  eq(a.pre.full, 20, 'คะแนนเต็มร่วม')
+  eq(a.pre.rawMean, 9, 'ก่อนเรียนเฉลี่ย 9 คะแนน (10+8+12+6)/4')
+  eq(a.pre.mean, 45, 'ก่อนเรียนเฉลี่ย 45%')
+  eq(a.pairedPre.mean, 50, 'เฉพาะคนที่ทำครบ ก่อนเรียน 50%')
+  eq(a.pairedPost.mean, 78.33333333333333, 'หลังเรียน (90+80+65)/3')
+  eq(a.passed, 2, 'ผ่าน 70%: 18/20 และ 16/20 (13/20 = 65% ไม่ผ่าน)')
+  eq(Math.round(a.passRate * 100) / 100, 33.33, 'ร้อยละผ่านเทียบทั้งห้อง')
+  eq(a.targetMet, false, 'ยังไม่ถึงเป้าหมาย 80%')
+  eq(a.improvedCount, 3, 'ทุกคนคะแนนสูงขึ้น')
+  assert(Math.abs(a.ei - (235 - 150) / (300 - 150)) < 1e-9, `E.I. ทั้งห้อง: ${a.ei}`)
+  eq(a.levels.excellent.post, 2, 'หลังเรียนดีเยี่ยม 2 คน')
+  eq(a.levels.fair.post, 1, 'หลังเรียนพอใช้ 1 คน')
+  eq(a.levels.improve.pre, 3, 'ก่อนเรียนควรปรับปรุง 3 คน')
+  eq(a.levels.fair.pre, 1, 'ก่อนเรียน 12/20 = 60% พอใช้')
+  eq(a.skills.addsub.post, 100, 'ทักษะบวกลบหลังเรียน')
+  eq(a.skills.notes.pre, null, 'ทักษะที่ไม่มีข้อสอบ = ไม่มีข้อมูล')
+  eq(a.groups.read.players, 2, 'กลุ่มอ่านเงิน 2 คน')
+  eq(a.groups.read.percent, 75, 'กลุ่มอ่านเงิน 15/20')
+  eq(a.groups.change.below, 1, 'กลุ่มทอนเงินต่ำกว่าเกณฑ์ 1 คน')
+  eq(a.groups.team.percent, null, 'ภารกิจร่วมมือยังไม่มีข้อมูล')
+  eq(a.e1.n, 5, 'E1 คิดจาก 5 คนที่ทำภารกิจ')
+  eq(a.e1.mean, 60, 'E1 = (90+80+40+60+30)/5')
+  eq(a.e2, 78.33333333333333, 'E2 = หลังเรียนเฉลี่ย')
+  // ซ่อมเสริม: น3 หลังเรียนไม่ผ่าน, น4 ก่อนเรียนไม่ผ่าน (ยังไม่สอบหลัง), น5 ภารกิจต่ำ, น6 ไม่มีข้อมูล ไม่ใส่
+  eq(a.remedial.map((r) => `${r.player.id}:${r.reason}`).join(), 'p4:pre-below,p5:process-below,p3:post-below', 'รายชื่อซ่อมเสริมเรียงจากคะแนนต่ำสุด')
+  eq(a.remedial.find((r) => r.player.id === 'p5').weakGroups.join(), 'budget', 'บอกกลุ่มภารกิจที่ควรฝึก')
+  eq(a.missingPost.map((p) => p.id).join(), 'p4,p5,p6', 'ยังไม่ทำหลังเรียน')
+  // ห้องว่าง
+  const empty = stats.analyzeClass([], { passPercent: 70, targetPercent: 80 })
+  eq(empty.passRate, null, 'ห้องว่างไม่หารศูนย์')
+  eq(empty.t.p, null, 'ห้องว่างไม่มี t')
+})
+
 
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {

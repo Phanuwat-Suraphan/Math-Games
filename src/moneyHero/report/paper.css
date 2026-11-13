@@ -309,3 +309,72 @@
 .mh-doc-group td {
   height: 8mm;
 }
+
+/* ------------------------------------------------------------------ */
+/* วิเคราะห์ผลการเรียนรู้ (#/teacher/analysis)                            */
+/* ------------------------------------------------------------------ */
+
+.mh-an-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mh-an-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(43, 35, 80, 0.12);
+  color: #1a1a1a;
+}
+
+.mh-an-tile b {
+  font-size: 1.25em;
+}
+
+.mh-an-tile span {
+  font-size: 0.85em;
+  color: #5c5c5c;
+}
+
+.mh-an-chart {
+  margin: 10px 0 14px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.mh-an-chart figcaption {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.mh-an-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  font-family: inherit;
+}
+
+.mh-an-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 10.5pt;
+  margin-bottom: 2px;
+}
+
+.mh-an-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mh-an-legend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
