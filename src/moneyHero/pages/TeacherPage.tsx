@@ -61,6 +61,9 @@ export function TeacherPage() {
         </Link>
         <h1 className="mh-title">🍎 แผงคุณครู</h1>
         <div className="mh-teacher-actions">
+          <Link to="/teacher/analysis" className="mh-btn mh-btn-go" data-testid="mh-teacher-analysis">
+            📊 วิเคราะห์ผล (ว.PA)
+          </Link>
           <Link to="/teacher/students" className="mh-btn mh-btn-gold" data-testid="mh-teacher-roster">
             <Users size={20} /> ทะเบียนนักเรียน
           </Link>

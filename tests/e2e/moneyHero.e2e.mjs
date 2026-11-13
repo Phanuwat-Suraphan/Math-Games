@@ -1383,6 +1383,32 @@ for (const [name, viewport] of [
     if (logCsv.charCodeAt(0) !== 0xfeff || !logCsv.includes('กลุ่มภารกิจ') || !logCsv.includes('ด่าน 0')) throw new Error(`CSV บันทึกภารกิจไม่ถูกต้อง: ${logCsv.slice(0, 120)}`)
   })
 
+  await step(`[${name}] วิเคราะห์ผลการเรียนรู้: สรุป 12 รายการ ตารางสถิติ t-test E.I. E1/E2 แผนภูมิ รายชื่อซ่อมเสริม และพิมพ์ A4`, async () => {
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-analysis').click()
+    await page.getByTestId('mh-analysis').waitFor()
+    if ((await page.getByTestId('mh-an-tiles').locator('.mh-an-tile').count()) !== 12) throw new Error('สรุปบนแผงต้องมี 12 รายการ')
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const ps = Object.values(saved.players)
+    const pool = ps.some((p) => p.student) ? ps.filter((p) => p.student) : ps
+    const total = await page.getByTestId('mh-an-total').locator('b').textContent()
+    if (total !== `${pool.length} คน`) throw new Error(`จำนวนนักเรียนบนแผง ${total} ไม่ตรงกับข้อมูล ${pool.length}`)
+    const preDone = await page.getByTestId('mh-an-pre-done').locator('b').textContent()
+    if (preDone !== `${pool.filter((p) => p.preTest).length} คน`) throw new Error(`จำนวนคนทำก่อนเรียนไม่ตรง: ${preDone}`)
+    for (const id of ['mh-an-participation', 'mh-an-desc', 'mh-an-ttest', 'mh-an-ei-table', 'mh-an-levels', 'mh-an-groups', 'mh-an-students', 'mh-an-mean-chart', 'mh-an-group-chart']) await page.getByTestId(id).waitFor()
+    if ((await page.getByTestId('mh-an-students').locator('tbody tr').count()) !== pool.length) throw new Error('ตารางรายบุคคลต้องมีครบทุกคน')
+    await page.getByTestId('mh-an-tsummary').waitFor()
+    if ((await page.getByTestId('mh-an-remedial').count()) + (await page.getByTestId('mh-an-remedial-none').count()) !== 1) throw new Error('ต้องแสดงรายชื่อซ่อมเสริม หรือบอกว่าไม่มี')
+    await snap(page, `${name}-analysis`)
+    await noSideScroll(page, 'วิเคราะห์ผลการเรียนรู้')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages < 2 || pages > 8) throw new Error(`พิมพ์รายงานวิเคราะห์ได้ ${pages} หน้า`)
+      await page.locator('.mh-doc').first().screenshot({ path: path.join(SHOTS, 'money-hero-analysis.png') })
+    }
+  })
+
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {
     await page.goto(`${BASE}#/teacher/students`)
     await page.getByTestId('mh-roster-teams').waitFor()

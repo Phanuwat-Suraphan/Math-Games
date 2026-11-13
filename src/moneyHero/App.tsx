@@ -37,6 +37,7 @@ import { BoardPage } from './board/BoardPage'
 import { RealPage } from './pages/RealPage'
 import { TeamMissionPage } from './pages/TeamMissionPage'
 import { GroupPrintPage } from './report/GroupPrint'
+import { AnalysisPage } from './report/AnalysisPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
@@ -274,6 +275,14 @@ export default function App() {
               element={
                 <TeacherGate>
                   <GroupPrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/analysis"
+              element={
+                <TeacherGate>
+                  <AnalysisPage />
                 </TeacherGate>
               }
             />
