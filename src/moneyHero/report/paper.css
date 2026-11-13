@@ -290,3 +290,22 @@
   border-radius: 50%;
   font-size: 9.5pt;
 }
+
+/* แบบสังเกตพฤติกรรมกลุ่ม */
+.mh-doc-rubric td {
+  font-size: 9.5pt;
+  vertical-align: top;
+}
+
+.mh-doc-group {
+  break-inside: avoid;
+  margin-top: 8px;
+}
+
+.mh-doc-group h3 {
+  margin: 8px 0 4px;
+}
+
+.mh-doc-group td {
+  height: 8mm;
+}

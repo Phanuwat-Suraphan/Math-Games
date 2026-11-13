@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { DenomId } from '../engine/types'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
+import { logActivity } from '../engine/activity'
 import {
   CHANGE_TRAY,
   PRACTICE_CUSTOMERS,
@@ -58,6 +59,9 @@ export function ChangePage() {
   const [happy, setHappy] = useState(0)
   const [record, setRecord] = useState(false)
   const finished = useRef(false)
+  // บันทึกภารกิจ: เวลาเริ่ม และจำนวนครั้งที่ทอนผิด (ใช้ ref เพราะ finish ถูกเรียกจากตัวจับเวลา)
+  const startedAt = useRef(0)
+  const missRef = useRef(0)
 
   useEffect(() => {
     window.__MH_CHANGE = phase === 'play' ? { change: order.change, solution: order.solution, served } : undefined
@@ -74,11 +78,25 @@ export function ChangePage() {
       playSound('complete')
       const best = mode === 'timed' && servedNow > (player?.changeBest ?? 0)
       setRecord(best)
-      updatePlayer((p) => ({
-        ...earn(p, roundCoins(servedNow), 'ร้านทอนไว', '💵'),
-        exp: p.exp + servedNow * 3,
-        changeBest: mode === 'timed' ? Math.max(p.changeBest, servedNow) : p.changeBest,
-      }))
+      updatePlayer((p) =>
+        logActivity(
+          {
+            ...earn(p, roundCoins(servedNow), 'ร้านทอนไว', '💵'),
+            exp: p.exp + servedNow * 3,
+            changeBest: mode === 'timed' ? Math.max(p.changeBest, servedNow) : p.changeBest,
+          },
+          {
+            act: `change-${mode}`,
+            group: 'change',
+            label: mode === 'timed' ? 'ร้านทอนไว (ท้าเวลา)' : 'ร้านทอนไว (ฝึก)',
+            correct: servedNow,
+            total: servedNow + missRef.current,
+            wrong: missRef.current,
+            timeMs: Date.now() - startedAt.current,
+            points: roundCoins(servedNow),
+          },
+        ),
+      )
     },
     [mode, player?.changeBest, updatePlayer],
   )
@@ -107,6 +125,8 @@ export function ChangePage() {
     setCombo(0)
     setScore(0)
     setMistakes(0)
+    missRef.current = 0
+    startedAt.current = Date.now()
     setLeft(TIMED_SECONDS)
     setRecord(false)
     setPhase('play')
@@ -132,7 +152,10 @@ export function ChangePage() {
     if (!r.ok) {
       playSound('wrong')
       setCombo(0)
-      if (given.length > 0) setMistakes((n) => n + 1)
+      if (given.length > 0) {
+        setMistakes((n) => n + 1)
+        missRef.current += 1
+      }
       speak(r.message)
       return
     }

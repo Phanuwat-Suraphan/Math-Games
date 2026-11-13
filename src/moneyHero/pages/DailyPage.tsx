@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useGame } from '../hooks/useMoneyGame'
 import { earn } from '../engine/ledger'
+import { logActivity } from '../engine/activity'
 import { DAILY_COUNT, buildDaily, dailyReward, dayKey, doneToday, liveStreak, recordDaily, shiftDay } from '../engine/daily'
 import { TopBar } from '../components/TopBar'
 import { StepRunner, type RunSummary } from '../components/StepRunner'
@@ -122,7 +123,21 @@ export function DailyPage() {
             onFinish={(s) => {
               const nextStreak = liveStreak(player.daily, today) + 1
               const r = dailyReward(nextStreak)
-              updatePlayer((p) => ({ ...earn(p, r.coins, 'รางวัลภารกิจประจำวัน', '🌞'), exp: p.exp + r.exp, daily: recordDaily(p.daily, today) }))
+              updatePlayer((p) =>
+                logActivity(
+                  { ...earn(p, r.coins, 'รางวัลภารกิจประจำวัน', '🌞'), exp: p.exp + r.exp, daily: recordDaily(p.daily, today) },
+                  {
+                    act: 'daily',
+                    group: 'word',
+                    label: 'ภารกิจประจำวัน',
+                    correct: s.firstTry,
+                    total: s.originals,
+                    wrong: s.originals - s.firstTry,
+                    timeMs: s.ms,
+                    points: s.coins + r.coins,
+                  },
+                ),
+              )
               setSummary(s)
               setReward(r)
               setPhase('done')

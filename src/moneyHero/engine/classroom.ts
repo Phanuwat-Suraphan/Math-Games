@@ -21,6 +21,8 @@ export interface StudentInfo {
   last: string
   /** ห้อง เช่น ป.3/1 */
   room: string
+  /** กลุ่มทำกิจกรรม (ว่าง = ยังไม่ได้จัดกลุ่ม) */
+  team?: string
 }
 
 export interface Classroom {
@@ -44,6 +46,8 @@ export interface Classroom {
   targetPercent: number
   /** ให้นักเรียนเข้าเกมด้วยการเลือกชื่อจากทะเบียนเท่านั้น (สร้างผู้เล่นเองไม่ได้) */
   rosterOnly: boolean
+  /** โหมดทบทวนในห้องเรียน: เปิดทุกด่านให้เล่นได้เลย ไม่ต้องผ่านด่านก่อนหน้า */
+  classMode: boolean
 }
 
 export const DEFAULT_CLASSROOM: Classroom = {
@@ -59,6 +63,7 @@ export const DEFAULT_CLASSROOM: Classroom = {
   passPercent: 70,
   targetPercent: 80,
   rosterOnly: false,
+  classMode: false,
 }
 
 function clampPercent(v: unknown, fallback: number): number {
@@ -87,6 +92,7 @@ export function repairClassroom(raw: unknown): Classroom {
     passPercent: clampPercent(r.passPercent, DEFAULT_CLASSROOM.passPercent),
     targetPercent: clampPercent(r.targetPercent, DEFAULT_CLASSROOM.targetPercent),
     rosterOnly: r.rosterOnly === true,
+    classMode: r.classMode === true,
   }
 }
 
@@ -108,6 +114,7 @@ export function repairStudent(raw: unknown): StudentInfo | undefined {
     first,
     last: text(r.last, 40),
     room: text(r.room, 20),
+    ...(text(r.team, 10) ? { team: text(r.team, 10) } : {}),
   }
 }
 

@@ -16,6 +16,7 @@ import {
   recordPlan,
   type PlanEvent,
 } from '../engine/budget'
+import { logActivity } from '../engine/activity'
 import { readBahtSatang } from '../engine/check'
 import { formatBS } from '../utils/money'
 import { TopBar } from '../components/TopBar'
@@ -48,6 +49,7 @@ export function PlanPage() {
   const [mistakes, setMistakes] = useState(0)
   const [over, setOver] = useState(0)
   const [result, setResult] = useState<{ stars: number; coins: number } | null>(null)
+  const [startedAt, setStartedAt] = useState(0)
 
   const total = event ? cartTotal(event, cart) : 0
   useEffect(() => {
@@ -66,6 +68,7 @@ export function PlanPage() {
     setMistakes(0)
     setOver(0)
     setResult(null)
+    setStartedAt(Date.now())
     setPhase('pick')
     speak(`${e.title} ${e.story}`)
   }
@@ -73,7 +76,20 @@ export function PlanPage() {
   const finish = (e: PlanEvent, wrong: number) => {
     const stars = planStars(wrong, over)
     const first = (player.plan?.best[e.id] ?? 0) === 0
-    updatePlayer((p) => recordPlan(p, e.id, stars))
+    updatePlayer((p) =>
+      logActivity(recordPlan(p, e.id, stars), {
+        act: `plan-${e.id}`,
+        group: 'budget',
+        label: `วางแผนใช้เงิน: ${e.title}`,
+        correct: stars,
+        total: 3,
+        wrong: wrong + over,
+        timeMs: Date.now() - startedAt,
+        points: planReward(stars, first),
+        stars,
+        passed: stars > 0,
+      }),
+    )
     setResult({ stars, coins: planReward(stars, first) })
     setPhase('done')
     playSound('complete')

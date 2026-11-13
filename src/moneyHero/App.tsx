@@ -34,6 +34,9 @@ import { RosterPrintPage } from './report/RosterPrint'
 import { TestBankPage } from './pages/TestBankPage'
 import { TestPrintPage } from './report/TestPrint'
 import { BoardPage } from './board/BoardPage'
+import { RealPage } from './pages/RealPage'
+import { TeamMissionPage } from './pages/TeamMissionPage'
+import { GroupPrintPage } from './report/GroupPrint'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
@@ -257,6 +260,23 @@ export default function App() {
             <Route path="/plan/print" element={<PlanPrintPage />} />
             <Route path="/duel" element={<DuelPage />} />
             <Route path="/board" element={<BoardPage />} />
+            <Route path="/team" element={<TeamMissionPage />} />
+            <Route
+              path="/real"
+              element={
+                <NeedPlayer>
+                  <RealPage />
+                </NeedPlayer>
+              }
+            />
+            <Route
+              path="/teacher/print/groups"
+              element={
+                <TeacherGate>
+                  <GroupPrintPage />
+                </TeacherGate>
+              }
+            />
             <Route path="/kad/class" element={<KadClassPage />} />
             <Route path="*" element={<Navigate to="/start" replace />} />
           </Routes>

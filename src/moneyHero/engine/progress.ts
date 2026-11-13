@@ -9,6 +9,7 @@ import { ecoStage, emptyEco, type EcoRecord } from './eco'
 import { emptyPlan, type PlanRecord } from './budget'
 import { DEFAULT_CLASSROOM, repairClassroom, repairStudent, type Classroom, type StudentInfo } from './classroom'
 import { defaultBank, repairBank, type TestAttempt, type TestBank } from './testBank'
+import { repairReflection, type ActivityEntry, type ActivityStat, type Reflection } from './activity'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -111,6 +112,12 @@ export interface Player {
   tests?: TestAttempt[]
   /** ครูให้ทำแบบทดสอบใหม่ได้ (เวลาที่ครูกด) */
   retake?: Partial<Record<TestKind, number>>
+  /** สถิติรวมรายกิจกรรม (ภารกิจ ด่านย่อย มินิเกม ภารกิจกลุ่ม) */
+  acts?: Record<string, ActivityStat>
+  /** บันทึกภารกิจล่าสุด (วันเวลา ถูก/ผิด เวลา แต้ม) */
+  actLog?: ActivityEntry[]
+  /** ขั้น L: การสะท้อนผลการเรียนรู้ของนักเรียน */
+  reflection?: Reflection
   mapX?: number
   mapY?: number
 }
@@ -216,6 +223,9 @@ function repairPlayer(raw: Partial<Player>): Player | null {
     needsAvatar: raw.needsAvatar === true ? true : undefined,
     tests: Array.isArray(raw.tests) ? raw.tests.filter((t) => t && typeof t.id === 'string' && (t.kind === 'pre' || t.kind === 'post') && Array.isArray(t.answers)) : undefined,
     retake: raw.retake && typeof raw.retake === 'object' ? raw.retake : undefined,
+    acts: raw.acts && typeof raw.acts === 'object' ? raw.acts : undefined,
+    actLog: Array.isArray(raw.actLog) ? raw.actLog.filter((e) => e && typeof e.act === 'string' && typeof e.at === 'number') : undefined,
+    reflection: repairReflection(raw.reflection),
   } as Player
 }
 
@@ -267,9 +277,9 @@ export function isLevelPassed(p: Player, id: number): boolean {
   return levelRecord(p, id).stepDone >= 4
 }
 
-/** ด่าน 0 เปิดเสมอ ด่านถัดไปเปิดเมื่อผ่านด่านก่อนหน้า */
-export function isLevelUnlocked(p: Player, id: number): boolean {
-  if (id === 0) return true
+/** ด่าน 0 เปิดเสมอ ด่านถัดไปเปิดเมื่อผ่านด่านก่อนหน้า · open = โหมดทบทวนในห้องเรียน (ครูเปิดทุกด่าน) */
+export function isLevelUnlocked(p: Player, id: number, open = false): boolean {
+  if (id === 0 || open) return true
   return isLevelPassed(p, id - 1)
 }
 

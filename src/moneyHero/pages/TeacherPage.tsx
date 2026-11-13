@@ -6,7 +6,7 @@ import { useGame } from '../hooks/useMoneyGame'
 import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { TOTAL_LESSONS } from '../data/levels'
 import { lessonsPassed, overallAccuracy, pendingMistakes, totalStars, weakSkills, type Player } from '../engine/progress'
-import { buildCsv, classProgress, classSummary, dateText, fixed2, improvement, minutes, passLabel, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
+import { buildCsv, buildLogCsv, feelingText, groupRows, classProgress, classSummary, dateText, fixed2, improvement, minutes, passLabel, percent, planStarsTotal, skillPercent, stageTable, testPercent } from '../engine/report'
 import { compareStudents, teacherName } from '../engine/classroom'
 import { participation, PARTICIPATION_LABEL } from '../engine/roster'
 import { attemptsOf, grantRetake, retakeOpen } from '../engine/exam'
@@ -70,6 +70,9 @@ export function TeacherPage() {
           <Link to="/teacher/tests" className="mh-btn mh-btn-gold" data-testid="mh-teacher-tests">
             📝 คลังข้อสอบ
           </Link>
+          <Link to="/team" className="mh-btn mh-btn-go" data-testid="mh-teacher-team">
+            👥 ภารกิจกลุ่ม
+          </Link>
           <Link to="/teacher/print/roster" className="mh-btn mh-btn-soft" data-testid="mh-teacher-print-roster">
             <Printer size={20} /> รายชื่อ (A4)
           </Link>
@@ -93,6 +96,26 @@ export function TeacherPage() {
           </button>
           <button type="button" className="mh-btn mh-btn-gold" onClick={() => downloadCsv(players, c.passPercent)} disabled={players.length === 0} data-testid="mh-csv">
             <Download size={20} /> ดาวน์โหลด CSV
+          </button>
+          <button
+            type="button"
+            className="mh-btn mh-btn-soft"
+            disabled={players.length === 0}
+            data-testid="mh-csv-log"
+            onClick={() => {
+              const d = new Date()
+              const blob = new Blob([buildLogCsv(players)], { type: 'text/csv;charset=utf-8' })
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `money-hero-บันทึกภารกิจ-${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}.csv`
+              document.body.appendChild(a)
+              a.click()
+              a.remove()
+              window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+            }}
+          >
+            <Download size={20} /> บันทึกภารกิจ (CSV)
           </button>
           {c.pin && (
             <button
@@ -263,6 +286,7 @@ function StudentDetail({ p }: { p: Player }) {
         <div>
           {p.preTest || p.postTest ? <BeforeAfter pre={p.preTest} post={p.postTest} /> : <p className="mh-soft">ยังไม่ได้ทำแบบทดสอบ</p>}
           <TestHistory p={p} />
+          <MissionLog p={p} />
           <h4 className="mh-card-title">🌱 กาดรักษ์โลก</h4>
           {p.eco.days > 0 ? (
             <p className="mh-soft" data-testid="mh-student-eco">
@@ -379,6 +403,56 @@ function TestHistory({ p }: { p: Player }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/** ผลรายกลุ่มภารกิจ (ขั้น E) และบันทึกสะท้อนผลของนักเรียน (ขั้น L) */
+function MissionLog({ p }: { p: Player }) {
+  const rows = groupRows(p)
+  const minutes = (ms: number) => (ms === 0 ? '–' : `${Math.max(1, Math.round(ms / 60000))} น.`)
+  return (
+    <div className="mh-student-missions" data-testid="mh-student-missions">
+      <h4 className="mh-card-title">🎯 ภารกิจตามกลุ่ม{p.student?.team ? ` · กลุ่มที่ ${p.student.team}` : ''}</h4>
+      <div className="mh-stage-scroll">
+        <table className="mh-table mh-stage-table">
+          <thead>
+            <tr>
+              <th>กลุ่มภารกิจ</th>
+              <th>ครั้ง</th>
+              <th>ถูก</th>
+              <th>ผิด</th>
+              <th>เวลา</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id}>
+                <td>
+                  {r.icon} {r.name}
+                </td>
+                <td>{r.plays || '–'}</td>
+                <td>{r.percent === null ? '–' : `${r.correct}/${r.total} (${r.percent}%)`}</td>
+                <td>{r.plays ? r.wrong : '–'}</td>
+                <td>{minutes(r.timeMs)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <h4 className="mh-card-title">📝 สะท้อนผลการเรียนรู้</h4>
+      {p.reflection ? (
+        <div className="mh-student-reflect" data-testid="mh-student-reflect">
+          <p>
+            {feelingText(p.reflection.feeling)} <small className="mh-soft">({dateText(p.reflection.at)})</small>
+          </p>
+          {p.reflection.good && <p>✅ ทำได้ดี: {p.reflection.good}</p>}
+          {p.reflection.improve && <p>🎯 อยากฝึกเพิ่ม: {p.reflection.improve}</p>}
+          {p.reflection.apply && <p>🏠 ใช้ในชีวิตจริง: {p.reflection.apply}</p>}
+        </div>
+      ) : (
+        <p className="mh-soft">ยังไม่ได้เขียน</p>
+      )}
     </div>
   )
 }

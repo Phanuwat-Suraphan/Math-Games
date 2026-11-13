@@ -1,5 +1,6 @@
 import { parseSave, type LevelRecord, type Player, type SaveData, type SkillStat } from './progress'
 import { classroomConfigured, studentKey } from './classroom'
+import { mergeActivity } from './activity'
 import type { Skill } from './types'
 
 /**
@@ -147,6 +148,8 @@ export function mergePlayer(a: Player, b: Player): Player {
     album: union(a.album, b.album),
     tests: a.tests || b.tests ? unionBy(a.tests, b.tests, (t) => t.id).sort((x, y) => x.startedAt - y.startedAt) : undefined,
     retake: mergeRetake(a.retake, b.retake),
+    ...mergeActivity(a, b),
+    reflection: (b.reflection?.at ?? 0) > (a.reflection?.at ?? 0) ? b.reflection : a.reflection ?? b.reflection,
   }
 }
 

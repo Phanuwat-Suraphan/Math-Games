@@ -55,7 +55,7 @@ export function parseTable(input: string): string[][] {
   return rows.map((r) => r.map((c) => c.trim())).filter((r) => r.some((c) => c !== ''))
 }
 
-type Field = 'no' | 'code' | 'prefix' | 'first' | 'last' | 'full' | 'nick' | 'room'
+type Field = 'no' | 'code' | 'prefix' | 'first' | 'last' | 'full' | 'nick' | 'room' | 'team'
 
 const HEADER_WORDS: [Field, string[]][] = [
   ['nick', ['ชื่อเล่น', 'nickname', 'nick']],
@@ -66,6 +66,7 @@ const HEADER_WORDS: [Field, string[]][] = [
   ['code', ['เลขประจำตัวนักเรียน', 'เลขประจำตัว', 'รหัสนักเรียน', 'รหัส', 'studentid', 'id', 'code']],
   ['no', ['เลขที่', 'ลำดับที่', 'ลำดับ', 'ที่', 'no', 'number']],
   ['room', ['ห้องเรียน', 'ห้อง', 'ชั้น', 'room', 'class']],
+  ['team', ['กลุ่ม', 'กลุ่มที่', 'group', 'team']],
 ]
 
 function headerField(cell: string): Field | null {
@@ -163,6 +164,7 @@ export function readRoster(input: string, defaultRoom: string): RosterRead {
       room: (get('room') || defaultRoom).slice(0, 20),
       nick: get('nick').slice(0, 20),
       line,
+      ...(get('team') ? { team: get('team').slice(0, 10) } : {}),
     }
     const key = studentKey(row)
     const dup = seen.get(key)
@@ -188,7 +190,7 @@ export function rosterTemplate(room: string): string {
 }
 
 export function studentFromRow(r: RosterRow): StudentInfo {
-  return { no: r.no, code: r.code, prefix: r.prefix, first: r.first, last: r.last, room: r.room }
+  return { no: r.no, code: r.code, prefix: r.prefix, first: r.first, last: r.last, room: r.room, ...(r.team ? { team: r.team } : {}) }
 }
 
 /** หาผู้เล่นของนักเรียนคนนี้ (เทียบคีย์ประจำตัว) */
@@ -212,8 +214,11 @@ export function applyRoster(players: Record<string, Player>, rows: RosterRow[], 
   let added = 0
   let updated = 0
   for (const r of rows) {
-    const student = studentFromRow(r)
-    const old = findStudent(out, student)
+    const fresh = studentFromRow(r)
+    const old = findStudent(out, fresh)
+    // นำเข้าซ้ำโดยไม่มีคอลัมน์กลุ่ม: กลุ่มเดิมที่ครูจัดไว้ยังอยู่
+    const team = fresh.team ?? old?.student?.team
+    const student: StudentInfo = team ? { ...fresh, team } : fresh
     if (old) {
       const keepNick = old.name !== old.student?.first
       out[old.id] = { ...old, student, name: r.nick && !keepNick ? r.nick : old.name }

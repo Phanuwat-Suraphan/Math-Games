@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react'
 import { levelById } from '../data/levels'
 import { useGame } from '../hooks/useMoneyGame'
 import { isLevelUnlocked } from '../engine/progress'
+import { levelGroup, logActivity } from '../engine/activity'
 import { BOSS_PASS, nextStar } from '../engine/scoring'
 import { isStageNo, isStageUnlocked, recordStage, stageRecord, stageResult, stageReward, STAGES, type StageResult } from '../engine/stages'
 import { buildStage } from '../generators'
@@ -33,10 +34,11 @@ export function StagePage() {
   const id = Number(params.id)
   const n = Number(params.n)
   const level = levelById(id)
-  const { player } = useGame()
+  const { player, save } = useGame()
+  const open = save.classroom.classMode
 
   if (!player || !level || Number.isNaN(id) || !isStageNo(n)) return <Navigate to="/map" replace />
-  if (!isLevelUnlocked(player, id) || id > PLAYABLE_MAX || !isStageUnlocked(player, id, n)) return <Navigate to="/map" replace />
+  if (!isLevelUnlocked(player, id, open) || id > PLAYABLE_MAX || !isStageUnlocked(player, id, n)) return <Navigate to="/map" replace />
   const def = STAGES[n]
 
   return (
@@ -196,7 +198,20 @@ function StageRun({ levelId, n }: { levelId: number; n: 2 | 3 }) {
           const r = stageResult(s)
           const firstClear = stageRecord(player, levelId, n).stars === 0
           playSound(r.passed ? 'complete' : 'wrong')
-          updatePlayer((p) => recordStage(p, levelId, n, r))
+          updatePlayer((p) =>
+            logActivity(recordStage(p, levelId, n, r), {
+              act: `S${levelId}-${n}`,
+              group: levelGroup(levelId),
+              label: `ด่านย่อย ${levelId}-${n}`,
+              correct: s.firstTry,
+              total: s.originals,
+              wrong: s.originals - s.firstTry,
+              timeMs: s.ms,
+              points: s.coins,
+              stars: r.stars,
+              passed: r.passed,
+            }),
+          )
           setResult({ ...r, firstClear })
         }}
       />

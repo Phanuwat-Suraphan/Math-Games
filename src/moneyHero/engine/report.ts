@@ -16,6 +16,7 @@ import { PLAN_EVENTS, plannedEvents } from './budget'
 import { LEVELS } from '../data/levels'
 import { teacherName, type Classroom } from './classroom'
 import { participation, PARTICIPATION_LABEL, hasPlayed } from './roster'
+import { FEELINGS, groupInfo, groupSummary, MISSION_GROUPS } from './activity'
 
 /**
  * รายงานสำหรับคุณครู และไฟล์ CSV
@@ -264,4 +265,45 @@ export function classProgress(players: Player[], c: Pick<Classroom, 'passPercent
 /** ตัวเลขทศนิยม 2 ตำแหน่งแบบรายงาน เช่น 85.71 */
 export function fixed2(v: number | null): string {
   return v === null ? '–' : v.toFixed(2)
+}
+
+/* ------------------------------------------------------------------ */
+/* บันทึกภารกิจ (CSV): หนึ่งแถวต่อการเล่นหนึ่งครั้ง                         */
+/* ------------------------------------------------------------------ */
+
+export function buildLogCsv(players: Player[]): string {
+  const header = ['เลขที่', 'ชื่อ - สกุล', 'กลุ่ม', 'วันเวลา', 'กิจกรรม', 'กลุ่มภารกิจ', 'ถูก (ข้อ)', 'ทั้งหมด (ข้อ)', 'ร้อยละถูก', 'ตอบผิด (ครั้ง)', 'เวลา (วินาที)', 'เหรียญที่ได้', 'ดาว', 'ผ่าน']
+  const rows: (string | number | null)[][] = []
+  for (const p of players) {
+    for (const e of p.actLog ?? []) {
+      rows.push([
+        p.student?.no ?? null,
+        teacherName(p),
+        p.student?.team ?? null,
+        dateText(e.at),
+        e.label,
+        e.group === 'other' ? 'อื่น ๆ' : groupInfo(e.group).name,
+        e.correct,
+        e.total,
+        e.total === 0 ? null : percent(e.correct / e.total),
+        e.wrong,
+        Math.round(e.timeMs / 1000),
+        e.points,
+        e.stars ?? null,
+        e.passed === undefined ? null : e.passed ? 'ผ่าน' : 'ไม่ผ่าน',
+      ])
+    }
+  }
+  return '\uFEFF' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
+}
+
+/** สรุปรายกลุ่มภารกิจของนักเรียนหนึ่งคน (สำหรับรายงานและ CSV) */
+export function groupRows(p: Player) {
+  const sum = groupSummary(p)
+  return MISSION_GROUPS.map((g) => ({ ...g, ...sum[g.id] }))
+}
+
+export function feelingText(id: string | undefined): string {
+  const f = FEELINGS.find((x) => x.id === id)
+  return f ? `${f.icon} ${f.label}` : ''
 }

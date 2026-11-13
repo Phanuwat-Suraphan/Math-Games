@@ -17,7 +17,8 @@ import { Stars } from '../components/Stars'
  * เส้นทาง #/stats
  */
 export function StatsPage() {
-  const { player } = useGame()
+  const { player, save } = useGame()
+  const open = save.classroom.classMode
   if (!player) return null
   const values = {} as Record<Skill, number | null>
   const counts = {} as Record<Skill, number>
@@ -90,7 +91,7 @@ export function StatsPage() {
             const rec = levelRecord(player, l.id)
             return (
               <div key={l.id} className={`mh-level-star ${rec.stepDone >= 4 ? 'is-done' : ''}`}>
-                <BuildingArt level={l.id} locked={!isLevelUnlocked(player, l.id)} className="mh-thumb-bld" />
+                <BuildingArt level={l.id} locked={!isLevelUnlocked(player, l.id, open)} className="mh-thumb-bld" />
                 <b>ด่าน {l.id}</b>
                 <Stars n={rec.bestStars} />
               </div>

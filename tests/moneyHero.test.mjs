@@ -57,6 +57,8 @@ const backup = load('engine/backup.js')
 const testBank = load('engine/testBank.js')
 const exam = load('engine/exam.js')
 const board = load('board/boardData.js')
+const activity = load('engine/activity.js')
+const teams = load('engine/teams.js')
 
 let passed = 0
 const failures = []
@@ -2057,6 +2059,129 @@ test('เกมกระดาน: การ์ดภารกิจ 32 ใบ �
     eq(c.answer, want, `การ์ด ${c.no} (${c.kind}) ${c.text}`)
     assert(c.reward === 500 || c.reward === 1000, `การ์ด ${c.no} รางวัล 5 หรือ 10 บาท`)
     assert(!c.text.includes('undefined') && !c.answer.includes('NaN'), `การ์ด ${c.no} ข้อความสมบูรณ์`)
+  }
+})
+
+/* ------------------------------------------------------------------ */
+/* ระยะ 3: บันทึกภารกิจ กลุ่มทำกิจกรรม โหมดทบทวน                          */
+/* ------------------------------------------------------------------ */
+
+test('บันทึกภารกิจ: สถิติรวมรายกิจกรรม รายการล่าสุดจำกัดจำนวน และสรุปตามกลุ่มภารกิจ 6 กลุ่ม', () => {
+  let p = progress.newPlayer('มะลิ', 'hero', 1)
+  p = activity.logActivity(p, { act: 'L3-practice', group: activity.levelGroup(3), label: 'ด่าน 3 ฝึกฝน', correct: 4, total: 5, wrong: 1, timeMs: 60000, points: 8 }, 100)
+  p = activity.logActivity(p, { act: 'L3-practice', group: 'read', label: 'ด่าน 3 ฝึกฝน', correct: 5, total: 5, wrong: 0, timeMs: 30000, points: 10 }, 200)
+  p = activity.logActivity(p, { act: 'change-practice', group: 'change', label: 'ร้านทอนไว', correct: 8, total: 10, wrong: 2, timeMs: 90000, points: 12 }, 300)
+  const st = p.acts['L3-practice']
+  eq(st.plays, 2, 'เล่นสองครั้ง')
+  eq(st.correct, 9, 'ถูกรวม')
+  eq(st.total, 10, 'ทั้งหมดรวม')
+  eq(st.wrong, 1, 'ผิดรวม')
+  eq(st.best, 1, 'ครั้งที่ดีที่สุด 100%')
+  eq(st.firstAt, 100, 'เล่นครั้งแรก')
+  eq(st.lastAt, 200, 'เล่นล่าสุด')
+  eq(p.actLog.length, 3, 'รายการล่าสุด 3 รายการ')
+  const g = activity.groupSummary(p)
+  eq(g.read.plays, 2, 'กลุ่มอ่านเงิน 2 ครั้ง')
+  eq(g.read.percent, 90, 'กลุ่มอ่านเงิน 90%')
+  eq(g.change.percent, 80, 'กลุ่มทอนเงิน 80%')
+  eq(g.team.percent, null, 'ยังไม่เล่นภารกิจร่วมมือ')
+  eq(activity.groupsPlayed(p), 2, 'เล่นแล้ว 2 กลุ่ม')
+  const sw = activity.strongWeakGroups(p, 85)
+  eq(sw.strong.join(), 'read', 'กลุ่มที่เด่น')
+  eq(sw.weak.join(), 'change', 'กลุ่มที่ควรฝึก (ต่ำกว่าเกณฑ์ 85)')
+  // ข้อมูลผิดรูปไม่ทำให้สถิติเสีย
+  const bad = activity.logActivity(p, { act: 'x', group: 'other', label: 'x', correct: 5, total: 2, wrong: -3, timeMs: NaN, points: Infinity }, 400)
+  eq(bad.acts.x.total, 5, 'ถูกมากกว่าทั้งหมด ปรับทั้งหมดให้เท่าถูก')
+  eq(bad.acts.x.wrong, 0, 'ค่าติดลบเป็น 0')
+  eq(bad.acts.x.timeMs, 0, 'เวลาเสียเป็น 0')
+  // จำกัดจำนวนรายการล่าสุด
+  let q = progress.newPlayer('ก', 'hero', 1)
+  for (let i = 0; i < activity.LOG_MAX + 20; i += 1) q = activity.logActivity(q, { act: 'daily', group: 'word', label: 'd', correct: 1, total: 1, wrong: 0, timeMs: 1, points: 0 }, i)
+  eq(q.actLog.length, activity.LOG_MAX, 'เก็บไม่เกินจำนวนที่กำหนด')
+  eq(q.acts.daily.plays, activity.LOG_MAX + 20, 'สถิติรวมนับครบทุกครั้ง')
+  // กลุ่มภารกิจของแต่ละด่าน
+  eq([0, 4, 6, 7, 8, 9, 10, 11, 12].map(activity.levelGroup).join(), 'read,read,read,price,price,word,word,budget,word', 'กลุ่มภารกิจของด่าน')
+  eq(activity.MISSION_GROUPS.length, 6, 'กลุ่มภารกิจ 6 กลุ่มตามแผน')
+  // รวมสองเครื่อง: รายการไม่ซ้ำ สถิติไม่นับซ้ำ
+  const m1 = activity.mergeActivity(p, p)
+  eq(m1.actLog.length, 3, 'รวมกับตัวเองไม่ซ้ำ')
+  eq(m1.acts['L3-practice'].plays, 2, 'สถิติไม่นับซ้ำ')
+  const other = activity.logActivity(progress.newPlayer('มะลิ', 'hero', 1), { act: 'duel', group: 'team', label: 'ดวล', correct: 7, total: 10, wrong: 1, timeMs: 1, points: 0 }, 500)
+  const m2 = activity.mergeActivity(p, other)
+  eq(m2.actLog.length, 4, 'รวมรายการจากสองเครื่อง')
+  assert(m2.acts.duel && m2.acts['L3-practice'], 'สถิติจากทั้งสองเครื่อง')
+  // สะท้อนผล
+  eq(activity.repairReflection({ feeling: 'great', good: 'ทอนเงินเร็ว', at: 5 }).good, 'ทอนเงินเร็ว', 'อ่านบันทึกสะท้อนผล')
+  eq(activity.repairReflection({ feeling: 'xx' }), undefined, 'ความรู้สึกผิดรูปไม่รับ')
+  const saved = progress.parseSave(JSON.stringify({ version: 1, players: { [p.id]: { ...p, reflection: { feeling: 'good', good: 'ก', at: 9 } } } }))
+  eq(saved.players[p.id].acts['L3-practice'].plays, 2, 'บันทึกภารกิจอ่านกลับได้')
+  eq(saved.players[p.id].reflection.feeling, 'good', 'บันทึกสะท้อนผลอ่านกลับได้')
+  // CSV บันทึกภารกิจ
+  const csv = report.buildLogCsv([p]).slice(1).split('\r\n')
+  eq(csv.length, 4, 'หัวตาราง + 3 แถว')
+  assert(csv[0].startsWith('เลขที่,ชื่อ - สกุล,กลุ่ม,วันเวลา,กิจกรรม'), `หัว CSV: ${csv[0]}`)
+  assert(csv[3].includes('ร้านทอนไว') && csv[3].includes('จ่ายเงินและทอนเงิน') && csv[3].includes(',8,10,80,2,90,12,'), `แถวร้านทอนไว: ${csv[3]}`)
+})
+
+test('กลุ่มทำกิจกรรม: จัดกลุ่มคละความสามารถแบบงูเลื้อย กลุ่มขนาดใกล้กัน คะแนนเฉลี่ยใกล้กัน และนำเข้ารายชื่อซ้ำกลุ่มไม่หาย', () => {
+  const mk = (i, pre) => {
+    const p = { ...progress.newPlayer(`น${i}`, 'hero', i), id: `p${i}`, student: { no: i, code: String(1000 + i), prefix: '', first: `น${i}`, last: '', room: 'ป.3/1' } }
+    if (pre !== null) p.preTest = { score: pre, total: 20, timeMs: 1, at: 1, skills: progress.emptyTestSkills() }
+    return p
+  }
+  const pres = [20, 18, 17, 16, 15, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+  const kids = pres.map((v, i) => mk(i + 1, v))
+  const map = teams.autoTeams(kids, 4)
+  const labels = Array.from(new Set(Object.values(map))).sort()
+  eq(labels.join(), '1,2,3,4,5', '18 คน กลุ่มละไม่เกิน 4 → 5 กลุ่ม')
+  const sizes = labels.map((t) => Object.values(map).filter((x) => x === t).length)
+  assert(Math.max(...sizes) - Math.min(...sizes) <= 1 && Math.max(...sizes) <= 4, `ขนาดกลุ่มใกล้กัน: ${sizes}`)
+  // งูเลื้อย: คนเก่งที่สุด 5 คนอยู่คนละกลุ่ม
+  eq(new Set(kids.slice(0, 5).map((k) => map[k.id])).size, 5, 'คนเก่งที่สุดกระจายทุกกลุ่ม')
+  eq(map.p1, '1', 'อันดับ 1 อยู่กลุ่ม 1')
+  eq(map.p10, '1', 'อันดับ 10 กลับมากลุ่ม 1 (งูเลื้อย)')
+  const avg = labels.map((t) => {
+    const ms = kids.filter((k) => map[k.id] === t)
+    return ms.reduce((s, k) => s + teams.abilityScore(k), 0) / ms.length
+  })
+  assert(Math.max(...avg) - Math.min(...avg) < 0.2, `คะแนนเฉลี่ยแต่ละกลุ่มใกล้กัน: ${avg.map((a) => a.toFixed(2))}`)
+  // ใส่กลุ่มลงทะเบียน แล้วแสดงรายกลุ่ม
+  const players = {}
+  for (const k of kids) players[k.id] = k
+  const withTeams = teams.applyTeams(players, map)
+  const list = teams.teamList(Object.values(withTeams))
+  eq(list.length, 5, 'แสดง 5 กลุ่ม')
+  eq(list[0].team, '1', 'เรียงตามเลขกลุ่ม')
+  assert(list[0].members[0].student.no < list[0].members[1].student.no, 'สมาชิกเรียงตามเลขที่')
+  // นำเข้ารายชื่อชุดเดิมซ้ำ (ไม่มีคอลัมน์กลุ่ม): กลุ่มเดิมยังอยู่
+  const rows = roster.readRoster('เลขที่,เลขประจำตัว,ชื่อ\n1,1001,น1', 'ป.3/1').rows
+  const reimport = roster.applyRoster(withTeams, rows)
+  eq(reimport.players.p1.student.team, '1', 'กลุ่มเดิมไม่หายเมื่อนำเข้าซ้ำ')
+  // นำเข้าพร้อมคอลัมน์กลุ่ม
+  const withCol = roster.readRoster('เลขที่,ชื่อ,กลุ่ม\n3,ข้าว,2', 'ป.3/1')
+  eq(withCol.rows[0].team, '2', 'อ่านคอลัมน์กลุ่มจากไฟล์')
+  // ล้างกลุ่ม
+  const cleared = teams.applyTeams(withTeams, { p1: '' })
+  eq(cleared.p1.student.team, undefined, 'เอาออกจากกลุ่ม')
+  eq(teams.teamOf(cleared.p2), map.p2, 'คนอื่นไม่เปลี่ยน')
+  // ไม่มีคะแนนก่อนเรียน: ใช้ผลในเกม ถ้าไม่มีอีกถือว่ากลาง ๆ
+  eq(teams.abilityScore(mk(99, null)), 0.5, 'ยังไม่มีข้อมูล = กลาง ๆ')
+})
+
+test('โหมดทบทวนในห้องเรียน: ครูเปิดทุกด่านได้ ค่าเริ่มต้นยังเล่นตามลำดับเหมือนเดิม', () => {
+  const p = progress.newPlayer('ก', 'hero', 1)
+  eq(progress.isLevelUnlocked(p, 5), false, 'ปกติด่าน 5 ยังล็อก')
+  eq(progress.isLevelUnlocked(p, 5, true), true, 'โหมดทบทวนเปิดด่าน 5')
+  eq(progress.isLevelUnlocked(p, 0), true, 'ด่าน 0 เปิดเสมอ')
+  eq(classroom.repairClassroom({}).classMode, false, 'ค่าเริ่มต้นปิด')
+  eq(classroom.repairClassroom({ classMode: true }).classMode, true, 'อ่านค่าที่ครูตั้ง')
+  eq(classroom.repairStudent({ first: 'ก', team: '3' }).team, '3', 'อ่านกลุ่มของนักเรียน')
+  eq(classroom.repairStudent({ first: 'ก' }).team, undefined, 'ไม่มีกลุ่ม')
+  // ภารกิจกลุ่ม: โจทย์ครบตามจำนวน และมีคำตอบทุกข้อ
+  for (const n of [9, 12, 15]) {
+    const qs = gens.buildTeam(n)
+    eq(qs.length, n, `ภารกิจกลุ่ม ${n} ข้อ`)
+    for (const q of qs) assert(q.title && q.skill, `โจทย์ภารกิจกลุ่มสมบูรณ์ (${q.gen})`)
   }
 })
 

@@ -891,11 +891,12 @@ for (const [name, viewport] of [
     if (JSON.stringify(p.album) !== '["b20"]') throw new Error(`สติกเกอร์ไม่ถูกบันทึก: ${JSON.stringify(p.album)}`)
   })
 
-  await step(`[${name}] ดวลสองคน: ใครถูกก่อนได้ดาว แตะผิดรอข้อต่อไป ครบ 10 ข้อแล้วประกาศผู้ชนะ`, async () => {
+  await step(`[${name}] ดวลสองคน: ใครถูกก่อนได้ดาว แตะผิดรอข้อต่อไป ครบ 10 ข้อแล้วประกาศผู้ชนะ และบันทึกผลให้ผู้เล่นฝั่งแดง`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-duel').click()
     await page.waitForURL(/#\/duel/)
-    await page.getByTestId('mh-duel-name-0').fill('แดงจ๋า')
+    // ฝั่งแดงเป็นผู้เล่นในเครื่องนี้ (เลือกไว้ให้แล้ว) ฝั่งฟ้าพิมพ์ชื่อเพื่อนเอง
+    if ((await page.getByTestId('mh-duel-who-0').inputValue()) === '') throw new Error('ฝั่งแดงต้องเลือกผู้เล่นปัจจุบันไว้ให้')
     await page.getByTestId('mh-duel-name-1').fill('ฟ้าใส')
     if (name === 'desktop') await page.getByRole('radio', { name: /นั่งข้างกัน/ }).click()
     await page.getByTestId('mh-duel-start').click()
@@ -923,7 +924,10 @@ for (const [name, viewport] of [
       await page.getByTestId('mh-duel-next').click()
     }
     await page.getByTestId('mh-duel-result').waitFor()
-    await page.getByText('แดงจ๋า ชนะ!').waitFor()
+    await page.getByText('ทดสอบ ชนะ!').waitFor()
+    await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('moneyHero.save.v1')).players)[0].actLog?.some((e) => e.act === 'duel'))
+    const duelLog = (await savedPlayer(page)).actLog?.find((e) => e.act === 'duel')
+    if (!duelLog || duelLog.correct !== 8 || duelLog.total !== 10 || duelLog.wrong !== 1 || duelLog.passed !== true) throw new Error(`ผลดวลไม่ถูกบันทึกให้ผู้เล่น: ${JSON.stringify(duelLog)}`)
     const a = await page.getByTestId('mh-duel-result').innerText()
     if (!a.includes('⭐ 8') || !a.includes('⭐ 1')) throw new Error(`คะแนนดวลผิด: ${a}`)
     await snap(page, `${name}-duel-result`)
@@ -1354,6 +1358,84 @@ for (const [name, viewport] of [
       const pages3 = (pdf3.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
       if (pages3 !== 5) throw new Error(`พิมพ์การ์ดภารกิจได้ ${pages3} หน้า ควรได้ 5`)
     }
+  })
+
+  await step(`[${name}] เส้นทาง REAL: เห็นผลก่อนเรียน ภารกิจที่เล่นแล้ว และเขียนสะท้อนผลให้ครูอ่านได้`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-real').click()
+    await page.getByTestId('mh-real').waitFor()
+    await page.getByTestId('mh-real-pre').getByText('/20', { exact: false }).waitFor()
+    if (!(await page.getByTestId('mh-real-group-read').getAttribute('class')).includes('is-played')) throw new Error('เล่นด่านแล้วแต่กลุ่มภารกิจอ่านเงินยังไม่ขึ้นว่าเล่นแล้ว')
+    await page.getByTestId('mh-feel-good').click()
+    await page.getByTestId('mh-reflect-good').fill('ทอนเงินได้เร็ว')
+    await page.getByTestId('mh-reflect-improve').fill('โจทย์ปัญหาสองขั้น')
+    await page.getByTestId('mh-reflect-save').click()
+    await page.getByText('บันทึกสิ่งที่ได้เรียนรู้แล้ว').waitFor()
+    await snap(page, `${name}-real`)
+    await noSideScroll(page, 'เส้นทาง REAL')
+    await page.waitForFunction(() => Object.values(JSON.parse(localStorage.getItem('moneyHero.save.v1')).players).some((p) => p.reflection?.good === 'ทอนเงินได้เร็ว'))
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-table').getByText('ทดสอบ เก่งมาก').click()
+    await page.getByTestId('mh-student-reflect').getByText('ทอนเงินได้เร็ว', { exact: false }).waitFor()
+    await page.getByTestId('mh-student-missions').waitFor()
+    const [log] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-csv-log').click()])
+    const logCsv = fs.readFileSync(await log.path(), 'utf8')
+    if (logCsv.charCodeAt(0) !== 0xfeff || !logCsv.includes('กลุ่มภารกิจ') || !logCsv.includes('ด่าน 0')) throw new Error(`CSV บันทึกภารกิจไม่ถูกต้อง: ${logCsv.slice(0, 120)}`)
+  })
+
+  await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {
+    await page.goto(`${BASE}#/teacher/students`)
+    await page.getByTestId('mh-roster-teams').waitFor()
+    await page.getByTestId('mh-team-size').selectOption('3')
+    await page.getByTestId('mh-team-auto').click()
+    await page.getByTestId('mh-team-box-2').waitFor()
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const members = Object.values(saved.players).filter((p) => p.student?.team === '1')
+    if (members.length !== 2) throw new Error(`กลุ่ม 1 ต้องมี 2 คน แต่มี ${members.length}`)
+    await snap(page, `${name}-teams`)
+    await page.getByTestId('mh-roster-print-groups').click()
+    await page.getByTestId('mh-print-groups').waitFor()
+    if ((await page.getByTestId('mh-print-group').count()) !== 2) throw new Error('แบบสังเกตต้องแยก 2 กลุ่ม')
+    await page.getByText('ควรปรับปรุง', { exact: false }).first().waitFor()
+    await noSideScroll(page, 'แบบสังเกตพฤติกรรมกลุ่ม')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages < 1 || pages > 2) throw new Error(`พิมพ์แบบสังเกตได้ ${pages} หน้า`)
+      await page.locator('.mh-doc').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-groups.png') })
+    }
+    // เล่นภารกิจกลุ่ม: ผลัดกันตอบ (ข้อแรกตอบผิด)
+    await page.goto(`${BASE}#/team`)
+    await page.getByTestId('mh-team-pick-1').click()
+    await page.getByTestId('mh-team-turn').getByText('ตาของ', { exact: false }).waitFor()
+    await snap(page, `${name}-team-mission`)
+    await noSideScroll(page, 'ภารกิจกลุ่ม')
+    await playUntil(page, 'mh-team-result', { makeMistake: true })
+    await snap(page, `${name}-team-result`)
+    await page.waitForFunction((ids) => {
+      const ps = JSON.parse(localStorage.getItem('moneyHero.save.v1')).players
+      return ids.every((id) => ps[id].actLog?.some((e) => e.act === 'team-mission'))
+    }, members.map((m) => m.id))
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).players)
+    const logs = members.map((m) => after[m.id].actLog.find((e) => e.act === 'team-mission'))
+    const total = logs.reduce((sum, e) => sum + e.total, 0)
+    if (total !== 9) throw new Error(`ภารกิจกลุ่ม 2 คนต้องมี 9 ข้อรวม แต่บันทึก ${total}`)
+    if (logs.some((e) => e.total < 4)) throw new Error(`ผลัดกันตอบไม่ทั่วถึง: ${logs.map((e) => e.total)}`)
+    if (!logs.some((e) => e.wrong >= 1)) throw new Error('ข้อที่ตอบผิดต้องบันทึกให้เจ้าของตา')
+    for (const m of members) {
+      const attempts = Object.values(after[m.id].skills).reduce((s, x) => s + x.attempts, 0)
+      const before = Object.values(m.skills).reduce((s, x) => s + x.attempts, 0)
+      if (attempts <= before) throw new Error(`สถิติทักษะของ ${m.name} ไม่เพิ่มจากภารกิจกลุ่ม`)
+    }
+    // โหมดทบทวนในห้องเรียน: เปิดทุกด่านให้คนที่ยังไม่ผ่าน
+    await page.goto(`${BASE}#/teacher/settings`)
+    await page.getByTestId('mh-cs-classmode').check()
+    await page.goto(`${BASE}#/players`)
+    await page.getByTestId('mh-pick-2').click()
+    await page.waitForURL(/#\/map/)
+    await page.goto(`${BASE}#/level/9/learn`)
+    await page.waitForTimeout(400)
+    if (!/#\/level\/9\/learn/.test(page.url())) throw new Error(`โหมดทบทวนแต่เข้าด่าน 9 ไม่ได้: ${page.url()}`)
   })
 
   await page.context().close()
