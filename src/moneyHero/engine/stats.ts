@@ -123,7 +123,8 @@ export function pairedT(pre: number[], post: number[]): PairedT {
   let t: number | null = null
   let p: number | null = null
   if (n >= 2 && d.mean !== null && d.sd !== null) {
-    if (d.sd === 0) {
+    // ทศนิยมของเครื่องทำให้ S.D. ไม่เป็น 0 พอดีแม้ทุกคนเพิ่มเท่ากัน ถือว่าเป็น 0
+    if (d.sd < 1e-9 * Math.max(1, Math.abs(d.mean))) {
       // ทุกคนเพิ่มเท่ากัน: ถ้าเพิ่มขึ้นถือว่าต่างอย่างชัดเจน ถ้าไม่เปลี่ยนเลยไม่มีหลักฐาน
       t = d.mean === 0 ? 0 : d.mean > 0 ? Infinity : -Infinity
     } else {
