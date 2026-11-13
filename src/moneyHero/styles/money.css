@@ -10744,3 +10744,94 @@ a.mh-stage-chip:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ================================================================== */
+/* บันทึกพฤติกรรม (#/teacher/behavior) และศูนย์เอกสารพิมพ์ (#/teacher/print) */
+/* ================================================================== */
+
+.mh-behavior-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mh-behavior-row {
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(43, 35, 80, 0.12);
+}
+
+.mh-behavior-name {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-bottom: 6px;
+}
+
+.mh-behavior-total {
+  font-weight: 700;
+  color: #1f6f43;
+}
+
+.mh-behavior-total.is-empty {
+  font-weight: 500;
+  color: #6c6c80;
+}
+
+.mh-behavior-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr));
+}
+
+.mh-behavior-note {
+  grid-column: 1 / -1;
+}
+
+.mh-behavior-rubric ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+
+.mh-behavior-sum {
+  margin: 6px 0 0;
+}
+
+.mh-print-tip {
+  font-size: 0.92em;
+}
+
+.mh-print-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.mh-print-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+  color: var(--mh-ink);
+  min-height: 140px;
+}
+
+.mh-print-card:hover,
+.mh-print-card:focus-visible {
+  transform: translateY(-2px);
+}
+
+.mh-print-card span {
+  font-size: 0.9em;
+}
+
+.mh-print-card small {
+  margin-top: auto;
+  color: #6c6c80;
+}
+
+.mh-print-icon {
+  font-size: 2em;
+  line-height: 1;
+}

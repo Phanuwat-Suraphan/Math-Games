@@ -11,6 +11,7 @@ import { compareStudents, teacherName } from '../engine/classroom'
 import { participation, PARTICIPATION_LABEL } from '../engine/roster'
 import { attemptsOf, grantRetake, retakeOpen } from '../engine/exam'
 import { KIND_NAME } from '../engine/testBank'
+import { BEHAVIOR_FULL, behaviorLevel, behaviorTotal } from '../engine/behavior'
 import type { TestKind } from '../engine/progress'
 import { PLAN_EVENTS, plannedEvents } from '../engine/budget'
 import { challengesCleared, stageStars } from '../engine/stages'
@@ -61,6 +62,12 @@ export function TeacherPage() {
         </Link>
         <h1 className="mh-title">🍎 แผงคุณครู</h1>
         <div className="mh-teacher-actions">
+          <Link to="/teacher/print" className="mh-btn mh-btn-gold" data-testid="mh-teacher-print-hub">
+            <Printer size={20} /> เอกสารพิมพ์ทั้งหมด (A4)
+          </Link>
+          <Link to="/teacher/behavior" className="mh-btn mh-btn-go" data-testid="mh-teacher-behavior">
+            ✍️ บันทึกพฤติกรรม
+          </Link>
           <Link to="/teacher/analysis" className="mh-btn mh-btn-go" data-testid="mh-teacher-analysis">
             📊 วิเคราะห์ผล (ว.PA)
           </Link>
@@ -279,6 +286,14 @@ function StudentDetail({ p }: { p: Player }) {
           <span className="mh-soft">
             ทำโจทย์ {p.answered} ข้อ · ใช้ตัวช่วย {p.hintsUsed} ครั้ง · ถูกติดกันสูงสุด {p.bestStreak} ข้อ · เล่นล่าสุด {new Date(p.lastPlayed).toLocaleString('th-TH')}
           </span>
+          <div className="mh-row-buttons">
+            <Link to={`/teacher/print/students?id=${encodeURIComponent(p.id)}`} className="mh-chip" data-testid="mh-student-print">
+              🖨️ รายงานรายบุคคล (A4)
+            </Link>
+            <span className="mh-soft" data-testid="mh-student-behavior">
+              ✍️ พฤติกรรม: {behaviorTotal(p.behavior) === null ? 'ยังไม่ได้ประเมินครบ' : `${behaviorTotal(p.behavior)}/${BEHAVIOR_FULL} (${behaviorLevel(behaviorTotal(p.behavior)!)})`}
+            </span>
+          </div>
         </div>
       </div>
       <div className="mh-stats-grid">
