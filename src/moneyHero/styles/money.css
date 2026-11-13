@@ -8958,8 +8958,9 @@ a.mh-stage-chip:hover {
   overflow-x: auto;
 }
 
-/* ให้ตารางดาวรายด่านเลื่อนในกล่อง ไม่ดันคอลัมน์ให้กว้างเกินจอ */
-.mh-student-left {
+/* ให้ตารางดาวรายด่านและตารางภารกิจเลื่อนในกล่อง ไม่ดันคอลัมน์ให้กว้างเกินจอ */
+.mh-student-left,
+.mh-student .mh-stats-grid > * {
   min-width: 0;
 }
 
