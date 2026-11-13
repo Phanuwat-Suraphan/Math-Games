@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useGame } from '../hooks/useMoneyGame'
 import { fullName, teacherName, thaiDate } from '../engine/classroom'
 import { rosterList } from '../engine/roster'
 import { teamList } from '../engine/teams'
+import { BEHAVIOR_CRITERIA, BEHAVIOR_LEVELS, behaviorLevel, behaviorTotal } from '../engine/behavior'
 import { DocHead, PaperPage, SignBlock } from './Paper'
 
 /**
@@ -11,45 +13,31 @@ import { DocHead, PaperPage, SignBlock } from './Paper'
  * เส้นทาง #/teacher/print/groups
  */
 
-export const BEHAVIOR_CRITERIA: { name: string; levels: [string, string, string, string] }[] = [
-  {
-    name: 'ความร่วมมือในกลุ่ม',
-    levels: ['ช่วยเพื่อนและรับฟังทุกคนตลอดกิจกรรม', 'ช่วยเพื่อนและรับฟังเป็นส่วนใหญ่', 'ร่วมมือเมื่อมีคนชวน', 'ไม่ค่อยร่วมทำกับกลุ่ม'],
-  },
-  {
-    name: 'การอธิบายวิธีคิด',
-    levels: ['อธิบายวิธีคิดเรื่องเงินได้ชัดเจนและถูกต้อง', 'อธิบายได้ถูกต้องเป็นส่วนใหญ่', 'อธิบายได้บางส่วนเมื่อครูถาม', 'ยังอธิบายวิธีคิดไม่ได้'],
-  },
-  {
-    name: 'ความรับผิดชอบ',
-    levels: ['ทำหน้าที่ของตนครบ ตรงเวลา และช่วยงานกลุ่ม', 'ทำหน้าที่ของตนครบ', 'ทำหน้าที่ได้บางส่วน', 'ต้องเตือนบ่อยครั้ง'],
-  },
-  {
-    name: 'การคิดแก้ปัญหา',
-    levels: ['ตรวจคำตอบเองและหาวิธีใหม่เมื่อผิด', 'แก้ไขเมื่อรู้ว่าผิด', 'แก้ไขได้เมื่อมีคนช่วย', 'ยังไม่แก้ไขเมื่อผิด'],
-  },
-]
-
-export const BEHAVIOR_LEVELS = ['ดีเยี่ยม', 'ดี', 'พอใช้', 'ควรปรับปรุง'] as const
-
-/** ระดับคุณภาพจากคะแนนรวม 4 ด้าน (เต็ม 16) */
-export function behaviorLevel(total: number): (typeof BEHAVIOR_LEVELS)[number] {
-  if (total >= 14) return 'ดีเยี่ยม'
-  if (total >= 11) return 'ดี'
-  if (total >= 8) return 'พอใช้'
-  return 'ควรปรับปรุง'
-}
-
 export function GroupPrintPage() {
   const { save } = useGame()
   const c = save.classroom
+  const [filled, setFilled] = useState(false)
   const roster = useMemo(() => rosterList(save.players).filter((p) => p.student), [save.players])
   const teams = teamList(roster)
   const noTeam = roster.filter((p) => !p.student?.team)
   const blocks = [...teams.map((t) => ({ title: `กลุ่มที่ ${t.team}`, members: t.members })), ...(noTeam.length > 0 ? [{ title: teams.length > 0 ? 'ยังไม่ได้จัดกลุ่ม' : 'นักเรียนทั้งหมด', members: noTeam }] : [])]
 
   return (
-    <PaperPage title="🖨️ แบบสังเกตพฤติกรรมกลุ่ม" back="/teacher/students" testId="mh-print-groups">
+    <PaperPage
+      title="🖨️ แบบสังเกตพฤติกรรมกลุ่ม"
+      back="/teacher/students"
+      testId="mh-print-groups"
+      tools={
+        <>
+          <label>
+            <input type="checkbox" checked={filled} onChange={(e) => setFilled(e.target.checked)} data-testid="mh-groups-filled" /> พิมพ์พร้อมคะแนนที่บันทึกไว้ในเกม
+          </label>
+          <Link to="/teacher/behavior" className="mh-chip">
+            ✍️ บันทึกคะแนนพฤติกรรม
+          </Link>
+        </>
+      }
+    >
       <article className="mh-doc">
         <DocHead title="แบบสังเกตพฤติกรรมการเรียนรู้เชิงรุกขณะทำกิจกรรมกลุ่ม" c={c} />
         <p className="mh-doc-fill">กิจกรรม ........................................................................ วันที่ ...................................</p>
@@ -104,11 +92,13 @@ export function GroupPrintPage() {
                   <tr key={p.id}>
                     <td className="c">{p.student?.no ?? ''}</td>
                     <td>{p.student ? fullName(p.student) : teacherName(p)}</td>
-                    {BEHAVIOR_CRITERIA.map((c) => (
-                      <td key={c.name} />
+                    {BEHAVIOR_CRITERIA.map((c, i) => (
+                      <td key={c.name} className="c">
+                        {filled && p.behavior?.scores[i] ? p.behavior.scores[i] : ''}
+                      </td>
                     ))}
-                    <td />
-                    <td />
+                    <td className="c">{filled ? (behaviorTotal(p.behavior) ?? '') : ''}</td>
+                    <td className="c">{filled && behaviorTotal(p.behavior) !== null ? behaviorLevel(behaviorTotal(p.behavior)!) : ''}</td>
                   </tr>
                 ))}
               </tbody>

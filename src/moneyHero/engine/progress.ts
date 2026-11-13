@@ -10,6 +10,7 @@ import { emptyPlan, type PlanRecord } from './budget'
 import { DEFAULT_CLASSROOM, repairClassroom, repairStudent, type Classroom, type StudentInfo } from './classroom'
 import { defaultBank, repairBank, type TestAttempt, type TestBank } from './testBank'
 import { repairReflection, type ActivityEntry, type ActivityStat, type Reflection } from './activity'
+import { repairBehavior, type BehaviorRecord } from './behavior'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -118,6 +119,8 @@ export interface Player {
   actLog?: ActivityEntry[]
   /** ขั้น L: การสะท้อนผลการเรียนรู้ของนักเรียน */
   reflection?: Reflection
+  /** ครูบันทึกพฤติกรรมการเรียนรู้เชิงรุก (4 ด้าน ด้านละ 1–4) */
+  behavior?: BehaviorRecord
   mapX?: number
   mapY?: number
 }
@@ -226,6 +229,7 @@ function repairPlayer(raw: Partial<Player>): Player | null {
     acts: raw.acts && typeof raw.acts === 'object' ? raw.acts : undefined,
     actLog: Array.isArray(raw.actLog) ? raw.actLog.filter((e) => e && typeof e.act === 'string' && typeof e.at === 'number') : undefined,
     reflection: repairReflection(raw.reflection),
+    behavior: repairBehavior(raw.behavior),
   } as Player
 }
 

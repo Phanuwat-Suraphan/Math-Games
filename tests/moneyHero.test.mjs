@@ -60,6 +60,7 @@ const board = load('board/boardData.js')
 const activity = load('engine/activity.js')
 const teams = load('engine/teams.js')
 const stats = load('engine/stats.js')
+const behavior = load('engine/behavior.js')
 
 let passed = 0
 const failures = []
@@ -2293,6 +2294,70 @@ test('วิเคราะห์ทั้งห้อง: การเข้า
   eq(empty.t.p, null, 'ห้องว่างไม่มี t')
 })
 
+
+/* ------------------------------------------------------------------ */
+/* ระยะ 5: บันทึกพฤติกรรม รายงานสรุป PDCA                                */
+/* ------------------------------------------------------------------ */
+
+test('บันทึกพฤติกรรม: ให้คะแนนรายด้าน รวม 16 แปลระดับ บันทึกกลับได้ รวมสองเครื่อง และสรุปทั้งห้อง', () => {
+  let p = progress.newPlayer('มะลิ', 'hero', 1)
+  eq(behavior.behaviorTotal(p.behavior), null, 'ยังไม่ประเมิน')
+  p = behavior.setBehaviorScore(p, 0, 4, 10)
+  p = behavior.setBehaviorScore(p, 1, 3, 11)
+  eq(behavior.behaviorTotal(p.behavior), null, 'ประเมินไม่ครบ 4 ด้าน ยังไม่รวม')
+  p = behavior.setBehaviorScore(p, 2, 4, 12)
+  p = behavior.setBehaviorScore(p, 3, 3, 13)
+  eq(behavior.behaviorTotal(p.behavior), 14, 'รวม 14')
+  eq(behavior.behaviorLevel(14), 'ดีเยี่ยม', '14 ดีเยี่ยม')
+  eq(behavior.behaviorLevel(13), 'ดี', '13 ดี')
+  eq(behavior.behaviorLevel(8), 'พอใช้', '8 พอใช้')
+  eq(behavior.behaviorLevel(7), 'ควรปรับปรุง', '7 ควรปรับปรุง')
+  eq(p.behavior.at, 13, 'เวลาบันทึกล่าสุด')
+  eq(behavior.setBehaviorScore(p, 9, 4).behavior.scores.join(), '4,3,4,3', 'ด้านที่ไม่มีไม่เปลี่ยนอะไร')
+  eq(behavior.setBehaviorScore(p, 0, 7).behavior.scores[0], 0, 'คะแนนนอกช่วงถือว่าล้าง')
+  // ล้างทุกด้าน = ลบบันทึก
+  let q = behavior.setBehaviorScore(progress.newPlayer('ก', 'hero', 1), 0, 2)
+  q = behavior.setBehaviorScore(q, 0, 0)
+  eq(q.behavior, undefined, 'ล้างครบลบบันทึก')
+  // บันทึกเพิ่มเติมอย่างเดียวก็เก็บไว้
+  const n = behavior.setBehaviorNote(progress.newPlayer('ข', 'hero', 1), 'ช่วยเพื่อนนับเงิน', 5)
+  const back = progress.parseSave(JSON.stringify({ version: 1, players: { a: { ...p, id: 'a' }, b: { ...n, id: 'b' } } }))
+  eq(back.players.a.behavior.scores.join(), '4,3,4,3', 'อ่านคะแนนกลับได้')
+  eq(back.players.b.behavior.note, 'ช่วยเพื่อนนับเงิน', 'บันทึกเพิ่มเติมอย่างเดียวไม่หาย')
+  eq(behavior.repairBehavior({ scores: [9, 'x', -1, 2.5] }), undefined, 'ข้อมูลผิดรูปทั้งหมดไม่รับ')
+  eq(behavior.repairBehavior({ scores: [2, 9] }).scores.join(), '2,0,0,0', 'รับเฉพาะค่าที่ถูกต้อง')
+  // รวมสองเครื่อง: บันทึกที่ใหม่กว่าชนะ
+  const older = { at: 1, scores: [1, 1, 1, 1] }
+  const newer = { at: 2, scores: [4, 4, 4, 4] }
+  eq(behavior.mergeBehavior(older, newer), newer, 'ใหม่กว่าชนะ')
+  eq(behavior.mergeBehavior(newer, older), newer, 'ลำดับไม่มีผล')
+  eq(behavior.mergeBehavior(undefined, older), older, 'มีฝั่งเดียว')
+  const merged = backup.mergeSaves(back, progress.parseSave(JSON.stringify({ version: 1, players: { a: { ...p, id: 'a', behavior: { at: 99, scores: [2, 2, 2, 2] } } } })))
+  eq(merged.save.players.a.behavior.scores.join(), '2,2,2,2', 'รวมไฟล์สำรองใช้บันทึกล่าสุด')
+  // สรุปทั้งห้อง
+  const r = (sc) => ({ ...progress.newPlayer('x', 'hero', 1), behavior: { at: 1, scores: sc } })
+  const s = behavior.behaviorSummary([r([4, 4, 4, 4]), r([3, 3, 3, 3]), r([2, 2, 2, 1]), r([1, 1, 1, 1]), progress.newPlayer('ไม่ประเมิน', 'hero', 1), r([4, 0, 0, 0])])
+  eq(s.assessed, 4, 'นับเฉพาะคนที่ประเมินครบ')
+  eq(s.mean, (16 + 12 + 7 + 4) / 4, 'ค่าเฉลี่ยรวม')
+  eq(s.levels['ดีเยี่ยม'], 1, 'ดีเยี่ยม 1')
+  eq(s.levels['ดี'], 1, 'ดี 1')
+  eq(s.levels['ควรปรับปรุง'], 2, 'ควรปรับปรุง 2')
+  eq(s.goodUp, 50, 'ระดับดีขึ้นไปร้อยละ 50')
+  eq(s.criteria[3], (4 + 3 + 1 + 1) / 4, 'ค่าเฉลี่ยด้านที่ 4')
+  eq(behavior.behaviorSummary([]).mean, null, 'ห้องว่าง')
+})
+
+test('บันทึก PDCA ของครู: ค่าเริ่มต้นว่าง อ่านกลับได้ ตัดความยาว และข้อมูลเก่าที่ไม่มีช่องนี้ยังเปิดได้', () => {
+  const d = classroom.repairClassroom({})
+  eq(JSON.stringify(d.pdca), JSON.stringify({ plan: '', do: '', check: '', act: '' }), 'ค่าเริ่มต้น')
+  const c = classroom.repairClassroom({ pdca: { plan: 'วิเคราะห์ปัญหา\nบรรทัดสอง', do: 5, act: 'x'.repeat(2000) } })
+  eq(c.pdca.plan, 'วิเคราะห์ปัญหา\nบรรทัดสอง', 'เก็บขึ้นบรรทัดใหม่')
+  eq(c.pdca.do, '', 'ค่าที่ไม่ใช่ข้อความเป็นว่าง')
+  eq(c.pdca.act.length, 1500, 'ตัดที่ 1500 ตัวอักษร')
+  const saved = progress.parseSave(JSON.stringify({ version: 1, players: {}, classroom: { teacher: 'ครูใจดี', pdca: { check: 'ผลดีขึ้น' } } }))
+  eq(saved.classroom.pdca.check, 'ผลดีขึ้น', 'อ่านจากไฟล์บันทึก')
+  eq(saved.classroom.teacher, 'ครูใจดี', 'ค่าอื่นไม่หาย')
+})
 
 console.log(`ผ่าน ${passed} ข้อ`)
 if (failures.length > 0) {

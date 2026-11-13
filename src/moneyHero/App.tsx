@@ -38,6 +38,10 @@ import { RealPage } from './pages/RealPage'
 import { TeamMissionPage } from './pages/TeamMissionPage'
 import { GroupPrintPage } from './report/GroupPrint'
 import { AnalysisPage } from './report/AnalysisPage'
+import { StudentReportPage } from './report/StudentReport'
+import { SummaryPrintPage } from './report/SummaryPrint'
+import { PrintHubPage } from './report/PrintHub'
+import { BehaviorPage } from './pages/BehaviorPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
 /** ต้องมีผู้เล่นก่อน ถ้ายังไม่มีให้กลับไปหน้าเริ่มเกม (นักเรียนในทะเบียนที่ยังไม่เลือกตัวละคร ไปเลือกก่อน) */
@@ -283,6 +287,38 @@ export default function App() {
               element={
                 <TeacherGate>
                   <AnalysisPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print"
+              element={
+                <TeacherGate>
+                  <PrintHubPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/students"
+              element={
+                <TeacherGate>
+                  <StudentReportPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/summary"
+              element={
+                <TeacherGate>
+                  <SummaryPrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/behavior"
+              element={
+                <TeacherGate>
+                  <BehaviorPage />
                 </TeacherGate>
               }
             />

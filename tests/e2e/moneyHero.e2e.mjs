@@ -1409,6 +1409,68 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] เอกสารพิมพ์ A4: บันทึกพฤติกรรมในเกม พิมพ์แบบสังเกตพร้อมคะแนน รายงานรายบุคคลคนละแผ่น และรายงานสรุป PDCA`, async () => {
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const pool = Object.values(saved.players).filter((p) => p.student)
+    if (pool.length === 0) throw new Error('ต้องมีนักเรียนในทะเบียนก่อนขั้นนี้')
+    const kid = pool.sort((a, b) => (a.student.no ?? 0) - (b.student.no ?? 0))[0]
+    // บันทึกพฤติกรรม 4 ด้าน
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-behavior').click()
+    await page.getByTestId('mh-behavior').waitFor()
+    for (const [i, v] of [4, 3, 4, 3].entries()) await page.getByTestId(`mh-bh-${kid.id}-${i}`).selectOption(String(v))
+    await page.getByTestId(`mh-bh-total-${kid.id}`).filter({ hasText: '14/16 · ดีเยี่ยม' }).waitFor()
+    await page.getByTestId(`mh-bh-note-${kid.id}`).fill('อธิบายวิธีทอนเงินให้เพื่อนฟัง')
+    await page.waitForFunction((id) => {
+      const b = JSON.parse(localStorage.getItem('moneyHero.save.v1')).players[id].behavior
+      return b && b.scores.join() === '4,3,4,3' && b.note === 'อธิบายวิธีทอนเงินให้เพื่อนฟัง'
+    }, kid.id)
+    await snap(page, `${name}-behavior`)
+    await noSideScroll(page, 'บันทึกพฤติกรรม')
+    // แบบสังเกตกลุ่มพิมพ์พร้อมคะแนน
+    await page.goto(`${BASE}#/teacher/print/groups`)
+    await page.getByTestId('mh-groups-filled').check()
+    await page.getByTestId('mh-print-groups').getByRole('cell', { name: 'ดีเยี่ยม', exact: true }).first().waitFor()
+    // ศูนย์เอกสารพิมพ์
+    await page.goto(`${BASE}#/teacher`)
+    await page.getByTestId('mh-teacher-print-hub').click()
+    await page.getByTestId('mh-print-hub').waitFor()
+    if ((await page.locator('.mh-print-card').count()) !== 10) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 10 รายการ')
+    await snap(page, `${name}-print-hub`)
+    await noSideScroll(page, 'ศูนย์เอกสารพิมพ์')
+    // รายงานรายบุคคล: ทั้งห้องคนละแผ่น
+    await page.getByTestId('mh-hub-students').click()
+    await page.getByTestId('mh-print-students').waitFor()
+    if ((await page.getByTestId('mh-print-student').count()) !== pool.length) throw new Error(`รายงานรายบุคคลต้องมี ${pool.length} แผ่น`)
+    await noSideScroll(page, 'รายงานรายบุคคล')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== pool.length) throw new Error(`รายงานรายบุคคล ${pool.length} คน ต้องพิมพ์ได้ ${pool.length} หน้า แต่ได้ ${pages}`)
+      await page.getByTestId('mh-print-student').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-student.png') })
+    }
+    // รายงานคนเดียวจากรายละเอียดนักเรียน
+    await page.goto(`${BASE}#/teacher/print/students?id=${encodeURIComponent(kid.id)}`)
+    await page.getByTestId('mh-print-student').waitFor()
+    if ((await page.getByTestId('mh-print-student').count()) !== 1) throw new Error('พิมพ์คนเดียวต้องมีแผ่นเดียว')
+    await page.getByTestId('mh-print-student').getByText('อธิบายวิธีทอนเงินให้เพื่อนฟัง', { exact: false }).waitFor()
+    // รายงานสรุป PDCA: ครูพิมพ์บันทึก แล้วขึ้นในเอกสาร
+    await page.goto(`${BASE}#/teacher/print/summary`)
+    await page.getByTestId('mh-print-summary').waitFor()
+    await page.getByTestId('mh-pdca-plan').fill('นักเรียนทอนเงินไม่คล่อง จึงออกแบบเกม')
+    await page.locator('.mh-doc').getByText('นักเรียนทอนเงินไม่คล่อง จึงออกแบบเกม').waitFor()
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')).classroom.pdca.plan === 'นักเรียนทอนเงินไม่คล่อง จึงออกแบบเกม')
+    for (const id of ['mh-summary-real', 'mh-summary-results', 'mh-summary-pass', 'mh-summary-act']) await page.getByTestId(id).waitFor()
+    await snap(page, `${name}-summary`)
+    await noSideScroll(page, 'รายงานสรุป PDCA')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages < 1 || pages > 4) throw new Error(`รายงานสรุปพิมพ์ได้ ${pages} หน้า`)
+      await page.locator('.mh-doc').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-summary.png') })
+    }
+  })
+
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {
     await page.goto(`${BASE}#/teacher/students`)
     await page.getByTestId('mh-roster-teams').waitFor()

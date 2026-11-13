@@ -1,6 +1,7 @@
 import { parseSave, type LevelRecord, type Player, type SaveData, type SkillStat } from './progress'
 import { classroomConfigured, studentKey } from './classroom'
 import { mergeActivity } from './activity'
+import { mergeBehavior } from './behavior'
 import type { Skill } from './types'
 
 /**
@@ -150,6 +151,7 @@ export function mergePlayer(a: Player, b: Player): Player {
     retake: mergeRetake(a.retake, b.retake),
     ...mergeActivity(a, b),
     reflection: (b.reflection?.at ?? 0) > (a.reflection?.at ?? 0) ? b.reflection : a.reflection ?? b.reflection,
+    behavior: mergeBehavior(a.behavior, b.behavior),
   }
 }
 

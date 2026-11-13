@@ -48,6 +48,15 @@ export interface Classroom {
   rosterOnly: boolean
   /** โหมดทบทวนในห้องเรียน: เปิดทุกด่านให้เล่นได้เลย ไม่ต้องผ่านด่านก่อนหน้า */
   classMode: boolean
+  /** บันทึกของครูตามวงจร PDCA (พิมพ์ในรายงานสรุปผลการใช้นวัตกรรม) */
+  pdca: PdcaNotes
+}
+
+export interface PdcaNotes {
+  plan: string
+  do: string
+  check: string
+  act: string
 }
 
 export const DEFAULT_CLASSROOM: Classroom = {
@@ -64,6 +73,7 @@ export const DEFAULT_CLASSROOM: Classroom = {
   targetPercent: 80,
   rosterOnly: false,
   classMode: false,
+  pdca: { plan: '', do: '', check: '', act: '' },
 }
 
 function clampPercent(v: unknown, fallback: number): number {
@@ -73,6 +83,12 @@ function clampPercent(v: unknown, fallback: number): number {
 
 function text(v: unknown, max = 80): string {
   return typeof v === 'string' ? v.trim().slice(0, max) : ''
+}
+
+function repairPdca(raw: unknown): PdcaNotes {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<Record<keyof PdcaNotes, unknown>>
+  const note = (v: unknown) => (typeof v === 'string' ? v.slice(0, 1500) : '')
+  return { plan: note(r.plan), do: note(r.do), check: note(r.check), act: note(r.act) }
 }
 
 /** ซ่อมการตั้งค่าห้องเรียนจากไฟล์ (ค่าที่หายหรือผิดรูปใช้ค่าเริ่มต้น) */
@@ -93,6 +109,7 @@ export function repairClassroom(raw: unknown): Classroom {
     targetPercent: clampPercent(r.targetPercent, DEFAULT_CLASSROOM.targetPercent),
     rosterOnly: r.rosterOnly === true,
     classMode: r.classMode === true,
+    pdca: repairPdca(r.pdca),
   }
 }
 
