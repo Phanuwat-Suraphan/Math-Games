@@ -1442,7 +1442,7 @@ for (const [name, viewport] of [
     await page.goto(`${BASE}#/teacher`)
     await page.getByTestId('mh-teacher-print-hub').click()
     await page.getByTestId('mh-print-hub').waitFor()
-    if ((await page.locator('.mh-print-card').count()) !== 13) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 13 รายการ')
+    if ((await page.locator('.mh-print-card').count()) !== 14) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 14 รายการ')
     await snap(page, `${name}-print-hub`)
     await noSideScroll(page, 'ศูนย์เอกสารพิมพ์')
     // รายงานรายบุคคล: ทั้งห้องคนละแผ่น
@@ -1559,6 +1559,40 @@ for (const [name, viewport] of [
     await page.goto(`${BASE}#/teacher/print/passport?id=${encodeURIComponent(pool[0].id)}`)
     await page.getByTestId('mh-passport').waitFor()
     if ((await page.getByTestId('mh-passport').count()) !== 1) throw new Error('พิมพ์คนเดียวต้องมีแผ่นเดียว')
+  })
+
+  await step(`[${name}] บิงโกเงินทอง: การ์ดคนละใบ หน้าละ 2 ใบ ใบเรียกโจทย์ ตารางตรวจผู้ชนะ และจอเรียกโจทย์`, async () => {
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const pool = Object.values(saved.players).filter((p) => p.student)
+    await page.goto(`${BASE}#/teacher/print`)
+    await page.getByTestId('mh-hub-bingo').click()
+    await page.getByTestId('mh-print-bingo').waitFor()
+    if ((await page.getByTestId('mh-bingo-card').count()) !== pool.length) throw new Error(`การ์ดบิงโกต้องมี ${pool.length} ใบตามรายชื่อ`)
+    if ((await page.getByTestId('mh-bingo-page').count()) !== Math.ceil(pool.length / 2)) throw new Error('การ์ดหน้าละ 2 ใบ')
+    if ((await page.getByTestId('mh-bingo-card').first().locator('.mh-bingo-cell').count()) !== 25) throw new Error('การ์ด 5×5')
+    if ((await page.getByTestId('mh-bingo-calls').locator('tbody').first().locator('tr').count()) !== 36) throw new Error('ใบเรียกโจทย์ต้องมี 36 ข้อ')
+    if ((await page.getByTestId('mh-bingo-wins').locator('tbody tr').count()) !== pool.length) throw new Error('ตารางตรวจผู้ชนะต้องครบทุกใบ')
+    await snap(page, `${name}-bingo`)
+    await noSideScroll(page, 'บิงโกเงินทอง')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      const cardPages = Math.ceil(pool.length / 2)
+      if (pages < cardPages + 1 || pages > cardPages + 4) throw new Error(`บิงโกพิมพ์ได้ ${pages} หน้า (การ์ด ${cardPages} หน้า + ใบเรียกโจทย์)`)
+      await page.getByTestId('mh-bingo-page').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-bingo.png') })
+    }
+    // จอเรียกโจทย์: ถัดไปได้โจทย์ใหม่ กดเฉลยเห็นคำตอบ
+    await page.getByTestId('mh-bingo-caller-toggle').click()
+    const first = await page.getByTestId('mh-bingo-call-text').innerText()
+    await page.getByTestId('mh-bingo-reveal').click()
+    await page.getByTestId('mh-bingo-answer').getByText('บาท', { exact: false }).waitFor()
+    await page.getByTestId('mh-bingo-next').click()
+    if ((await page.getByTestId('mh-bingo-call-text').innerText()) === first) throw new Error('กดถัดไปแล้วโจทย์ต้องเปลี่ยน')
+    if ((await page.getByTestId('mh-bingo-answer').innerText()).includes('บาท')) throw new Error('ข้อใหม่ต้องซ่อนคำตอบ')
+    // ไม่ใส่ชื่อ: เลือกจำนวนการ์ดเอง
+    await page.getByTestId('mh-bingo-byname').uncheck()
+    await page.getByTestId('mh-bingo-count').selectOption('10')
+    if ((await page.getByTestId('mh-bingo-card').count()) !== 10) throw new Error('เลือก 10 ใบต้องได้ 10 ใบ')
   })
 
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {

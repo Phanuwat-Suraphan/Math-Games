@@ -65,6 +65,7 @@ const worksheet = load('engine/worksheet.js')
 const xlsx = load('engine/xlsx.js')
 const workbook = load('engine/workbook.js')
 const passport = load('engine/passport.js')
+const bingo = load('engine/bingo.js')
 const { SKILLS } = load('data/characters.js')
 
 let passed = 0
@@ -2605,6 +2606,71 @@ test('หนังสือเดินทาง: ได้ตราเมื่
   eq(JSON.stringify(s.steps), JSON.stringify({ r: true, e: true, a: true, l: true }), 'ครบทุกขั้น')
   eq(s.postPassed, false, '13/20 = 65% ไม่ผ่านเกณฑ์ 70')
   eq(passport.CLASS_STAMPS.length, 4, 'ตรากิจกรรมในห้องเรียน 4 ช่อง')
+})
+
+test('บิงโกเงินทอง: คำตอบไม่ซ้ำ เฉลยทุกโจทย์ถูก (คำนวณย้อนจากโจทย์) การ์ดถูกต้อง และตารางตรวจผู้ชนะตรงกับการเล่นจริง', () => {
+  const denoms = load('data/denominations.js')
+  const wordsValue = (s) => {
+    let sum = 0
+    const re = /((?:ธนบัตร|เหรียญ) [\d,]+ (?:บาท|สตางค์)) (\d+) (?:ใบ|เหรียญ)/g
+    let m
+    while ((m = re.exec(s))) sum += denoms.DENOMINATIONS.find((d) => d.name === m[1]).value * Number(m[2])
+    return sum
+  }
+  for (let seed = 1; seed <= 30; seed += 1) {
+    const set = bingo.buildBingo(seed)
+    eq(set.calls.length, bingo.POOL, `ชุด ${seed} มี ${bingo.POOL} โจทย์`)
+    eq(new Set(set.calls.map((c) => c.answer)).size, bingo.POOL, 'คำตอบไม่ซ้ำ')
+    for (const c of set.calls) {
+      const where = `[ชุด ${seed} ${c.kind}] ${c.text} → ${c.answer}`
+      assert(c.answer >= 200 && c.answer <= 9975 && c.answer % 25 === 0, `คำตอบอยู่ในช่วง ${where}`)
+      assert(!/NaN|undefined/.test(c.text), `ข้อความเสีย ${where}`)
+      let got
+      if (c.kind === 'change') {
+        const m = c.text.match(new RegExp(`ราคา (${AMT}) จ่ายด้วยธนบัตร (\\d+) บาท`))
+        got = Number(m[2]) * 100 - amt(m[1])
+        assert(amt(m[1]) >= 25, `ราคาเป็นบวก ${where}`)
+      } else if (c.kind === 'add') {
+        const m = c.text.match(new RegExp(`มีเงิน (${AMT}) ได้เพิ่มอีก (${AMT}) `))
+        got = amt(m[1]) + amt(m[2])
+      } else if (c.kind === 'times') {
+        const m = c.text.match(new RegExp(`ละ (${AMT}) ซื้อ (\\d+) `))
+        got = amt(m[1]) * Number(m[2])
+      } else if (c.kind === 'count') got = wordsValue(c.text)
+      else got = amt(c.text.match(new RegExp(`^(${AMT}) เขียน`))[1])
+      eq(got, c.answer, `เฉลยถูก ${where}`)
+    }
+    // การ์ด: 24 คำตอบไม่ซ้ำจากชุด ช่องกลางฟรี ข้อความอ่านได้ค่าตรง
+    const pool = new Set(set.calls.map((c) => c.answer))
+    const seen = new Set()
+    for (let n = 1; n <= 12; n += 1) {
+      const card = bingo.bingoCard(set, n)
+      eq(card.length, 25, 'การ์ด 25 ช่อง')
+      eq(card[bingo.FREE].value, null, 'ช่องกลางฟรี')
+      const vals = card.filter((c) => c.value !== null).map((c) => c.value)
+      eq(new Set(vals).size, 24, 'ในการ์ดไม่ซ้ำ')
+      for (const c of card) {
+        if (c.value === null) continue
+        assert(pool.has(c.value), 'ทุกช่องเป็นคำตอบของชุด')
+        eq(/\.\d\d$/.test(c.label) ? dotNum(c.label) : amt(c.label), c.value, `ข้อความบนการ์ด ${c.label}`)
+      }
+      seen.add(JSON.stringify(card))
+      // ตารางตรวจผู้ชนะ: จำลองการเล่นทีละข้อ
+      const marked = new Set([bingo.FREE])
+      let real = null
+      for (let k = 0; k < set.calls.length && real === null; k += 1) {
+        const i = card.findIndex((c) => c.value === set.calls[k].answer)
+        if (i >= 0) marked.add(i)
+        if (bingo.LINES.some((line) => line.every((x) => marked.has(x)))) real = k + 1
+      }
+      eq(bingo.winAt(set, card), real, `ข้อที่ได้บิงโก (ชุด ${seed} ใบ ${n})`)
+    }
+    eq(seen.size, 12, 'การ์ดแต่ละใบไม่เหมือนกัน')
+  }
+  eq(JSON.stringify(bingo.buildBingo(4)), JSON.stringify(bingo.buildBingo(4)), 'ชุดเดิมได้โจทย์เดิม')
+  eq(JSON.stringify(bingo.bingoCard(bingo.buildBingo(4), 3)), JSON.stringify(bingo.bingoCard(bingo.buildBingo(4), 3)), 'การ์ดเดิมพิมพ์ซ้ำได้เหมือนเดิม')
+  eq(bingo.LINES.length, 12, 'แถวชนะ 12 แบบ')
+  eq(bingo.moneyWords(8775), 'ธนบัตร 50 บาท 1 ใบ ธนบัตร 20 บาท 1 ใบ เหรียญ 10 บาท 1 เหรียญ เหรียญ 5 บาท 1 เหรียญ เหรียญ 2 บาท 1 เหรียญ เหรียญ 50 สตางค์ 1 เหรียญ เหรียญ 25 สตางค์ 1 เหรียญ', 'แตกเงินน้อยชิ้นที่สุด')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

@@ -1019,3 +1019,108 @@
     flex-direction: row;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* บิงโกเงินทอง (#/teacher/print/bingo) A4 หน้าละ 2 ใบ                   */
+/* ------------------------------------------------------------------ */
+
+.mh-bingo-page {
+  display: flex;
+  flex-direction: column;
+  gap: 8mm;
+}
+
+.mh-bingo-card {
+  border: 2px solid #333;
+  border-radius: 10px;
+  padding: 4mm 5mm 3mm;
+  break-inside: avoid;
+}
+
+.mh-bingo-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 15pt;
+}
+
+.mh-bingo-head span {
+  font-size: 10.5pt;
+}
+
+.mh-bingo-name {
+  margin: 1mm 0 2mm;
+  font-weight: 600;
+}
+
+.mh-bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  border: 2px solid #333;
+}
+
+.mh-bingo-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 17mm;
+  padding: 1mm;
+  border: 1px solid #555;
+  text-align: center;
+  font-size: 13pt;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.mh-bingo-cell.is-free {
+  background: #fff3c4;
+  font-size: 12pt;
+}
+
+.mh-bingo-rule {
+  margin: 2mm 0 0;
+  font-size: 9.5pt;
+}
+
+.mh-bingo-caller {
+  margin-bottom: 14px;
+}
+
+.mh-bingo-caller-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.mh-bingo-call {
+  margin: 12px 0;
+  font-size: clamp(22px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.mh-bingo-answer {
+  margin: 0 0 8px;
+  font-size: clamp(24px, 5vw, 48px);
+  font-weight: 800;
+  color: #1f6f43;
+}
+
+@media (max-width: 860px) {
+  .mh-bingo-cell {
+    min-height: 12mm;
+    font-size: 10pt;
+  }
+}
+
+@media print {
+  .mh-bingo-page {
+    break-after: page;
+  }
+  .mh-bingo-cell {
+    min-height: 17mm;
+    font-size: 13pt;
+  }
+}
