@@ -11333,3 +11333,65 @@ a.mh-stage-chip:hover {
     scale: 1;
   }
 }
+
+/* จ่ายเงิน: เงินตกลงกระเป๋าดัง "ปุ๊" ยอดรวมเด้งทุกครั้งที่เปลี่ยน ยอดพอดีกระเป๋าเรืองเขียว */
+.mh-wallet-piece {
+  animation: mh-plop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-wallet-total {
+  display: inline-block;
+  animation: mh-pop 0.3s ease-out both;
+}
+
+.mh-wallet {
+  transition: border-color 0.25s, background-color 0.25s, box-shadow 0.25s;
+}
+
+.mh-wallet.is-exact {
+  border-style: solid;
+  border-color: var(--mh-mint);
+  background: #effff7;
+  box-shadow: 0 0 0 4px rgba(70, 220, 164, 0.2);
+}
+
+.mh-tray-item:hover:not(:disabled) {
+  filter: drop-shadow(0 4px 4px rgba(43, 35, 80, 0.2));
+}
+
+@keyframes mh-plop {
+  0% {
+    transform: translateY(-14px) scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: translateY(2px) scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: none;
+  }
+}
+
+/* จับคู่และเรียงลำดับ: ป้ายคู่เด้งตอนจับคู่ ช่องที่ใส่แล้วเด้ง ตัวที่เลือกอยู่เต้นเบา ๆ */
+.mh-pair-badge {
+  animation: mh-pop-spin 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-match-item.is-active {
+  animation: mh-glow-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes mh-glow-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0.12);
+  }
+}
+
+.mh-sort-slot.is-filled {
+  animation: mh-plop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}

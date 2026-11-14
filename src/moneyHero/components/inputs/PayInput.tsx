@@ -114,14 +114,15 @@ export function PayInput({
       )}
 
       <div
-        className={`mh-wallet ${badWay ? 'is-wrong' : ''}`}
+        className={`mh-wallet ${badWay ? 'is-wrong' : ''} ${status === 'eq' && wallet.length > 0 && !badWay ? 'is-exact' : ''}`}
         data-drop="wallet"
         data-testid="mh-wallet"
         aria-label={q.mode === 'exchange' ? 'หลังแลก' : 'เงินที่เลือก'}
       >
         <div className="mh-wallet-head">
           <span>{q.mode === 'exchange' ? '🔄 หลังแลก' : q.mode === 'make' ? '🧰 แบบที่กำลังสร้าง' : '👛 เงินที่จ่าย'}</span>
-          <span className={`mh-wallet-total is-${status}`}>
+          {/* key เปลี่ยนเมื่อยอดเปลี่ยน ป้ายยอดรวมจะเด้งให้เห็นว่านับเพิ่มแล้ว */}
+          <span key={total} className={`mh-wallet-total is-${status}`}>
             รวม {formatBS(total)} {status === 'eq' ? '✔ พอดี' : status === 'lt' ? '▲ ยังขาด' : '▼ เกิน'}
           </span>
         </div>
