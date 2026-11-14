@@ -1883,7 +1883,7 @@ button:disabled {
     padding: 3px;
   }
   .mh-topbar-name,
-  .mh-lv,
+  .mh-topbar .mh-lv,
   .mh-stat-exp {
     display: none;
   }
@@ -11716,4 +11716,226 @@ a.mh-stage-chip:hover {
     display: inline-block;
     animation: mh-tilt 0.6s ease-in-out;
   }
+}
+
+/* ================================================================== */
+/* โปรไฟล์ สถิติ สมุดสะสม เป้าหมายการออม: น่ารักขึ้น (ไม่เพิ่มฟีเจอร์)     */
+/* ================================================================== */
+
+/* ป้ายสถิติของนักเรียน (โปรไฟล์ ผลแบบทดสอบ): สีพาสเทลวนกัน เด้งเข้ามาทีละป้าย ไอคอนลอยเบา ๆ
+   แผงคุณครู (.mh-teacher-tiles) คงแบบเดิม */
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 1) {
+  background: #fff4f8;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 2) {
+  background: #f6f2ff;
+  animation-delay: 50ms;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 3) {
+  background: #fffae6;
+  animation-delay: 100ms;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 4) {
+  background: #f1f7ff;
+  animation-delay: 150ms;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 5) {
+  background: #fff3ec;
+  animation-delay: 200ms;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(6n + 6) {
+  background: #f2fbf4;
+  animation-delay: 250ms;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) .mh-stat-tile-icon {
+  display: inline-block;
+  animation: mh-icon-bob 2.6s ease-in-out infinite;
+}
+
+.mh-stat-tiles:not(.mh-teacher-tiles) > .mh-stat-tile:nth-child(2n) .mh-stat-tile-icon {
+  animation-delay: -1.3s;
+}
+
+/* โปรไฟล์: ชื่อเด้ง ป้ายเลเวลเป็นปุ่มนูน ตัวละครที่เลือกกระโดด ชี้ตัวอื่นแล้วเอียงหัว */
+.mh-profile-name {
+  animation: mh-pop 0.4s ease-out both;
+}
+
+.mh-lv-row .mh-lv {
+  font-size: 0.9em;
+  padding: 3px 10px;
+  background: linear-gradient(180deg, #9b7bff, #7048e8);
+  box-shadow: 0 3px 0 #4b2fb0;
+}
+
+.mh-avatar-chip.is-on {
+  border-color: var(--mh-gold-deep);
+  box-shadow: 0 0 0 4px rgba(255, 190, 40, 0.3);
+  animation: mh-hop 0.5s ease-out;
+  transform-origin: 50% 100%;
+}
+
+@media (hover: hover) {
+  .mh-avatar-chip:hover:not(.is-on) .mh-portrait {
+    animation: mh-tilt 0.6s ease-in-out;
+  }
+}
+
+.mh-test-card .mh-test-pair > div:first-child {
+  background: #eef6ff;
+}
+
+.mh-test-card .mh-test-pair > div:last-child {
+  background: #fff0f6;
+}
+
+/* สถิติทักษะ: อาคารแต่ละด่านเด้งเข้ามาทีละหลัง ด่านที่ผ่านแล้วเป็นการ์ดทอง ชี้แล้วอาคารเด้งดึ๋ง */
+.mh-level-star {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-level-star:nth-child(2) {
+  animation-delay: 30ms;
+}
+
+.mh-level-star:nth-child(3) {
+  animation-delay: 60ms;
+}
+
+.mh-level-star:nth-child(4) {
+  animation-delay: 90ms;
+}
+
+.mh-level-star:nth-child(5) {
+  animation-delay: 120ms;
+}
+
+.mh-level-star:nth-child(6) {
+  animation-delay: 150ms;
+}
+
+.mh-level-star:nth-child(7) {
+  animation-delay: 180ms;
+}
+
+.mh-level-star:nth-child(8) {
+  animation-delay: 210ms;
+}
+
+.mh-level-star:nth-child(9) {
+  animation-delay: 240ms;
+}
+
+.mh-level-star:nth-child(10) {
+  animation-delay: 270ms;
+}
+
+.mh-level-star:nth-child(n + 11) {
+  animation-delay: 300ms;
+}
+
+.mh-level-star.is-done {
+  background: linear-gradient(180deg, #fff9e0, #fff);
+  box-shadow: 0 4px 0 #f5d77a;
+}
+
+@media (hover: hover) {
+  .mh-level-star:hover .mh-thumb-bld {
+    animation: mh-jelly 0.7s ease-in-out;
+  }
+}
+
+.mh-review-card .mh-btn-gold {
+  animation: mh-breath 2.2s ease-in-out infinite;
+}
+
+/* สมุดสะสมเงินไทย: การ์ดเด้งเข้ามาทีละใบ เงินที่เก็บแล้วติดเอียงเหมือนสติกเกอร์ ป้ายเก็บแล้วหมุนเด้ง */
+.mh-album-card {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+  transition: transform 0.18s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+.mh-album-card:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.mh-album-card:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.mh-album-card:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.mh-album-card:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.mh-album-card:nth-child(n + 6) {
+  animation-delay: 200ms;
+}
+
+.mh-album-card:active {
+  transform: scale(0.97);
+}
+
+.mh-album-card.is-got:nth-child(odd) .mh-money {
+  transform: rotate(-5deg);
+}
+
+.mh-album-card.is-got:nth-child(even) .mh-money {
+  transform: rotate(4deg);
+}
+
+.mh-album-card.is-got .mh-money {
+  filter: drop-shadow(0 4px 3px rgba(43, 35, 80, 0.18));
+}
+
+.mh-album-sticker.is-got {
+  animation: mh-pop-spin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-album-count {
+  animation: mh-pop 0.4s ease-out both;
+}
+
+.mh-album-opts .mh-choice.is-answer {
+  animation: mh-jelly 0.7s ease-in-out;
+}
+
+.mh-album-got {
+  animation: mh-pop 0.4s ease-out both;
+}
+
+/* เป้าหมายการออม: ของที่เลือกเป็นเป้าหมายมีหัวใจเด้งที่มุม */
+.mh-goal-choice {
+  position: relative;
+}
+
+.mh-goal-choice.is-on {
+  box-shadow: 0 0 0 4px rgba(255, 143, 179, 0.3), 0 4px 0 rgba(201, 68, 119, 0.18);
+}
+
+.mh-goal-choice.is-on::after {
+  content: '💖';
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 20px;
+  animation: mh-pop-spin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-goal-choice.is-on .mh-goal-choice-art {
+  animation: mh-hop 0.55s ease-out;
+  transform-origin: 50% 100%;
 }
