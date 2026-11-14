@@ -33,7 +33,10 @@ function Sheet({ s, room, n }: { s: ColourSheet; room: string; n: number }) {
       <div className="mh-colour-legend">
         {s.legend.map((l) => (
           <span key={l.color} className="mh-colour-key">
-            <i style={{ borderColor: PALETTE[l.color].hex }} />
+            <svg className="mh-colour-crayon" viewBox="0 0 44 20" aria-hidden="true">
+              <path d="M3 3H30L41 10L30 17H3Z" fill="#fff" stroke={PALETTE[l.color].hex} strokeWidth={3.2} strokeLinejoin="round" />
+              <path d="M9 3V17M30 3V17" stroke={PALETTE[l.color].hex} strokeWidth={2} />
+            </svg>
             ได้ <b>{l.answer} บาท</b> ระบายสี<b>{PALETTE[l.color].name}</b>
           </span>
         ))}

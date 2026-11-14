@@ -729,3 +729,71 @@
 .bd-score tbody tr:nth-child(4) td:first-child::before {
   color: #69db7c;
 }
+
+/* การ์ดโชคดี: ดาวโบนัสเป็นป้ายสีเหลือง */
+.bd-star {
+  padding: 0.2cqw 1.6cqw;
+  border-radius: 99px;
+  background: #fff3bf;
+}
+
+/* หน้าเลือกชุดพิมพ์ของเกมกระดาน (บนจอ): ปุ่มชุดใช้สีส้มของเกมกระดาน ชุดที่เลือกไอคอนกระโดด */
+.bd-page .kad-tab {
+  background: linear-gradient(180deg, #ffffff, #fff4e6);
+  box-shadow: 0 4px 0 rgba(232, 89, 12, 0.25);
+}
+
+.bd-page .kad-tab.is-on {
+  border-color: #e8590c;
+  background: linear-gradient(180deg, #ffe8cc, #ffc078);
+}
+
+@media (hover: hover) {
+  .bd-page .kad-tab:hover {
+    outline-color: #ffd8a8;
+  }
+}
+
+/* กติกาและคู่มือครู: ขั้นตอนเป็นเลขในวงกลมสีพาสเทลวนกัน อ่านทีละขั้นง่ายขึ้น (เลขอยู่นอกบรรทัด ไม่เพิ่มความสูง) */
+.bd-rules ol {
+  list-style: none;
+  padding-left: 1.7em;
+  counter-reset: bd-step;
+}
+
+.bd-rules ol > li {
+  position: relative;
+  counter-increment: bd-step;
+}
+
+.bd-rules ol > li::before {
+  content: counter(bd-step);
+  position: absolute;
+  left: -1.6em;
+  top: 0.12em;
+  display: grid;
+  place-items: center;
+  width: 1.3em;
+  height: 1.3em;
+  border-radius: 50%;
+  background: #ffd8a8;
+  color: #d9480f;
+  font-size: 0.9em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bd-rules ol > li:nth-child(4n + 2)::before {
+  background: #d0ebff;
+  color: #1864ab;
+}
+
+.bd-rules ol > li:nth-child(4n + 3)::before {
+  background: #d3f9d8;
+  color: #2b8a3e;
+}
+
+.bd-rules ol > li:nth-child(4n + 4)::before {
+  background: #ffdeeb;
+  color: #c2255c;
+}
