@@ -87,3 +87,22 @@ export function buildDaily(p: Player, today = dayKey()): Question[] {
     useMathRandom()
   }
 }
+
+/**
+ * โจทย์ของภาพปริศนา: สุ่มจากด่านที่ผ่านแล้ว (ยังไม่ผ่านใช้ด่าน 0–1) เหมือนภารกิจประจำวัน
+ * round = เล่นภาพนี้ครั้งที่เท่าไร เล่นซ้ำได้โจทย์ชุดใหม่
+ */
+export function buildPuzzle(p: Player, pictureId: string, round: number, count: number): Question[] {
+  const specs = dailyLevels(p).flatMap((id) => [...(LEVEL_PLANS[id]?.practice ?? []), ...(LEVEL_PLANS[id]?.mission ?? [])])
+  seedRandom(hash(`puzzle|${pictureId}|${round}|${p.id}`))
+  try {
+    const out: Question[] = []
+    for (let i = 0; i < count; i += 1) {
+      const [gen, d] = specs[Math.floor(rand() * specs.length)]
+      out.push(generate(gen, d)[0])
+    }
+    return out
+  } finally {
+    useMathRandom()
+  }
+}

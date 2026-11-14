@@ -11,6 +11,7 @@ import { DEFAULT_CLASSROOM, repairClassroom, repairStudent, type Classroom, type
 import { defaultBank, repairBank, type TestAttempt, type TestBank } from './testBank'
 import { repairReflection, type ActivityEntry, type ActivityStat, type Reflection } from './activity'
 import { repairBehavior, type BehaviorRecord } from './behavior'
+import { repairPuzzles } from './pictures'
 
 /**
  * ข้อมูลผู้เล่นและการบันทึกลง localStorage
@@ -121,6 +122,8 @@ export interface Player {
   reflection?: Reflection
   /** ครูบันทึกพฤติกรรมการเรียนรู้เชิงรุก (4 ด้าน ด้านละ 1–4) */
   behavior?: BehaviorRecord
+  /** ภาพปริศนาที่สะสมแล้ว (รหัสภาพ) */
+  puzzles?: string[]
   mapX?: number
   mapY?: number
 }
@@ -230,6 +233,7 @@ function repairPlayer(raw: Partial<Player>): Player | null {
     actLog: Array.isArray(raw.actLog) ? raw.actLog.filter((e) => e && typeof e.act === 'string' && typeof e.at === 'number') : undefined,
     reflection: repairReflection(raw.reflection),
     behavior: repairBehavior(raw.behavior),
+    puzzles: repairPuzzles(raw.puzzles),
   } as Player
 }
 
