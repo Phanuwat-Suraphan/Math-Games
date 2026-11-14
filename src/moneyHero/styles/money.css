@@ -11183,3 +11183,92 @@ a.mh-stage-chip:hover {
 .mh-btn:not(:disabled):hover {
   filter: brightness(1.05) saturate(1.05);
 }
+
+/* เมนูบนแผนที่: ทุกช่องมีสีพาสเทล (ช่องที่มีสีของตัวเองอยู่แล้วคงเดิม) ไอคอนลอยเป็นคลื่น */
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 1) {
+  background: linear-gradient(180deg, #fff, #ffe9f2);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 2) {
+  background: linear-gradient(180deg, #fff, #e8f3ff);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 3) {
+  background: linear-gradient(180deg, #fff, #fff4dc);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 4) {
+  background: linear-gradient(180deg, #fff, #ecfbe9);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 5) {
+  background: linear-gradient(180deg, #fff, #f1ebff);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n) {
+  background: linear-gradient(180deg, #fff, #e6fbf8);
+}
+
+.mh-menu-tile > span:first-child {
+  display: inline-block;
+  animation: mh-icon-bob 3.2s ease-in-out infinite;
+}
+
+.mh-menu-tile:nth-child(3n + 2) > span:first-child {
+  animation-delay: -1s;
+}
+
+.mh-menu-tile:nth-child(3n) > span:first-child {
+  animation-delay: -2s;
+}
+
+.mh-menu-tile:hover > span:first-child,
+.mh-menu-tile:focus-visible > span:first-child {
+  animation: mh-icon-wiggle 0.6s ease-in-out;
+}
+
+.mh-menu-tile:active {
+  scale: 0.96;
+}
+
+.mh-menu-badge {
+  animation: mh-flame 1.2s ease-in-out infinite;
+}
+
+@keyframes mh-icon-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes mh-icon-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  30% {
+    transform: rotate(-12deg) scale(1.15);
+  }
+  60% {
+    transform: rotate(10deg) scale(1.15);
+  }
+}
+
+/* ปุ่มเริ่มเกมหายใจเบา ๆ ชวนให้กด */
+.mh-start-actions .mh-btn-xl:not(:active) {
+  animation: mh-breath 2.2s ease-in-out infinite;
+}
+
+@keyframes mh-breath {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.04;
+  }
+}
