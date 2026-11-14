@@ -12169,3 +12169,13 @@ a.mh-stage-chip:hover {
 .mh-learn-title .mh-speak {
   animation: mh-icon-wiggle 0.6s ease-in-out 0.9s;
 }
+
+/* ตอนพิมพ์: ตัวละครหยุดในท่าปกติ (ไม่ติดจังหวะกะพริบตาหรือแกว่งหาง) และแผ่นงานไม่ค้างกลางแอนิเมชัน */
+@media print {
+  .mh-cs,
+  .mh-cs *,
+  .kad-sheet *,
+  .mh-doc * {
+    animation: none !important;
+  }
+}

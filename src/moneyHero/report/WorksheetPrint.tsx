@@ -26,7 +26,7 @@ function Item({ item, n }: { item: SheetItem; n: number }) {
   return (
     <div className="mh-ws-item">
       <p className="mh-doc-q">
-        <b>{n}.</b> {item.text}
+        <b className="mh-ws-no">{n}</b> {item.text}
       </p>
       {item.money && item.money.length > 0 && <MoneyPile items={item.money} base={42} className="mh-doc-money mh-ws-money" />}
       {item.table && (
@@ -51,7 +51,7 @@ function Item({ item, n }: { item: SheetItem; n: number }) {
           </tbody>
         </table>
       )}
-      {item.work && <div className="mh-ws-work">แสดงวิธีทำ</div>}
+      {item.work && <div className="mh-ws-work">✏️ แสดงวิธีทำ</div>}
     </div>
   )
 }

@@ -1279,3 +1279,90 @@
   background: #fff6e8;
   border-radius: 0 8px 8px 0;
 }
+
+/* ------------------------------------------------------------------ */
+/* บิงโกและระบายสี: น่ารักขึ้นบนกระดาษ (ปรับของเดิม ไม่เพิ่มชุดใหม่)      */
+/* ------------------------------------------------------------------ */
+
+/* บิงโก: แต่ละคอลัมน์มีสีพาสเทลอ่อนของตัวเอง (กากบาทด้วยดินสอยังเห็นชัด หาคำตอบตามคอลัมน์ง่ายขึ้น)
+   กรอบการ์ดสีเดียวกับป้ายชื่อเกมของการ์ดใบนั้น ช่องฟรีเป็นดาวทอง */
+.mh-bingo-cell:not(.is-free):nth-child(5n + 1) {
+  background: #fff5f8;
+}
+
+.mh-bingo-cell:not(.is-free):nth-child(5n + 2) {
+  background: #fffbea;
+}
+
+.mh-bingo-cell:not(.is-free):nth-child(5n + 3) {
+  background: #f1fbf4;
+}
+
+.mh-bingo-cell:not(.is-free):nth-child(5n + 4) {
+  background: #f1f7ff;
+}
+
+.mh-bingo-cell:not(.is-free):nth-child(5n + 5) {
+  background: #f7f3ff;
+}
+
+.mh-bingo-cell.is-free {
+  background: radial-gradient(circle, #fffbe0 35%, #ffe066 100%);
+}
+
+.mh-bingo-card {
+  border-color: #f5c84c;
+  border-width: 2.5px;
+}
+
+.mh-bingo-card.is-m1 {
+  border-color: #f4a58a;
+}
+
+.mh-bingo-card.is-m2 {
+  border-color: #7cb9f2;
+}
+
+.mh-bingo-card.is-m3 {
+  border-color: #b49cf0;
+}
+
+.mh-bingo-card.is-m4 {
+  border-color: #73cf9b;
+}
+
+/* ระบายสี: ตารางมีกรอบชมพูพาสเทลเหมือนกรอบรูป บรรทัดตอบชื่อภาพตัวหนา */
+.mh-colour-grid {
+  box-shadow:
+    0 0 0 1.4mm #fff,
+    0 0 0 2.6mm #ffc9de;
+  border-radius: 1mm;
+  margin-top: 3mm;
+  margin-bottom: 4mm;
+}
+
+.mh-colour-guess {
+  font-weight: 700;
+}
+
+/* ใบงานฝึกทักษะ: เลขข้อในวงกลมสีส้มพาสเทล กล่องแสดงวิธีทำมุมมนเส้นประสีส้ม */
+.mh-ws-no {
+  display: inline-grid;
+  place-items: center;
+  min-width: 6.5mm;
+  height: 6.5mm;
+  margin-right: 1mm;
+  padding: 0 1mm;
+  border-radius: 999px;
+  background: #ffe8cc;
+  color: #d9480f;
+  font-size: 10pt;
+  line-height: 1;
+  vertical-align: 0.2mm;
+}
+
+.mh-ws-work {
+  border: 1.5px dashed #ffa94d;
+  border-radius: 3mm;
+  background: #fffaf3;
+}

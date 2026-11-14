@@ -405,3 +405,274 @@
 .bd-die {
   width: 100%;
 }
+
+/* ================================================================== */
+/* ความน่ารักบนกระดาษ (ปรับของเดิม ไม่เพิ่มชุดใหม่)                       */
+/* ================================================================== */
+
+/* ตัวละครโผล่ทักทายที่มุมขวาบนของหัวกระดาษ (อยู่เหนือบรรทัดคำอธิบาย ไม่ทับข้อความ) */
+.bd-head.has-mascot {
+  position: relative;
+}
+
+.bd-head-mascot {
+  position: absolute;
+  top: -1.4cqw;
+  right: -0.6cqw;
+  width: 7.2cqw;
+  height: 9cqw;
+  transform: rotate(6deg);
+}
+
+.bd-head-mascot svg,
+.bd-card-mascot svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* การ์ดภารกิจ: สีพาสเทลตามชนิดภารกิจ (แยกกองง่ายด้วย) และสติกเกอร์ตัวละครที่มุมขวาล่าง */
+.bd-quest.is-count {
+  background: linear-gradient(180deg, #fff9db, #fff);
+}
+
+.bd-quest.is-exchange {
+  background: linear-gradient(180deg, #e7f5ff, #fff);
+}
+
+.bd-quest.is-compare {
+  background: linear-gradient(180deg, #f3f0ff, #fff);
+}
+
+.bd-quest.is-dot {
+  background: linear-gradient(180deg, #e6fcf5, #fff);
+}
+
+.bd-quest.is-add {
+  background: linear-gradient(180deg, #fff4e6, #fff);
+}
+
+.bd-quest.is-change {
+  background: linear-gradient(180deg, #fff0f6, #fff);
+}
+
+.bd-quest.is-muldiv {
+  background: linear-gradient(180deg, #ebfbee, #fff);
+}
+
+.bd-quest.is-ledger {
+  background: linear-gradient(180deg, #edf2ff, #fff);
+}
+
+.bd-quest.is-exchange .bd-tag {
+  background: #d0ebff;
+  color: #1864ab;
+}
+
+.bd-quest.is-compare .bd-tag {
+  background: #e5dbff;
+  color: #5f3dc4;
+}
+
+.bd-quest.is-dot .bd-tag {
+  background: #c3fae8;
+  color: #087f5b;
+}
+
+.bd-quest.is-add .bd-tag {
+  background: #ffe8cc;
+  color: #d9480f;
+}
+
+.bd-quest.is-change .bd-tag {
+  background: #ffdeeb;
+  color: #c2255c;
+}
+
+.bd-quest.is-muldiv .bd-tag {
+  background: #d3f9d8;
+  color: #2b8a3e;
+}
+
+.bd-quest.is-ledger .bd-tag {
+  background: #dbe4ff;
+  color: #364fc7;
+}
+
+.bd-reward {
+  box-shadow: 0 0.4cqw 0 #f59f00;
+}
+
+.bd-reward::before {
+  content: '🪙 ';
+}
+
+.bd-card-mascot {
+  position: absolute;
+  right: 1.2cqw;
+  bottom: 0.6cqw;
+  width: 5.6cqw;
+  height: 7cqw;
+  transform: rotate(8deg);
+}
+
+/* เฉลยกลับหัวอยู่ตรงกลาง ไม่ทับสติกเกอร์ */
+.bd-quest .bd-answer-flip {
+  left: 8cqw;
+  right: 8cqw;
+}
+
+/* การ์ดโชคดี: ได้เงินสีเขียวมิ้นต์ จ่ายเงินสีชมพู เดินพิเศษสีม่วง ภาพอยู่ในวงกลมขาวเหมือนป้าย */
+.bd-luck.is-in {
+  background: linear-gradient(180deg, #ebfbee, #fff);
+}
+
+.bd-luck.is-out {
+  background: linear-gradient(180deg, #fff0f6, #fff);
+}
+
+.bd-luck.is-move {
+  background: linear-gradient(180deg, #f3f0ff, #fff);
+}
+
+.bd-luck-icon {
+  display: grid;
+  place-items: center;
+  width: 10cqw;
+  height: 10cqw;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.7cqw rgba(255, 255, 255, 0.7),
+    0 0.5cqw 1.2cqw rgba(43, 35, 80, 0.12);
+  font-size: 2.3em;
+}
+
+/* บัตรรายการซื้อของ: สีพาสเทลวน 4 สี ภาพหัวการ์ดในวงกลม ช่องรวมเงินเป็นกล่องเส้นประ */
+.bd-list:nth-child(4n + 2) {
+  background: linear-gradient(180deg, #fff0f6, #fff);
+}
+
+.bd-list:nth-child(4n + 3) {
+  background: linear-gradient(180deg, #ebfbee, #fff);
+}
+
+.bd-list:nth-child(4n + 4) {
+  background: linear-gradient(180deg, #fff9db, #fff);
+}
+
+.bd-list-emoji {
+  display: inline-grid;
+  place-items: center;
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0.3cqw 0.8cqw rgba(43, 35, 80, 0.15);
+  vertical-align: middle;
+}
+
+.bd-list-sum {
+  align-self: center;
+  padding: 0.3cqw 1.6cqw;
+  border: 0.25cqw dashed #f08c00;
+  border-radius: 99px;
+  background: #fff;
+}
+
+.bd-list-sum::before {
+  content: '🪙 ';
+}
+
+/* สมุดรายรับรายจ่าย: หัวตารางรายรับสีเขียว รายจ่ายสีชมพู คงเหลือสีเหลือง แถวสลับสีอ่อน */
+.bd-ledger thead th:nth-child(3) {
+  background: #d3f9d8;
+}
+
+.bd-ledger thead th:nth-child(4) {
+  background: #ffdeeb;
+}
+
+.bd-ledger thead th:nth-child(5) {
+  background: #fff3bf;
+}
+
+.bd-ledger thead th:nth-child(1),
+.bd-ledger thead th:nth-child(2) {
+  background: #e7f5ff;
+}
+
+.bd-ledger tbody tr:nth-child(even) td {
+  background: #f8f9ff;
+}
+
+.bd-ledger tbody tr:first-child td {
+  background: #fff9db;
+  font-weight: 700;
+}
+
+.bd-check {
+  padding: 0.6cqw 1.6cqw;
+  border: 0.25cqw dashed #ffa94d;
+  border-radius: 2cqw;
+  background: #fff9f0;
+}
+
+.bd-check p::before {
+  content: '🐷 ';
+}
+
+.bd-score thead th {
+  background: #fff3bf;
+}
+
+/* หมากเดิน: แต่ละตัวมีวงสีของตัวเอง เลือกสีประจำตัวได้ง่าย */
+.bd-pawn:nth-child(1) .bd-pawn-face {
+  background: radial-gradient(circle, #fff 45%, #ffe3e3 46%, #ffe3e3 70%, transparent 71%);
+}
+
+.bd-pawn:nth-child(2) .bd-pawn-face {
+  background: radial-gradient(circle, #fff 45%, #ffdeeb 46%, #ffdeeb 70%, transparent 71%);
+}
+
+.bd-pawn:nth-child(3) .bd-pawn-face {
+  background: radial-gradient(circle, #fff 45%, #ffe8cc 46%, #ffe8cc 70%, transparent 71%);
+}
+
+.bd-pawn:nth-child(4) .bd-pawn-face {
+  background: radial-gradient(circle, #fff 45%, #d3f9d8 46%, #d3f9d8 70%, transparent 71%);
+}
+
+/* ขั้นตอนทำลูกเต๋า เป็นป้ายเรียงกันพร้อมลูกศร */
+.bd-fold-steps {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1cqw 4cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.9em;
+  font-weight: 700;
+}
+
+.bd-fold-steps li {
+  position: relative;
+  padding: 0.4cqw 1.8cqw;
+  border-radius: 99px;
+  background: #fff4e6;
+  border: 0.25cqw solid #ffd8a8;
+}
+
+.bd-fold-steps li:not(:last-child)::after {
+  content: '➜';
+  position: absolute;
+  top: 50%;
+  right: -2cqw;
+  transform: translate(50%, -50%);
+  color: #f08c00;
+}
+
+.bd-fold-steps li:last-child {
+  background: #fff9db;
+  border-color: #ffe066;
+}

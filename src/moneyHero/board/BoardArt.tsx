@@ -1,3 +1,4 @@
+import { CharacterSvg, type CharacterKind } from '../components/CharacterSvg'
 import { BOARD_H, BOARD_SEAM, BOARD_SPACES, BOARD_W, SPACE_INFO, boardShop, spaceCenter, type BoardSpace } from './boardData'
 
 /**
@@ -96,6 +97,18 @@ const DECOR: [string, number, number, number][] = [
   ['🐦', 1180, 298, 32],
 ]
 
+/**
+ * ตัวละครยืนเล่นอยู่ข้างถนน (ในช่องว่างระหว่างแถว ไม่ทับช่องเดิน ไม่ทับของตกแต่ง และไม่อยู่ตรงรอยต่อกระดาน x = 700)
+ * [ตัวละคร, จุดกึ่งกลาง x, จุดกึ่งกลาง y]
+ */
+const FRIENDS: [CharacterKind, number, number][] = [
+  ['rabbit', 150, 725],
+  ['bear', 460, 515],
+  ['hero', 165, 305],
+  ['owl', 945, 725],
+  ['fox', 1090, 305],
+]
+
 export function BoardArt({ part = 'full' }: { part?: 'full' | 'left' | 'right' }) {
   const vb = part === 'full' ? `0 0 ${BOARD_W} ${BOARD_H}` : part === 'left' ? `0 0 ${BOARD_SEAM} ${BOARD_H}` : `${BOARD_SEAM} 0 ${BOARD_W - BOARD_SEAM} ${BOARD_H}`
   const legend = (['quest', 'luck', 'save', 'exchange', 'bus', 'work'] as const).map((k) => SPACE_INFO[k])
@@ -128,6 +141,12 @@ export function BoardArt({ part = 'full' }: { part?: 'full' | 'left' | 'right' }
         <text key={i} x={x} y={y} fontSize={size} textAnchor="middle" opacity={0.85}>
           {e}
         </text>
+      ))}
+
+      {FRIENDS.map(([kind, x, y]) => (
+        <svg key={kind} x={x - 32} y={y - 40} width={64} height={80} overflow="visible">
+          <CharacterSvg kind={kind} mood="happy" />
+        </svg>
       ))}
 
       <path d={roadPath()} fill="none" stroke="#868e96" strokeWidth={58} strokeLinecap="round" strokeLinejoin="round" />
