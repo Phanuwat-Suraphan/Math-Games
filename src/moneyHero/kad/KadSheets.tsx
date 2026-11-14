@@ -747,7 +747,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet mascot="rabbit" title="ใบคำนวณเงินทอน" sub="เงินทอน = เงินที่ลูกค้าจ่าย − ราคาสินค้า">
+      <Sheet mascot="rabbit" title="ใบคำนวณเงินทอน" sub="เงินทอน = เงินที่ลูกค้าจ่าย − ราคาสินค้า" className="kad-change-sheet">
         <GroupLine />
         <FormTable
           cols={['ข้อ', 'ราคาสินค้า (บาท)', 'ลูกค้าจ่าย (บาท)', 'เงินทอน (บาท)', 'ทอนด้วยเงินอะไรบ้าง']}
@@ -782,7 +782,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet mascot="owl" title="สมุดบัญชีเงินของกลุ่ม" sub="จดทุกครั้งที่เงินเข้าหรือออก แล้วหาเงินคงเหลือ">
+      <Sheet mascot="owl" title="สมุดบัญชีเงินของกลุ่ม" sub="จดทุกครั้งที่เงินเข้าหรือออก แล้วหาเงินคงเหลือ" className="kad-book-sheet">
         <GroupLine />
         <FormTable
           cols={['วัน/เดือน', 'รายการ', 'รายรับ (บาท)', 'รายจ่าย (บาท)', 'คงเหลือ (บาท)']}

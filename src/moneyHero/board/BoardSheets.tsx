@@ -309,10 +309,9 @@ export function ListSheets() {
                 const { item, shop } = boardItem(line.item)
                 return (
                   <li key={line.item}>
-                    <span>{item.emoji}</span> {item.name} {line.qty} {item.unit}
-                    <small>
-                      {' '}
-                      ({shop.icon} {shop.short})
+                    <span>{item.emoji}</span> {item.name} {line.qty} {item.unit}{' '}
+                    <small className="bd-list-shop" style={{ color: shop.color, background: shop.light }}>
+                      {shop.icon} {shop.short}
                     </small>
                   </li>
                 )
@@ -370,9 +369,9 @@ export function QuestSheets() {
           </thead>
           <tbody>
             {cards.map((c) => (
-              <tr key={c.no}>
+              <tr key={c.no} className={`is-${c.kind}`}>
                 <td>{c.no}</td>
-                <td>{QUEST_KIND_INFO[c.kind].name}</td>
+                <td className="bd-key-kind">{QUEST_KIND_INFO[c.kind].name}</td>
                 <td>
                   <b>{c.answer}</b>
                 </td>

@@ -797,3 +797,59 @@
   background: #ffdeeb;
   color: #c2255c;
 }
+
+/* หัวการ์ด: สีตามชนิดการ์ด (ภารกิจส้ม โชคดีชมพู บัตรรายการฟ้า) แยกกองง่าย */
+.bd-quest .bd-card-top > span:first-child {
+  color: #e67700;
+}
+
+.bd-luck .bd-card-top > span:first-child {
+  color: #d6336c;
+}
+
+.bd-list .bd-card-top > span:first-child {
+  color: #1c7ed6;
+}
+
+/* แผ่นเฉลยการ์ดภารกิจ: ช่องชนิดภารกิจสีเดียวกับการ์ด นายธนาคารหาเฉลยได้เร็ว */
+.bd-key tr.is-count .bd-key-kind {
+  background: #fff9db;
+}
+
+.bd-key tr.is-exchange .bd-key-kind {
+  background: #e7f5ff;
+}
+
+.bd-key tr.is-compare .bd-key-kind {
+  background: #f3f0ff;
+}
+
+.bd-key tr.is-dot .bd-key-kind {
+  background: #e6fcf5;
+}
+
+.bd-key tr.is-add .bd-key-kind {
+  background: #fff4e6;
+}
+
+.bd-key tr.is-change .bd-key-kind {
+  background: #fff0f6;
+}
+
+.bd-key tr.is-muldiv .bd-key-kind {
+  background: #ebfbee;
+}
+
+.bd-key tr.is-ledger .bd-key-kind {
+  background: #edf2ff;
+}
+
+/* บัตรรายการซื้อของ: ชื่อร้านเป็นป้ายสีเดียวกับป้ายราคาร้านนั้น หาร้านบนโต๊ะได้ทันที */
+.bd-list ul .bd-list-shop {
+  display: inline-block;
+  padding: 0 1cqw;
+  border-radius: 99px;
+  font-weight: 700;
+  font-size: 0.8em;
+  line-height: 1.5;
+}

@@ -15,6 +15,9 @@ import './planPrint.css'
 
 function Worksheet({ event }: { event: PlanEvent }) {
   const rows = Object.values(event.needs).reduce((a, b) => a + b, 0) + 1
+  // สีตามหมวด: ป้าย "ต้องซื้อ" กับของบนชั้นวางหมวดเดียวกันสีเดียวกัน เด็กจับคู่ได้ทันที
+  const cats = Object.keys(event.needs)
+  const tone = (cat: string) => `is-c${Math.max(0, cats.indexOf(cat)) % 4}`
   return (
     <section className="kad-sheet kad-portrait pp-sheet" data-testid={`pp-sheet-${event.id}`}>
       <div className="kad-sheet-in">
@@ -38,7 +41,7 @@ function Worksheet({ event }: { event: PlanEvent }) {
         <div className="pp-needs">
           <b>ต้องซื้อ:</b>
           {Object.entries(event.needs).map(([cat, n]) => (
-            <span key={cat} className="pp-need">
+            <span key={cat} className={`pp-need ${tone(cat)}`}>
               ☐ {event.catNames[cat]} {n} อย่าง
             </span>
           ))}
@@ -46,7 +49,7 @@ function Worksheet({ event }: { event: PlanEvent }) {
 
         <div className="pp-shelf">
           {event.items.map((i) => (
-            <div key={i.id} className="pp-item">
+            <div key={i.id} className={`pp-item ${tone(i.cat)}`}>
               <span className="pp-item-icon">{i.icon}</span>
               <span className="pp-item-name">{i.name}</span>
               <span className="pp-item-cat">{event.catNames[i.cat]}</span>
