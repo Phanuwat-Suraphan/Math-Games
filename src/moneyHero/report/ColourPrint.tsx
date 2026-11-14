@@ -3,7 +3,12 @@ import { useGame } from '../hooks/useMoneyGame'
 import { INNOVATION_NAME } from '../engine/classroom'
 import { colourSheet, PALETTE, PICTURES, type ColourLevel, type ColourSheet } from '../engine/pictures'
 import { PixelPicture } from '../pages/PuzzlePage'
+import { CharacterArt } from '../components/Art'
+import type { NpcId } from '../engine/types'
 import { PaperPage } from './Paper'
+
+/** ตัวละครถือดินสอสีทักทายที่หัวใบงาน วนกันไปทีละภาพ */
+const MASCOTS: NpcId[] = ['rabbit', 'fox', 'bear', 'owl', 'hero']
 
 /**
  * ระบายสีภาพปริศนา (A4 แผ่นละภาพ): แต่ละช่องมีโจทย์เงินสั้น ๆ คำตอบบอกว่าต้องระบายสีอะไร
@@ -11,10 +16,11 @@ import { PaperPage } from './Paper'
  * เส้นทาง #/teacher/print/colour
  */
 
-function Sheet({ s, room }: { s: ColourSheet; room: string }) {
+function Sheet({ s, room, n }: { s: ColourSheet; room: string; n: number }) {
   return (
     <article className="mh-doc mh-colour" data-testid="mh-colour-sheet">
       <header className="mh-ws-head">
+        <CharacterArt id={MASCOTS[n % MASCOTS.length]} size={40} mood="happy" className="mh-ws-mascot" />
         <h2>🖍️ ระบายสีภาพปริศนา</h2>
         <p>
           {INNOVATION_NAME} · เรื่อง เงิน · ชั้น {room}
@@ -39,7 +45,7 @@ function Sheet({ s, room }: { s: ColourSheet; room: string }) {
           </div>
         ))}
       </div>
-      <p className="mh-doc-line">ภาพของฉันคือ</p>
+      <p className="mh-doc-line mh-colour-guess">🔍 ภาพของฉันคือ</p>
     </article>
   )
 }
@@ -95,8 +101,8 @@ export function ColourPrintPage() {
         </>
       }
     >
-      {sheets.map((s) => (
-        <Sheet key={s.pic.id} s={s} room={save.classroom.room} />
+      {sheets.map((s, i) => (
+        <Sheet key={s.pic.id} s={s} room={save.classroom.room} n={i} />
       ))}
       {withKey && (
         <article className="mh-doc" data-testid="mh-colour-answers">

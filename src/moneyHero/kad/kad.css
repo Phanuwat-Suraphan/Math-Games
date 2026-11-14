@@ -1720,3 +1720,28 @@ h3.kad-out {
     height: 210mm;
   }
 }
+
+/* ตัวละครโผล่ทักทายที่มุมขวาบนของหัวกระดาษ (อยู่เหนือบรรทัดคำอธิบาย ไม่ทับข้อความ ไม่เพิ่มความสูงหัวกระดาษ) */
+.kad-head.has-mascot {
+  position: relative;
+}
+
+.kad-head-mascot {
+  position: absolute;
+  top: -1.4cqw;
+  right: -0.6cqw;
+  width: 7.2cqw;
+  height: 9cqw;
+  transform: rotate(6deg);
+}
+
+.kad-landscape .kad-head-mascot {
+  top: -1cqw;
+  width: 4.8cqw;
+  height: 6cqw;
+}
+
+.kad-head-mascot svg {
+  width: 100%;
+  height: 100%;
+}

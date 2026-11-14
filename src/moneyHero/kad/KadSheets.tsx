@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react'
-import { CharacterSvg } from '../components/CharacterSvg'
+import { CharacterSvg, type CharacterKind } from '../components/CharacterSvg'
 import { formatBS } from '../utils/money'
 import {
   CLASS_GOALS,
@@ -26,16 +26,36 @@ import { EcoCoin, EcoNote, MissionBadgeArt, ProductArt, TrashArt } from './KadAr
 /* ชิ้นส่วนที่ใช้ร่วมกัน                                                */
 /* ------------------------------------------------------------------ */
 
-function Sheet({ land = false, title, sub, children, className = '' }: { land?: boolean; title?: string; sub?: string; children: ReactNode; className?: string }) {
+function Sheet({
+  land = false,
+  title,
+  sub,
+  mascot,
+  children,
+  className = '',
+}: {
+  land?: boolean
+  title?: string
+  sub?: string
+  /** ตัวละครโผล่ทักทายที่มุมขวาบนของหัวกระดาษ */
+  mascot?: CharacterKind
+  children: ReactNode
+  className?: string
+}) {
   // className 'kad-spread' = กระจายเนื้อหาให้เต็มความสูงแผ่น
   return (
     <section className={`kad-sheet ${land ? 'kad-landscape' : 'kad-portrait'} ${className}`}>
       <div className="kad-sheet-in">
         {title && (
-          <header className="kad-head">
+          <header className={`kad-head ${mascot ? 'has-mascot' : ''}`}>
             <span className="kad-logo">♻ กาดรักษ์โลก ป.3</span>
             <h2>{title}</h2>
             {sub && <p>{sub}</p>}
+            {mascot && (
+              <span className="kad-head-mascot" aria-hidden="true">
+                <CharacterSvg kind={mascot} mood="happy" />
+              </span>
+            )}
           </header>
         )}
         {children}
@@ -280,7 +300,7 @@ export function PosterSheets() {
         </div>
       </Sheet>
 
-      <Sheet land title="วงจรกาดรักษ์โลก" sub="ทำครบหนึ่งรอบ แล้วนำกำไรไปลงทุนรอบใหม่">
+      <Sheet land mascot="hero" title="วงจรกาดรักษ์โลก" sub="ทำครบหนึ่งรอบ แล้วนำกำไรไปลงทุนรอบใหม่">
         <div className="kad-cycle-wrap">
           <div className="kad-cycle">
             <svg viewBox="0 0 100 100" className="kad-cycle-ring" aria-hidden="true">
@@ -360,7 +380,7 @@ export function PosterSheets() {
 export function TrashCardSheets({ prices }: { prices: TrashPrices }) {
   const cards = [...TRASH, ...TRASH]
   return (
-    <Sheet title="บัตรขยะ" sub="ตัดตามเส้นประ ใช้แทนขยะจริงตอนฝึกขายให้ธนาคารขยะ (ชนิดละ 2 ใบ)">
+    <Sheet mascot="rabbit" title="บัตรขยะ" sub="ตัดตามเส้นประ ใช้แทนขยะจริงตอนฝึกขายให้ธนาคารขยะ (ชนิดละ 2 ใบ)">
       <div className="kad-grid kad-grid-3 kad-cut">
         {cards.map((t, i) => (
           <div key={`${t.id}-${i}`} className="kad-card kad-trash-card">
@@ -385,7 +405,7 @@ export function TrashCardSheets({ prices }: { prices: TrashPrices }) {
 
 function NotePage({ money }: { money: EcoMoney }) {
   return (
-    <Sheet title={`ธนบัตรจำลอง ${money.label}`} sub="เงินของกาดรักษ์โลก ใช้เล่นในห้องเรียนเท่านั้น (ตัดตามเส้นประ)">
+    <Sheet mascot="bear" title={`ธนบัตรจำลอง ${money.label}`} sub="เงินของกาดรักษ์โลก ใช้เล่นในห้องเรียนเท่านั้น (ตัดตามเส้นประ)">
       <div className="kad-grid kad-grid-2 kad-cut kad-notes">
         {Array.from({ length: 10 }, (_, i) => (
           <div key={i} className="kad-note-cell">
@@ -403,7 +423,7 @@ export function MoneySheets() {
   const rows: EcoMoney[] = [coins[0], coins[1], coins[1], coins[2], coins[3], coins[3], coins[4], coins[4]]
   return (
     <>
-      <Sheet title="เหรียญจำลอง" sub="50 สตางค์ · 1 บาท · 2 บาท · 5 บาท · 10 บาท (ตัดตามวงกลม ติดกระดาษแข็งจะทนขึ้น)">
+      <Sheet mascot="bear" title="เหรียญจำลอง" sub="50 สตางค์ · 1 บาท · 2 บาท · 5 บาท · 10 บาท (ตัดตามวงกลม ติดกระดาษแข็งจะทนขึ้น)">
         <div className="kad-coin-rows">
           {rows.map((m, r) => (
             <div key={r} className="kad-coin-row">
@@ -498,7 +518,7 @@ export function BankSheets({ prices }: { prices: TrashPrices }) {
         </div>
       </Sheet>
 
-      <Sheet title="ป้ายราคารับซื้อขยะ" sub="ราคาจำลอง ครูปรับได้ที่ช่อง 'ตั้งราคาขยะ' ก่อนพิมพ์">
+      <Sheet mascot="owl" title="ป้ายราคารับซื้อขยะ" sub="ราคาจำลอง ครูปรับได้ที่ช่อง 'ตั้งราคาขยะ' ก่อนพิมพ์">
         <div className="kad-price-board">
           {TRASH.map((t) => (
             <div key={t.id} className="kad-price-row">
@@ -531,7 +551,7 @@ export function BankSheets({ prices }: { prices: TrashPrices }) {
         ))}
       </Sheet>
 
-      <Sheet title="ใบรับซื้อขยะ" sub="หน้าละ 2 ใบ ตัดครึ่ง">
+      <Sheet mascot="owl" title="ใบรับซื้อขยะ" sub="หน้าละ 2 ใบ ตัดครึ่ง">
         <div className="kad-halves kad-cut">
           <BuySlip prices={prices} />
           <BuySlip prices={prices} />
@@ -550,7 +570,7 @@ export function ProductSheets() {
   return (
     <>
       {pages.map((list, i) => (
-        <Sheet key={i} title={`บัตรสินค้า (${i + 1}/2)`} sub="วางหน้าร้าน แล้วให้กลุ่มตั้งราคาขายเอง">
+        <Sheet key={i} mascot="fox" title={`บัตรสินค้า (${i + 1}/2)`} sub="วางหน้าร้าน แล้วให้กลุ่มตั้งราคาขายเอง">
           <div className="kad-grid kad-grid-2 kad-cut kad-products">
             {list.map((p) => (
               <div key={p.id} className="kad-card kad-product-card">
@@ -668,7 +688,7 @@ function OrderForm() {
 export function DocSheets() {
   return (
     <>
-      <Sheet title="ใบวางแผนธุรกิจของกลุ่ม" sub="ตอบให้ครบก่อนเปิดร้าน" className="kad-spread">
+      <Sheet mascot="fox" title="ใบวางแผนธุรกิจของกลุ่ม" sub="ตอบให้ครบก่อนเปิดร้าน" className="kad-spread">
         <GroupLine />
         <div className="kad-fill-row">
           <Blank label="สมาชิก" w="l" />
@@ -694,7 +714,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบคำนวณต้นทุน" sub="ต้นทุน = เงินที่ใช้ซื้ออุปกรณ์ทั้งหมด (ขยะที่เก็บมาเองไม่ต้องจ่ายเงิน)">
+      <Sheet mascot="owl" title="ใบคำนวณต้นทุน" sub="ต้นทุน = เงินที่ใช้ซื้ออุปกรณ์ทั้งหมด (ขยะที่เก็บมาเองไม่ต้องจ่ายเงิน)">
         <GroupLine />
         <FormTable
           cols={['อุปกรณ์ที่ซื้อ', 'จำนวน', 'ราคาต่อชิ้น (บาท)', 'เป็นเงิน (บาท)']}
@@ -712,14 +732,14 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบสั่งซื้อ" sub="หน้าละ 2 ใบ ตัดครึ่ง">
+      <Sheet mascot="bear" title="ใบสั่งซื้อ" sub="หน้าละ 2 ใบ ตัดครึ่ง">
         <div className="kad-halves kad-cut">
           <OrderForm />
           <OrderForm />
         </div>
       </Sheet>
 
-      <Sheet title="ใบเสร็จรับเงิน" sub="หน้าละ 3 ใบ">
+      <Sheet mascot="bear" title="ใบเสร็จรับเงิน" sub="หน้าละ 3 ใบ">
         <div className="kad-thirds kad-cut">
           <Receipt />
           <Receipt />
@@ -727,7 +747,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบคำนวณเงินทอน" sub="เงินทอน = เงินที่ลูกค้าจ่าย − ราคาสินค้า">
+      <Sheet mascot="rabbit" title="ใบคำนวณเงินทอน" sub="เงินทอน = เงินที่ลูกค้าจ่าย − ราคาสินค้า">
         <GroupLine />
         <FormTable
           cols={['ข้อ', 'ราคาสินค้า (บาท)', 'ลูกค้าจ่าย (บาท)', 'เงินทอน (บาท)', 'ทอนด้วยเงินอะไรบ้าง']}
@@ -745,7 +765,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบบันทึกรายรับ–รายจ่าย" sub="รายรับ = เงินที่ได้มา · รายจ่าย = เงินที่จ่ายไป">
+      <Sheet mascot="owl" title="ใบบันทึกรายรับ–รายจ่าย" sub="รายรับ = เงินที่ได้มา · รายจ่าย = เงินที่จ่ายไป">
         <GroupLine />
         <div className="kad-two-col">
           <div>
@@ -762,7 +782,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="สมุดบัญชีเงินของกลุ่ม" sub="จดทุกครั้งที่เงินเข้าหรือออก แล้วหาเงินคงเหลือ">
+      <Sheet mascot="owl" title="สมุดบัญชีเงินของกลุ่ม" sub="จดทุกครั้งที่เงินเข้าหรือออก แล้วหาเงินคงเหลือ">
         <GroupLine />
         <FormTable
           cols={['วัน/เดือน', 'รายการ', 'รายรับ (บาท)', 'รายจ่าย (บาท)', 'คงเหลือ (บาท)']}
@@ -774,7 +794,7 @@ export function DocSheets() {
         <p className="kad-note-text">✔ ตรวจคำตอบ: ยอดยกมา + รายรับรวม − รายจ่ายรวม = คงเหลือบรรทัดสุดท้าย</p>
       </Sheet>
 
-      <Sheet title="ใบสรุปกำไร" sub="รายได้ − ต้นทุน = กำไร" className="kad-spread">
+      <Sheet mascot="hero" title="ใบสรุปกำไร" sub="รายได้ − ต้นทุน = กำไร" className="kad-spread">
         <GroupLine />
         <div className="kad-example kad-example-wide">
           <b>ตัวอย่าง กลุ่มกระถาง</b>
@@ -803,7 +823,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบวางแผนใช้กำไร" sub="แบ่งกำไรไปใช้ แต่ละส่วนรวมกันต้องเท่ากับกำไรพอดี" className="kad-spread">
+      <Sheet mascot="fox" title="ใบวางแผนใช้กำไร" sub="แบ่งกำไรไปใช้ แต่ละส่วนรวมกันต้องเท่ากับกำไรพอดี" className="kad-spread">
         <GroupLine />
         <div className="kad-eq-row kad-profit-total">
           กำไรของกลุ่ม <i className="kad-line kad-line-s" /> บาท
@@ -830,7 +850,7 @@ export function DocSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="ใบนักช้อปตัวน้อย (เดินตลาดนัด)" sub="แต่ละคนได้เงินจำลอง แล้วเดินซื้อสินค้าของเพื่อน">
+      <Sheet mascot="rabbit" title="ใบนักช้อปตัวน้อย (เดินตลาดนัด)" sub="แต่ละคนได้เงินจำลอง แล้วเดินซื้อสินค้าของเพื่อน">
         <div className="kad-fill-row">
           <Blank label="ชื่อ" w="l" />
           <span className="kad-blank">
@@ -910,7 +930,7 @@ export function TreeStage({ stage }: { stage: number }) {
 export function MissionSheets() {
   return (
     <>
-      <Sheet title="ตราภารกิจ" sub="ตัดเป็นเหรียญตรา/สติกเกอร์ มอบเมื่อทำภารกิจสำเร็จ">
+      <Sheet mascot="hero" title="ตราภารกิจ" sub="ตัดเป็นเหรียญตรา/สติกเกอร์ มอบเมื่อทำภารกิจสำเร็จ">
         <div className="kad-grid kad-grid-2 kad-cut kad-missions">
           {MISSIONS.map((m) => (
             <div key={m.id} className="kad-card kad-mission-card">
@@ -939,7 +959,7 @@ export function MissionSheets() {
         </div>
       </Sheet>
 
-      <Sheet title="บัตรสะสมภารกิจของกลุ่ม" sub="ทำภารกิจสำเร็จ ครูประทับตราหรือติดสติกเกอร์ในช่อง (หน้าละ 2 ใบ)">
+      <Sheet mascot="hero" title="บัตรสะสมภารกิจของกลุ่ม" sub="ทำภารกิจสำเร็จ ครูประทับตราหรือติดสติกเกอร์ในช่อง (หน้าละ 2 ใบ)">
         <div className="kad-halves kad-cut">
           {[0, 1].map((k) => (
             <div key={k} className="kad-slip kad-stamp-card">
@@ -960,7 +980,7 @@ export function MissionSheets() {
         </div>
       </Sheet>
 
-      <Sheet land title="ภารกิจปลดล็อกต้นไม้ของทั้งห้อง" sub="ระบายช่องละ 10 บาท ทุกครั้งที่ยอดขายรวมของห้องเพิ่มขึ้น">
+      <Sheet land mascot="rabbit" title="ภารกิจปลดล็อกต้นไม้ของทั้งห้อง" sub="ระบายช่องละ 10 บาท ทุกครั้งที่ยอดขายรวมของห้องเพิ่มขึ้น">
         <div className="kad-unlock">
           <div className="kad-unlock-goals">
             <span>

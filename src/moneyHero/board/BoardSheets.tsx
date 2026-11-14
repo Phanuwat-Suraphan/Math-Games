@@ -24,15 +24,35 @@ import {
  * ใช้แผ่นกระดาษชุดเดียวกับกาดรักษ์โลก (kad.css): ตัวอักษรเป็น cqw ของความกว้างแผ่น พิมพ์แล้วเต็ม A4 พอดี
  */
 
-function Sheet({ land = false, title, sub, children, className = '' }: { land?: boolean; title?: string; sub?: string; children: ReactNode; className?: string }) {
+function Sheet({
+  land = false,
+  title,
+  sub,
+  mascot,
+  children,
+  className = '',
+}: {
+  land?: boolean
+  title?: string
+  sub?: string
+  /** ตัวละครโผล่ทักทายที่มุมขวาบนของหัวกระดาษ */
+  mascot?: CharacterKind
+  children: ReactNode
+  className?: string
+}) {
   return (
     <section className={`kad-sheet ${land ? 'kad-landscape' : 'kad-portrait'} bd-sheet ${className}`}>
       <div className="kad-sheet-in">
         {title && (
-          <header className="kad-head bd-head">
+          <header className={`kad-head bd-head ${mascot ? 'has-mascot' : ''}`}>
             <span className="kad-logo bd-logo">🎲 เกมกระดาน ตะลุยเมืองเงิน ป.3</span>
             <h2>{title}</h2>
             {sub && <p>{sub}</p>}
+            {mascot && (
+              <span className="bd-head-mascot" aria-hidden="true">
+                <CharacterSvg kind={mascot} mood="happy" />
+              </span>
+            )}
           </header>
         )}
         {children}
@@ -49,7 +69,7 @@ export function RuleSheets() {
   const kinds = ['home', 'quest', 'luck', 'shop', 'save', 'exchange', 'bus', 'work', 'bank'] as const
   return (
     <>
-      <Sheet title="กติกาการเล่น" sub="ผู้เล่น 2–4 คน + นายธนาคาร 1 คน (คุณครูหรือนักเรียน) · ใช้เวลา 30–40 นาที">
+      <Sheet mascot="hero" title="กติกาการเล่น" sub="ผู้เล่น 2–4 คน + นายธนาคาร 1 คน (คุณครูหรือนักเรียน) · ใช้เวลา 30–40 นาที">
         <div className="bd-rules">
           <section>
             <h3>🎯 เป้าหมาย</h3>
@@ -108,7 +128,7 @@ export function RuleSheets() {
           </section>
         </div>
       </Sheet>
-      <Sheet title="คู่มือครู" sub="ใช้ในขั้น E (Engage & Experience) ของรูปแบบ REAL Model หลังเรียนเรื่องเงินครบแล้ว">
+      <Sheet mascot="owl" title="คู่มือครู" sub="ใช้ในขั้น E (Engage & Experience) ของรูปแบบ REAL Model หลังเรียนเรื่องเงินครบแล้ว">
         <div className="bd-rules">
           <section>
             <h3>📚 นักเรียนได้ฝึกอะไร</h3>
@@ -251,7 +271,7 @@ export function PriceSheets() {
   return (
     <>
       {[BOARD_SHOPS.slice(0, 3), BOARD_SHOPS.slice(3)].map((shops, i) => (
-        <Sheet key={i} title={`ป้ายราคาร้านค้า ${i + 1}/2`} sub="วางไว้กลางโต๊ะให้ทุกคนเห็น ร้านละ 4 อย่าง (ราคาเขียนทั้งแบบบาท–สตางค์ และแบบใช้จุด)">
+        <Sheet key={i} mascot="bear" title={`ป้ายราคาร้านค้า ${i + 1}/2`} sub="วางไว้กลางโต๊ะให้ทุกคนเห็น ร้านละ 4 อย่าง (ราคาเขียนทั้งแบบบาท–สตางค์ และแบบใช้จุด)">
           <div className="bd-shops">
             {shops.map((s) => (
               <ShopCard key={s.id} shop={s} />
@@ -269,7 +289,7 @@ export function PriceSheets() {
 
 export function ListSheets() {
   return (
-    <Sheet title="บัตรรายการซื้อของ" sub="ตัดตามเส้นประ ผู้เล่นจั่วคนละ 1 ใบ แล้วรวมราคาก่อนออกเดินทาง">
+    <Sheet mascot="rabbit" title="บัตรรายการซื้อของ" sub="ตัดตามเส้นประ ผู้เล่นจั่วคนละ 1 ใบ แล้วรวมราคาก่อนออกเดินทาง">
       <div className="kad-grid kad-grid-2 kad-cut bd-cards">
         {SHOPPING_LISTS.map((l) => (
           <div key={l.no} className="bd-card bd-list">
@@ -277,7 +297,10 @@ export function ListSheets() {
               <span>🛒 บัตรรายการที่ {l.no}</span>
             </div>
             <b className="bd-list-title">
-              {l.emoji} {l.title}
+              <span className="bd-list-emoji" aria-hidden="true">
+                {l.emoji}
+              </span>{' '}
+              {l.title}
             </b>
             <ul>
               {l.lines.map((line) => {
@@ -305,16 +328,19 @@ export function ListSheets() {
 /* ชุดที่ 5 การ์ดภารกิจคณิต + เฉลย                                         */
 /* ------------------------------------------------------------------ */
 
+/** สติกเกอร์ตัวละครมุมการ์ดภารกิจ วนกันไป */
+const CARD_MASCOTS: CharacterKind[] = ['rabbit', 'fox', 'bear', 'owl']
+
 export function QuestSheets() {
   const cards = buildQuestCards()
   const pages = [0, 1, 2, 3].map((p) => cards.slice(p * 8, p * 8 + 8))
   return (
     <>
       {pages.map((page, p) => (
-        <Sheet key={p} title={`การ์ดภารกิจคณิต ${p + 1}/4`} sub="ตัดตามเส้นประ วางคว่ำ · เฉลยกลับหัวอยู่ใต้การ์ด (พับหรือปิดไว้ได้) และมีแผ่นเฉลยสำหรับนายธนาคาร">
+        <Sheet key={p} mascot="fox" title={`การ์ดภารกิจคณิต ${p + 1}/4`} sub="ตัดตามเส้นประ วางคว่ำ · เฉลยกลับหัวอยู่ใต้การ์ด (พับหรือปิดไว้ได้) และมีแผ่นเฉลยสำหรับนายธนาคาร">
           <div className="kad-grid kad-grid-2 kad-cut bd-cards">
             {page.map((c) => (
-              <div key={c.no} className="bd-card bd-quest">
+              <div key={c.no} className={`bd-card bd-quest is-${c.kind}`}>
                 <div className="bd-card-top">
                   <span>⭐ ภารกิจที่ {c.no}</span>
                   <span className="bd-tag">{QUEST_KIND_INFO[c.kind].name}</span>
@@ -322,12 +348,15 @@ export function QuestSheets() {
                 <p className="bd-quest-text">{c.text}</p>
                 <div className="bd-reward">ตอบถูก รับ {formatBS(c.reward)}</div>
                 <div className="bd-answer-flip">เฉลย: {c.answer}</div>
+                <span className="bd-card-mascot" aria-hidden="true">
+                  <CharacterSvg kind={CARD_MASCOTS[(c.no - 1) % CARD_MASCOTS.length]} mood="happy" />
+                </span>
               </div>
             ))}
           </div>
         </Sheet>
       ))}
-      <Sheet title="เฉลยการ์ดภารกิจ (สำหรับนายธนาคาร)" sub="ตอบถูกจ่ายรางวัลตามการ์ด · ตอบผิดให้ดูเฉลยแล้วคิดใหม่ด้วยกัน ไม่ได้เงิน">
+      <Sheet mascot="owl" title="เฉลยการ์ดภารกิจ (สำหรับนายธนาคาร)" sub="ตอบถูกจ่ายรางวัลตามการ์ด · ตอบผิดให้ดูเฉลยแล้วคิดใหม่ด้วยกัน ไม่ได้เงิน">
         <table className="kad-form bd-key">
           <thead>
             <tr>
@@ -364,10 +393,10 @@ export function LuckSheets() {
   return (
     <>
       {pages.map((page, p) => (
-        <Sheet key={p} title={`การ์ดโชคดี ${p + 1}/2`} sub="ตัดตามเส้นประ วางคว่ำ จั่วเมื่อหยุดที่ช่องโชคดี 🎁 แล้วจดเงินที่ได้หรือจ่ายลงสมุดบัญชี">
+        <Sheet key={p} mascot="rabbit" title={`การ์ดโชคดี ${p + 1}/2`} sub="ตัดตามเส้นประ วางคว่ำ จั่วเมื่อหยุดที่ช่องโชคดี 🎁 แล้วจดเงินที่ได้หรือจ่ายลงสมุดบัญชี">
           <div className="kad-grid kad-grid-2 kad-cut bd-cards">
             {page.map((c) => (
-              <div key={c.no} className="bd-card bd-luck">
+              <div key={c.no} className={`bd-card bd-luck ${c.money > 0 ? 'is-in' : c.money < 0 ? 'is-out' : 'is-move'}`}>
                 <div className="bd-card-top">
                   <span>🎁 โชคดี {c.no}</span>
                   {c.money !== 0 && <span className={`bd-tag ${c.money > 0 ? 'is-in' : 'is-out'}`}>{c.money > 0 ? `+${formatBS(c.money)}` : `−${formatBS(-c.money)}`}</span>}
@@ -391,7 +420,7 @@ export function LuckSheets() {
 export function LedgerSheets() {
   return (
     <>
-      <Sheet title="สมุดรายรับรายจ่าย" sub="ทุกครั้งที่ได้เงินหรือจ่ายเงิน เขียน 1 บรรทัด แล้วคิดเงินคงเหลือ">
+      <Sheet mascot="owl" title="สมุดรายรับรายจ่าย" sub="ทุกครั้งที่ได้เงินหรือจ่ายเงิน เขียน 1 บรรทัด แล้วคิดเงินคงเหลือ">
         <p className="bd-fill">
           ชื่อ ........................................ เลขที่ ........ บัตรรายการที่ ........ ต้องใช้เงิน ................ บาท
         </p>
@@ -429,7 +458,7 @@ export function LedgerSheets() {
           <p>ยอดคงเหลือในสมุดตรงกับเงินในมือหรือไม่ ☐ ตรง ☐ ไม่ตรง (ต่างกัน .............. บาท)</p>
         </div>
       </Sheet>
-      <Sheet title="ใบสรุปคะแนนกลุ่ม" sub="นับดาวเมื่อจบเกม แล้วช่วยกันตรวจ">
+      <Sheet mascot="hero" title="ใบสรุปคะแนนกลุ่ม" sub="นับดาวเมื่อจบเกม แล้วช่วยกันตรวจ">
         <p className="bd-fill">กลุ่มที่ ........ นายธนาคาร ............................................ วันที่ ................................</p>
         <table className="kad-form bd-score">
           <thead>
@@ -486,24 +515,30 @@ const PIPS: Record<number, [number, number][]> = {
   6: [[28, 24], [72, 24], [28, 50], [72, 50], [28, 76], [72, 76]],
 }
 
+/** สีพาสเทลของแต่ละหน้า (พิมพ์ขาวดำก็ยังเห็นแต้มชัด) */
+const DIE_COLORS: Record<number, string> = { 1: '#ffe3ec', 2: '#e7f5ff', 3: '#ebfbee', 4: '#fff4e6', 5: '#f3f0ff', 6: '#fff9db' }
+const HEART = 'M50 72C50 72 22 55 22 38C22 28 30 21 39 21C44 21 48 24 50 28C52 24 56 21 61 21C70 21 78 28 78 38C78 55 50 72 50 72Z'
+
 function DieNet() {
-  // รูปคลี่ลูกบาศก์แบบกากบาท (ด้านตรงข้ามรวมกันได้ 7)
+  // รูปคลี่ลูกบาศก์แบบกากบาทแนวตั้ง กว้าง 3 สูง 4 หน้า (ด้านตรงข้ามรวมกันได้ 7) ลูกเต๋าที่ได้จึงใหญ่ขึ้น
   const faces: [number, number, number][] = [
-    [1, 1, 0],
-    [2, 0, 1],
+    [1, 0, 1],
+    [2, 1, 0],
     [3, 1, 1],
-    [5, 2, 1],
-    [4, 3, 1],
-    [6, 1, 2],
+    [5, 1, 2],
+    [4, 1, 3],
+    [6, 2, 1],
   ]
   return (
-    <svg viewBox="-4 -4 408 308" className="bd-die" role="img" aria-label="รูปคลี่ลูกเต๋า">
+    <svg viewBox="-4 -4 308 408" className="bd-die" role="img" aria-label="รูปคลี่ลูกเต๋า">
       {faces.map(([n, cx, cy]) => (
         <g key={n} transform={`translate(${cx * 100} ${cy * 100})`}>
-          <rect width={100} height={100} fill="#fff" stroke="#212529" strokeWidth={2} />
-          {PIPS[n].map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={9} fill={n === 1 ? '#e03131' : '#212529'} />
-          ))}
+          <rect width={100} height={100} fill={DIE_COLORS[n]} stroke="#212529" strokeWidth={2} />
+          {n === 1 ? (
+            <path d={HEART} fill="#e64980" />
+          ) : (
+            PIPS[n].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={9} fill="#3b2f63" />)
+          )}
         </g>
       ))}
     </svg>
@@ -525,6 +560,20 @@ export function PieceSheets() {
           </div>
         ))}
       </div>
+      <ol className="bd-fold-steps" aria-label="วิธีทำลูกเต๋า">
+        <li>
+          <span aria-hidden="true">✂️</span> ตัดรอบนอก
+        </li>
+        <li>
+          <span aria-hidden="true">📐</span> พับตามเส้น
+        </li>
+        <li>
+          <span aria-hidden="true">🩹</span> ติดเทปใส
+        </li>
+        <li>
+          <span aria-hidden="true">🎲</span> พร้อมทอย!
+        </li>
+      </ol>
       <div className="bd-dice">
         <DieNet />
         <DieNet />
