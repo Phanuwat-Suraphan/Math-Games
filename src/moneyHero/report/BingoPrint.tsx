@@ -46,7 +46,9 @@ function Card({ set, who, cells }: { set: BingoSet; who: Who; cells: BingoCell[]
           </div>
         ))}
       </div>
-      <p className="mh-bingo-rule">ฟังโจทย์ คิดคำตอบ แล้วกากบาท ✗ ช่องที่ตรงกัน · ครบ 1 แถว (แนวนอน แนวตั้ง หรือแนวทแยง) ตะโกน “บิงโก!”</p>
+      <p className="mh-bingo-rule">
+        ฟังโจทย์ คิดคำตอบ แล้วกากบาท ✗ ช่องที่ตรงกัน · ครบ 1 แถว (แนวนอน แนวตั้ง หรือแนวทแยง) ตะโกน <b className="mh-bingo-shout">📣 บิงโก!</b>
+      </p>
     </div>
   )
 }

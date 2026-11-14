@@ -1372,3 +1372,18 @@
   margin-bottom: 0.5mm;
   box-shadow: none;
 }
+
+/* บิงโก: คำว่า บิงโก! ในกติกาเป็นป้ายตะโกนสีเหลือง */
+.mh-bingo-shout {
+  padding: 0 2mm;
+  border-radius: 999px;
+  background: #fff3bf;
+  white-space: nowrap;
+}
+
+/* ระบายสี: ตัวอย่างสีเป็นรูปดินสอสี ข้างในขาว (พิมพ์ขาวดำแล้วระบายตัวอย่างเองได้) */
+.mh-colour-crayon {
+  flex: none;
+  width: 12mm;
+  height: 5.5mm;
+}

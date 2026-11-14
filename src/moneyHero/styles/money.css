@@ -12179,3 +12179,41 @@ a.mh-stage-chip:hover {
     animation: none !important;
   }
 }
+
+/* ศูนย์เอกสารพิมพ์: การ์ดแต่ละช่วงสีพาสเทลของตัวเอง ไอคอนอยู่ในวงกลมขาว ชี้แล้วไอคอนส่าย */
+.mh-print-hub section:nth-of-type(1) .mh-print-card {
+  background: linear-gradient(180deg, #ffffff, #eef6ff);
+}
+
+.mh-print-hub section:nth-of-type(2) .mh-print-card {
+  background: linear-gradient(180deg, #ffffff, #fff4e6);
+}
+
+.mh-print-hub section:nth-of-type(3) .mh-print-card {
+  background: linear-gradient(180deg, #ffffff, #effbf1);
+}
+
+.mh-print-hub section:nth-of-type(4) .mh-print-card {
+  background: linear-gradient(180deg, #ffffff, #f4f0ff);
+}
+
+/* ใช้ตัวเลือกที่เจาะจงกว่า .mh-print-card span (ขนาดตัวหนังสือทั่วไปของการ์ด) ไอคอนจึงใหญ่ตามที่ตั้งใจ */
+.mh-print-card .mh-print-icon {
+  font-size: 2em;
+}
+
+.mh-print-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(43, 35, 80, 0.12);
+}
+
+@media (hover: hover) {
+  .mh-print-card:hover .mh-print-icon {
+    animation: mh-icon-wiggle 0.6s ease-in-out;
+  }
+}
