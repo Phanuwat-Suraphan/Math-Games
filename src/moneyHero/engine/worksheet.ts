@@ -75,7 +75,7 @@ function dot(v: number): string {
 }
 
 /** ลักษณนามของสินค้า (ไม่มีในรายการใช้ "ชิ้น") */
-const UNITS: Record<string, string> = {
+export const UNITS: Record<string, string> = {
   ลูกอม: 'เม็ด',
   นม: 'กล่อง',
   ขนมปัง: 'ถุง',

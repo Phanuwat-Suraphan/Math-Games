@@ -44,6 +44,7 @@ import { PrintHubPage } from './report/PrintHub'
 import { WorksheetPrintPage } from './report/WorksheetPrint'
 import { CertificatePrintPage } from './report/CertificatePrint'
 import { PassportPrintPage } from './report/PassportPrint'
+import { BingoPrintPage } from './report/BingoPrint'
 import { BehaviorPage } from './pages/BehaviorPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
@@ -346,6 +347,14 @@ export default function App() {
               element={
                 <TeacherGate>
                   <PassportPrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/bingo"
+              element={
+                <TeacherGate>
+                  <BingoPrintPage />
                 </TeacherGate>
               }
             />
