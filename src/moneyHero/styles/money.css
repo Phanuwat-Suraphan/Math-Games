@@ -11939,3 +11939,233 @@ a.mh-stage-chip:hover {
   animation: mh-hop 0.55s ease-out;
   transform-origin: 50% 100%;
 }
+
+/* ================================================================== */
+/* ภารกิจกลุ่ม และสไลด์บทเรียน: น่ารักขึ้น (ไม่เพิ่มฟีเจอร์)               */
+/* ================================================================== */
+
+/* เลือกกลุ่ม: การ์ดกลุ่มสีพาสเทล หน้าเพื่อนเบียดกันเหมือนถ่ายรูปหมู่ ชี้แล้วทุกคนกระโดดทีละคน */
+.mh-team-card:not(:disabled):nth-child(4n + 1) {
+  background: #fff4f8;
+  border-color: #ffd3e2;
+}
+
+.mh-team-card:not(:disabled):nth-child(4n + 2) {
+  background: #f1f7ff;
+  border-color: #cfe3ff;
+}
+
+.mh-team-card:not(:disabled):nth-child(4n + 3) {
+  background: #f2fbf4;
+  border-color: #c9f0d3;
+}
+
+.mh-team-card:not(:disabled):nth-child(4n + 4) {
+  background: #fff9ec;
+  border-color: #ffe3a8;
+}
+
+.mh-team-card {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-team-faces {
+  gap: 0;
+  padding-left: 8px;
+}
+
+.mh-team-faces > * {
+  margin-left: -8px;
+}
+
+.mh-team-faces > .mh-roster-noavatar {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #fff;
+}
+
+@media (hover: hover) {
+  .mh-team-card:not(:disabled):hover .mh-team-faces > * {
+    animation: mh-hop 0.5s ease-out;
+    transform-origin: 50% 100%;
+  }
+
+  .mh-team-card:not(:disabled):hover .mh-team-faces > :nth-child(2) {
+    animation-delay: 0.08s;
+  }
+
+  .mh-team-card:not(:disabled):hover .mh-team-faces > :nth-child(3) {
+    animation-delay: 0.16s;
+  }
+
+  .mh-team-card:not(:disabled):hover .mh-team-faces > :nth-child(4) {
+    animation-delay: 0.24s;
+  }
+
+  .mh-team-card:not(:disabled):hover .mh-team-faces > :nth-child(5) {
+    animation-delay: 0.32s;
+  }
+}
+
+.mh-team-picks .mh-chip.is-on {
+  animation: mh-jelly 0.5s ease-in-out;
+}
+
+/* ระหว่างเล่น: สมาชิกแต่ละคนมีสีของตัวเอง คนที่ถึงตามีไมค์เด้งที่มุมและตัวละครกระโดด */
+.mh-team-member {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.mh-team-member:not(.is-turn):nth-child(5n + 1) {
+  background: #fff4f8;
+}
+
+.mh-team-member:not(.is-turn):nth-child(5n + 2) {
+  background: #f1f7ff;
+}
+
+.mh-team-member:not(.is-turn):nth-child(5n + 3) {
+  background: #f2fbf4;
+}
+
+.mh-team-member:not(.is-turn):nth-child(5n + 4) {
+  background: #f6f2ff;
+}
+
+.mh-team-member:not(.is-turn):nth-child(5n + 5) {
+  background: #effbfb;
+}
+
+.mh-team-member.is-turn {
+  box-shadow: 0 0 0 4px rgba(255, 190, 40, 0.3), 0 4px 0 #f0c14b;
+}
+
+.mh-team-member.is-turn::after {
+  content: '🎤';
+  position: absolute;
+  top: -8px;
+  right: -6px;
+  font-size: 18px;
+  animation: mh-pop-spin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-team-member.is-turn > :first-child {
+  animation: mh-hop 0.6s ease-out;
+  transform-origin: 50% 100%;
+}
+
+.mh-team-turn-text {
+  display: inline-block;
+  animation: mh-pop 0.35s ease-out both;
+}
+
+/* จบภารกิจกลุ่ม: ฮีโร่กระโดดดีใจ รายชื่อสมาชิกเด้งเข้ามาทีละคน */
+.mh-team-result > .mh-char {
+  animation: mh-hop 0.6s ease-out 0.2s 2;
+  transform-origin: 50% 100%;
+}
+
+.mh-team-scores li {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-team-scores li:nth-child(2) {
+  animation-delay: 0.1s;
+}
+
+.mh-team-scores li:nth-child(3) {
+  animation-delay: 0.2s;
+}
+
+.mh-team-scores li:nth-child(4) {
+  animation-delay: 0.3s;
+}
+
+.mh-team-scores li:nth-child(5) {
+  animation-delay: 0.4s;
+}
+
+.mh-team-scores li:nth-child(5n + 1) {
+  background: #fff4f8;
+}
+
+.mh-team-scores li:nth-child(5n + 2) {
+  background: #f1f7ff;
+}
+
+.mh-team-scores li:nth-child(5n + 3) {
+  background: #f2fbf4;
+}
+
+.mh-team-scores li:nth-child(5n + 4) {
+  background: #f6f2ff;
+}
+
+.mh-team-scores li:nth-child(5n + 5) {
+  background: #effbfb;
+}
+
+/* สไลด์บทเรียน: ตัวละครกระโดดทักทายทุกสไลด์ กล่องข้อความเป็นลูกโป่งคำพูด ประโยคโผล่ทีละบรรทัด */
+.mh-learn-dots span {
+  transition: width 0.3s cubic-bezier(0.3, 1.6, 0.5, 1), background-color 0.3s;
+}
+
+.mh-learn-slide .mh-learn-npc > :first-child {
+  animation: mh-hop 0.6s ease-out 0.1s;
+  transform-origin: 50% 100%;
+}
+
+.mh-learn-body {
+  position: relative;
+}
+
+.mh-learn-body::before {
+  content: '';
+  position: absolute;
+  top: 30px;
+  left: -10px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-left: 2px solid var(--mh-line);
+  border-bottom: 2px solid var(--mh-line);
+  transform: rotate(45deg);
+}
+
+@media (max-width: 560px) {
+  .mh-learn-body {
+    width: 100%;
+  }
+
+  .mh-learn-body::before {
+    top: -10px;
+    left: 50%;
+    margin-left: -8px;
+    transform: rotate(135deg);
+  }
+}
+
+.mh-learn-lines li {
+  animation: mh-pop-in 0.35s ease-out backwards;
+}
+
+.mh-learn-lines li:nth-child(1) {
+  animation-delay: 0.15s;
+}
+
+.mh-learn-lines li:nth-child(2) {
+  animation-delay: 0.35s;
+}
+
+.mh-learn-lines li:nth-child(3) {
+  animation-delay: 0.55s;
+}
+
+.mh-learn-lines li:nth-child(n + 4) {
+  animation-delay: 0.75s;
+}
+
+.mh-learn-title .mh-speak {
+  animation: mh-icon-wiggle 0.6s ease-in-out 0.9s;
+}
