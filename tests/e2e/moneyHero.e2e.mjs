@@ -1442,7 +1442,7 @@ for (const [name, viewport] of [
     await page.goto(`${BASE}#/teacher`)
     await page.getByTestId('mh-teacher-print-hub').click()
     await page.getByTestId('mh-print-hub').waitFor()
-    if ((await page.locator('.mh-print-card').count()) !== 12) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 12 รายการ')
+    if ((await page.locator('.mh-print-card').count()) !== 13) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 13 รายการ')
     await snap(page, `${name}-print-hub`)
     await noSideScroll(page, 'ศูนย์เอกสารพิมพ์')
     // รายงานรายบุคคล: ทั้งห้องคนละแผ่น
@@ -1534,6 +1534,31 @@ for (const [name, viewport] of [
     const passed = pool.filter((p) => p.postTest && p.postTest.score * 100 >= pass * Math.max(1, p.postTest.total)).length
     if (passed === 0) await page.getByTestId('mh-cert-none').waitFor()
     else if ((await page.getByTestId('mh-cert').count()) !== passed) throw new Error(`เกียรติบัตรผ่านเกณฑ์ต้องมี ${passed} แผ่น`)
+  })
+
+  await step(`[${name}] หนังสือเดินทางนักผจญภัย: คนละแผ่น ตราจากเกม และแบบว่างสำหรับสะสมตราจริง`, async () => {
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const pool = Object.values(saved.players).filter((p) => p.student)
+    await page.goto(`${BASE}#/teacher/print`)
+    await page.getByTestId('mh-hub-passport').click()
+    await page.getByTestId('mh-print-passport').waitFor()
+    if ((await page.getByTestId('mh-passport').count()) !== pool.length) throw new Error(`หนังสือเดินทางต้องมี ${pool.length} แผ่น`)
+    if ((await page.getByTestId('mh-passport').first().locator('.mh-pp-stamp').count()) !== 10) throw new Error('ต้องมีช่องตรา 6 ภารกิจ + 4 กิจกรรมในห้องเรียน')
+    await snap(page, `${name}-passport`)
+    await noSideScroll(page, 'หนังสือเดินทาง')
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== pool.length) throw new Error(`หนังสือเดินทาง ${pool.length} คน ต้องพิมพ์ได้ ${pool.length} หน้า แต่ได้ ${pages}`)
+      await page.getByTestId('mh-passport').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-passport.png') })
+    }
+    // แบบว่าง: ไม่มีตราและคะแนนจากเกม ให้สะสมตราจริง
+    await page.getByTestId('mh-pp-fill').uncheck()
+    if ((await page.locator('.mh-pp-stamp.is-earned').count()) !== 0) throw new Error('แบบว่างต้องไม่มีตราที่พิมพ์ไว้')
+    // คนเดียวจากรายละเอียดนักเรียน
+    await page.goto(`${BASE}#/teacher/print/passport?id=${encodeURIComponent(pool[0].id)}`)
+    await page.getByTestId('mh-passport').waitFor()
+    if ((await page.getByTestId('mh-passport').count()) !== 1) throw new Error('พิมพ์คนเดียวต้องมีแผ่นเดียว')
   })
 
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {

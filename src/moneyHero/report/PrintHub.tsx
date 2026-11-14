@@ -22,6 +22,7 @@ const SECTIONS: { title: string; docs: Doc[] }[] = [
     title: 'ก่อนสอน (ขั้น R)',
     docs: [
       { id: 'roster', to: '/teacher/print/roster', icon: '📋', name: 'แบบบันทึกรายชื่อและการเข้าร่วม', desc: 'รายชื่อนักเรียน พร้อมช่องคะแนนก่อน/หลังเรียน', pages: '1–2 แผ่น' },
+      { id: 'passport', to: '/teacher/print/passport', icon: '🧭', name: 'หนังสือเดินทางนักผจญภัยเมืองเงิน', desc: 'บัตรสะสมตราตามขั้น REAL ให้นักเรียนเก็บตลอดหน่วย ตราภารกิจในเกมพิมพ์ให้อัตโนมัติ', pages: '1 แผ่นต่อคน' },
       { id: 'test-pre', to: '/teacher/print/test/pre', icon: '📝', name: 'แบบทดสอบก่อนเรียน', desc: 'ข้อสอบ กระดาษคำตอบ เฉลย และตารางวิเคราะห์จุดประสงค์', pages: 'หลายแผ่น' },
     ],
   },
