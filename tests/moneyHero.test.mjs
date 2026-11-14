@@ -64,6 +64,7 @@ const behavior = load('engine/behavior.js')
 const worksheet = load('engine/worksheet.js')
 const xlsx = load('engine/xlsx.js')
 const workbook = load('engine/workbook.js')
+const passport = load('engine/passport.js')
 const { SKILLS } = load('data/characters.js')
 
 let passed = 0
@@ -2574,6 +2575,36 @@ test('ไฟล์ Excel ของห้อง: 8 ชีต ทุกชีต�
   // ไฟล์จริงแตกได้ และมี 8 ชีต
   const files = unzipStored(xlsx.buildXlsx(sheets))
   eq(Object.keys(files).filter((n) => n.startsWith('xl/worksheets/')).length, 8, 'ไฟล์มี 8 ชีต')
+})
+
+test('หนังสือเดินทาง: ได้ตราเมื่อทำครบ 5 ข้อและถึงเกณฑ์ ขั้น REAL ครบตามจริง', () => {
+  let p = progress.newPlayer('มะลิ', 'hero', 1)
+  let s = passport.passportSummary(p, 70)
+  eq(s.earned, 0, 'ยังไม่มีตรา')
+  eq(s.stamps.length, 6, 'ตราภารกิจ 6 กลุ่ม')
+  eq(JSON.stringify(s.steps), JSON.stringify({ r: false, e: false, a: false, l: false }), 'ยังไม่ได้ทำขั้นใด')
+  const log = (q, group, correct, total, at) => activity.logActivity(q, { act: `${group}-x${at}`, group, label: group, correct, total, wrong: total - correct, timeMs: 1, points: 0 }, at)
+  p = log(p, 'read', 4, 4, 10)
+  eq(passport.passportStamps(p, 70)[0].earned, false, 'ถูกหมดแต่ทำแค่ 4 ข้อ ยังไม่ได้ตรา')
+  p = log(p, 'read', 3, 6, 20)
+  const read = passport.passportStamps(p, 70)[0]
+  eq(read.earned, true, '7/10 = 70% พอดีเกณฑ์ ได้ตรา')
+  eq(read.at, 20, 'วันที่ล่าสุด')
+  eq(read.total, 10, 'นับรวมทุกกิจกรรมในกลุ่ม')
+  eq(passport.passportStamps(p, 71)[0].earned, false, 'เกณฑ์ 71% ไม่ได้ตรา')
+  p = log(p, 'change', 2, 10, 30)
+  eq(passport.passportStamps(p, 70).find((x) => x.group === 'change').earned, false, '20% ไม่ได้ตรา')
+  for (const g of ['price', 'word']) p = log(p, g, 9, 10, 40)
+  s = passport.passportSummary(p, 70)
+  eq(s.earned, 3, 'ได้ 3 ตรา')
+  eq(s.steps.e, true, 'ได้ครึ่งหนึ่งของ 6 กลุ่ม ถือว่าผ่านขั้น E')
+  p.preTest = { score: 8, total: 20, timeMs: 1, at: 1, skills: progress.emptyTestSkills() }
+  p.postTest = { score: 13, total: 20, timeMs: 1, at: 2, skills: progress.emptyTestSkills() }
+  p.reflection = { at: 3, feeling: 'good', good: 'ก', improve: '', apply: '' }
+  s = passport.passportSummary(p, 70)
+  eq(JSON.stringify(s.steps), JSON.stringify({ r: true, e: true, a: true, l: true }), 'ครบทุกขั้น')
+  eq(s.postPassed, false, '13/20 = 65% ไม่ผ่านเกณฑ์ 70')
+  eq(passport.CLASS_STAMPS.length, 4, 'ตรากิจกรรมในห้องเรียน 4 ช่อง')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

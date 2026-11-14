@@ -43,6 +43,7 @@ import { SummaryPrintPage } from './report/SummaryPrint'
 import { PrintHubPage } from './report/PrintHub'
 import { WorksheetPrintPage } from './report/WorksheetPrint'
 import { CertificatePrintPage } from './report/CertificatePrint'
+import { PassportPrintPage } from './report/PassportPrint'
 import { BehaviorPage } from './pages/BehaviorPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
@@ -337,6 +338,14 @@ export default function App() {
               element={
                 <TeacherGate>
                   <CertificatePrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/passport"
+              element={
+                <TeacherGate>
+                  <PassportPrintPage />
                 </TeacherGate>
               }
             />

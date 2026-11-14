@@ -736,3 +736,286 @@
   gap: 8px;
   margin: 4px 0 6px 18px;
 }
+
+/* ------------------------------------------------------------------ */
+/* หนังสือเดินทางนักผจญภัยเมืองเงิน (#/teacher/print/passport)            */
+/* ------------------------------------------------------------------ */
+
+.mh-pp {
+  --pp-r: #2a78d6;
+  --pp-e: #d9622b;
+  --pp-a: #1f8a5b;
+  --pp-l: #7b4fc4;
+  font-size: 12.5pt;
+  line-height: 1.45;
+}
+
+.mh-pp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 2px solid #b7791f;
+  border-radius: 10px;
+  background: #fff8e1;
+}
+
+.mh-pp-head h2 {
+  margin: 0;
+  font-size: 17pt;
+}
+
+.mh-pp-head p {
+  margin: 0;
+  font-size: 10pt;
+}
+
+.mh-pp-head > div:nth-child(2) {
+  flex: 1;
+}
+
+.mh-pp-emblem {
+  font-size: 30pt;
+  line-height: 1;
+}
+
+.mh-pp-count {
+  text-align: center;
+  font-size: 12pt;
+  line-height: 1.1;
+}
+
+.mh-pp-count b {
+  font-size: 22pt;
+}
+
+.mh-pp-count small {
+  display: block;
+  font-size: 9pt;
+}
+
+.mh-pp-who {
+  margin: 6px 0;
+}
+
+.mh-pp-step {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 9px;
+  border: 1.5px solid #ccc;
+  border-radius: 10px;
+  overflow: hidden;
+  break-inside: avoid;
+}
+
+.mh-pp-letter {
+  flex: 0 0 15mm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26pt;
+  font-weight: 800;
+  color: #fff;
+}
+
+.mh-pp-step.is-r .mh-pp-letter {
+  background: var(--pp-r);
+}
+
+.mh-pp-step.is-e .mh-pp-letter {
+  background: var(--pp-e);
+}
+
+.mh-pp-step.is-a .mh-pp-letter {
+  background: var(--pp-a);
+}
+
+.mh-pp-step.is-l .mh-pp-letter {
+  background: var(--pp-l);
+}
+
+.mh-pp-body {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px 8px 0;
+}
+
+.mh-pp-body h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 4px;
+  font-size: 13pt;
+}
+
+.mh-pp-body h3 small {
+  font-weight: 400;
+  color: #555;
+  font-size: 9.5pt;
+}
+
+.mh-pp-check {
+  margin-left: auto;
+  font-size: 10pt;
+  font-weight: 600;
+  color: #777;
+}
+
+.mh-pp-check.is-done {
+  color: #1f6f43;
+}
+
+.mh-pp-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: flex-end;
+}
+
+.mh-pp-score {
+  display: flex;
+  flex-direction: column;
+  min-width: 30mm;
+  padding: 3px 8px;
+  border: 1.5px dashed #888;
+  border-radius: 8px;
+  font-size: 10pt;
+}
+
+.mh-pp-score b {
+  font-size: 15pt;
+}
+
+.mh-pp-lines {
+  flex: 1;
+  min-width: 50mm;
+}
+
+.mh-pp-note {
+  margin: 2px 0 4px;
+  font-size: 9.5pt;
+  color: #555;
+}
+
+.mh-pp-stamps {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.mh-pp-stamps.is-class {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.mh-pp-stamp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+
+.mh-pp-ring {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 25mm;
+  height: 25mm;
+  border: 1.5px dashed #999;
+  border-radius: 50%;
+  line-height: 1.05;
+}
+
+.mh-pp-ring.is-small {
+  width: 20mm;
+  height: 20mm;
+}
+
+.mh-pp-ring-icon {
+  font-size: 19pt;
+}
+
+.mh-pp-ring-icon.is-faint {
+  opacity: 0.25;
+}
+
+.mh-pp-stamp.is-earned .mh-pp-ring {
+  border: 2.5px double #c0392b;
+  color: #c0392b;
+  transform: rotate(-10deg);
+  background: rgba(192, 57, 43, 0.05);
+}
+
+.mh-pp-ring-ok {
+  font-size: 9pt;
+  font-weight: 800;
+}
+
+.mh-pp-ring-date {
+  font-size: 7.5pt;
+}
+
+.mh-pp-stamp-name {
+  font-size: 9.5pt;
+  line-height: 1.2;
+}
+
+.mh-pp-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0 0 2px;
+  font-size: 10.5pt;
+}
+
+.mh-pp-faces span {
+  padding: 0 6px;
+  border-radius: 999px;
+}
+
+.mh-pp-faces span.is-picked {
+  outline: 2px solid #333;
+}
+
+.mh-pp-signs {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.mh-pp-signs p {
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .mh-pp-stamps {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .mh-pp-stamps.is-class {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .mh-pp-signs {
+    flex-direction: column;
+  }
+}
+
+@media print {
+  .mh-pp {
+    break-after: page;
+    font-size: 12.5pt;
+  }
+  .mh-pp-stamps {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  .mh-pp-stamps.is-class {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .mh-pp-signs {
+    flex-direction: row;
+  }
+}
