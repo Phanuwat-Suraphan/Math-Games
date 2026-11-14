@@ -1387,3 +1387,22 @@
   width: 12mm;
   height: 5.5mm;
 }
+
+/* ใบงานที่เด็กใช้ (ระบายสี ฝึกทักษะ): กล่องวิธีทำ/คำชี้แจงมุมมนสีอ่อน */
+.mh-colour .mh-doc-box {
+  border: 1.5px solid #ffc9de;
+  border-radius: 3mm;
+  background: #fff7fa;
+}
+
+.mh-ws .mh-doc-box {
+  border: 1.5px solid #ffd8a8;
+  border-radius: 3mm;
+  background: #fffaf3;
+}
+
+/* ใบเรียกโจทย์บิงโกและเฉลยใบงาน: แถวสลับสีอ่อน ครูอ่านตามบรรทัดได้ไม่หลง */
+.mh-bingo-calls .mh-doc-table tbody tr:nth-child(even) td,
+.mh-ws-key .mh-doc-table tbody tr:nth-child(even) td {
+  background: #f8f9ff;
+}

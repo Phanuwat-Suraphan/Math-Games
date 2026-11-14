@@ -853,3 +853,11 @@
   font-size: 0.8em;
   line-height: 1.5;
 }
+
+/* ใบสรุปคะแนน: หัวข้อเขียนสิ่งที่ได้เรียนรู้เป็นป้ายสีส้มอ่อน */
+.bd-reflect h3 {
+  display: inline-block;
+  padding: 0.2cqw 1.8cqw;
+  border-radius: 99px;
+  background: #fff4e6;
+}
