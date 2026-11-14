@@ -6,6 +6,10 @@ import { bingoCard, buildBingo, CELLS, POOL, winAt, type BingoCell, type BingoSe
 import { formatBS, formatDotNumber } from '../utils/money'
 import type { Player } from '../engine/progress'
 import { PaperPage } from './Paper'
+import { CharacterArt } from '../components/Art'
+import type { NpcId } from '../engine/types'
+
+const MASCOTS: NpcId[] = ['rabbit', 'fox', 'bear', 'owl', 'hero']
 
 /**
  * บิงโกเงินทอง: การ์ด 5×5 (A4 หน้าละ 2 ใบ) ใบเรียกโจทย์ของครูพร้อมเฉลย ตารางตรวจผู้ชนะ
@@ -17,7 +21,8 @@ type Who = { n: number; p: Player | null }
 
 function Card({ set, who, cells }: { set: BingoSet; who: Who; cells: BingoCell[] }) {
   return (
-    <div className="mh-bingo-card" data-testid="mh-bingo-card">
+    <div className={`mh-bingo-card is-m${who.n % MASCOTS.length}`} data-testid="mh-bingo-card">
+      <CharacterArt id={MASCOTS[who.n % MASCOTS.length]} size={46} mood="happy" className="mh-bingo-mascot" />
       <div className="mh-bingo-head">
         <b>🎱 บิงโกเงินทอง</b>
         <span>
@@ -30,7 +35,16 @@ function Card({ set, who, cells }: { set: BingoSet; who: Who; cells: BingoCell[]
       <div className="mh-bingo-grid">
         {cells.map((c, i) => (
           <div key={i} className={`mh-bingo-cell ${c.value === null ? 'is-free' : ''}`}>
-            {c.value === null ? '⭐ ฟรี' : c.label}
+            {c.value === null ? (
+              <>
+                <span className="mh-bingo-free-face" aria-hidden="true">
+                  😊
+                </span>
+                ฟรี
+              </>
+            ) : (
+              c.label
+            )}
           </div>
         ))}
       </div>

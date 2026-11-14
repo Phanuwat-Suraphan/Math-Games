@@ -11000,3 +11000,275 @@ a.mh-stage-chip:hover {
     animation: none;
   }
 }
+
+/* ================================================================== */
+/* ความน่ารักระหว่างตอบโจทย์ (ปรับของเดิม ไม่ใช่ฟีเจอร์ใหม่)            */
+/* ทุกแอนิเมชันปิดเองเมื่อเปิด "ลดการเคลื่อนไหว" (กฎ .mh-reduce-motion ด้านบน) */
+/* ================================================================== */
+
+/* แถบความคืบหน้า: ตัวละครของเด็กวิ่งไปหากล่องของขวัญ */
+.mh-runner-track {
+  position: relative;
+  flex: 1;
+  padding: 0 18px 0 16px;
+}
+
+.mh-runner-me {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -58%);
+  transition: left 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  filter: drop-shadow(0 2px 2px rgba(43, 35, 80, 0.25));
+  pointer-events: none;
+  animation: mh-runner-bob 0.9s ease-in-out infinite;
+}
+
+.mh-runner-goal {
+  position: absolute;
+  right: -4px;
+  top: 50%;
+  transform: translateY(-55%);
+  font-size: 22px;
+  animation: mh-gift-wiggle 2.4s ease-in-out infinite;
+}
+
+@keyframes mh-runner-bob {
+  0%,
+  100% {
+    margin-top: 0;
+  }
+  50% {
+    margin-top: -4px;
+  }
+}
+
+@keyframes mh-gift-wiggle {
+  0%,
+  80%,
+  100% {
+    rotate: 0deg;
+  }
+  85% {
+    rotate: -12deg;
+  }
+  90% {
+    rotate: 12deg;
+  }
+  95% {
+    rotate: -6deg;
+  }
+}
+
+/* ไฟคอมโบเด้งทุกครั้งที่ถูกเพิ่ม ถูก 5 ข้อขึ้นไปลุกโชน */
+.mh-streak {
+  animation: mh-pop 0.3s ease-out both, mh-flame 1.2s ease-in-out 0.3s infinite;
+}
+
+.mh-streak.is-hot {
+  background: linear-gradient(90deg, #ffe08a, #ffb36b);
+  color: #9a3412;
+  box-shadow: 0 0 0 3px rgba(255, 154, 60, 0.35);
+}
+
+@keyframes mh-flame {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+/* ตัวละครในกล่องผลการตอบ: ถูกกระโดดดีใจ ผิดเอียงหัวคิด เฉลยพยักหน้า */
+.mh-feedback-right .mh-feedback-char {
+  animation: mh-hop 0.7s cubic-bezier(0.3, 1.5, 0.5, 1) 0.1s 2 both;
+}
+
+.mh-feedback-wrong .mh-feedback-char {
+  animation: mh-tilt 1.6s ease-in-out infinite;
+  transform-origin: 50% 90%;
+}
+
+.mh-feedback-reveal .mh-feedback-char {
+  animation: mh-nod 1.4s ease-in-out 2;
+  transform-origin: 50% 80%;
+}
+
+@keyframes mh-hop {
+  0% {
+    transform: translateY(0) scale(1);
+  }
+  35% {
+    transform: translateY(-14px) scale(1.05, 0.95);
+  }
+  60% {
+    transform: translateY(0) scale(1.08, 0.92);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes mh-tilt {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-8deg);
+  }
+  60% {
+    transform: rotate(5deg);
+  }
+}
+
+@keyframes mh-nod {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(6deg) translateY(2px);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+}
+
+/* เครื่องหมายถูกหมุนเด้ง รางวัลเด้งตาม */
+.mh-feedback-right .mh-feedback-icon {
+  animation: mh-pop-spin 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-feedback-right .mh-gain {
+  animation: mh-pop 0.4s ease-out 0.25s both;
+}
+
+@keyframes mh-pop-spin {
+  0% {
+    transform: scale(0.2) rotate(-90deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+/* ตอบผิด: การ์ดโจทย์ส่ายเบา ๆ ครั้งเดียว (บอกว่ายังไม่ใช่ ไม่ดุ) */
+.mh-q-card.is-oops {
+  animation: mh-oops 0.45s ease-in-out;
+}
+
+@keyframes mh-oops {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px) rotate(-0.6deg);
+  }
+  50% {
+    transform: translateX(6px) rotate(0.5deg);
+  }
+  80% {
+    transform: translateX(-3px);
+  }
+}
+
+/* ปุ่มนุ่มเด้งเหมือนกดเยลลี่ */
+.mh-btn:active:not(:disabled) {
+  scale: 0.97;
+}
+
+.mh-btn:not(:disabled):hover {
+  filter: brightness(1.05) saturate(1.05);
+}
+
+/* เมนูบนแผนที่: ทุกช่องมีสีพาสเทล (ช่องที่มีสีของตัวเองอยู่แล้วคงเดิม) ไอคอนลอยเป็นคลื่น */
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 1) {
+  background: linear-gradient(180deg, #fff, #ffe9f2);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 2) {
+  background: linear-gradient(180deg, #fff, #e8f3ff);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 3) {
+  background: linear-gradient(180deg, #fff, #fff4dc);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 4) {
+  background: linear-gradient(180deg, #fff, #ecfbe9);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n + 5) {
+  background: linear-gradient(180deg, #fff, #f1ebff);
+}
+
+.mh-menu-tile:not(.mh-menu-ar, .mh-menu-shop, .mh-menu-sandbox):nth-child(6n) {
+  background: linear-gradient(180deg, #fff, #e6fbf8);
+}
+
+.mh-menu-tile > span:first-child {
+  display: inline-block;
+  animation: mh-icon-bob 3.2s ease-in-out infinite;
+}
+
+.mh-menu-tile:nth-child(3n + 2) > span:first-child {
+  animation-delay: -1s;
+}
+
+.mh-menu-tile:nth-child(3n) > span:first-child {
+  animation-delay: -2s;
+}
+
+.mh-menu-tile:hover > span:first-child,
+.mh-menu-tile:focus-visible > span:first-child {
+  animation: mh-icon-wiggle 0.6s ease-in-out;
+}
+
+.mh-menu-tile:active {
+  scale: 0.96;
+}
+
+.mh-menu-badge {
+  animation: mh-flame 1.2s ease-in-out infinite;
+}
+
+@keyframes mh-icon-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes mh-icon-wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1);
+  }
+  30% {
+    transform: rotate(-12deg) scale(1.15);
+  }
+  60% {
+    transform: rotate(10deg) scale(1.15);
+  }
+}
+
+/* ปุ่มเริ่มเกมหายใจเบา ๆ ชวนให้กด */
+.mh-start-actions .mh-btn-xl:not(:active) {
+  animation: mh-breath 2.2s ease-in-out infinite;
+}
+
+@keyframes mh-breath {
+  0%,
+  100% {
+    scale: 1;
+  }
+  50% {
+    scale: 1.04;
+  }
+}

@@ -142,6 +142,9 @@ export const ENCOURAGE = [
   'มาดูวิธีคิดอีกครั้งกัน',
   'ไม่เป็นไร ทุกฮีโร่เคยพลาด',
   'ค่อย ๆ คิดทีละขั้นนะ',
+  'สู้ ๆ นะ เพื่อน ๆ เชียร์อยู่',
+  'หายใจลึก ๆ แล้วนับใหม่อีกทีนะ',
+  'พลาดได้ แปลว่ากำลังเก่งขึ้น',
 ]
 
 export const PRAISE = [
@@ -151,4 +154,17 @@ export const PRAISE = [
   'ใช่เลย!',
   'เยี่ยมไปเลย!',
   'คิดได้ถูกต้อง!',
+  'ว้าว! ถูกเป๊ะ',
+  'ปังมาก!',
+  'เก่งเหมือนฮีโร่ตัวจริงเลย!',
+  'นับเงินคล่องสุด ๆ',
 ]
+
+/** คำชมตอนตอบถูกติดกันตั้งแต่ 3 ข้อ ({n} = จำนวนข้อ) */
+export const COMBO_PRAISE = ['ถูกติดกัน {n} ข้อ! ไฟลุกแล้ว 🔥', '{n} ข้อติด! หยุดไม่อยู่แล้ว', 'คอมโบ {n} ข้อ! เทพมาก', 'ถูก {n} ข้อรวด! ฮีโร่ตัวจริง']
+
+/** คำชมตามจำนวนข้อที่ถูกติดกัน (ต่ำกว่า 3 ข้อใช้คำชมทั่วไป) */
+export function praiseFor(streak: number, roll: number): string {
+  if (streak >= 3) return COMBO_PRAISE[Math.floor(roll * COMBO_PRAISE.length) % COMBO_PRAISE.length].replace('{n}', String(streak))
+  return PRAISE[Math.floor(roll * PRAISE.length) % PRAISE.length]
+}

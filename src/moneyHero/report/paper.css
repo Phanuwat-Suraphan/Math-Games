@@ -1213,3 +1213,69 @@
     font-size: 10pt;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* ความน่ารักของสื่อพิมพ์: ตัวละครประจำการ์ดบิงโกและใบงาน               */
+/* ------------------------------------------------------------------ */
+
+.mh-bingo-card {
+  position: relative;
+}
+
+.mh-bingo-mascot {
+  position: absolute !important;
+  right: 4mm;
+  top: -6mm;
+}
+
+.mh-bingo-head {
+  padding-right: 16mm;
+}
+
+.mh-bingo-head b {
+  padding: 1mm 4mm;
+  border-radius: 999px;
+  background: #fff3c4;
+}
+
+.mh-bingo-card.is-m1 .mh-bingo-head b {
+  background: #ffe1d6;
+}
+
+.mh-bingo-card.is-m2 .mh-bingo-head b {
+  background: #e3f2ff;
+}
+
+.mh-bingo-card.is-m3 .mh-bingo-head b {
+  background: #ece5ff;
+}
+
+.mh-bingo-card.is-m4 .mh-bingo-head b {
+  background: #dcf7e8;
+}
+
+.mh-bingo-cell.is-free {
+  flex-direction: column;
+  gap: 0;
+}
+
+.mh-bingo-free-face {
+  font-size: 18pt;
+  line-height: 1;
+}
+
+.mh-ws-head {
+  position: relative;
+}
+
+.mh-ws-mascot {
+  position: absolute !important;
+  left: 0;
+  top: -4mm;
+}
+
+.mh-ws-skill h3 {
+  border-left-color: #ff9a3c;
+  background: #fff6e8;
+  border-radius: 0 8px 8px 0;
+}
