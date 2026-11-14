@@ -1360,6 +1360,44 @@ for (const [name, viewport] of [
     }
   })
 
+  await step(`[${name}] ภาพปริศนา: ตอบถูกแล้วภาพค่อย ๆ เผย ทายภาพถูก ได้เหรียญ และเก็บเข้าสมุดภาพ`, async () => {
+    await page.goto(`${BASE}#/map`)
+    await page.getByTestId('mh-menu-puzzle').click()
+    await page.getByTestId('mh-puzzle').waitFor()
+    const before = await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('moneyHero.save.v1'))
+      const p = s.players[s.activeId]
+      return { coins: p.coins, puzzles: p.puzzles ?? [] }
+    })
+    if (before.puzzles.length !== 0) throw new Error('ผู้เล่นใหม่ยังไม่มีภาพในสมุด')
+    await page.getByTestId('mh-puzzle-start').click()
+    await page.getByTestId('mh-puzzle-grid').waitFor()
+    if ((await page.getByTestId('mh-puzzle-grid').locator('.mh-pix-cell.is-hidden').count()) !== 100) throw new Error('เริ่มต้นต้องซ่อนทุกช่อง')
+    await snap(page, `${name}-puzzle-start`)
+    await noSideScroll(page, 'ภาพปริศนา')
+    await playUntil(page, 'mh-puzzle-guess')
+    if ((await page.getByTestId('mh-puzzle-grid').locator('.mh-pix-cell.is-hidden').count()) !== 0) throw new Error('ตอบครบแล้วต้องเผยครบทุกช่อง')
+    // ภาพแรกของผู้เล่นใหม่คือลูกหมูออมสิน
+    await page.getByTestId('mh-puzzle-guess').getByRole('button', { name: 'ลูกหมูออมสิน' }).click()
+    await page.getByTestId('mh-puzzle-done').waitFor()
+    await page.getByTestId('mh-puzzle-name').getByText('ลูกหมูออมสิน', { exact: false }).waitFor()
+    await snap(page, `${name}-puzzle-done`)
+    await page.waitForFunction(() => {
+      const s = JSON.parse(localStorage.getItem('moneyHero.save.v1'))
+      const p = s.players[s.activeId]
+      return (p.puzzles ?? []).includes('piggy') && (p.actLog ?? []).some((e) => e.act === 'puzzle')
+    })
+    const after = await page.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('moneyHero.save.v1'))
+      return s.players[s.activeId].coins
+    })
+    if (after < before.coins + 20) throw new Error(`ทายถูกครั้งแรกต้องได้อย่างน้อย 20 เหรียญ (ได้ ${after - before.coins})`)
+    // สมุดภาพ: ภาพที่เก็บแล้วขึ้นสี ภาพถัดไปถูกเลือกไว้
+    await page.getByTestId('mh-puzzle-next').click()
+    if (!(await page.getByTestId('mh-puzzle-pick-piggy').getAttribute('class')).includes('is-got')) throw new Error('สมุดภาพต้องแสดงภาพที่เก็บแล้ว')
+    if ((await page.getByTestId('mh-puzzle-pick-heart').getAttribute('aria-pressed')) !== 'true') throw new Error('ภาพต่อไปต้องถูกเลือกไว้ให้')
+  })
+
   await step(`[${name}] เส้นทาง REAL: เห็นผลก่อนเรียน ภารกิจที่เล่นแล้ว และเขียนสะท้อนผลให้ครูอ่านได้`, async () => {
     await page.goto(`${BASE}#/map`)
     await page.getByTestId('mh-menu-real').click()
@@ -1442,7 +1480,7 @@ for (const [name, viewport] of [
     await page.goto(`${BASE}#/teacher`)
     await page.getByTestId('mh-teacher-print-hub').click()
     await page.getByTestId('mh-print-hub').waitFor()
-    if ((await page.locator('.mh-print-card').count()) !== 14) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 14 รายการ')
+    if ((await page.locator('.mh-print-card').count()) !== 15) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 15 รายการ')
     await snap(page, `${name}-print-hub`)
     await noSideScroll(page, 'ศูนย์เอกสารพิมพ์')
     // รายงานรายบุคคล: ทั้งห้องคนละแผ่น
@@ -1593,6 +1631,25 @@ for (const [name, viewport] of [
     await page.getByTestId('mh-bingo-byname').uncheck()
     await page.getByTestId('mh-bingo-count').selectOption('10')
     if ((await page.getByTestId('mh-bingo-card').count()) !== 10) throw new Error('เลือก 10 ใบต้องได้ 10 ใบ')
+  })
+
+  await step(`[${name}] ระบายสีภาพปริศนา: แผ่นละภาพ ทุกช่องมีโจทย์ เลือกภาพเดียวได้ และมีเฉลยภาพสี`, async () => {
+    await page.goto(`${BASE}#/teacher/print`)
+    await page.getByTestId('mh-hub-colour').click()
+    await page.getByTestId('mh-print-colour').waitFor()
+    if ((await page.getByTestId('mh-colour-sheet').count()) !== 8) throw new Error('ระบายสีต้องมี 8 แผ่น')
+    if ((await page.getByTestId('mh-colour-sheet').first().locator('.mh-colour-cell').count()) !== 100) throw new Error('ตาราง 10×10')
+    await page.getByTestId('mh-colour-answers').locator('.mh-pix').first().waitFor()
+    await noSideScroll(page, 'ระบายสีภาพปริศนา')
+    await page.getByTestId('mh-colour-which').selectOption('cat')
+    if ((await page.getByTestId('mh-colour-sheet').count()) !== 1) throw new Error('เลือกภาพเดียวต้องได้แผ่นเดียว')
+    await snap(page, `${name}-colour`)
+    if (name === 'desktop') {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+      if (pages !== 2) throw new Error(`ภาพเดียว + เฉลยต้องได้ 2 หน้า แต่ได้ ${pages}`)
+      await page.getByTestId('mh-colour-sheet').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-colour.png') })
+    }
   })
 
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {

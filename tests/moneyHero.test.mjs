@@ -66,6 +66,7 @@ const xlsx = load('engine/xlsx.js')
 const workbook = load('engine/workbook.js')
 const passport = load('engine/passport.js')
 const bingo = load('engine/bingo.js')
+const pictures = load('engine/pictures.js')
 const { SKILLS } = load('data/characters.js')
 
 let passed = 0
@@ -2671,6 +2672,78 @@ test('บิงโกเงินทอง: คำตอบไม่ซ้ำ �
   eq(JSON.stringify(bingo.bingoCard(bingo.buildBingo(4), 3)), JSON.stringify(bingo.bingoCard(bingo.buildBingo(4), 3)), 'การ์ดเดิมพิมพ์ซ้ำได้เหมือนเดิม')
   eq(bingo.LINES.length, 12, 'แถวชนะ 12 แบบ')
   eq(bingo.moneyWords(8775), 'ธนบัตร 50 บาท 1 ใบ ธนบัตร 20 บาท 1 ใบ เหรียญ 10 บาท 1 เหรียญ เหรียญ 5 บาท 1 เหรียญ เหรียญ 2 บาท 1 เหรียญ เหรียญ 50 สตางค์ 1 เหรียญ เหรียญ 25 สตางค์ 1 เหรียญ', 'แตกเงินน้อยชิ้นที่สุด')
+})
+
+test('ภาพปริศนา: ภาพ 10×10 ถูกรูปแบบ เผยครบเมื่อตอบครบ ทายภาพ สะสมภาพ และบันทึกกลับได้', () => {
+  eq(pictures.PICTURES.length, 8, 'ภาพ 8 ภาพ')
+  eq(new Set(pictures.PICTURES.map((p) => p.id)).size, 8, 'รหัสไม่ซ้ำ')
+  for (const p of pictures.PICTURES) {
+    eq(p.rows.length, 10, `${p.id} สูง 10 แถว`)
+    for (const r of p.rows) assert(/^[0-8]{10}$/.test(r), `${p.id} แถวละ 10 ช่อง สีที่รู้จัก: ${r}`)
+    assert(pictures.coloredCells(p).length >= 30, `${p.id} มีช่องสีพอให้เป็นภาพ`)
+    const order = pictures.revealOrder(p)
+    eq([...order].sort((a, b) => a - b).join(), Array.from({ length: 100 }, (_, i) => i).join(), `${p.id} ลำดับการเผยครบทุกช่อง`)
+    eq(JSON.stringify(order), JSON.stringify(pictures.revealOrder(p)), 'ภาพเดิมเผยแบบเดิม')
+    let last = 0
+    for (let c = 0; c <= pictures.PUZZLE_QUESTIONS; c += 1) {
+      const n = pictures.revealedCount(p, c)
+      assert(n >= last, 'ยิ่งตอบถูกยิ่งเผยมาก')
+      last = n
+    }
+    eq(pictures.revealedCount(p, 0), 0, 'ยังไม่ตอบ ไม่เผย')
+    eq(pictures.revealedCount(p, pictures.PUZZLE_QUESTIONS), 100, 'ตอบครบ เผยครบ')
+    const g = pictures.guessChoices(p)
+    eq(g.length, 3, 'ตัวเลือกทาย 3 ตัว')
+    assert(g.includes(p.name) && new Set(g).size === 3, `ตัวเลือกมีคำตอบจริงและไม่ซ้ำ: ${g}`)
+  }
+  // สะสมภาพ
+  let pl = progress.newPlayer('มะลิ', 'hero', 1)
+  eq(pictures.nextPicture(pl).id, 'piggy', 'ภาพแรกคือลูกหมู')
+  pl = pictures.collectPicture(pl, 'piggy')
+  eq(pictures.collectPicture(pl, 'piggy'), pl, 'เก็บซ้ำไม่เพิ่ม')
+  eq(pictures.collectPicture(pl, 'xx'), pl, 'รหัสที่ไม่มีไม่เก็บ')
+  eq(pictures.nextPicture(pl).id, 'heart', 'ภาพถัดไป')
+  for (const p of pictures.PICTURES) pl = pictures.collectPicture(pl, p.id)
+  eq(pictures.nextPicture(pl).id, 'piggy', 'ครบแล้ววนกลับภาพแรก')
+  const back = progress.parseSave(JSON.stringify({ version: 1, players: { a: { ...pl, id: 'a', puzzles: ['heart', 'zzz', 'heart', 7] } } }))
+  eq(back.players.a.puzzles.join(), 'heart', 'อ่านกลับ กรองรหัสผิดและซ้ำ')
+  const m = backup.mergeSaves(progress.parseSave(JSON.stringify({ version: 1, players: { a: { ...pl, id: 'a', puzzles: ['heart'] } } })), progress.parseSave(JSON.stringify({ version: 1, players: { a: { ...pl, id: 'a', puzzles: ['cat'] } } })))
+  eq([...m.save.players.a.puzzles].sort().join(), 'cat,heart', 'รวมสองเครื่องได้ภาพจากทั้งสองเครื่อง')
+  // โจทย์ของภาพ: ครบจำนวน และเล่นซ้ำได้ชุดใหม่
+  const q1 = daily.buildPuzzle(pl, 'piggy', 1, pictures.PUZZLE_QUESTIONS)
+  eq(q1.length, pictures.PUZZLE_QUESTIONS, 'โจทย์ครบ')
+  eq(JSON.stringify(daily.buildPuzzle(pl, 'piggy', 1, 8).map((q) => q.title)), JSON.stringify(q1.map((q) => q.title)), 'รอบเดิมได้โจทย์เดิม')
+})
+
+test('ระบายสีภาพปริศนา: ทุกช่องคำนวณได้คำตอบตรงกับสีของช่อง แต่ละสีคำตอบไม่ซ้ำ ช่องขาวไม่มีโจทย์', () => {
+  const calc = (e) => {
+    const m = e.match(/^(\d+) ([+−×]) (\d+)$/)
+    assert(m, `รูปแบบโจทย์: ${e}`)
+    const a = Number(m[1])
+    const b = Number(m[3])
+    assert(a > 0 && b > 0, `ตัวเลขบวก: ${e}`)
+    return m[2] === '+' ? a + b : m[2] === '−' ? a - b : a * b
+  }
+  for (const level of [1, 2]) {
+    for (let seed = 1; seed <= 10; seed += 1) {
+      for (const p of pictures.PICTURES) {
+        const s = pictures.colourSheet(p, seed, level)
+        eq(s.legend.length, pictures.colorsUsed(p).length, 'ทุกสีมีในตาราง')
+        eq(new Set(s.legend.map((l) => l.answer)).size, s.legend.length, `${p.id} คำตอบแต่ละสีไม่ซ้ำ`)
+        const ans = new Map(s.legend.map((l) => [l.color, l.answer]))
+        s.cells.forEach((c, i) => {
+          eq(c.color, pictures.cellColor(p, i), 'สีของช่องตรงกับภาพ')
+          if (c.color === 0) {
+            eq(c.expr, null, 'ช่องขาวไม่มีโจทย์')
+            return
+          }
+          eq(calc(c.expr), ans.get(c.color), `${p.id} ระดับ ${level} ชุด ${seed} ช่อง ${i}: ${c.expr}`)
+          if (level === 1) assert(!c.expr.includes('×'), 'ระดับ 1 ไม่มีคูณ')
+        })
+      }
+    }
+  }
+  eq(JSON.stringify(pictures.colourSheet(pictures.PICTURES[0], 3, 1)), JSON.stringify(pictures.colourSheet(pictures.PICTURES[0], 3, 1)), 'ชุดเดิมพิมพ์ซ้ำได้เหมือนเดิม')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

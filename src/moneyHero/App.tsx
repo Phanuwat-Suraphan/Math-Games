@@ -45,6 +45,8 @@ import { WorksheetPrintPage } from './report/WorksheetPrint'
 import { CertificatePrintPage } from './report/CertificatePrint'
 import { PassportPrintPage } from './report/PassportPrint'
 import { BingoPrintPage } from './report/BingoPrint'
+import { PuzzlePage } from './pages/PuzzlePage'
+import { ColourPrintPage } from './report/ColourPrint'
 import { BehaviorPage } from './pages/BehaviorPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
@@ -271,6 +273,14 @@ export default function App() {
             <Route path="/board" element={<BoardPage />} />
             <Route path="/team" element={<TeamMissionPage />} />
             <Route
+              path="/puzzle"
+              element={
+                <NeedPlayer>
+                  <PuzzlePage />
+                </NeedPlayer>
+              }
+            />
+            <Route
               path="/real"
               element={
                 <NeedPlayer>
@@ -355,6 +365,14 @@ export default function App() {
               element={
                 <TeacherGate>
                   <BingoPrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/colour"
+              element={
+                <TeacherGate>
+                  <ColourPrintPage />
                 </TeacherGate>
               }
             />

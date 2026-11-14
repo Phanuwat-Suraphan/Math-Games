@@ -807,6 +807,9 @@ export function MapPage() {
         <Link to="/real" className="mh-menu-tile mh-menu-real" data-testid="mh-menu-real">
           <span aria-hidden="true">🧭</span>เส้นทาง REAL
         </Link>
+        <Link to="/puzzle" className="mh-menu-tile mh-menu-puzzle" data-testid="mh-menu-puzzle">
+          <span aria-hidden="true">🖼️</span>ภาพปริศนา
+        </Link>
         <Link to="/team" className="mh-menu-tile mh-menu-team" data-testid="mh-menu-team">
           <span aria-hidden="true">👥</span>ภารกิจกลุ่ม
         </Link>

@@ -152,6 +152,7 @@ export function mergePlayer(a: Player, b: Player): Player {
     ...mergeActivity(a, b),
     reflection: (b.reflection?.at ?? 0) > (a.reflection?.at ?? 0) ? b.reflection : a.reflection ?? b.reflection,
     behavior: mergeBehavior(a.behavior, b.behavior),
+    puzzles: a.puzzles || b.puzzles ? union(a.puzzles, b.puzzles) : undefined,
   }
 }
 
