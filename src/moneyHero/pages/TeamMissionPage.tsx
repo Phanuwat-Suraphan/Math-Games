@@ -135,13 +135,16 @@ export function TeamMissionPage() {
             ))}
           </div>
           <p className="mh-team-turn" role="status" data-testid="mh-team-turn">
-            {current ? (
-              <>
-                👉 ตาของ <b>{current.name}</b> · เพื่อนช่วยคิดได้ แต่ให้ {current.name} เป็นคนกดตอบนะ
-              </>
-            ) : (
-              <>🤝 ข้อฝึกซ้ำ: ช่วยกันคิดทั้งกลุ่ม</>
-            )}
+            {/* เปลี่ยนตาแล้วข้อความเด้ง (key อยู่ที่ข้อความข้างใน กล่องประกาศ role=status คงเดิม) */}
+            <span key={String(turn)} className="mh-team-turn-text">
+              {current ? (
+                <>
+                  👉 ตาของ <b>{current.name}</b> · เพื่อนช่วยคิดได้ แต่ให้ {current.name} เป็นคนกดตอบนะ
+                </>
+              ) : (
+                <>🤝 ข้อฝึกซ้ำ: ช่วยกันคิดทั้งกลุ่ม</>
+              )}
+            </span>
           </p>
           <StepRunner
             questions={questions}
