@@ -11395,3 +11395,77 @@ a.mh-stage-chip:hover {
 .mh-sort-slot.is-filled {
   animation: mh-plop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
 }
+
+/* ร้านของฮีโร่: ซื้อแล้วฮีโร่กระโดดดีใจ ยอดเหรียญเด้ง เงินไม่พอกระเป๋าส่าย ลุงหมีพูดแล้วคำพูดเด้ง */
+.mh-pedestal.is-party > :first-child {
+  animation: mh-hop 0.6s ease-out 2;
+  transform-origin: 50% 100%;
+}
+
+.mh-shop-coins {
+  display: inline-block;
+  animation: mh-pop 0.4s ease-out both;
+}
+
+.mh-shop-wallet.is-oops {
+  animation: mh-oops 0.45s ease-in-out;
+}
+
+.mh-bubble-text {
+  display: inline-block;
+  animation: mh-pop 0.35s ease-out both;
+}
+
+.mh-shop-item.is-owned::after {
+  animation: mh-pop-spin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-shop-item .mh-shop-preview {
+  transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.mh-shop-item:active .mh-shop-preview {
+  transform: scale(1.06) rotate(-3deg);
+}
+
+/* ภาพปริศนา: จุดนับเด้งทีละดวง ถามชื่อภาพแล้วผงกหัว ทายผิดปุ่มส่าย เผยครบแล้วภาพเด้งในกรอบทอง */
+.mh-puzzle-dots i.is-on {
+  animation: mh-plop 0.35s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-puzzle-ask {
+  display: inline-block;
+  animation: mh-nod 1.4s ease-in-out 2;
+  transform-origin: 50% 80%;
+}
+
+.mh-puzzle-guess .is-wrong {
+  animation: mh-oops 0.45s ease-in-out;
+}
+
+.mh-puzzle-board.is-done .mh-pix {
+  box-shadow:
+    inset 0 0 0 3px #f3d9a4,
+    0 0 0 5px #ffd56a,
+    0 8px 22px rgba(240, 164, 0, 0.35);
+  animation: mh-hop 0.7s ease-out 0.1s 2;
+  transform-origin: 50% 100%;
+}
+
+.mh-puzzle-done > :first-child {
+  animation: mh-hop 0.6s ease-out 0.3s 2;
+  transform-origin: 50% 100%;
+}
+
+.mh-puzzle-slot.is-picked > :first-child {
+  animation: mh-hop 0.5s ease-out;
+  transform-origin: 50% 100%;
+}
+
+.mh-puzzle-slot:not(.is-got) .mh-puzzle-q {
+  animation: mh-bob 2.6s ease-in-out infinite;
+}
+
+.mh-puzzle-slot:not(.is-got):nth-child(2n) .mh-puzzle-q {
+  animation-delay: -1.3s;
+}
