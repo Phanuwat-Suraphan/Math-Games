@@ -61,6 +61,8 @@ const activity = load('engine/activity.js')
 const teams = load('engine/teams.js')
 const stats = load('engine/stats.js')
 const behavior = load('engine/behavior.js')
+const worksheet = load('engine/worksheet.js')
+const { SKILLS } = load('data/characters.js')
 
 let passed = 0
 const failures = []
@@ -2357,6 +2359,127 @@ test('บันทึก PDCA ของครู: ค่าเริ่มต้
   const saved = progress.parseSave(JSON.stringify({ version: 1, players: {}, classroom: { teacher: 'ครูใจดี', pdca: { check: 'ผลดีขึ้น' } } }))
   eq(saved.classroom.pdca.check, 'ผลดีขึ้น', 'อ่านจากไฟล์บันทึก')
   eq(saved.classroom.teacher, 'ครูใจดี', 'ค่าอื่นไม่หาย')
+})
+
+/* ------------------------------------------------------------------ */
+/* ระยะ 6: ใบงานซ่อมเสริม เกียรติบัตร                                     */
+/* ------------------------------------------------------------------ */
+
+const AMT = String.raw`(?:[\d,]+\.\d\d บาท|[\d,]+ บาท \d+ สตางค์|[\d,]+ บาท|\d+ สตางค์)`
+function amt(s) {
+  const n = (x) => Number(x.replace(/,/g, ''))
+  let m = s.match(/^([\d,]+)\.(\d\d) บาท$/)
+  if (m) return n(m[1]) * 100 + Number(m[2])
+  m = s.match(/^([\d,]+) บาท (\d+) สตางค์$/)
+  if (m) return n(m[1]) * 100 + Number(m[2])
+  m = s.match(/^([\d,]+) บาท$/)
+  if (m) return n(m[1]) * 100
+  m = s.match(/^(\d+) สตางค์$/)
+  if (m) return Number(m[1])
+  throw new Error(`อ่านจำนวนเงินไม่ได้: ${s}`)
+}
+const dotNum = (s) => Math.round(Number(s.replace(/,/g, '')) * 100)
+
+test('ใบงานซ่อมเสริม: เฉลยทุกข้อตรงกับโจทย์ (คำนวณย้อนจากข้อความโจทย์) 9 ทักษะ 2 ระดับ หลายชุด', () => {
+  const denoms = load('data/denominations.js')
+  let checked = 0
+  for (const level of [1, 2]) {
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const items = worksheet.buildWorksheet({ skills: [...SKILLS], perSkill: 4, level, seed })
+      eq(items.length, SKILLS.length * 4, `ครบทุกทักษะ ทักษะละ 4 ข้อ (ระดับ ${level} ชุด ${seed})`)
+      for (const it of items) {
+        const where = `[${it.skill} ระดับ ${level} ชุด ${seed}] ${it.text} → ${it.answer}`
+        assert(it.answer && !/NaN|undefined|null|-\d/.test(it.answer + it.text), `ข้อความเสีย ${where}`)
+        assert(it.text.includes('............') || it.skill === 'compare', `มีช่องให้เติม ${where}`)
+        let expect
+        if (it.skill === 'notes') expect = denoms.denom(it.money[0]).value
+        else if (it.skill === 'count') expect = denoms.sumDenoms(it.money)
+        else if (it.skill === 'dot') expect = amt(it.text.match(new RegExp(`^(${AMT})`))[1])
+        else if (it.skill === 'compare') {
+          const m = it.text.match(new RegExp(`(${AMT})\\s+\\(\\s+\\)\\s+(${AMT})$`))
+          const d = amt(m[1]) - amt(m[2])
+          eq(it.answer, d > 0 ? '>' : d < 0 ? '<' : '=', `เครื่องหมายถูก ${where}`)
+          expect = d
+        } else if (it.skill === 'exchange') {
+          let m = it.text.match(/^(.+) 1 (?:เหรียญ|ใบ) แลกเป็น(.+)ได้/)
+          if (m) {
+            const v = (name) => denoms.DENOMINATIONS.find((x) => x.name === name).value
+            expect = v(m[1]) / v(m[2])
+          } else if ((m = it.text.match(/^เงิน (\d+) บาท แลกเป็นเหรียญ (\d+) สตางค์/))) expect = (Number(m[1]) * 100) / Number(m[2])
+          else {
+            m = it.text.match(/^(.+) (\d+) เหรียญ รวมเป็นเงิน/)
+            expect = denoms.DENOMINATIONS.find((x) => x.name === m[1]).value * Number(m[2])
+          }
+          assert(Number.isInteger(expect), `แลกได้พอดี ${where}`)
+        } else if (it.skill === 'addsub') {
+          const m = it.text.match(/^([\d,]+\.\d\d) ([+−]) ([\d,]+\.\d\d) =/)
+          expect = m[2] === '+' ? dotNum(m[1]) + dotNum(m[3]) : dotNum(m[1]) - dotNum(m[3])
+          eq(amt(it.answer), expect, `เฉลยบวกลบ ${where}`)
+        } else if (it.skill === 'muldiv') {
+          let m = it.text.match(new RegExp(`ละ (${AMT}) ซื้อ (\\d+) `))
+          if (m) expect = amt(m[1]) * Number(m[2])
+          else {
+            m = it.text.match(new RegExp(`^แบ่งเงิน (${AMT}) ให้เพื่อน (\\d+) คน`))
+            expect = amt(m[1]) / Number(m[2])
+            assert(Number.isInteger(expect / 100), `แบ่งได้ลงตัวเป็นบาท ${where}`)
+          }
+          eq(amt(it.answer), expect, `เฉลยคูณหาร ${where}`)
+        } else if (it.skill === 'word') {
+          let m = it.text.match(new RegExp(`มีเงิน (${AMT}) ซื้อ.+ราคา (${AMT}) และ.+ราคา (${AMT}) `))
+          if (m) expect = amt(m[1]) - amt(m[2]) - amt(m[3])
+          else {
+            m = it.text.match(new RegExp(`วันละ (${AMT}) เป็นเวลา (\\d+) วัน .+ราคา (${AMT}) `))
+            expect = amt(m[1]) * Number(m[2]) - amt(m[3])
+          }
+          assert(expect > 0, `ซื้อแล้วยังมีเงินเหลือ ${where}`)
+          eq(amt(it.answer.replace(/ \(.*\)$/, '')), expect, `เฉลยโจทย์ปัญหา ${where}`)
+        } else if (it.skill === 'ledger') {
+          let bal = amt(it.text.match(new RegExp(`ยกมา (${AMT})`))[1])
+          for (const [, , inc, out] of it.table.rows) {
+            bal += inc ? dotNum(inc) : -dotNum(out)
+            assert(bal > 0, `เงินในบัญชีไม่ติดลบระหว่างทาง ${where}`)
+          }
+          eq(it.table.rows.length, level === 1 ? 3 : 4, `จำนวนรายการในบัญชี ${where}`)
+          expect = bal
+          eq(amt(it.answer), expect, `เฉลยบัญชี ${where}`)
+        }
+        eq(it.value, expect, `ค่าเฉลยตรงกับโจทย์ ${where}`)
+        if (!['exchange', 'compare'].includes(it.skill) || /รวมเป็นเงิน/.test(it.text)) assert(worksheet.validAmount(it.value), `จำนวนเงินใช้ได้จริง ${where}`)
+        checked += 1
+      }
+      // ข้อในทักษะเดียวกันไม่ซ้ำ
+      for (const s of SKILLS) {
+        const keys = items.filter((i) => i.skill === s).map((i) => JSON.stringify([i.text, i.money ?? [], i.table ?? null]))
+        eq(new Set(keys).size, keys.length, `โจทย์ทักษะ ${s} ไม่ซ้ำกัน (ชุด ${seed})`)
+      }
+    }
+  }
+  assert(checked === 2 * 40 * SKILLS.length * 4, `ตรวจครบ ${checked} ข้อ`)
+  // ชุดเดิมพิมพ์ซ้ำได้โจทย์เดิม ชุดใหม่ได้โจทย์ใหม่
+  const o = { skills: ['dot', 'word'], perSkill: 5, level: 1, seed: 3 }
+  eq(JSON.stringify(worksheet.buildWorksheet(o)), JSON.stringify(worksheet.buildWorksheet(o)), 'ชุดเดิมได้โจทย์เดิม')
+  assert(JSON.stringify(worksheet.buildWorksheet(o)) !== JSON.stringify(worksheet.buildWorksheet({ ...o, seed: 4 })), 'ชุดใหม่ได้โจทย์ใหม่')
+  eq(worksheet.buildWorksheet({ ...o, skills: [] }).length, 0, 'ไม่เลือกทักษะ ไม่มีโจทย์')
+  // ไม่รบกวนตัวสุ่มของเกม
+  random.seedRandom(5)
+  const a = random.rand()
+  random.seedRandom(5)
+  worksheet.buildWorksheet(o)
+  eq(random.rand(), a, 'ตัวสุ่มของเกมไม่เปลี่ยน')
+  random.useMathRandom()
+})
+
+test('ใบงานรายบุคคล: เลือกทักษะที่ยังอ่อน คนละชุดโจทย์ และเกียรติบัตรเลือกผู้รับถูกต้อง', () => {
+  const p = progress.newPlayer('มะลิ', 'hero', 1)
+  eq(worksheet.remedialSkills(p, 70).length, 0, 'ยังไม่มีข้อมูล ไม่ต้องซ่อม')
+  p.skills.dot = { attempts: 6, correct: 2, firstTry: 2 }
+  const t = { score: 10, total: 20, timeMs: 1, at: 1, skills: progress.emptyTestSkills() }
+  t.skills.word = { correct: 1, total: 4 }
+  t.skills.addsub = { correct: 3, total: 3 }
+  p.postTest = t
+  eq(worksheet.remedialSkills(p, 70).join(), 'dot,word', 'ทักษะที่อ่อนในเกม + ต่ำกว่าเกณฑ์ในแบบทดสอบ')
+  assert(worksheet.studentSeed(1, 'st-a') !== worksheet.studentSeed(1, 'st-b'), 'คนละคนได้ชุดต่างกัน')
+  eq(worksheet.studentSeed(1, 'st-a'), worksheet.studentSeed(1, 'st-a'), 'คนเดิมได้ชุดเดิม')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)
