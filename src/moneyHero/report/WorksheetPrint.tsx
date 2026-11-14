@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useGame } from '../hooks/useMoneyGame'
 import type { Skill } from '../engine/types'
-import { SKILLS, SKILL_NAMES } from '../data/characters'
+import { SKILLS, SKILL_ICONS, SKILL_NAMES } from '../data/characters'
 import { fullName, INNOVATION_NAME, teacherName, type Classroom } from '../engine/classroom'
 import { hasRoster, rosterList } from '../engine/roster'
 import { buildWorksheet, remedialSkills, studentSeed, type SheetItem, type SheetLevel } from '../engine/worksheet'
 import type { Player } from '../engine/progress'
-import { MoneyPile } from '../components/Art'
+import { CharacterArt, MoneyPile } from '../components/Art'
 import { PaperPage } from './Paper'
 
 /**
@@ -59,6 +59,7 @@ function Item({ item, n }: { item: SheetItem; n: number }) {
 function SheetHead({ c, title, who }: { c: Classroom; title: string; who?: Player }) {
   return (
     <header className="mh-ws-head">
+      <CharacterArt id="rabbit" size={40} mood="happy" className="mh-ws-mascot" />
       <h2>{title}</h2>
       <p>
         {INNOVATION_NAME} · เรื่อง เงิน · ชั้น {c.room}
@@ -88,7 +89,11 @@ function Sheet({ c, items, title, who, testId }: { c: Classroom; items: SheetIte
         const own = items.filter((i) => i.skill === s)
         const start = n
         n += own.length
-        const head = <h3>ทักษะ: {SKILL_NAMES[s]}</h3>
+        const head = (
+          <h3>
+            <span aria-hidden="true">{SKILL_ICONS[s]}</span> ทักษะ: {SKILL_NAMES[s]}
+          </h3>
+        )
         return (
           <section key={s} className="mh-ws-skill">
             {/* หัวข้อทักษะติดไปกับข้อแรกเสมอ ไม่ค้างอยู่ท้ายหน้าเดียว ๆ */}

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Lightbulb, RotateCcw } from 'lucide-react'
 import type { CheckResult, Question, Response } from '../engine/types'
 import type { LearnSlide } from '../data/levels'
-import { ENCOURAGE, PRAISE } from '../data/characters'
+import { ENCOURAGE, praiseFor } from '../data/characters'
 import { answerText, checkAnswer } from '../engine/check'
 import { recordAnswer, type Player } from '../engine/progress'
 import { earn } from '../engine/ledger'
@@ -226,7 +226,8 @@ export function StepRunner({
     setInputKey((k) => k + 1)
   }
 
-  const praise = useMemo(() => pick(PRAISE), [index, phase])
+  // ถูกติดกันตั้งแต่ 3 ข้อ ชมแบบคอมโบ (streak นับข้อนี้แล้ว ตอนเฟส right)
+  const praise = useMemo(() => praiseFor(phase === 'right' ? streak.current : 0, Math.random()), [index, phase])
   const encourage = useMemo(() => pick(ENCOURAGE), [index, attempt])
 
   // อ่านโจทย์ให้ฟังเองเมื่อขึ้นข้อใหม่ (เปิดในหน้าตั้งค่า) ต่อคิวหลังคำพูดของตัวละคร
@@ -253,13 +254,27 @@ export function StepRunner({
         <span className="mh-runner-count" data-testid="mh-count">
           {item.retry ? '🔁 ฝึกซ้ำ' : `ข้อ ${Math.min(index + 1, originals)} / ${originals}`}
         </span>
-        <div className="mh-progress mh-runner-bar">
-          <div style={{ width: `${progress}%` }} />
+        <div className="mh-runner-track">
+          <div className="mh-progress mh-runner-bar">
+            <div style={{ width: `${progress}%` }} />
+          </div>
+          {player && (
+            <span className="mh-runner-me" style={{ left: `${progress}%` }} aria-hidden="true">
+              <AvatarArt avatar={player.avatar} size={34} mood={phase === 'right' ? 'happy' : 'normal'} wear={player.wear} />
+            </span>
+          )}
+          <span className="mh-runner-goal" aria-hidden="true">
+            🎁
+          </span>
         </div>
-        {!isTest && streak.current >= 2 && <span className="mh-streak">🔥 {streak.current}</span>}
+        {!isTest && streak.current >= 2 && (
+          <span key={streak.current} className={`mh-streak ${streak.current >= 5 ? 'is-hot' : ''}`}>
+            🔥 {streak.current}
+          </span>
+        )}
       </div>
 
-      <div className="mh-card mh-q-card">
+      <div className={`mh-card mh-q-card ${phase === 'wrong' ? 'is-oops' : ''}`}>
         <QuestionView
           q={q}
           inputKey={inputKey}
