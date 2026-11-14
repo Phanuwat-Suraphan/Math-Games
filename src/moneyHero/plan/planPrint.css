@@ -192,3 +192,64 @@
   margin: 0 0 12px;
   font-weight: 700;
 }
+
+/* สีตามหมวด: ป้าย "ต้องซื้อ" กับของบนชั้นวางหมวดเดียวกันใช้สีเดียวกัน (พิมพ์ขาวดำยังมีชื่อหมวดกำกับ) */
+.pp-need.is-c0 {
+  background: #fff0f6;
+  border-color: #f783ac;
+}
+
+.pp-need.is-c1 {
+  background: #fff9db;
+  border-color: #fcc419;
+}
+
+.pp-need.is-c2 {
+  background: #e7f5ff;
+  border-color: #4dabf7;
+}
+
+.pp-need.is-c3 {
+  background: #ebfbee;
+  border-color: #51cf66;
+}
+
+.pp-item.is-c0 {
+  background: #fff7fa;
+  border-color: #ffc9de;
+}
+
+.pp-item.is-c1 {
+  background: #fffcee;
+  border-color: #ffe58f;
+}
+
+.pp-item.is-c2 {
+  background: #f4f9ff;
+  border-color: #a5d8ff;
+}
+
+.pp-item.is-c3 {
+  background: #f4fdf5;
+  border-color: #b2f2bb;
+}
+
+.pp-item.is-c0 .pp-item-cat {
+  color: #c2255c;
+  opacity: 1;
+}
+
+.pp-item.is-c1 .pp-item-cat {
+  color: #8a5a00;
+  opacity: 1;
+}
+
+.pp-item.is-c2 .pp-item-cat {
+  color: #1864ab;
+  opacity: 1;
+}
+
+.pp-item.is-c3 .pp-item-cat {
+  color: #2b8a3e;
+  opacity: 1;
+}

@@ -1814,3 +1814,60 @@ h3.kad-out {
 .kad-qa-item:nth-child(3n + 3) > b {
   background: #e7f5ff;
 }
+
+/* ตารางบัญชีของกาดรักษ์โลกใช้สีเดียวกับสมุดบัญชีเกมกระดาน: รายรับเขียว รายจ่ายชมพู คงเหลือเหลือง */
+h3.kad-in,
+h3.kad-out {
+  align-self: flex-start;
+  padding: 0.2cqw 1.8cqw;
+  border-radius: 99px;
+}
+
+h3.kad-in {
+  background: #ebfbee;
+}
+
+h3.kad-out {
+  background: #fff0f6;
+}
+
+.kad-two-col > div:last-child .kad-form thead th {
+  background: #ffdeeb;
+}
+
+.kad-book-sheet .kad-form thead th:nth-child(1),
+.kad-book-sheet .kad-form thead th:nth-child(2) {
+  background: #e7f5ff;
+}
+
+.kad-book-sheet .kad-form thead th:nth-child(4) {
+  background: #ffdeeb;
+}
+
+.kad-book-sheet .kad-form thead th:nth-child(5) {
+  background: #fff3bf;
+}
+
+.kad-book-sheet .kad-form tbody tr:nth-child(odd):not(.kad-form-example) td {
+  background: #f8f9ff;
+}
+
+/* ใบสั่งซื้อ ใบเสร็จ ใบรับซื้อขยะ: ชื่อใบเป็นป้ายสีเขียวอ่อน */
+.kad-slip-head b {
+  padding: 0.1cqw 1.8cqw;
+  border-radius: 99px;
+  background: #ebfbee;
+}
+
+/* ใบคำนวณเงินทอน: หัวตารางสีตามความหมาย ราคาสินค้าเหลือง ลูกค้าจ่ายฟ้า เงินทอนเขียว ทอนด้วยเงินอะไรม่วง */
+.kad-change-sheet .kad-form thead th:nth-child(2) {
+  background: #fff3bf;
+}
+
+.kad-change-sheet .kad-form thead th:nth-child(3) {
+  background: #e7f5ff;
+}
+
+.kad-change-sheet .kad-form thead th:nth-child(5) {
+  background: #f3f0ff;
+}
