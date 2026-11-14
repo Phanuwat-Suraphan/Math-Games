@@ -11272,3 +11272,64 @@ a.mh-stage-chip:hover {
     scale: 1.04;
   }
 }
+
+/* ตัวเลือกคำตอบ: ขอบพาสเทลคนละสี ตอบถูกแล้วปุ่มที่แตะเรืองเขียวพร้อมติ๊กเด้ง */
+.mh-choices .mh-choice:nth-child(4n + 1):not(.is-picked, .is-wrong) {
+  border-color: #e3ddfb;
+}
+
+.mh-choices .mh-choice:nth-child(4n + 2):not(.is-picked, .is-wrong) {
+  border-color: #d7ebff;
+  box-shadow: 0 5px 0 #d7ebff;
+}
+
+.mh-choices .mh-choice:nth-child(4n + 3):not(.is-picked, .is-wrong) {
+  border-color: #ffdbe9;
+  box-shadow: 0 5px 0 #ffdbe9;
+}
+
+.mh-choices .mh-choice:nth-child(4n):not(.is-picked, .is-wrong) {
+  border-color: #d6f5e3;
+  box-shadow: 0 5px 0 #d6f5e3;
+}
+
+.mh-choice.is-right {
+  border-color: var(--mh-mint);
+  background: linear-gradient(180deg, #eafff5, #fff);
+  box-shadow: 0 5px 0 #9fe6c6, 0 0 0 4px rgba(70, 220, 164, 0.25);
+  animation: mh-pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-mark-right {
+  position: absolute;
+  top: -10px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--mh-mint);
+  color: #fff;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #1fae79;
+  animation: mh-pop-spin 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) 0.1s both;
+}
+
+/* กรอกคำตอบครบ ปุ่มส่งคำตอบเด้ง "บึ๋ง" หนึ่งครั้งตอนเพิ่งกดได้ ชวนให้กด */
+.mh-answer-box .mh-btn-go:not(:disabled) {
+  animation: mh-boing 0.5s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+@keyframes mh-boing {
+  0% {
+    scale: 0.92;
+  }
+  60% {
+    scale: 1.06;
+  }
+  100% {
+    scale: 1;
+  }
+}

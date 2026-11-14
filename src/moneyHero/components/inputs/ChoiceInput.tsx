@@ -26,13 +26,15 @@ export function ChoiceInput({
     <div className={`mh-choices mh-choices-${q.layout}`} role="group" aria-label="ตัวเลือก">
       {q.options.map((o) => {
         const wrong = wrongKeys?.includes(o.id)
+        // ตอบแล้ว (ปุ่มถูกล็อก) และข้อที่แตะไม่ใช่ข้อผิด = ตอบถูก ให้ปุ่มนั้นเรืองเขียวฉลอง
+        const right = disabled && picked === o.id && !wrong && (wrongKeys?.length ?? 0) === 0
         const hasMoney = !!o.money && o.money.length > 0
         return (
           <button
             key={o.id}
             type="button"
             data-testid={`mh-opt-${o.id}`}
-            className={`mh-choice ${picked === o.id ? 'is-picked' : ''} ${wrong ? 'is-wrong' : ''} ${hasMoney ? 'has-money' : ''}`}
+            className={`mh-choice ${picked === o.id ? 'is-picked' : ''} ${wrong ? 'is-wrong' : ''} ${right ? 'is-right' : ''} ${hasMoney ? 'has-money' : ''}`}
             disabled={disabled}
             onClick={() => choose(o.id)}
             aria-label={o.label}
@@ -42,6 +44,11 @@ export function ChoiceInput({
             {/* ข้อที่ให้แตะเงินตามชื่อ ห้ามแสดงชื่อบนปุ่ม ไม่งั้นเฉลยตัวเอง */}
             {(!hasMoney || q.layout !== 'grid') && <span className="mh-choice-label">{o.label}</span>}
             {wrong && <span className="mh-mark-wrong" aria-label="ยังไม่ถูก">✗</span>}
+            {right && (
+              <span className="mh-mark-right" aria-label="ถูกต้อง">
+                ✓
+              </span>
+            )}
           </button>
         )
       })}
