@@ -36,6 +36,7 @@ export function ShopPage() {
   const [slot, setSlot] = useState<ShopSlot>('hat')
   const [talk, setTalk] = useState('ยินดีต้อนรับสู่ร้านของลุงหมี! เลือกของที่ชอบได้เลย')
   const [party, setParty] = useState(0)
+  const [oops, setOops] = useState(0)
   if (!player) return null
 
   const buy = (item: ShopItem) => {
@@ -43,6 +44,7 @@ export function ShopPage() {
     if (!r.ok) {
       if (r.reason === 'short') {
         playSound('wrong')
+        setOops((n) => n + 1)
         const msg = `${item.name} ราคา ${item.price} เหรียญ มีอยู่ ${player.coins} เหรียญ ยังขาดอีก ${r.short} เหรียญ ไปเล่นด่านเก็บเหรียญเพิ่มนะ`
         setTalk(msg)
         speak(msg)
@@ -78,17 +80,21 @@ export function ShopPage() {
           <div className="mh-card mh-shop-stage">
             {party > 0 && <Confetti key={party} count={24} />}
             <Bunting count={10} />
-            <div className="mh-pedestal">
+            {/* ซื้อของแล้วฮีโร่กระโดดดีใจ (key เปลี่ยน = เล่นแอนิเมชันใหม่) */}
+            <div key={party} className={`mh-pedestal ${party > 0 ? 'is-party' : ''}`}>
               <AvatarArt avatar={player.avatar} size={130} wear={player.wear} pet mood={party > 0 ? 'happy' : 'normal'} />
             </div>
-            <div className="mh-shop-wallet" data-testid="mh-shop-wallet">
-              🪙 มีอยู่ <b>{player.coins}</b> เหรียญ
+            {/* เงินไม่พอ กระเป๋าส่ายเบา ๆ · ยอดเหรียญเปลี่ยนแล้วเด้ง */}
+            <div key={`w${oops}`} className={`mh-shop-wallet ${oops > 0 ? 'is-oops' : ''}`} data-testid="mh-shop-wallet">
+              🪙 มีอยู่ <b key={player.coins} className="mh-shop-coins">{player.coins}</b> เหรียญ
             </div>
           </div>
           <div className="mh-card mh-shop-keeper">
             <CharacterArt id="bear" size={86} mood={party > 0 ? 'happy' : 'normal'} />
             <div className="mh-bubble" aria-live="polite" data-testid="mh-shop-talk">
-              {talk}
+              <span key={talk} className="mh-bubble-text">
+                {talk}
+              </span>
             </div>
           </div>
         </div>

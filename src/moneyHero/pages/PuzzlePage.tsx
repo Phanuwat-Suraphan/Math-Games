@@ -129,7 +129,7 @@ export function PuzzlePage() {
         )}
 
         {phase !== 'pick' && (
-          <div className="mh-card mh-puzzle-board">
+          <div className={`mh-card mh-puzzle-board is-${phase}`}>
             {phase === 'done' && <Confetti />}
             <PixelPicture pic={pic} shown={phase === 'run' ? shown : 'all'} testId="mh-puzzle-grid" />
             <div className="mh-puzzle-meter" aria-live="polite">
@@ -143,7 +143,7 @@ export function PuzzlePage() {
                   เผยแล้ว {Math.min(correct, PUZZLE_QUESTIONS)}/{PUZZLE_QUESTIONS}
                 </>
               ) : phase === 'guess' ? (
-                <b>ภาพนี้คืออะไรนะ? 🤔</b>
+                <b className="mh-puzzle-ask">ภาพนี้คืออะไรนะ? 🤔</b>
               ) : (
                 <b data-testid="mh-puzzle-name">
                   {pic.emoji} {pic.name} เก็บเข้าสมุดภาพแล้ว!
