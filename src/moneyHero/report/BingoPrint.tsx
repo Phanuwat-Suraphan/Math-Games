@@ -37,9 +37,7 @@ function Card({ set, who, cells }: { set: BingoSet; who: Who; cells: BingoCell[]
           <div key={i} className={`mh-bingo-cell ${c.value === null ? 'is-free' : ''}`}>
             {c.value === null ? (
               <>
-                <span className="mh-bingo-free-face" aria-hidden="true">
-                  😊
-                </span>
+                <CharacterArt id={MASCOTS[who.n % MASCOTS.length]} size={34} portrait className="mh-bingo-free-face" />
                 ฟรี
               </>
             ) : (

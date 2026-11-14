@@ -676,3 +676,56 @@
   background: #fff9db;
   border-color: #ffe066;
 }
+
+/* ป้ายราคาร้าน: หัวป้ายเป็นกันสาดลายทาง ขอบล่างหยักเหมือนร้านจริง (สีตามร้าน) */
+.bd-shop-head {
+  position: relative;
+  isolation: isolate;
+}
+
+.bd-shop-head::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.22) 0 3cqw, transparent 3cqw 6cqw);
+}
+
+.bd-shop-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 1.2cqw;
+  background: inherit;
+  -webkit-mask: radial-gradient(circle at 50% 0, #000 1.2cqw, transparent 1.25cqw) 0 0 / 2.4cqw 1.2cqw repeat-x;
+  mask: radial-gradient(circle at 50% 0, #000 1.2cqw, transparent 1.25cqw) 0 0 / 2.4cqw 1.2cqw repeat-x;
+}
+
+.bd-shop-item {
+  box-shadow: 0 0.4cqw 0 rgba(43, 35, 80, 0.08);
+}
+
+/* ใบสรุปคะแนน: ผู้เล่นแต่ละแถวมีจุดสีตรงกับวงสีของหมากเดิน */
+.bd-score tbody tr td:first-child::before {
+  content: '●';
+  margin-right: 0.8cqw;
+  font-size: 1.2em;
+}
+
+.bd-score tbody tr:nth-child(1) td:first-child::before {
+  color: #ff8787;
+}
+
+.bd-score tbody tr:nth-child(2) td:first-child::before {
+  color: #f783ac;
+}
+
+.bd-score tbody tr:nth-child(3) td:first-child::before {
+  color: #ffa94d;
+}
+
+.bd-score tbody tr:nth-child(4) td:first-child::before {
+  color: #69db7c;
+}
