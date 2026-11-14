@@ -57,13 +57,14 @@ export function PlayersPage() {
           <div className="mh-roster-grid">
             {roster
               .filter((p) => p.student!.room === shownRoom)
-              .map((p) => (
+              .map((p, i) => (
                 <button
                   key={p.id}
                   type="button"
                   className={`mh-roster-kid ${player?.id === p.id ? 'is-on' : ''}`}
                   data-testid={`mh-pick-${p.student!.no ?? p.id}`}
                   onClick={() => pick(p)}
+                  style={{ animationDelay: `${Math.min(i, 20) * 30}ms` }}
                 >
                   {p.needsAvatar ? <span className="mh-roster-noavatar is-big">?</span> : <AvatarArt avatar={p.avatar} size={56} portrait wear={p.wear} />}
                   <span className="mh-roster-kid-no">{p.student!.no ? `เลขที่ ${p.student!.no}` : ''}</span>

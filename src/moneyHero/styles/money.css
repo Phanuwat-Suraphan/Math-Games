@@ -11469,3 +11469,251 @@ a.mh-stage-chip:hover {
 .mh-puzzle-slot:not(.is-got):nth-child(2n) .mh-puzzle-q {
   animation-delay: -1.3s;
 }
+
+/* ================================================================== */
+/* หน้าเลือกชื่อ สร้างฮีโร่ เส้นทาง R-E-A-L ตู้ตรา: น่ารักขึ้น (ไม่เพิ่มฟีเจอร์) */
+/* ================================================================== */
+
+/* แตะชื่อของหนู: การ์ดเด้งเข้ามาทีละใบ สีพาสเทลวนกัน แตะแล้วหน้าตัวละครเอียงทักทาย */
+.mh-roster-kid {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.08);
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 1) {
+  background: #fff4f8;
+  border-color: #ffd3e2;
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 2) {
+  background: #f1f7ff;
+  border-color: #cfe3ff;
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 3) {
+  background: #f2fbf4;
+  border-color: #c9f0d3;
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 4) {
+  background: #fff9ec;
+  border-color: #ffe3a8;
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 5) {
+  background: #f6f2ff;
+  border-color: #ddd2ff;
+}
+
+.mh-roster-kid:not(.is-on):nth-child(6n + 6) {
+  background: #effbfb;
+  border-color: #bfeeee;
+}
+
+.mh-roster-kid.is-on {
+  box-shadow: 0 0 0 4px rgba(255, 190, 40, 0.3), 0 4px 0 #f0c14b;
+}
+
+.mh-roster-kid .mh-portrait {
+  transition: transform 0.2s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+
+.mh-roster-kid:active .mh-portrait {
+  transform: scale(1.1) rotate(-6deg);
+}
+
+@media (hover: hover) {
+  .mh-roster-kid:hover .mh-portrait {
+    animation: mh-tilt 0.6s ease-in-out;
+  }
+}
+
+.mh-roster-kid .mh-roster-noavatar.is-big {
+  animation: mh-bob 2.4s ease-in-out infinite;
+}
+
+.mh-player-row {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-player-go {
+  animation: mh-nudge 1.4s ease-in-out infinite;
+}
+
+@keyframes mh-nudge {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+/* สร้างฮีโร่: ตัวที่เลือกกระโดดทักทาย ติ๊กหมุนเด้ง การ์ดตัวละครพาสเทล */
+.mh-avatar-card.is-on > .mh-char {
+  animation: mh-hop 0.55s ease-out;
+  transform-origin: 50% 100%;
+}
+
+.mh-avatar-card .mh-check {
+  animation: mh-pop-spin 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-avatar-card:not(.is-on):nth-child(4n + 1) {
+  background: #fff6fa;
+}
+
+.mh-avatar-card:not(.is-on):nth-child(4n + 2) {
+  background: #f3f8ff;
+}
+
+.mh-avatar-card:not(.is-on):nth-child(4n + 3) {
+  background: #f3fcf5;
+}
+
+.mh-avatar-card:not(.is-on):nth-child(4n + 4) {
+  background: #f8f4ff;
+}
+
+.mh-avatar-card.is-on {
+  box-shadow: 0 0 0 4px rgba(255, 190, 40, 0.3), 0 5px 0 #f0c14b;
+}
+
+/* เส้นทาง R-E-A-L: จุดเชื่อมกันเป็นทางเดิน ขั้นที่ทำอยู่ลอยเด้ง ขั้นที่เสร็จมีติ๊ก */
+.mh-real-track {
+  gap: 18px;
+}
+
+.mh-real-dot {
+  position: relative;
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.1);
+}
+
+.mh-real-dot + .mh-real-dot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 18px;
+  margin-right: 3px;
+  border-top: 3px dotted #c9bdf5;
+}
+
+.mh-real-dot.is-done + .mh-real-dot::before {
+  border-top-color: #40c057;
+}
+
+.mh-real-dot.is-now {
+  box-shadow: 0 0 0 5px rgba(255, 200, 60, 0.35), 0 4px 0 rgba(43, 35, 80, 0.1);
+  animation: mh-bob 2s ease-in-out infinite;
+}
+
+.mh-real-dot.is-done::after {
+  content: '✓';
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: #40c057;
+  color: #fff;
+  font-family: var(--mh-font);
+  font-size: 11px;
+  animation: mh-pop-spin 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+
+.mh-real-letter {
+  box-shadow: 0 4px 0 rgba(43, 35, 80, 0.15);
+}
+
+.mh-real-letter.is-r {
+  transform: rotate(-5deg);
+}
+
+.mh-real-letter.is-e {
+  transform: rotate(4deg);
+}
+
+.mh-real-letter.is-a {
+  transform: rotate(-3deg);
+}
+
+.mh-real-letter.is-l {
+  transform: rotate(5deg);
+}
+
+.mh-real-state.is-now {
+  animation: mh-breath 2.2s ease-in-out infinite;
+}
+
+.mh-real-group.is-played .mh-real-group-title > span {
+  animation: mh-hop 0.6s ease-out;
+  transform-origin: 50% 100%;
+}
+
+/* บันทึกความรู้สึก: หน้าที่เลือกกระโดด ชี้แล้วเอียงหัว */
+.mh-reflect-face {
+  transition: transform 0.18s cubic-bezier(0.3, 1.8, 0.5, 1);
+}
+
+.mh-reflect-face.is-on {
+  transform: translateY(-3px);
+  box-shadow: 0 5px 0 #f0c14b;
+}
+
+.mh-reflect-face.is-on span {
+  animation: mh-hop 0.55s ease-out;
+  transform-origin: 50% 100%;
+}
+
+@media (hover: hover) {
+  .mh-reflect-face:hover:not(.is-on) span {
+    animation: mh-tilt 0.6s ease-in-out;
+  }
+}
+
+/* ตู้ตรา: ตราเด้งเข้ามาทีละอัน ตราที่ยังไม่ได้เป็นช่องว่างเส้นประรอเติม */
+.mh-badge {
+  animation: mh-pop-in 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+.mh-badge:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.mh-badge:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.mh-badge:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.mh-badge:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+.mh-badge:nth-child(6) {
+  animation-delay: 200ms;
+}
+
+.mh-badge:nth-child(n + 7) {
+  animation-delay: 240ms;
+}
+
+.mh-badge.is-locked .mh-badge-medal {
+  outline: 3px dashed #cfc8e6;
+  outline-offset: 3px;
+}
+
+@media (hover: hover) {
+  .mh-badge.is-locked:hover .mh-badge-icon {
+    display: inline-block;
+    animation: mh-tilt 0.6s ease-in-out;
+  }
+}
