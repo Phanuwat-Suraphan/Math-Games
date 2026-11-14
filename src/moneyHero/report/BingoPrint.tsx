@@ -160,7 +160,7 @@ export function BingoPrintPage() {
         </article>
       ))}
 
-      <article className="mh-doc" data-testid="mh-bingo-calls">
+      <article className="mh-doc mh-bingo-calls" data-testid="mh-bingo-calls">
         <h2 className="mh-ws-keytitle">ใบเรียกโจทย์บิงโกเงินทอง ชุดที่ {set.seed} (สำหรับครู)</h2>
         <div className="mh-doc-box">
           <b>วิธีเล่น</b> แจกการ์ดคนละใบ ครูอ่านโจทย์ตามลำดับ ให้เวลาคิดข้อละประมาณ 20–30 วินาที นักเรียนกากบาทช่องที่เป็นคำตอบ (ช่องกลางฟรี) ใครครบ 1 แถวก่อนชนะ
