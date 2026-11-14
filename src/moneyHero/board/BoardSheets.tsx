@@ -105,7 +105,9 @@ export function RuleSheets() {
               <tbody>
                 {kinds.map((k) => (
                   <tr key={k}>
-                    <td className="bd-legend-icon">{SPACE_INFO[k].icon}</td>
+                    <td className="bd-legend-icon" style={{ background: SPACE_INFO[k].light }}>
+                      {SPACE_INFO[k].icon}
+                    </td>
                     <td>
                       <b>{k === 'shop' ? 'ร้านค้า 6 ร้าน' : SPACE_INFO[k].name}</b>
                     </td>

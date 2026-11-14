@@ -1366,3 +1366,9 @@
   border-radius: 3mm;
   background: #fffaf3;
 }
+
+/* บิงโก: ช่องฟรีเป็นหน้าตัวละครประจำการ์ด */
+.mh-bingo-cell.is-free .mh-portrait {
+  margin-bottom: 0.5mm;
+  box-shadow: none;
+}
