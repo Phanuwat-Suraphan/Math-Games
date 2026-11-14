@@ -486,3 +486,253 @@
   border-bottom: 1px dotted #000;
   margin-bottom: 0.35em;
 }
+
+/* ------------------------------------------------------------------ */
+/* ใบงานซ่อมเสริม (#/teacher/print/worksheets)                           */
+/* ------------------------------------------------------------------ */
+
+.mh-ws-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  width: 100%;
+}
+
+.mh-ws-modes,
+.mh-ws-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  width: 100%;
+}
+
+.mh-ws-head {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.mh-ws-head h2 {
+  margin: 0 0 2px;
+  font-size: 16pt;
+}
+
+.mh-ws-head p {
+  margin: 2px 0;
+}
+
+.mh-ws-head .mh-doc-line {
+  text-align: left;
+}
+
+.mh-ws-skill h3 {
+  margin: 10px 0 4px;
+  padding: 2px 8px;
+  background: #f1f1f1;
+  border-left: 4px solid #555;
+}
+
+.mh-ws-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mh-ws-item {
+  margin: 0 0 8px;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.mh-ws-table {
+  width: auto;
+  min-width: 0;
+  margin: 4px 0 4px 18px;
+}
+
+.mh-ws-work {
+  margin: 4px 0 0 18px;
+  min-height: 22mm;
+  border: 1px dashed #777;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9pt;
+  color: #555;
+}
+
+.mh-ws-key {
+  break-inside: avoid;
+  margin-bottom: 10px;
+}
+
+.mh-ws-key h3 {
+  margin: 6px 0 4px;
+}
+
+.mh-ws-keytitle {
+  text-align: center;
+  font-size: 15pt;
+  margin: 0 0 8px;
+}
+
+/* ------------------------------------------------------------------ */
+/* เกียรติบัตร (#/teacher/print/certificates) A4 แนวนอน                   */
+/* ------------------------------------------------------------------ */
+
+.mh-cert-reason-edit {
+  flex: 1 1 280px;
+}
+
+.mh-cert-reason-edit input {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font: inherit;
+}
+
+.mh-cert {
+  display: flex;
+}
+
+.mh-cert-frame {
+  position: relative;
+  flex: 1;
+  box-sizing: border-box;
+  min-height: 170mm;
+  border: 3mm double #b7791f;
+  outline: 1mm solid #f2c94c;
+  outline-offset: -6mm;
+  padding: 12mm 22mm 8mm;
+  text-align: center;
+  font-size: 15pt;
+  line-height: 1.45;
+  background: radial-gradient(circle at 50% 40%, #fffdf3 0%, #fff 70%);
+}
+
+.mh-cert-frame p {
+  margin: 1mm 0;
+}
+
+.mh-cert-corner {
+  position: absolute;
+  width: 16mm;
+  height: 16mm;
+}
+
+.mh-cert-corner.is-tl {
+  top: 3mm;
+  left: 3mm;
+}
+
+.mh-cert-corner.is-tr {
+  top: 3mm;
+  right: 3mm;
+  transform: scaleX(-1);
+}
+
+.mh-cert-corner.is-bl {
+  bottom: 3mm;
+  left: 3mm;
+  transform: scaleY(-1);
+}
+
+.mh-cert-corner.is-br {
+  bottom: 3mm;
+  right: 3mm;
+  transform: scale(-1, -1);
+}
+
+.mh-cert-school {
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+.mh-cert-area {
+  font-size: 13pt;
+}
+
+.mh-cert-title {
+  margin: 3mm 0 2mm;
+  font-size: 34pt;
+  color: #8a5a00;
+  letter-spacing: 2px;
+}
+
+.mh-cert-name {
+  font-size: 24pt;
+  font-weight: 700;
+  margin: 3mm 0 !important;
+}
+
+.mh-cert-reason {
+  font-size: 17pt;
+  font-weight: 700;
+}
+
+.mh-cert-date {
+  margin-top: 3mm !important;
+}
+
+.mh-cert-signs {
+  display: flex;
+  justify-content: space-around;
+  gap: 10mm;
+  margin-top: 8mm;
+  font-size: 13pt;
+}
+
+.mh-cert-signs p {
+  margin: 0.5mm 0;
+}
+
+@media (max-width: 860px) {
+  .mh-cert-frame {
+    min-height: 0;
+    padding: 10mm 8mm 6mm;
+    font-size: 12pt;
+  }
+  .mh-cert-title {
+    font-size: 24pt;
+  }
+  .mh-cert-name {
+    font-size: 18pt;
+  }
+  .mh-cert-signs {
+    flex-direction: column;
+    gap: 4mm;
+  }
+}
+
+@media print {
+  .mh-ws + .mh-ws {
+    break-before: page;
+  }
+  .mh-cert {
+    break-after: page;
+  }
+  .mh-cert-frame {
+    min-height: 178mm;
+    padding: 12mm 22mm 8mm;
+    font-size: 15pt;
+  }
+  .mh-cert-title {
+    font-size: 34pt;
+  }
+  .mh-cert-name {
+    font-size: 24pt;
+  }
+  .mh-cert-signs {
+    flex-direction: row;
+  }
+}
+
+.mh-ws-keep {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.mh-ws .mh-pile.mh-ws-money {
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 4px 0 6px 18px;
+}

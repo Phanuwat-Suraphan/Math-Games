@@ -1435,7 +1435,7 @@ for (const [name, viewport] of [
     await page.goto(`${BASE}#/teacher`)
     await page.getByTestId('mh-teacher-print-hub').click()
     await page.getByTestId('mh-print-hub').waitFor()
-    if ((await page.locator('.mh-print-card').count()) !== 10) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 10 รายการ')
+    if ((await page.locator('.mh-print-card').count()) !== 12) throw new Error('ศูนย์เอกสารพิมพ์ต้องมี 12 รายการ')
     await snap(page, `${name}-print-hub`)
     await noSideScroll(page, 'ศูนย์เอกสารพิมพ์')
     // รายงานรายบุคคล: ทั้งห้องคนละแผ่น
@@ -1469,6 +1469,64 @@ for (const [name, viewport] of [
       if (pages < 1 || pages > 4) throw new Error(`รายงานสรุปพิมพ์ได้ ${pages} หน้า`)
       await page.locator('.mh-doc').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-summary.png') })
     }
+  })
+
+  await step(`[${name}] ใบงานซ่อมเสริมพร้อมเฉลย และเกียรติบัตร A4 แนวนอน`, async () => {
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('moneyHero.save.v1')))
+    const pool = Object.values(saved.players).filter((p) => p.student)
+    const pdfPages = async () => {
+      const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true })
+      return (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
+    }
+    // ใบงานตามทักษะ: ค่าเริ่มต้น 3 ทักษะ ทักษะละ 4 ข้อ พร้อมเฉลย
+    await page.goto(`${BASE}#/teacher/print`)
+    await page.getByTestId('mh-hub-worksheets').click()
+    await page.getByTestId('mh-print-worksheets').waitFor()
+    if ((await page.locator('.mh-ws-item').count()) !== 12) throw new Error('ใบงานค่าเริ่มต้นต้องมี 12 ข้อ')
+    if ((await page.getByTestId('mh-ws-keypage').locator('tbody tr').count()) !== 12) throw new Error('เฉลยต้องครบ 12 ข้อ')
+    await snap(page, `${name}-worksheet`)
+    await noSideScroll(page, 'ใบงานซ่อมเสริม')
+    if (name === 'desktop') {
+      const pages = await pdfPages()
+      if (pages < 2 || pages > 4) throw new Error(`ใบงาน + เฉลยพิมพ์ได้ ${pages} หน้า`)
+      await page.getByTestId('mh-ws-sheet').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-worksheet.png') })
+    }
+    // เปลี่ยนชุดที่ได้โจทย์ใหม่ ลดจำนวนข้อ ปิดเฉลย เพิ่มทักษะ
+    const first = await page.locator('.mh-ws-item').first().innerText()
+    await page.getByTestId('mh-ws-seed').selectOption('2')
+    await page.waitForFunction((t) => document.querySelector('.mh-ws-item')?.innerText !== t, first)
+    await page.getByTestId('mh-ws-per').selectOption('2')
+    await page.getByTestId('mh-ws-skill-ledger').check()
+    if ((await page.locator('.mh-ws-item').count()) !== 8) throw new Error('4 ทักษะ ทักษะละ 2 ข้อ ต้องได้ 8 ข้อ')
+    await page.locator('.mh-ws-table').first().waitFor()
+    await page.getByTestId('mh-ws-key').uncheck()
+    if ((await page.getByTestId('mh-ws-keypage').count()) !== 0) throw new Error('ปิดเฉลยแล้วต้องไม่พิมพ์เฉลย')
+    // รายบุคคล: มีใบงานของคนที่ต้องซ่อม หรือบอกว่ายังไม่มี
+    await page.getByTestId('mh-ws-mode-student').check()
+    const sheets = await page.getByTestId('mh-ws-sheet').count()
+    if (sheets === 0) await page.getByTestId('mh-ws-none').waitFor()
+    else if ((await page.getByTestId('mh-ws-sheet').first().locator('.mh-ws-item').count()) === 0) throw new Error('ใบงานรายบุคคลต้องมีโจทย์')
+    // เกียรติบัตร: เข้าร่วมกิจกรรม = ทุกคน หนึ่งคนต่อหน้า
+    await page.goto(`${BASE}#/teacher/print`)
+    await page.getByTestId('mh-hub-certs').click()
+    await page.getByTestId('mh-print-certs').waitFor()
+    await page.getByTestId('mh-cert-kind-all').check()
+    if ((await page.getByTestId('mh-cert').count()) !== pool.length) throw new Error(`เกียรติบัตรเข้าร่วมกิจกรรมต้องมี ${pool.length} แผ่น`)
+    await page.getByTestId('mh-cert-reason').fill('เป็นนักออมเงินยอดเยี่ยมประจำห้อง')
+    await page.getByTestId('mh-cert').first().getByText('เป็นนักออมเงินยอดเยี่ยมประจำห้อง').waitFor()
+    await snap(page, `${name}-certificate`)
+    await noSideScroll(page, 'เกียรติบัตร')
+    if (name === 'desktop') {
+      const pages = await pdfPages()
+      if (pages !== pool.length) throw new Error(`เกียรติบัตร ${pool.length} คน ต้องพิมพ์ได้ ${pool.length} หน้า แต่ได้ ${pages}`)
+      await page.getByTestId('mh-cert').first().screenshot({ path: path.join(SHOTS, 'money-hero-print-certificate.png') })
+    }
+    // ผ่านเกณฑ์: เฉพาะคนที่หลังเรียนถึงเกณฑ์ของห้อง
+    await page.getByTestId('mh-cert-kind-passed').check()
+    const pass = saved.classroom.passPercent ?? 70
+    const passed = pool.filter((p) => p.postTest && p.postTest.score * 100 >= pass * Math.max(1, p.postTest.total)).length
+    if (passed === 0) await page.getByTestId('mh-cert-none').waitFor()
+    else if ((await page.getByTestId('mh-cert').count()) !== passed) throw new Error(`เกียรติบัตรผ่านเกณฑ์ต้องมี ${passed} แผ่น`)
   })
 
   await step(`[${name}] กิจกรรมกลุ่ม: ครูจัดกลุ่มคละความสามารถ พิมพ์แบบสังเกตพฤติกรรม A4 แล้วกลุ่มผลัดกันตอน บันทึกผลแยกรายคน`, async () => {

@@ -39,6 +39,8 @@ const SECTIONS: { title: string; docs: Doc[] }[] = [
     docs: [
       { id: 'test-post', to: '/teacher/print/test/post', icon: '🎓', name: 'แบบทดสอบหลังเรียน', desc: 'ฉบับคู่ขนานกับก่อนเรียน', pages: 'หลายแผ่น' },
       { id: 'students', to: '/teacher/print/students', icon: '👧', name: 'รายงานผลการเรียนรู้รายบุคคล', desc: 'ผลสอบ รายทักษะ ภารกิจ พฤติกรรม ข้อเสนอแนะ ช่องลงนามผู้ปกครอง', pages: '1 แผ่นต่อคน' },
+      { id: 'worksheets', to: '/teacher/print/worksheets', icon: '✏️', name: 'ใบงานซ่อมเสริมรายทักษะ', desc: 'สร้างโจทย์ใหม่ได้ไม่จำกัด เลือกทักษะเอง หรือให้ระบบเลือกทักษะที่แต่ละคนยังอ่อน พร้อมเฉลย', pages: '1–2 แผ่นต่อชุด' },
+      { id: 'certs', to: '/teacher/print/certificates', icon: '🏅', name: 'เกียรติบัตร', desc: 'ผ่านเกณฑ์ · พัฒนาการดีเด่น · เข้าร่วมกิจกรรม แก้ข้อความได้', pages: 'A4 แนวนอน 1 แผ่นต่อคน' },
     ],
   },
   {

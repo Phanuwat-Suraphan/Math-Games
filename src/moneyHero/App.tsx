@@ -41,6 +41,8 @@ import { AnalysisPage } from './report/AnalysisPage'
 import { StudentReportPage } from './report/StudentReport'
 import { SummaryPrintPage } from './report/SummaryPrint'
 import { PrintHubPage } from './report/PrintHub'
+import { WorksheetPrintPage } from './report/WorksheetPrint'
+import { CertificatePrintPage } from './report/CertificatePrint'
 import { BehaviorPage } from './pages/BehaviorPage'
 import { TeacherAutoLock, TeacherGate } from './components/TeacherGate'
 
@@ -319,6 +321,22 @@ export default function App() {
               element={
                 <TeacherGate>
                   <BehaviorPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/worksheets"
+              element={
+                <TeacherGate>
+                  <WorksheetPrintPage />
+                </TeacherGate>
+              }
+            />
+            <Route
+              path="/teacher/print/certificates"
+              element={
+                <TeacherGate>
+                  <CertificatePrintPage />
                 </TeacherGate>
               }
             />

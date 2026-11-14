@@ -290,6 +290,12 @@ function StudentDetail({ p }: { p: Player }) {
             <Link to={`/teacher/print/students?id=${encodeURIComponent(p.id)}`} className="mh-chip" data-testid="mh-student-print">
               🖨️ รายงานรายบุคคล (A4)
             </Link>
+            <Link to={`/teacher/print/worksheets?id=${encodeURIComponent(p.id)}`} className="mh-chip" data-testid="mh-student-worksheet">
+              ✏️ ใบงานซ่อมเสริม
+            </Link>
+            <Link to={`/teacher/print/certificates?id=${encodeURIComponent(p.id)}`} className="mh-chip" data-testid="mh-student-cert">
+              🏅 เกียรติบัตร
+            </Link>
             <span className="mh-soft" data-testid="mh-student-behavior">
               ✍️ พฤติกรรม: {behaviorTotal(p.behavior) === null ? 'ยังไม่ได้ประเมินครบ' : `${behaviorTotal(p.behavior)}/${BEHAVIOR_FULL} (${behaviorLevel(behaviorTotal(p.behavior)!)})`}
             </span>
