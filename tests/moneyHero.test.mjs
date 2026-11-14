@@ -62,6 +62,8 @@ const teams = load('engine/teams.js')
 const stats = load('engine/stats.js')
 const behavior = load('engine/behavior.js')
 const worksheet = load('engine/worksheet.js')
+const xlsx = load('engine/xlsx.js')
+const workbook = load('engine/workbook.js')
 const { SKILLS } = load('data/characters.js')
 
 let passed = 0
@@ -2480,6 +2482,98 @@ test('ใบงานรายบุคคล: เลือกทักษะท
   eq(worksheet.remedialSkills(p, 70).join(), 'dot,word', 'ทักษะที่อ่อนในเกม + ต่ำกว่าเกณฑ์ในแบบทดสอบ')
   assert(worksheet.studentSeed(1, 'st-a') !== worksheet.studentSeed(1, 'st-b'), 'คนละคนได้ชุดต่างกัน')
   eq(worksheet.studentSeed(1, 'st-a'), worksheet.studentSeed(1, 'st-a'), 'คนเดิมได้ชุดเดิม')
+})
+
+/* ------------------------------------------------------------------ */
+/* ไฟล์ Excel (.xlsx) แยกชีต                                             */
+/* ------------------------------------------------------------------ */
+
+/** แตกไฟล์ zip แบบไม่บีบอัด (อ่านจาก central directory) */
+function unzipStored(bytes) {
+  const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  let end = bytes.length - 22
+  while (end >= 0 && v.getUint32(end, true) !== 0x06054b50) end -= 1
+  const count = v.getUint16(end + 10, true)
+  let at = v.getUint32(end + 16, true)
+  const out = {}
+  for (let i = 0; i < count; i += 1) {
+    assert(v.getUint32(at, true) === 0x02014b50, 'central directory ถูกต้อง')
+    const method = v.getUint16(at + 10, true)
+    const crc = v.getUint32(at + 16, true)
+    const size = v.getUint32(at + 20, true)
+    const nameLen = v.getUint16(at + 28, true)
+    const local = v.getUint32(at + 42, true)
+    const name = new TextDecoder().decode(bytes.subarray(at + 46, at + 46 + nameLen))
+    assert(v.getUint32(local, true) === 0x04034b50, `local header ของ ${name}`)
+    const lNameLen = v.getUint16(local + 26, true)
+    const data = bytes.subarray(local + 30 + lNameLen, local + 30 + lNameLen + size)
+    eq(method, 0, `${name} ไม่บีบอัด`)
+    eq(xlsx.crc32(data), crc, `CRC ของ ${name}`)
+    out[name] = new TextDecoder().decode(data)
+    at += 46 + nameLen
+  }
+  return out
+}
+
+test('ไฟล์ Excel: zip ถูกโครงสร้าง CRC ถูก ชื่อคอลัมน์ ชื่อชีต และอักขระพิเศษปลอดภัย', () => {
+  eq(xlsx.crc32(new TextEncoder().encode('123456789')), 0xcbf43926, 'CRC-32 มาตรฐาน')
+  eq([0, 25, 26, 51, 52, 701, 702].map(xlsx.colName).join(), 'A,Z,AA,AZ,BA,ZZ,AAA', 'ชื่อคอลัมน์')
+  const used = new Set()
+  eq(xlsx.sheetName('ก่อน/หลัง [เรียน]?', used), 'ก่อน หลัง  เรียน', 'ตัดอักขระที่ Excel ไม่รับ')
+  eq(xlsx.sheetName('ก่อน/หลัง [เรียน]?', used), 'ก่อน หลัง  เรียน (2)', 'ชื่อซ้ำเติมเลข')
+  assert(xlsx.sheetName('ก'.repeat(40), used).length <= 31, 'ยาวไม่เกิน 31 ตัว')
+  const bytes = xlsx.buildXlsx([
+    { name: 'ทดสอบ', rows: [['ชื่อ', 'คะแนน'], ['A & "B" <C>', 12.5], ['ว่าง', null], ['ศูนย์', 0]], widths: [20, 8] },
+    { name: 'ทดสอบ', rows: [['x']], headerRows: 0, landscape: true },
+  ])
+  const files = unzipStored(bytes)
+  eq(Object.keys(files).sort().join(), ['[Content_Types].xml', '_rels/.rels', 'xl/_rels/workbook.xml.rels', 'xl/styles.xml', 'xl/workbook.xml', 'xl/worksheets/sheet1.xml', 'xl/worksheets/sheet2.xml'].sort().join(), 'ไฟล์ในแพ็กเกจครบ')
+  const s1 = files['xl/worksheets/sheet1.xml']
+  assert(s1.includes('<t xml:space="preserve">A &amp; &quot;B&quot; &lt;C&gt;</t>'), 'อักขระพิเศษถูก escape')
+  assert(s1.includes('<c r="B2"><v>12.5</v></c>'), 'ตัวเลขเป็นตัวเลขจริง')
+  assert(s1.includes('<c r="B4"><v>0</v></c>'), 'ศูนย์ไม่หาย')
+  assert(!s1.includes('r="B3"'), 'ช่องว่างไม่เขียน')
+  assert(s1.includes('state="frozen"') && s1.includes('ySplit="1"'), 'ตรึงหัวตาราง')
+  assert(s1.includes('paperSize="9"') && s1.includes('orientation="portrait"'), 'ตั้งกระดาษ A4')
+  assert(s1.includes('<c r="A1" t="inlineStr" s="1">'), 'หัวตารางใช้รูปแบบตัวหนา')
+  assert(files['xl/worksheets/sheet2.xml'].includes('orientation="landscape"'), 'แนวนอน')
+  assert(!files['xl/worksheets/sheet2.xml'].includes('<pane'), 'ไม่มีหัวตารางไม่ตรึง')
+  assert(files['xl/workbook.xml'].includes('name="ทดสอบ (2)"'), 'ชื่อชีตซ้ำได้เลขต่อท้าย')
+  for (const [name, xml] of Object.entries(files)) assert(xml.startsWith('<?xml') && !/[\u0000-\u0008]/.test(xml), `${name} เป็น XML`)
+})
+
+test('ไฟล์ Excel ของห้อง: 8 ชีต ทุกชีตมีครบทุกคน และตัวเลขตรงกับหน้าวิเคราะห์ผล', () => {
+  const mk = (no, pre, post) => {
+    let p = { ...progress.newPlayer(`น${no}`, 'hero', no), id: `p${no}`, student: { no, code: `0${no}`, prefix: 'ด.ญ.', first: `น${no}`, last: 'ใจดี', room: 'ป.3/1' } }
+    if (pre !== null) p.preTest = { score: pre, total: 20, timeMs: 1, at: 1, skills: progress.emptyTestSkills() }
+    if (post !== null) p.postTest = { score: post, total: 20, timeMs: 1, at: 2, skills: progress.emptyTestSkills() }
+    p = activity.logActivity(p, { act: 'daily', group: 'word', label: 'ภารกิจประจำวัน', correct: 4, total: 5, wrong: 1, timeMs: 1000, points: 3 }, 5)
+    p = behavior.setBehaviorScore(p, 0, 4, 6)
+    return p
+  }
+  const kids = [mk(1, 8, 16), mk(2, 10, 12), mk(3, 6, null)]
+  const c = classroom.repairClassroom({ room: 'ป.3/1', passPercent: 70 })
+  const sheets = workbook.classWorkbook(kids, c, 0)
+  eq(sheets.map((s) => s.name).join(), 'สรุป,นักเรียน,ก่อน-หลังเรียน,รายทักษะ,กลุ่มภารกิจ,บันทึกภารกิจ,พฤติกรรม,สะท้อนผล', 'ชื่อชีต')
+  for (const s of sheets.slice(1)) {
+    const expect = s.name === 'บันทึกภารกิจ' ? 1 + 3 : 1 + kids.length
+    eq(s.rows.length, expect, `ชีต ${s.name} มีครบทุกคน`)
+    for (const r of s.rows.slice(1)) assert(r.length <= s.rows[0].length, `ชีต ${s.name} ไม่มีช่องเกินหัวตาราง`)
+  }
+  const a = stats.analyzeClass(kids, c)
+  const sum = Object.fromEntries(sheets[0].rows.map((r) => [r[0], r[1]]))
+  eq(sum['นักเรียนทั้งหมด (คน)'], 3, 'จำนวนนักเรียน')
+  eq(sum['ก่อนเรียน: ค่าเฉลี่ย (ร้อยละ)'], Math.round(a.pre.mean * 100) / 100, 'ค่าเฉลี่ยก่อนเรียนตรงกับหน้าวิเคราะห์ผล')
+  eq(sum['ผ่านเกณฑ์หลังเรียน (คน)'], a.passed, 'จำนวนผ่านเกณฑ์ตรงกัน')
+  const test = sheets[2]
+  eq(test.rows[1].join('|'), '1|ด.ญ.น1 ใจดี|8|20|40|16|20|80|40|ดีเยี่ยม|ผ่าน', 'แถวก่อน-หลังเรียน')
+  eq(test.rows[3][10], 'รอสอบ', 'ยังไม่สอบหลังเรียน')
+  eq(sheets[1].rows[1][1], '01', 'เลขประจำตัวเก็บเป็นข้อความ ไม่หายเลขศูนย์นำหน้า')
+  eq(sheets[6].rows[1][3], 4, 'คะแนนพฤติกรรม')
+  eq(workbook.workbookFileName(c, new Date(2026, 10, 14).getTime()), 'money-hero-ป.3-1-2026-11-14.xlsx', 'ชื่อไฟล์')
+  // ไฟล์จริงแตกได้ และมี 8 ชีต
+  const files = unzipStored(xlsx.buildXlsx(sheets))
+  eq(Object.keys(files).filter((n) => n.startsWith('xl/worksheets/')).length, 8, 'ไฟล์มี 8 ชีต')
 })
 
 console.log(`ผ่าน ${passed} ข้อ`)

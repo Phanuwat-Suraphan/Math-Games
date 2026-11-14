@@ -57,8 +57,24 @@ function csvCell(value: string | number | null): string {
   return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text
 }
 
+export type TableCell = string | number | null
+
+export interface Table {
+  header: string[]
+  rows: TableCell[][]
+}
+
+function toCsv(t: Table): string {
+  return '\uFEFF' + [t.header, ...t.rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
+}
+
 /** สร้างไฟล์ CSV (มี BOM ให้ Excel อ่านภาษาไทยได้) */
 export function buildCsv(players: Player[], passPercent = 70): string {
+  return toCsv(studentTable(players, passPercent))
+}
+
+/** ตารางนักเรียนรายคน (ใช้ทั้งไฟล์ CSV และชีต "นักเรียน" ในไฟล์ Excel) */
+export function studentTable(players: Player[], passPercent = 70): Table {
   const header = [
     'เลขที่',
     'เลขประจำตัว',
@@ -131,7 +147,7 @@ export function buildCsv(players: Player[], passPercent = 70): string {
     planStarsTotal(p),
     dateText(p.lastPlayed),
   ])
-  return '﻿' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
+  return { header, rows }
 }
 
 function average(xs: number[]): number | null {
@@ -272,6 +288,11 @@ export function fixed2(v: number | null): string {
 /* ------------------------------------------------------------------ */
 
 export function buildLogCsv(players: Player[]): string {
+  return toCsv(logTable(players))
+}
+
+/** ตารางบันทึกภารกิจทุกรายการ (ใช้ทั้งไฟล์ CSV และชีตในไฟล์ Excel) */
+export function logTable(players: Player[]): Table {
   const header = ['เลขที่', 'ชื่อ - สกุล', 'กลุ่ม', 'วันเวลา', 'กิจกรรม', 'กลุ่มภารกิจ', 'ถูก (ข้อ)', 'ทั้งหมด (ข้อ)', 'ร้อยละถูก', 'ตอบผิด (ครั้ง)', 'เวลา (วินาที)', 'เหรียญที่ได้', 'ดาว', 'ผ่าน']
   const rows: (string | number | null)[][] = []
   for (const p of players) {
@@ -294,7 +315,7 @@ export function buildLogCsv(players: Player[]): string {
       ])
     }
   }
-  return '\uFEFF' + [header, ...rows].map((r) => r.map(csvCell).join(',')).join('\r\n')
+  return { header, rows }
 }
 
 /** สรุปรายกลุ่มภารกิจของนักเรียนหนึ่งคน (สำหรับรายงานและ CSV) */

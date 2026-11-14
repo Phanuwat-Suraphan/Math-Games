@@ -9,6 +9,7 @@ import { analyzeClass, f2, pctOf, processPercent, pText, REMEDIAL_REASON, SCORE_
 import type { Player } from '../engine/progress'
 import { passedResult } from '../engine/report'
 import { DocHead, PaperPage, SignBlock } from './Paper'
+import { downloadXlsx } from './exportExcel'
 import { DumbbellSvg, PairBarsSvg, SingleBarsSvg } from './AnalysisCharts'
 
 /**
@@ -80,7 +81,10 @@ export function AnalysisPage() {
           คิดจาก{rosterMode ? 'นักเรียนในทะเบียน' : 'ผู้เล่นทุกคนในเครื่องนี้'} · เกณฑ์ผ่าน {c.passPercent}% · เป้าหมาย {c.targetPercent}% ของห้อง{' '}
           <Link to="/teacher/settings" className="mh-chip">
             ⚙️ เปลี่ยนเกณฑ์
-          </Link>
+          </Link>{' '}
+          <button type="button" className="mh-chip" onClick={() => downloadXlsx(save.players, c)} data-testid="mh-an-xlsx">
+            📗 ดาวน์โหลด Excel
+          </button>
         </span>
       }
     >

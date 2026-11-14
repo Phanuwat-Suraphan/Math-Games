@@ -11,6 +11,7 @@ import { compareStudents, teacherName } from '../engine/classroom'
 import { participation, PARTICIPATION_LABEL } from '../engine/roster'
 import { attemptsOf, grantRetake, retakeOpen } from '../engine/exam'
 import { KIND_NAME } from '../engine/testBank'
+import { downloadXlsx } from '../report/exportExcel'
 import { BEHAVIOR_FULL, behaviorLevel, behaviorTotal } from '../engine/behavior'
 import type { TestKind } from '../engine/progress'
 import { PLAN_EVENTS, plannedEvents } from '../engine/budget'
@@ -103,6 +104,9 @@ export function TeacherPage() {
           </Link>
           <button type="button" className="mh-btn mh-btn-soft" onClick={() => window.print()} disabled={players.length === 0}>
             <Printer size={20} /> พิมพ์
+          </button>
+          <button type="button" className="mh-btn mh-btn-go" onClick={() => downloadXlsx(save.players, c)} disabled={players.length === 0} data-testid="mh-xlsx">
+            <Download size={20} /> Excel แยกชีต (.xlsx)
           </button>
           <button type="button" className="mh-btn mh-btn-gold" onClick={() => downloadCsv(players, c.passPercent)} disabled={players.length === 0} data-testid="mh-csv">
             <Download size={20} /> ดาวน์โหลด CSV

@@ -1398,6 +1398,13 @@ for (const [name, viewport] of [
     for (const id of ['mh-an-participation', 'mh-an-desc', 'mh-an-ttest', 'mh-an-ei-table', 'mh-an-levels', 'mh-an-groups', 'mh-an-students', 'mh-an-mean-chart', 'mh-an-group-chart']) await page.getByTestId(id).waitFor()
     if ((await page.getByTestId('mh-an-students').locator('tbody tr').count()) !== pool.length) throw new Error('ตารางรายบุคคลต้องมีครบทุกคน')
     await page.getByTestId('mh-an-tsummary').waitFor()
+    // ไฟล์ Excel แยกชีต: เป็น zip ของ .xlsx มี 8 ชีต ชื่อไฟล์ลงท้าย .xlsx
+    const [xl] = await Promise.all([page.waitForEvent('download'), page.getByTestId('mh-an-xlsx').click()])
+    if (!xl.suggestedFilename().endsWith('.xlsx')) throw new Error(`ชื่อไฟล์ Excel ผิด: ${xl.suggestedFilename()}`)
+    const xb = fs.readFileSync(await xl.path())
+    const xs = xb.toString('latin1')
+    if (xb[0] !== 0x50 || xb[1] !== 0x4b || !xs.includes('xl/workbook.xml') || (xs.match(/xl\/worksheets\/sheet\d+\.xml/g) ?? []).length < 16) throw new Error('ไฟล์ Excel ไม่ครบ 8 ชีต')
+    if (!xb.toString('utf8').includes('ก่อน-หลังเรียน')) throw new Error('ไม่มีชีตก่อน-หลังเรียน')
     if ((await page.getByTestId('mh-an-remedial').count()) + (await page.getByTestId('mh-an-remedial-none').count()) !== 1) throw new Error('ต้องแสดงรายชื่อซ่อมเสริม หรือบอกว่าไม่มี')
     await snap(page, `${name}-analysis`)
     await noSideScroll(page, 'วิเคราะห์ผลการเรียนรู้')
